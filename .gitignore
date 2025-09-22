@@ -1,0 +1,72 @@
+### OS ###
+.DS_Store
+Thumbs.db
+ehthumbs.db
+*.swp
+
+### IDE / tooling ###
+.vs/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+### Git logs ###
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+### Node / Angular ###
+**/node_modules/
+**/dist/
+**/.angular/
+**/coverage/
+**/.cache/
+# lock-файлы коммитим (важно для воспроизводимых сборок)
+# !package-lock.json
+# !yarn.lock
+# !pnpm-lock.yaml
+
+### .env / секреты фронта ###
+**/.env
+**/.env.*.local
+**/.env.local
+
+### .NET / ASP.NET Core ###
+**/bin/
+**/obj/
+**/out/
+**/TestResults/
+**/AppPackages/
+**/app.publish/
+*.user
+*.suo
+*.userosscache
+*.sln.ide
+*.nupkg
+*.snupkg
+packages/            # если где-то ещё используются packages.config
+
+# Паблиш-артефакты
+PublishProfiles/
+
+### Конфиги / секреты бэкенда (по желанию) ###
+# Оставь appsettings.json в репо, а локальные/секретные — в игноре:
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.local.json
+
+### SPA + статические файлы (на выбор) ###
+# Если Angular билд складывается в wwwroot — игнорируй его артефакты:
+# wwwroot/
+# Или игнорируй конкретные подпапки, если они генерируются сборкой:
+# wwwroot/assets/
+# wwwroot/*.map
+
+# secrets
+
+FoodBot/appsettings*.json

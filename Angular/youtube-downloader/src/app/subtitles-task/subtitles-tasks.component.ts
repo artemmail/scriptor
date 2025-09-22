@@ -1,0 +1,172 @@
+import { Component, OnInit, ViewChild } from '@angular/core';
+import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
+import { HttpClientModule } from '@angular/common/http';
+import { RouterModule } from '@angular/router';
+import { Title } from '@angular/platform-browser';
+
+import { MatTableDataSource, MatTableModule } from '@angular/material/table';
+import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatCardModule } from '@angular/material/card';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+
+import { MarkdownModule } from 'ngx-markdown';
+import { InfiniteScrollModule } from 'ngx-infinite-scroll';
+
+import { CommonModule } from '@angular/common';
+import { LocalTimePipe } from '../pipe/local-time.pipe';
+import { SubtitleService, YoutubeCaptionTaskDto2, RecognizeStatus } from '../services/subtitle.service';
+import { VideoDialogComponent, VideoDialogData } from '../video-dialog/video-dialog.component';
+import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
+
+@Component({
+  selector: 'app-subtitles-tasks',
+  standalone: true,
+  templateUrl: './subtitles-tasks.component.html',
+  styleUrls: ['./subtitles-tasks.component.css'],
+  imports: [
+    CommonModule,
+    HttpClientModule,
+    RouterModule,
+    /* Material & CDK */
+    MatTableModule,
+    MatSortModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    MatIconModule,
+    MatCardModule,
+    MatProgressBarModule,
+    MatProgressSpinnerModule,
+    MatDialogModule,
+    /* 3‑rd party */
+    MarkdownModule,
+    InfiniteScrollModule,
+    /* Stand‑alone components & pipes */
+    LocalTimePipe,
+    VideoDialogComponent,
+    YandexAdComponent,
+  ],
+})
+export class SubtitlesTasksComponent implements OnInit {
+  displayedColumns: string[] = ['status', 'createdAt', 'youtube', 'title', 'channelName', 'result'];
+  dataSource = new MatTableDataSource<YoutubeCaptionTaskDto2>();
+  RecognizeStatus = RecognizeStatus;
+
+  totalItems = 0;
+  pageSize = 15;
+  pageIndex = 0;
+  sortField = '';
+  sortOrder = '';
+  filterValue = '';
+
+  isMobile = false;
+  loading = false;
+  expandedTasks = new Set<string>();
+
+  @ViewChild(MatSort) sort!: MatSort;
+
+  constructor(
+    private subtitleService: SubtitleService,
+    private titleService: Title,
+    private dialog: MatDialog,
+    private breakpointObserver: BreakpointObserver
+  ) {
+    this.titleService.setTitle('Transcription Queue');
+
+    this.breakpointObserver
+      .observe([Breakpoints.Handset])
+      .subscribe(r => (this.isMobile = r.matches));
+  }
+
+  ngOnInit(): void {
+    this.loadTasks();
+  }
+
+  private loadTasks(append = false): void {
+    this.loading = true;
+    const page = this.pageIndex + 1;
+    this.subtitleService
+      .getTasks(page, this.pageSize, this.sortField, this.sortOrder, this.filterValue)
+      .subscribe({
+        next: res => {
+          this.dataSource.data = append
+            ? this.dataSource.data.concat(res.items)
+            : res.items;
+          this.totalItems = res.totalCount;
+          this.loading = false;
+        },
+        error: err => {
+          console.error('Error loading tasks', err);
+          this.loading = false;
+        },
+      });
+  }
+
+  applyFilter(evt: Event): void {
+    this.filterValue = (evt.target as HTMLInputElement).value.trim().toLowerCase();
+    this.pageIndex = 0;
+    this.loadTasks();
+  }
+
+  onSortChange(sort: Sort): void {
+    this.sortField = sort.active;
+    this.sortOrder = sort.direction;
+    this.pageIndex = 0;
+    this.loadTasks();
+  }
+
+  onScrollDown(): void {
+    if (this.loading) return;
+    if (this.dataSource.data.length >= this.totalItems) return;
+
+    this.pageIndex++;
+    this.loadTasks(true);
+  }
+
+  taskProgress(t: YoutubeCaptionTaskDto2): number {
+    if (!t.segmentsTotal) return 0;
+    return (t.segmentsProcessed / t.segmentsTotal) * 100;
+  }
+
+  isExpanded(id: string): boolean {
+    return this.expandedTasks.has(id);
+  }
+  toggleExpand(id: string): void {
+    this.isExpanded(id) ? this.expandedTasks.delete(id) : this.expandedTasks.add(id);
+  }
+
+  getStatusIcon(s: RecognizeStatus | null): string {
+    switch (s) {
+      case RecognizeStatus.Done:  return 'check_circle';
+      case RecognizeStatus.Error: return 'cancel';
+      default:                    return 'loop';
+    }
+  }
+  getStatusClass(s: RecognizeStatus | null): string {
+    switch (s) {
+      case RecognizeStatus.Done:  return 'icon-status-done';
+      case RecognizeStatus.Error: return 'icon-status-error';
+      default:                    return 'icon-status-pending';
+    }
+  }
+  getStatusText(s: RecognizeStatus | null | undefined): string {
+    return this.subtitleService.getStatusText(s);
+  }
+
+  openVideoDialog(t: YoutubeCaptionTaskDto2): void {
+    const data: VideoDialogData = {
+      videoId: t.id,
+      title: t.title,
+      channelName: t.channelName,
+      channelId: t.channelId,
+      uploadDate: t.uploadDate,
+    };
+    this.dialog.open(VideoDialogComponent, { width: '800px', data });
+  }
+}

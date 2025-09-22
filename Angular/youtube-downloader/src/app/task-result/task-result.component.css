@@ -1,0 +1,138 @@
+/* Базовые контейнеры */
+.container {
+  width: 100%;
+  max-width: 1250px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.blogblock {
+  background: #fff;
+  padding: 10px;
+  border: 1px solid #ceced2;
+  margin-top: 12px;
+}
+
+.youtube-result-card {
+  margin-top: 1rem;
+}
+
+/* Заголовок */
+.header-flex {
+  display: flex;
+  align-items: center;
+}
+
+.yt-logo-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.youtube-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.yt-logo-button:hover .youtube-logo {
+  filter: brightness(1.2);
+}
+
+.title-wrapper {
+  margin-left: 1rem;
+  text-align: left;
+}
+
+.video-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+/* Секция загрузки */
+.download-section {
+  display: flex;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.download-text {
+  font-size: 1rem;
+  font-weight: bold;
+  margin-right: 10px;
+}
+
+.download-icons {
+  display: flex;
+  gap: 7px;
+}
+
+/* Цвета иконок в активном состоянии */
+.icon-pdf    { color: red;    }
+.icon-word   { color: #2b579a; /* Word-синий */ }
+.icon-md     { color: green;  }
+.icon-html   { color: blue;   }
+
+/* Disabled-стиль для всех кнопок */
+button[disabled] .mat-icon,
+button[disabled] .fa-icon {
+  filter: grayscale(100%);
+  opacity: 0.6;
+  transition: filter 0.2s, opacity 0.2s;
+}
+
+/* Markdown-контент */
+.markdown-content {
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* Desktop / Mobile */
+.desktop-only { display: block; }
+.mobile-only  { display: none;  }
+
+@media (max-width: 600px) {
+  .desktop-only { display: none; }
+  .mobile-only  { display: block; }
+
+  .container {
+    padding: 0;
+    max-width: 100%;
+  }
+  .blogblock {
+    padding: 0 !important;
+    border: none !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+  .header-flex {
+    justify-content: flex-start;
+  }
+  .yt-logo-button {
+    width: 50px !important;
+  }
+  .title-wrapper {
+    margin-left: 1rem !important;
+  }
+  .video-title {
+    font-size: 1rem !important;
+  }
+  .download-icons {
+    gap: 5px;
+  }
+  .markdown-content {
+    font-size: 14px;
+    padding: 0;
+  }
+  html, body {
+    background: #fff !important;
+  }
+}

@@ -1,0 +1,61 @@
+<!-- markdown-converter.component.html -->
+<div class="page-container">
+
+  <mat-card class="editor-card">
+    <md-editor
+      name="contentEditor"
+      [(ngModel)]="markdownContent"
+      preview="vertical"
+      height="'100%'"
+      [options]="editorOptions"
+      [preRender]="renderWithMath">
+    </md-editor>
+  </mat-card>
+
+  <div class="actions">
+    <button mat-raised-button color="primary"
+            (click)="onDownloadMd()"
+            [disabled]="!markdownContent.trim()">
+      <mat-icon>download</mat-icon>
+      Download .md
+    </button>
+    <button mat-raised-button color="accent"
+            (click)="onDownloadHtml()"
+            [disabled]="!markdownContent.trim()">
+      <mat-icon>download</mat-icon>
+      Download .html
+    </button>
+
+        <button mat-raised-button color="accent"
+            (click)="onCopyHtml()"
+            [disabled]="!markdownContent.trim()">
+      <mat-icon>content_copy</mat-icon>
+      Copy .html
+    </button>
+
+
+
+    <button mat-raised-button color="warn"
+            (click)="onDownloadPdf()"
+            [disabled]="!markdownContent.trim() || isDownloading">
+      <mat-icon>download</mat-icon>
+      Download .pdf
+    </button>
+    <button mat-raised-button color="basic"
+            (click)="onDownloadWord()"
+            [disabled]="!markdownContent.trim() || isDownloading">
+      <mat-icon>download</mat-icon>
+      Download .docx
+    </button>
+
+    <button mat-raised-button color="primary"
+        (click)="onCopyBbcode()"
+        [disabled]="!markdownContent.trim() || isDownloading">
+  <mat-icon>content_copy</mat-icon>
+  Copy .bbcode (phpBB)
+</button>
+
+
+  </div>
+
+</div>

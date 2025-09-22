@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta name="yandex-verification" content="ce463f751b58169c" />
+  <meta charset="utf-8">
+  <title>YouScriptor Accurate transcription from YouTube videos to text</title>
+  <base href="/" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  
+  <!-- ACE editor -->
+  <script src="assets/ace-builds/ace.js"></script>
+
+  <!-- KaTeX CSS (будет скопировано из node_modules/katex/dist) -->
+  <link rel="stylesheet" href="assets/katex/katex.min.css" />
+
+    <link
+    href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap"
+    rel="stylesheet"
+  />
+  <link
+    href="https://fonts.googleapis.com/icon?family=Material+Icons"
+    rel="stylesheet"
+  />
+  
+
+
+  <!-- KaTeX core и auto-render (будут скопированы из node_modules/katex/dist) -->
+  <script src="assets/katex/katex.min.js"></script>
+  <script src="assets/katex/contrib/auto-render.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      if (typeof renderMathInElement === "function") {
+        renderMathInElement(document.body, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "$",  right: "$",  display: false }
+          ],
+          throwOnError: false
+        });
+      } else {
+        console.warn("KaTeX auto-render не загружен");
+      }
+    });
+  </script>
+
+  <!-- Яндекс.Контекст -->
+  <script>window.yaContextCb = window.yaContextCb || [];</script>
+  <script src="https://yandex.ru/ads/system/context.js" async></script>
+</head>
+<body>
+  <!-- Yandex.Metrika counter -->
+  <script type="text/javascript">
+    (function (m, e, t, r, i, k, a) {
+      m[i] = m[i] || function () {
+        (m[i].a = m[i].a || []).push(arguments);
+      };
+      m[i].l = 1 * new Date();
+      for (var j = 0; j < document.scripts.length; j++) {
+        if (document.scripts[j].src === r) return;
+      }
+      k = e.createElement(t);
+      a = e.getElementsByTagName(t)[0];
+      k.async = 1;
+      k.src = r;
+      a.parentNode.insertBefore(k, a);
+    })(
+      window,
+      document,
+      "script",
+      "https://mc.yandex.ru/metrika/tag.js",
+      "ym"
+    );
+
+    ym(99571329, "init", {
+      clickmap: true,
+      trackLinks: true,
+      accurateTrackBounce: true,
+    });
+  </script>
+  <noscript>
+    <div>
+      <img
+        src="https://mc.yandex.ru/watch/99571329"
+        style="position:absolute; left:-9999px;"
+        alt=""
+      />
+    </div>
+  </noscript>
+  <!-- /Yandex.Metrика counter -->
+
+  <app-root></app-root>
+</body>
+</html>

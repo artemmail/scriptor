@@ -1,0 +1,193 @@
+<!-- src/app/subtitles-tasks.component.html -->
+<mat-card class="table-card">
+  <mat-card-header>
+    <mat-card-title>Лента транскприпций</mat-card-title>
+  </mat-card-header>
+
+  <!-- Контентная область с бесконечной прокруткой и адаптивная разметка -->
+  <mat-card-content class="card-content"
+    infiniteScroll
+    [scrollWindow]="true"
+    [infiniteScrollDistance]="1"
+    [infiniteScrollThrottle]="200"
+    (scrolled)="onScrollDown()"
+  >
+    <!-- Фильтр -->
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Фильтр по названию или каналу</mat-label>
+      <input matInput placeholder="Фильтр..." (keyup)="applyFilter($event)">
+    </mat-form-field>
+
+    <app-yandex-ad></app-yandex-ad>
+
+    <!-- DESKTOP -->
+    <ng-container *ngIf="!isMobile; else mobileTemplate">
+      <!-- Таблица задач -->
+      <table
+        mat-table
+        [dataSource]="dataSource"
+        matSort
+        (matSortChange)="onSortChange($event)"
+        class="custom-table"
+      >
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="status">Статус</th>
+          <td mat-cell *matCellDef="let task">
+            <mat-icon [ngClass]="getStatusClass(task.status)">
+              {{ getStatusIcon(task.status) }}
+            </mat-icon>
+          </td>
+        </ng-container>
+
+        <!-- Created At Column -->
+        <ng-container matColumnDef="createdAt">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="createdAt">Создано</th>
+          <td mat-cell *matCellDef="let task">
+            {{ task.createdAt | localTime:'yyyy-MM-dd HH:mm:ss' }}
+          </td>
+        </ng-container>
+
+        <!-- YouTube Column -->
+        <ng-container matColumnDef="youtube">
+          <th mat-header-cell *matHeaderCellDef>Видео</th>
+          <td mat-cell *matCellDef="let task">
+            <button class="youtube-logo-button" matRipple (click)="openVideoDialog(task)">
+              <img src="assets/yt.webp" alt="YouTube" class="youtube-logo">
+            </button>
+          </td>
+        </ng-container>
+
+        <!-- Title Column -->
+        <ng-container matColumnDef="title">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="title">Название видео</th>
+          <td mat-cell *matCellDef="let task">
+            <a [routerLink]="['/recognized', task.slug]">{{ task.title }}</a>
+          </td>
+        </ng-container>
+
+        <!-- Channel Column -->
+        <ng-container matColumnDef="channelName">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="channelName">Канал</th>
+          <td mat-cell *matCellDef="let task">{{ task.channelName }}</td>
+        </ng-container>
+
+        <!-- Result Column -->
+        <ng-container matColumnDef="result">
+          <th mat-header-cell *matHeaderCellDef>Результат</th>
+          <td mat-cell *matCellDef="let task">
+            <ng-container *ngIf="!task.done; else doneTemplate">
+              <ng-container *ngIf="task.status === RecognizeStatus.Error; else processingTemplate">
+                <p class="error-text">Ошибка: {{ task.error }}</p>
+              </ng-container>
+              <ng-template #processingTemplate>
+                <p>Статус: {{ getStatusText(task.status) }}</p>
+                <mat-progress-bar *ngIf="task.status === RecognizeStatus.ApplyingPunctuationSegment"
+                                  mode="determinate"
+                                  [value]="taskProgress(task)">
+                </mat-progress-bar>
+                <p *ngIf="task.status === RecognizeStatus.ApplyingPunctuationSegment">
+                  {{ task.segmentsProcessed }} / {{ task.segmentsTotal }}
+                </p>
+              </ng-template>
+            </ng-container>
+
+            <ng-template #doneTemplate>
+              <div class="markdown-container" [ngClass]="{ collapsed: !isExpanded(task.id) }">
+                <markdown [data]="task.resultShort"></markdown>
+              </div>
+              <div class="actions">
+                <button mat-button color="primary" (click)="toggleExpand(task.id)">
+                  {{ isExpanded(task.id) ? 'Свернуть' : 'Развернуть' }}
+                </button>
+                <a [routerLink]="['/recognized', task.slug]" class="recognized-link">
+                  Полная версия
+                </a>
+              </div>
+            </ng-template>
+          </td>
+        </ng-container>
+
+        <!-- Header and Row Definitions -->
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      </table>
+    </ng-container>
+
+    <!-- MOBILE -->
+    <ng-template #mobileTemplate>
+      <div #mobileScroll
+           class="mobile-container"
+           infiniteScroll
+           [infiniteScrollContainer]="mobileScroll"
+           [infiniteScrollDistance]="1"
+           [infiniteScrollThrottle]="200"
+           (scrolled)="onScrollDown()">
+
+        <app-yandex-ad></app-yandex-ad>
+
+        <table mat-table [dataSource]="dataSource" class="custom-table mobile-table">
+          <ng-container matColumnDef="mobile">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let task">
+              <div class="mobile-cell">
+                <div class="mobile-header">
+                  <mat-icon class="status-icon" [ngClass]="getStatusClass(task.status)">
+                    {{ getStatusIcon(task.status) }}
+                  </mat-icon>
+
+                  <span class="mobile-title">
+                    <b>{{ task.title }}</b><br>
+                    Канал: {{ task.channelName }}<br>
+                    {{ task.createdAt | localTime:'yyyy-MM-dd HH:mm' }}
+                  </span>
+
+                  <button class="youtube-logo-button" matRipple (click)="openVideoDialog(task)">
+                    <img src="assets/yt.webp" alt="YouTube" class="youtube-logo">
+                  </button>
+                </div>
+
+                <div class="mobile-details">
+                  <ng-container *ngIf="!task.done; else mobileDone">
+                    <ng-container *ngIf="task.status === RecognizeStatus.Error; else mobileProcess">
+                      <p class="error-text">Ошибка: {{ task.error }}</p>
+                    </ng-container>
+                    <ng-template #mobileProcess>
+                      <p>Статус: {{ getStatusText(task.status) }}</p>
+                      <mat-progress-bar *ngIf="task.status === RecognizeStatus.ApplyingPunctuationSegment" mode="determinate" [value]="taskProgress(task)"></mat-progress-bar>
+                      <p *ngIf="task.status === RecognizeStatus.ApplyingPunctuationSegment">
+                        {{ task.segmentsProcessed }} / {{ task.segmentsTotal }}
+                      </p>
+                    </ng-template>
+                  </ng-container>
+
+                  <ng-template #mobileDone>
+                    <div class="markdown-container" [ngClass]="{ collapsed: !isExpanded(task.id) }">
+                      <markdown [data]="task.resultShort"></markdown>
+                    </div>
+                    <div class="actions">
+                      <button mat-button color="primary" (click)="toggleExpand(task.id)">
+                        {{ isExpanded(task.id) ? 'Свернуть' : 'Развернуть' }}
+                      </button>
+                      <a [routerLink]="['/recognized', task.slug]" class="recognized-link">
+                        Полная версия
+                      </a>
+                    </div>
+                  </ng-template>
+                </div>
+              </div>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="['mobile']"></tr>
+          <tr mat-row *matRowDef="let row; columns: ['mobile']"></tr>
+        </table>
+
+        <mat-spinner *ngIf="loading"></mat-spinner>
+      </div>
+    </ng-template>
+
+    <!-- Общий лоадер на случай, если нужно -->
+    <mat-spinner *ngIf="loading"></mat-spinner>
+  </mat-card-content>
+</mat-card>

@@ -1,0 +1,31 @@
+<h2 mat-dialog-title>{{ data.title }}</h2>
+
+<mat-dialog-content>
+  <!-- Встроенное YouTube-видео -->
+  <div class="video-wrapper">
+    <iframe
+      [src]="safeVideoUrl"
+      frameborder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen
+    >
+    </iframe>
+  </div>
+
+  <p>Channel link: <a [href]="'https://www.youtube.com/channel/' + data.channelId" target="_blank">{{ data.channelName }}</a></p>
+
+  <p>UploadDate: {{ data.uploadDate |  localTime: 'yyyy-MM-dd HH:mm:ss' }} </p>
+
+
+  
+
+  <p>YouTube link: 
+    <a [href]="'https://www.youtube.com/watch?v=' + data.videoId" target="_blank">
+      https://www.youtube.com/watch?v={{ data.videoId }}
+    </a>
+  </p>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button color="primary" (click)="onClose()">Close</button>
+</mat-dialog-actions>

@@ -1,0 +1,42 @@
+<div class="search-container">
+  <!-- Логотип сервиса -->
+  <img class="logo" src="assets/logo.webp" alt="Логотип" />
+
+  <!-- Новое позиционирование -->
+  <div class="service-description">
+     YouScriptor - Ваш личный учёный писарь
+     <app-yandex-ad></app-yandex-ad>
+  </div>
+
+  <!-- Поисковая форма -->
+  <mat-card class="search-card">
+    <div class="search-form">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Введите идентификатор или ссылку YouTube</mat-label>
+        <input
+          matInput
+          [(ngModel)]="inputValue"
+          placeholder="youtubeId или URL"
+          (keyup.enter)="onStart()"
+        />
+        <!-- Кнопка-индикатор внутри поля ввода -->
+        <button mat-icon-button matSuffix color="primary" (click)="onStart()">
+          <mat-icon>search</mat-icon>
+        </button>
+      </mat-form-field>
+    </div>
+  </mat-card>
+
+  <!-- Инструкции для пользователя -->
+  <div class="instructions">
+    <span style="font-size: 0.9em; color: #666;">Создавайте профессиональные конспекты и отчёты из видео автоматически</span>
+    <ol>
+      <li>Укажите ссылку на YouTube-видео с субтитрами.</li>
+      <li>Готовый результат ищите в <b><a href="/tasks">Скрипториуме</a></b>, либо повторите тот же запрос - результат сохраняется.</li>
+      <li>Получите транскрипцию в виде аккуратно отформатированного документа. Готовое решение для учёбы, работы и технической документации.</li>
+      <li>Сохраняется структура: заголовки, списки, цитаты, формулы (LaTeX), программный код с подсветкой.</li>
+      <li>Экспортируйте в PDF, Word, HTML или Markdown; при необходимости сохраните субтитры в формате <strong>.srt</strong>.</li>      
+      <li>Можно также  <b><a href="/down">скачать YouTube-видео</a></b> с нужными дорожками (качество/контейнер/кодек/аудио и субтитры).</li>
+    </ol>
+  </div>
+</div>

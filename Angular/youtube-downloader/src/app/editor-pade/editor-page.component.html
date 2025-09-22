@@ -1,0 +1,53 @@
+<!-- editor-page.component.html -->
+<div class="page-container">
+
+  <ng-container *ngIf="!loading && !errorMessage; else loadingOrError">
+
+    <mat-card class="editor-card">
+      <md-editor
+        name="contentEditor"
+        [(ngModel)]="markdownContent"
+        preview="vertical"
+        height="'100%'"
+        [options]="editorOptions"
+        [preRender]="renderWithMath">
+      </md-editor>
+    </mat-card>
+
+    <div class="actions">
+      <button mat-raised-button color="primary"
+              (click)="onDownloadMd()"
+              [disabled]="!markdownContent.trim()">
+        <mat-icon>download</mat-icon>
+        Скачать .md
+      </button>
+      <button mat-raised-button color="accent"
+              (click)="onSave()"
+              [disabled]="!markdownContent.trim()">
+        <mat-icon>save</mat-icon>
+        Сохранить
+      </button>
+      <button mat-raised-button color="warn"
+              (click)="onDelete()">
+        <mat-icon>delete</mat-icon>
+        Удалить задачу
+      </button>
+    </div>
+
+  </ng-container>
+
+  <ng-template #loadingOrError>
+    <ng-container *ngIf="errorMessage; else loading">
+      <p class="error">{{ errorMessage }}</p>
+    </ng-container>
+    <ng-template #loading>
+      <app-task-progress
+        [taskId]="taskId"
+        (taskLoaded)="onTaskLoaded($event)"
+        (taskDone)="onTaskDone($event)"
+        (taskError)="onTaskError($event)">
+      </app-task-progress>
+    </ng-template>
+  </ng-template>
+
+</div>

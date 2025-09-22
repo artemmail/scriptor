@@ -1,0 +1,27 @@
+<mat-sidenav-container class="app-shell">
+  <mat-sidenav
+    #drawer
+    mode="over"
+    class="app-drawer"
+    fixedInViewport
+  >
+    <app-side-menu (close)="drawer.close()"></app-side-menu>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="app-content">
+    <mat-toolbar
+      class="app-header"
+      [class.hidden]="hideToolbar"
+      color="primary"
+    >
+      <button mat-icon-button (click)="drawer.toggle()">
+        <mat-icon>menu</mat-icon>
+      </button>
+      <span class="app-title">
+        <span id="hAI">You</span><span id="hDot"></span><span id="hPodcaster">Scriptor</span>
+      </span>
+    </mat-toolbar>
+
+    <router-outlet></router-outlet>
+  </mat-sidenav-content>
+</mat-sidenav-container>

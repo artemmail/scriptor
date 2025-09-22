@@ -1,0 +1,49 @@
+<ng-container *ngIf="youtubeTask !== null; else loading">
+  <mat-card class="progress-card">
+    <mat-card-header>
+      <!-- Вращающаяся иконка для статуса (всегда default) -->
+      <mat-icon class="icon-status-pending">loop</mat-icon>
+      <mat-card-title>Задача в процессе...</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+
+      <app-yandex-ad></app-yandex-ad>
+
+      <!-- Информация о начале и последнем обновлении (если нет ошибки и задача не завершена) -->
+      <div *ngIf="!youtubeTask?.done && youtubeTask?.status !== RecognizeStatus.Error">
+        <p>Время начала: {{ youtubeTask?.createdAt | localTime: 'yyyy-MM-dd HH:mm:ss' }}</p>
+        <p>Время последнего обновления: {{ youtubeTask?.modifiedAt | localTime: 'yyyy-MM-dd HH:mm:ss' }}</p>
+      </div>
+
+      <!-- Если статус = Error, показываем ошибку -->
+      <p *ngIf="youtubeTask?.status === RecognizeStatus.Error" style="color: red;">
+        Произошла ошибка: {{ youtubeTask?.error }}
+      </p>
+
+      <!-- Если нет ошибки и задача не завершена, показываем статус и прогресс -->
+      <ng-container *ngIf="youtubeTask && youtubeTask.status !== RecognizeStatus.Error && !youtubeTask.done">
+        <p>Статус: {{ getStatusText(youtubeTask?.status) }}</p>
+
+        <!-- Полоса прогресса, если доступно -->
+        <mat-progress-bar
+          *ngIf="youtubeTask?.status === RecognizeStatus.ApplyingPunctuationSegment &&
+                 youtubeTask?.segmentsTotal !== undefined &&
+                 youtubeTask?.segmentsProcessed !== undefined"
+          mode="determinate"
+          [value]="(youtubeTask.segmentsProcessed / youtubeTask.segmentsTotal) * 100"
+        ></mat-progress-bar>
+
+        <p *ngIf="youtubeTask?.status === RecognizeStatus.ApplyingPunctuationSegment">
+          Обработано: {{ youtubeTask?.segmentsProcessed }} из {{ youtubeTask?.segmentsTotal }}
+        </p>
+      </ng-container>
+    </mat-card-content>
+  </mat-card>
+</ng-container>
+
+<ng-template #loading>
+  <div class="spinner-container">
+    <mat-spinner></mat-spinner>
+  </div>
+</ng-template>

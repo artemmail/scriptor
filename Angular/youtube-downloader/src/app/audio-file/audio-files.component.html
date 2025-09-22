@@ -1,0 +1,64 @@
+<mat-card>
+  <h2>Мои аудиофайлы</h2>
+
+  <div class="file-upload">
+    <label for="fileInput">Выберите файл</label>
+    <input id="fileInput" type="file" (change)="onFileSelected($event)" accept="audio/*" />
+    <button mat-raised-button color="primary"
+            (click)="upload()"
+            [disabled]="!selectedFile || uploading">
+      <mat-icon>{{ uploading ? 'hourglass_top' : 'upload' }}</mat-icon>
+      Загрузить
+    </button>
+    <mat-progress-spinner *ngIf="uploading"
+                          diameter="24"
+                          mode="indeterminate">
+    </mat-progress-spinner>
+    <p *ngIf="errorMessage" class="error">{{ errorMessage }}</p>
+  </div>
+</mat-card>
+
+<div class="table-container">
+  <table mat-table [dataSource]="dataSource" class="mat-elevation-z8">
+
+    <!-- Имя файла -->
+    <ng-container matColumnDef="originalFileName">
+      <th mat-header-cell *matHeaderCellDef>Имя файла</th>
+      <td mat-cell *matCellDef="let file">{{ file.originalFileName }}</td>
+    </ng-container>
+
+    <!-- Дата загрузки -->
+    <ng-container matColumnDef="uploadedAt">
+      <th mat-header-cell *matHeaderCellDef>Загружен</th>
+      <td mat-cell *matCellDef="let file">{{ file.uploadedAt | date:'short' }}</td>
+    </ng-container>
+
+    <!-- Действия -->
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef>Действия</th>
+      <td mat-cell *matCellDef="let file">
+        <button mat-icon-button color="warn" (click)="delete(file.id)">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </td>
+    </ng-container>
+
+    <!-- Распознавание -->
+    <ng-container matColumnDef="recognize">
+      <th mat-header-cell *matHeaderCellDef>Распознать</th>
+      <td mat-cell *matCellDef="let file">
+        <button mat-button color="accent"
+                (click)="onRecognize(file.id)"
+                [disabled]="recognizing[file.id]">
+          <mat-icon>record_voice_over</mat-icon>
+          {{ recognizing[file.id] ? 'В очереди...' : 'Распознать' }}
+        </button>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+  </table>
+
+  <mat-paginator [pageSizeOptions]="[5, 10, 20]" showFirstLastButtons></mat-paginator>
+</div>

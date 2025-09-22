@@ -1,0 +1,36 @@
+<!-- side-menu.component.html -->
+<mat-nav-list>
+  <ng-container *ngIf="user$ | async as user; else guestMenu">
+    <a mat-list-item (click)="navigate('/recognition')">
+      <mat-icon>home</mat-icon><span>Распознавание</span>
+    </a>
+    <a mat-list-item (click)="navigate('/tasks')">
+      <mat-icon>subtitles</mat-icon><span>Скрипториум</span>
+    </a>
+    <a mat-list-item (click)="navigate('/down')">
+      <mat-icon>download-icons</mat-icon><span>Скачать ролик</span>
+    </a>
+    <a mat-list-item (click)="navigate('/markdown-converter')">
+      <mat-icon>sync_alt</mat-icon><span>Конвертер Markdown </span>
+    </a>
+    <mat-divider></mat-divider>
+    <a mat-list-item (click)="onLogout()">
+      <mat-icon>logout</mat-icon><span>Выйти ({{user.email}})</span>
+    </a>
+  </ng-container>
+  <ng-template #guestMenu>
+    <a mat-list-item (click)="navigate('/recognition')">
+      <mat-icon>home</mat-icon><span>Распознавание</span>
+    </a>
+    <a mat-list-item (click)="navigate('/tasks')">
+      <mat-icon>subtitles</mat-icon><span>Скрипториум</span>
+    </a>
+    <a mat-list-item (click)="navigate('/markdown-converter')">
+      <mat-icon>sync_alt</mat-icon><span>Конвертер Markdown</span>
+    </a>
+    <mat-divider></mat-divider>
+    <a mat-list-item (click)="navigate('/login')">
+      <mat-icon>login</mat-icon><span>Войти</span>
+    </a>
+  </ng-template>
+</mat-nav-list>

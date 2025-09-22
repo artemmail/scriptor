@@ -1,0 +1,43 @@
+/* Общие настройки */
+.full-width {
+  width: 100%;
+}
+
+.margin-vertical {
+  margin: 16px 0;
+}
+
+.error {
+  color: #f44336;
+}
+
+/* Таблица */
+.table-container {
+  margin-top: 12px;
+}
+
+/* Приглушаем задизэйбленные строки */
+.disabled-row {
+  opacity: 0.4;
+}
+
+/* Отступы в ячейках таблицы */
+.mat-header-cell,
+.mat-cell {
+  padding: 8px 16px;
+}
+
+/* Карточки */
+mat-card {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Вкладки */
+mat-tab-group {
+  width: 100%;
+}
+
+mat-tab-group ::ng-deep .mat-tab-label {
+  font-weight: 600;
+}

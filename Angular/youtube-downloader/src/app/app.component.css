@@ -1,0 +1,33 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: auto;
+}
+
+.mat-sidenav-container.app-shell {
+  position: relative;
+}
+
+.app-drawer {
+  width: 260px;
+  z-index: 1000;
+}
+
+.app-content {
+  display: flex;
+  flex-direction: column;
+  background: #f5f4ef;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  transition: transform .3s ease;
+}
+
+.app-header.hidden {
+  transform: translateY(-100%);
+}
+
+/* убраны все локальные overflow-y из старых .scroll-host и внутренних контейнеров */

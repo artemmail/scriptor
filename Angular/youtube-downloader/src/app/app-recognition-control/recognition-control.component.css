@@ -1,0 +1,137 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 64px); /* вычитаем высоту toolbar, если нужно */
+
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+/* ===== Внутренние элементы =========================================== */
+
+.logo {
+  max-width: 600px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.service-description {
+  text-align: center;
+  font-size: 26px;
+  color: #555;
+  max-width: 600px;
+  margin-bottom: 14px;
+}
+
+.search-card {
+  padding: 0;
+  border-radius: 24px;
+  box-shadow: none;
+  background: transparent;
+  border: none;
+  max-width: 600px;
+  width: 100%;
+}
+
+.search-form   { display: flex; flex-direction: column; }
+.search-field  { width: 100%; }
+
+.search-field .mat-form-field-infix {
+  background: #fff;
+  border-radius: 24px;
+  height: 56px;
+}
+
+.mat-form-field-appearance-outline .mat-form-field-outline {
+  border-radius: 24px;
+}
+
+button[mat-icon-button] { margin-right: 8px; }
+
+.instructions {
+  max-width: 600px;
+  width: 100%;
+  margin-top: 20px;
+  padding: 0 16px;
+  text-align: left;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #555;
+}
+
+.instructions ol { padding-left: 20px; }
+.instructions li { margin-bottom: 10px; }
+
+
+:host {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* теперь точно на всю высоту контейнера scroll-host */
+  height: 100%;
+ 
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+/* …остальные стили без изменений… */
+.search-container {
+  .service-description {
+    .headline { font-weight: 700; line-height: 1.2; margin-bottom: 4px; }
+    .subline { font-size: 0.95em; color: #5f6368; }
+  }
+
+  .features-card { margin-top: 12px; }
+
+  .features-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .features-label {
+    font-weight: 600;
+    margin-right: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Чипы Material */
+  .feature-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    .mat-mdc-chip {
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+
+    .icon-inline {
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+  }
+
+  .instructions {
+    margin-top: 12px;
+
+    .section-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+    }
+
+    .divider { margin: 12px 0; }
+    .no-margin { margin: 0; }
+  }
+
+  .icon-inline { vertical-align: middle; }
+  .mr-6 { margin-right: 6px; }
+}

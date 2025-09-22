@@ -1,0 +1,216 @@
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+  min-height: 100vh;
+  background: #E9E9E9;
+}
+
+/* Если нужно, можно убрать или откорректировать стили для контейнеров Angular Material */
+mat-sidenav-container {
+  background: transparent;
+}
+
+mat-sidenav-content {
+  background: transparent;
+}
+
+/* Остальные глобальные стили остаются без изменений */
+
+.app-header {
+  justify-content: space-between;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  box-shadow: 0 3px 5px -1px rgba(0, 0, 0, .2),
+              0 6px 10px 0 rgba(0, 0, 0, .14),
+              0 1px 18px 0 rgba(0, 0, 0, .12);
+}
+
+.login-wrapper {
+  height: 100%;
+}
+
+.positronx {
+  text-decoration: none;
+  color: #ffffff;
+}
+
+.box {
+  position: relative;
+  top: 0;
+  opacity: 1;
+  float: left;
+  padding: 60px 50px 40px 50px;
+  width: 100%;
+  background: #fff;
+  border-radius: 10px;
+  transform: scale(1);
+  -webkit-transform: scale(1);
+  -ms-transform: scale(1);
+  z-index: 5;
+  max-width: 330px;
+}
+
+.box.back {
+  transform: scale(.95);
+  -webkit-transform: scale(.95);
+  -ms-transform: scale(.95);
+  top: -20px;
+  opacity: .8;
+  z-index: -1;
+}
+
+.box:before {
+  content: "";
+  width: 100%;
+  height: 30px;
+  border-radius: 10px;
+  position: absolute;
+  top: -10px;
+  background: rgba(255, 255, 255, .6);
+  left: 0;
+  transform: scale(.95);
+  -webkit-transform: scale(.95);
+  -ms-transform: scale(.95);
+  z-index: -1;
+}
+
+.login-wrapper .example-form {
+  min-width: 100%;
+  max-width: 300px;
+  width: 100%;
+}
+
+.login-wrapper .example-full-width,
+.login-wrapper .btn-block {
+  width: 100%;
+}
+
+.login-wrapper mat-card-header {
+  text-align: center;
+  width: 100%;
+  display: block;
+  font-weight: 700;
+}
+
+.login-wrapper mat-card-header mat-card-title {
+  font-size: 30px;
+  margin: 0;
+}
+
+.login-wrapper .mat-card {
+  padding: 40px 70px 50px;
+}
+
+.login-wrapper .mat-stroked-button {
+  border: 1px solid currentColor;
+  line-height: 54px;
+  background: #FFF7FA;
+}
+
+.login-wrapper .mat-form-field-appearance-legacy .mat-form-field-infix {
+  padding: 0.8375em 0;
+}
+
+mat-table .mat-row .mat-mdc-row {
+  height: 10px;
+}
+
+mat-cell {
+  height: 10px;
+}
+
+mat-cell mat-table .mat-header-row {
+  height: 50px;
+}
+
+.wblogblock {
+  border-style: solid;
+  border-color: #ceced2;
+  margin-top: 8px;
+  display: inline-block;
+  border-width: 1px;
+  background: #fff;
+  padding: 10px;
+  width: calc(100% - 22px);
+}
+
+.elementWidth {
+  width: 250px;
+}
+
+.custom-table {
+  width: 100%;
+}
+
+.custom-table mat-header-cell,
+.custom-table mat-cell {
+  padding: 8px 6px;
+  line-height: 1.2;
+}
+
+.custom-table tr {
+  height: 32px;
+}
+
+a {
+  color: var(--mdc-protected-button-label-text-color);
+}
+
+a:visited {
+  color: var(--mdc-protected-button-label-text-color);
+}
+
+a:hover {
+  color: var(--mdc-protected-button-label-text-color);
+}
+
+blockquote {
+  margin: 20px;
+  padding: 10px 20px;
+  background-color: #f9f9f9;
+  border-left: 5px solid #ccc;
+  font-style: italic;
+}
+
+.mat-datepicker-popup {
+  background-color: var(--mat-background, #fdfbff);
+}
+
+::ng-deep {
+  ngx-mat-datepicker-content {
+    background-color: var(--mat-background, #fdfbff) !important;
+    position: absolute;
+  }
+
+  mat-icon {
+    font-family: 'Material Icons' !important;
+  }
+}
+
+@media (max-width: 600px) {
+  html, body {
+    background: #fff !important;
+  }
+  .blogblock,
+  .wblogblock,
+  mat-card {
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+}
+
+
+html, body {
+  height: 100%;
+  margin: 0;
+}

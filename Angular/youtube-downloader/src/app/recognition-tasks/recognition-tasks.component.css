@@ -1,0 +1,21 @@
+.tasks-table {
+    width: 100%;
+    overflow: auto;
+  }
+  
+  .mat-elevation-z8 {
+    margin-top: 20px;
+  }
+  
+  /* recognition-tasks.component.css */
+
+.markdown-container {
+  transition: max-height 0.3s ease;
+  /* Чтобы был плавный переход при разворачивании */
+  overflow: hidden;
+}
+
+/* Когда свернуто, показываем ограниченный размер, например, 200px */
+.collapsed {
+  max-height: 200px;
+}

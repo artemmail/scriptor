@@ -1,0 +1,20 @@
+.spinner-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px; /* или любая подходящая высота */
+}
+
+.progress-card {
+  margin: 1rem 0;
+}
+
+mat-progress-bar {
+  margin: 1rem 0;
+}
+
+/* Icons */
+.icon-status-done   { color: #4caf50; }
+.icon-status-error  { color: #f44336; }
+@keyframes slow-rotate { from {transform:rotate(0)} to {transform:rotate(-360deg)} }
+.icon-status-pending { color:#2196f3; display:inline-block; animation:slow-rotate 5s linear infinite; }
