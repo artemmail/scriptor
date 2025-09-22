@@ -3,6 +3,7 @@ using System.Text;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.S3.Transfer;
+using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using YandexSpeech.Services;
@@ -11,20 +12,45 @@ namespace YandexSpeech.services
 {
     public class YSpeechService : IYSpeechService
     {
-        private readonly string yandexPassportOauthToken =
-            "1111";
-        private readonly string apiKey = "111";
-        private readonly string SERVICEACCOUNTID = "111";
-        private readonly string folderId = "11";
-        private string accessKey = "11";
-        private string secretKey = "111-";
-
-        string awsAccessKey = "111";
-        string awsSecretKey = "111";
-
-        private readonly string s3ServiceUrl = "https://storage.yandexcloud.net";
-        private readonly string defaultBucketName = "ruticker";
+        private readonly string yandexPassportOauthToken;
+        private readonly string apiKey;
+        private readonly string serviceAccountId;
+        private readonly string folderId;
+        private string accessKey;
+        private string secretKey;
+        private readonly string awsAccessKey;
+        private readonly string awsSecretKey;
+        private readonly string s3ServiceUrl;
+        private readonly string defaultBucketName;
         private readonly OpusConversionService opusService = new OpusConversionService();
+
+        public YSpeechService(IConfiguration configuration)
+        {
+            ArgumentNullException.ThrowIfNull(configuration);
+
+            var section = configuration.GetSection("YSpeech");
+            if (!section.Exists())
+            {
+                throw new InvalidOperationException("Configuration section 'YSpeech' is missing.");
+            }
+
+            yandexPassportOauthToken = GetRequiredSetting(section, "YandexPassportOauthToken");
+            apiKey = GetRequiredSetting(section, "ApiKey");
+            serviceAccountId = GetRequiredSetting(section, "ServiceAccountId");
+            folderId = GetRequiredSetting(section, "FolderId");
+            accessKey = GetRequiredSetting(section, "AccessKey");
+            secretKey = GetRequiredSetting(section, "SecretKey");
+            awsAccessKey = GetRequiredSetting(section, "AwsAccessKey");
+            awsSecretKey = GetRequiredSetting(section, "AwsSecretKey");
+            s3ServiceUrl = GetRequiredSetting(section, "S3ServiceUrl");
+            defaultBucketName = GetRequiredSetting(section, "DefaultBucketName");
+        }
+
+        private static string GetRequiredSetting(IConfiguration configuration, string key)
+        {
+            return configuration[key]
+                ?? throw new InvalidOperationException($"Configuration value 'YSpeech:{key}' is missing.");
+        }
 
         public async Task<string> GetToken()
         {
@@ -92,7 +118,7 @@ namespace YandexSpeech.services
                 string url = "https://iam.api.cloud.yandex.net/iam/aws-compatibility/v1/accessKeys";
                 var data = new Dictionary<string, string>
                 {
-                    { "serviceAccountId", SERVICEACCOUNTID },
+                    { "serviceAccountId", serviceAccountId },
                 };
                 string json = JsonConvert.SerializeObject(data);
                 HttpContent content = new StringContent(json, Encoding.UTF8, "application/json");
