@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 
 namespace YandexSpeech.services
 {
@@ -12,13 +13,14 @@ namespace YandexSpeech.services
 
     public class PunctuationService : IPunctuationService
     {
-        private readonly string _openAiApiKey = "---- poot to config ----------";
+        private readonly string _openAiApiKey;
         private const int MaxRetries = 20;
         private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(15);
 
-        public PunctuationService()
+        public PunctuationService(IConfiguration configuration)
         {
-            // Можно получить ключ из окружения, если нужно.
+            _openAiApiKey = configuration["OpenAI:ApiKey"]
+                ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured.");
         }
 
         public async Task<string> GetAvailableModelsAsync()
