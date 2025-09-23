@@ -1,4 +1,4 @@
-<div class="blog-container">
+<div class="page-shell">
   <section class="topic-creation" *ngIf="canCreateTopics">
     <mat-card>
       <mat-card-title>Новая тема</mat-card-title>
@@ -16,96 +16,57 @@
     Пока нет тем. Создайте первую!
   </div>
 
-  <ng-template #topicCard let-topic>
-    <mat-card class="blogblock">
+  <div
+    class="blog-container"
+    infiniteScroll
+    [scrollWindow]="true"
+    [infiniteScrollDistance]="2"
+    [infiniteScrollThrottle]="200"
+    [infiniteScrollDisabled]="loading || allLoaded"
+    (scrolled)="onScrollDown()"
+  >
+    <mat-card class="blog-card" *ngFor="let topic of topics; trackBy: trackByTopicId">
       <mat-card-header>
         <mat-card-title>{{ topic.header }}</mat-card-title>
       </mat-card-header>
       <mat-card-content>
         <div class="topic-meta">
-          <b>{{ topic.user }}</b>
+          <b class="topic-author">{{ topic.user }}</b>
           <span>{{ topic.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
-        </div>
-        <div class="topic-comments-count" *ngIf="topic.commentCount > 0">
-          <b>Число ответов:</b> {{ topic.commentCount }}
+          <span class="topic-comments-count" *ngIf="topic.commentCount > 0">
+            Комментариев: {{ topic.commentCount }}
+          </span>
         </div>
 
         <div class="content" [class.collapsed]="topic.collapsed" [innerHTML]="topic.renderedText"></div>
-        <p *ngIf="topic.textIsTooLong" class="toggle">
-          <button mat-button color="primary" (click)="toggleCollapse(topic)">
+
+        <div class="card-actions">
+          <button
+            mat-button
+            color="primary"
+            class="toggle"
+            *ngIf="topic.textIsTooLong"
+            (click)="toggleCollapse(topic)"
+          >
             {{ topic.collapsed ? 'Развернуть' : 'Свернуть' }}
           </button>
-        </p>
-
-        <mat-divider></mat-divider>
-
-        <section class="comments">
-          <h4>Комментарии</h4>
-          <div class="comment" *ngFor="let comment of topic.comments; trackBy: trackByCommentId">
-            <div class="comment-header">
-              <b>{{ comment.user }}</b>
-              <span>{{ comment.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
-            </div>
-            <div class="comment-text">{{ comment.text }}</div>
-          </div>
-          <div class="empty-comments" *ngIf="topic.comments.length === 0">
-            Пока нет комментариев
-          </div>
-        </section>
-
-        <mat-divider></mat-divider>
-
-        <section class="comment-form" *ngIf="currentUser; else loginHint">
-          <mat-form-field class="full-width" appearance="outline">
-            <mat-label>Комментарий</mat-label>
-            <textarea
-              matInput
-              rows="3"
-              [(ngModel)]="topic.newComment"
-              [ngModelOptions]="{ standalone: true }"
-              maxlength="2000"
-            ></textarea>
-          </mat-form-field>
-          <div class="form-actions">
-            <span class="error" *ngIf="topic.commentError">{{ topic.commentError }}</span>
-            <button mat-stroked-button color="primary" (click)="submitComment(topic)" [disabled]="topic.submittingComment">
-              Отправить
-            </button>
-          </div>
-        </section>
-        <ng-template #loginHint>
-          <div class="login-hint">Чтобы оставить комментарий, войдите в систему.</div>
-        </ng-template>
+          <a mat-stroked-button color="primary" [routerLink]="['/blog', topic.slug]">
+            Читать полностью
+          </a>
+        </div>
       </mat-card-content>
     </mat-card>
-  </ng-template>
 
-  <div class="desktop-only">
-    <ng-container *ngFor="let topic of topics; trackBy: trackByTopicId">
-      <ng-container *ngTemplateOutlet="topicCard; context: { $implicit: topic }"></ng-container>
-    </ng-container>
-    <div class="desktop-pagination" *ngIf="topics.length > 0">
-      <button mat-stroked-button color="primary" (click)="onLoadMore()" [disabled]="loading || allLoaded">
-        {{ allLoaded ? 'Больше нет записей' : 'Загрузить ещё' }}
-      </button>
+    <div class="feed-loader" *ngIf="loading && topics.length > 0">
+      <mat-spinner diameter="36"></mat-spinner>
     </div>
-    <div class="loading-overlay" *ngIf="loading && topics.length === 0">
-      <mat-spinner diameter="40"></mat-spinner>
+
+    <div class="feed-end" *ngIf="allLoaded && topics.length > 0">
+      Больше нет записей
     </div>
   </div>
 
-  <div class="mobile-only">
-    <ng-container *ngFor="let topic of topics; trackBy: trackByTopicId">
-      <ng-container *ngTemplateOutlet="topicCard; context: { $implicit: topic }"></ng-container>
-    </ng-container>
-    <div
-      infiniteScroll
-      [infiniteScrollDistance]="2"
-      [infiniteScrollThrottle]="300"
-      (scrolled)="onScrollDown()"
-      class="mobile-scroll-anchor"
-    >
-      <mat-spinner *ngIf="loading" diameter="36"></mat-spinner>
-    </div>
+  <div class="initial-loader" *ngIf="loading && topics.length === 0">
+    <mat-spinner diameter="40"></mat-spinner>
   </div>
 </div>

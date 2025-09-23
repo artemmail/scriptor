@@ -1,0 +1,68 @@
+<div class="topic-shell">
+  <a mat-button color="primary" class="back-link" [routerLink]="['/blog']">
+    ← Вернуться к блогу
+  </a>
+
+  <div class="state" *ngIf="loadError">{{ loadError }}</div>
+
+  <div class="state" *ngIf="loading">
+    <mat-spinner diameter="48"></mat-spinner>
+  </div>
+
+  <mat-card class="topic-card" *ngIf="!loading && topic">
+    <mat-card-header>
+      <mat-card-title>{{ topic.header }}</mat-card-title>
+      <mat-card-subtitle>
+        <div class="topic-meta">
+          <span class="topic-author">{{ topic.user }}</span>
+          <span>{{ topic.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
+          <span *ngIf="topic.commentCount > 0">Комментариев: {{ topic.commentCount }}</span>
+        </div>
+      </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div class="topic-content" [innerHTML]="topic.renderedText"></div>
+
+      <mat-divider></mat-divider>
+
+      <section class="comments">
+        <h3>Комментарии</h3>
+        <div class="comment" *ngFor="let comment of topic.comments; trackBy: trackByCommentId">
+          <div class="comment-header">
+            <b>{{ comment.user }}</b>
+            <span>{{ comment.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
+          </div>
+          <div class="comment-text">{{ comment.text }}</div>
+        </div>
+        <div class="empty" *ngIf="topic.comments.length === 0">
+          Пока нет комментариев
+        </div>
+      </section>
+
+      <mat-divider></mat-divider>
+
+      <section class="comment-form" *ngIf="currentUser; else loginHint">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Комментарий</mat-label>
+          <textarea
+            matInput
+            rows="4"
+            maxlength="2000"
+            [(ngModel)]="topic.newComment"
+            [ngModelOptions]="{ standalone: true }"
+          ></textarea>
+        </mat-form-field>
+        <div class="comment-actions">
+          <span class="error" *ngIf="topic.commentError">{{ topic.commentError }}</span>
+          <button mat-raised-button color="primary" (click)="submitComment(topic)" [disabled]="topic.submittingComment">
+            Отправить
+          </button>
+        </div>
+      </section>
+      <ng-template #loginHint>
+        <div class="login-hint">Чтобы оставить комментарий, войдите в систему.</div>
+      </ng-template>
+    </mat-card-content>
+  </mat-card>
+</div>

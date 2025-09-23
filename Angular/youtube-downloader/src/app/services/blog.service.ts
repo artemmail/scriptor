@@ -34,6 +34,10 @@ export class BlogService {
     return this.http.get<BlogTopic[]>(`${this.apiUrl}/topics`, { params });
   }
 
+  getTopicBySlug(slug: string): Observable<BlogTopic> {
+    return this.http.get<BlogTopic>(`${this.apiUrl}/topics/by-slug/${slug}`);
+  }
+
   createTopic(payload: { title: string; text: string }): Observable<BlogTopic> {
     return this.http.post<BlogTopic>(`${this.apiUrl}/topics`, payload);
   }

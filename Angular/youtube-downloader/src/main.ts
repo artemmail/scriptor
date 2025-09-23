@@ -26,6 +26,7 @@ import { AudioFilesComponent } from './app/audio-file/audio-files.component';
 import { MarkdownConverterComponent } from './app/Markdown-converter/markdown-converter.component';
 import { BlogFeedComponent } from './app/blog-feed/blog-feed.component';
 import { BlogTopicCreateComponent } from './app/blog-topic-create/blog-topic-create.component';
+import { BlogTopicDetailComponent } from './app/blog-topic-detail/blog-topic-detail.component';
 import { RoleGuard } from './app/services/role.guard';
 
 
@@ -87,6 +88,10 @@ const routes: Routes = [
     component: BlogTopicCreateComponent,
     canActivate: [RoleGuard],
     data: { roles: ['Moderator'] }
+  },
+  {
+    path: 'blog/:slug',
+    component: BlogTopicDetailComponent,
   },
   {
     path: 'ServiceNews',
