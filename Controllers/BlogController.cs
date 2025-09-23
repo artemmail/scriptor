@@ -99,6 +99,63 @@ namespace YandexSpeech.Controllers
             return Ok(dto);
         }
 
+        [HttpPut("topics/{topicId:int}")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Moderator")]
+        public async Task<ActionResult<BlogTopicDto>> UpdateTopic(int topicId, [FromBody] UpdateTopicRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            var topic = await _dbContext.BlogTopics
+                .Include(t => t.CreatedBy)
+                .Include(t => t.Comments)
+                    .ThenInclude(c => c.CreatedBy)
+                .FirstOrDefaultAsync(t => t.Id == topicId);
+
+            if (topic == null)
+            {
+                return NotFound();
+            }
+
+            var title = request.Title?.Trim() ?? string.Empty;
+            var text = request.Text?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(text))
+            {
+                return BadRequest("Title and text are required.");
+            }
+
+            if (!string.Equals(topic.Title, title, StringComparison.Ordinal))
+            {
+                topic.Slug = await GenerateSlugAsync(title, topic.Id);
+            }
+
+            topic.Title = title;
+            topic.Content = text;
+
+            await _dbContext.SaveChangesAsync();
+
+            return Ok(MapTopic(topic));
+        }
+
+        [HttpDelete("topics/{topicId:int}")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Moderator")]
+        public async Task<IActionResult> DeleteTopic(int topicId)
+        {
+            var topic = await _dbContext.BlogTopics.FirstOrDefaultAsync(t => t.Id == topicId);
+            if (topic == null)
+            {
+                return NotFound();
+            }
+
+            _dbContext.BlogTopics.Remove(topic);
+            await _dbContext.SaveChangesAsync();
+
+            return NoContent();
+        }
+
         [HttpPost("topics/{topicId:int}/comments")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<ActionResult<BlogCommentDto>> AddComment(int topicId, [FromBody] CreateCommentRequest request)
@@ -149,6 +206,52 @@ namespace YandexSpeech.Controllers
             return Ok(dto);
         }
 
+        [HttpPut("topics/{topicId:int}/comments/{commentId:int}")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Moderator")]
+        public async Task<ActionResult<BlogCommentDto>> UpdateComment(int topicId, int commentId, [FromBody] UpdateCommentRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            var comment = await _dbContext.BlogComments
+                .Include(c => c.CreatedBy)
+                .FirstOrDefaultAsync(c => c.Id == commentId && c.TopicId == topicId);
+
+            if (comment == null)
+            {
+                return NotFound();
+            }
+
+            var text = request.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return BadRequest("Comment text is required.");
+            }
+
+            comment.Content = text;
+            await _dbContext.SaveChangesAsync();
+
+            return Ok(MapComment(comment));
+        }
+
+        [HttpDelete("topics/{topicId:int}/comments/{commentId:int}")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Moderator")]
+        public async Task<IActionResult> DeleteComment(int topicId, int commentId)
+        {
+            var comment = await _dbContext.BlogComments.FirstOrDefaultAsync(c => c.Id == commentId && c.TopicId == topicId);
+            if (comment == null)
+            {
+                return NotFound();
+            }
+
+            _dbContext.BlogComments.Remove(comment);
+            await _dbContext.SaveChangesAsync();
+
+            return NoContent();
+        }
+
         [HttpGet("topics/by-slug/{slug}")]
         [AllowAnonymous]
         public async Task<ActionResult<BlogTopicDto>> GetBySlug(string slug)
@@ -173,7 +276,7 @@ namespace YandexSpeech.Controllers
             return Ok(MapTopic(topic));
         }
 
-        private async Task<string> GenerateSlugAsync(string title)
+        private async Task<string> GenerateSlugAsync(string title, int? excludeTopicId = null)
         {
             var normalized = Regex.Replace(title.ToLowerInvariant(), "[^a-z0-9а-яё\s-]", "").Trim();
             normalized = Regex.Replace(normalized, "\s+", "-");
@@ -185,7 +288,7 @@ namespace YandexSpeech.Controllers
 
             var slug = normalized;
             var index = 1;
-            while (await _dbContext.BlogTopics.AnyAsync(t => t.Slug == slug))
+            while (await _dbContext.BlogTopics.AnyAsync(t => t.Slug == slug && (!excludeTopicId.HasValue || t.Id != excludeTopicId.Value)))
             {
                 slug = $"{normalized}-{index}";
                 index++;
@@ -236,7 +339,25 @@ namespace YandexSpeech.Controllers
             public string Text { get; set; } = string.Empty;
         }
 
+        public class UpdateTopicRequest
+        {
+            [Required]
+            [StringLength(256)]
+            public string Title { get; set; } = string.Empty;
+
+            [Required]
+            [StringLength(10000)]
+            public string Text { get; set; } = string.Empty;
+        }
+
         public class CreateCommentRequest
+        {
+            [Required]
+            [StringLength(2000)]
+            public string Text { get; set; } = string.Empty;
+        }
+
+        public class UpdateCommentRequest
         {
             [Required]
             [StringLength(2000)]
