@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 export interface BlogComment {
   id: number;
   text: string;
+  userId: string;
   user: string;
   createdAt: string;
 }
@@ -14,6 +15,7 @@ export interface BlogTopic {
   slug: string;
   header: string;
   text: string;
+  userId: string;
   user: string;
   createdAt: string;
   commentCount: number;

@@ -1,14 +1,18 @@
-﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using YandexSpeech.models.DB;
+using YandexSpeech.models.DTO;
+using Microsoft.AspNetCore.Http;
 
 namespace YandexSpeech.Controllers
 {
@@ -92,7 +96,8 @@ namespace YandexSpeech.Controllers
                     {
                         Email = email,
                         UserName = email,
-                        IsSubscribed = false
+                        IsSubscribed = false,
+                        DisplayName = GenerateDefaultDisplayName()
                     };
 
                     var createRes = await _userManager.CreateAsync(user);
@@ -114,6 +119,8 @@ namespace YandexSpeech.Controllers
 
                 await _userManager.AddToRoleAsync(user, "Free");
             }
+
+            await EnsureDisplayNameAsync(user);
 
             // ---------- выдаём JWT + refresh ----------
             var accessToken = await GenerateJwtToken(user);
@@ -164,6 +171,72 @@ namespace YandexSpeech.Controllers
             return NoContent();
         }
 
+        [HttpGet("profile")]
+        public async Task<ActionResult<UserProfileDto>> GetProfile()
+        {
+            var userId = _userManager.GetUserId(User);
+            if (userId == null)
+            {
+                return Unauthorized();
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            await EnsureDisplayNameAsync(user);
+
+            return Ok(new UserProfileDto
+            {
+                Id = user.Id,
+                Email = user.Email ?? string.Empty,
+                DisplayName = user.DisplayName
+            });
+        }
+
+        [HttpPut("profile")]
+        public async Task<ActionResult<UserProfileDto>> UpdateProfile([FromBody] UpdateProfileRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            var userId = _userManager.GetUserId(User);
+            if (userId == null)
+            {
+                return Unauthorized();
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var displayName = request.DisplayName.Trim();
+            if (string.IsNullOrWhiteSpace(displayName))
+            {
+                return BadRequest("Display name is required.");
+            }
+
+            user.DisplayName = displayName;
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, "Failed to update profile.");
+            }
+
+            return Ok(new UserProfileDto
+            {
+                Id = user.Id,
+                Email = user.Email ?? string.Empty,
+                DisplayName = user.DisplayName
+            });
+        }
+
         // ---------- REFRESH ----------
 
         [HttpPost("refresh-token")]
@@ -185,6 +258,8 @@ namespace YandexSpeech.Controllers
             var user = await _userManager.FindByIdAsync(tokenEntity.UserId);
             if (user == null)
                 return Unauthorized("User not found");
+
+            await EnsureDisplayNameAsync(user);
 
             tokenEntity.IsRevoked = true;
 
@@ -229,8 +304,10 @@ namespace YandexSpeech.Controllers
             var claims = new List<Claim>
             {
                 new(JwtRegisteredClaimNames.Sub, user.Id),
-                new(JwtRegisteredClaimNames.Email, user.Email ?? ""),
-                new(ClaimTypes.Name, user.UserName ?? ""),
+                new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+                new(JwtRegisteredClaimNames.Name, user.DisplayName ?? string.Empty),
+                new(ClaimTypes.Name, user.DisplayName ?? string.Empty),
+                new("displayName", user.DisplayName ?? string.Empty),
                 new("IsSubscribed", user.IsSubscribed.ToString())
             };
             if (user.SubscriptionExpiry.HasValue)
@@ -247,6 +324,30 @@ namespace YandexSpeech.Controllers
                 signingCredentials: creds);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        private async Task EnsureDisplayNameAsync(ApplicationUser user)
+        {
+            if (!string.IsNullOrWhiteSpace(user.DisplayName))
+            {
+                return;
+            }
+
+            user.DisplayName = GenerateDefaultDisplayName();
+            await _userManager.UpdateAsync(user);
+        }
+
+        private static string GenerateDefaultDisplayName()
+        {
+            var number = RandomNumberGenerator.GetInt32(0, 1_000_000);
+            return $"User{number:000000}";
+        }
+
+        public class UpdateProfileRequest
+        {
+            [Required]
+            [StringLength(100)]
+            public string DisplayName { get; set; } = string.Empty;
         }
     }
 }

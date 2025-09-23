@@ -1,0 +1,33 @@
+.profile-shell {
+  max-width: 600px;
+  margin: 32px auto;
+  padding: 0 16px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.actions .error {
+  color: #d32f2f;
+}
+
+.actions .success {
+  color: #2e7d32;
+}
+
+.state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 120px;
+  font-size: 16px;
+  color: rgba(0, 0, 0, 0.6);
+}

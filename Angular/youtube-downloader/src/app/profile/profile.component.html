@@ -1,0 +1,30 @@
+<div class="profile-shell">
+  <mat-card>
+    <mat-card-title>Профиль</mat-card-title>
+    <mat-card-content>
+      <div class="state" *ngIf="loading">
+        <mat-spinner diameter="40"></mat-spinner>
+      </div>
+      <div class="state" *ngIf="loadError && !loading">{{ loadError }}</div>
+
+      <form *ngIf="!loading && !loadError" [formGroup]="form" (ngSubmit)="submit()">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Отображаемое имя</mat-label>
+          <input matInput formControlName="displayName" maxlength="100" />
+          <mat-error *ngIf="form.controls.displayName.hasError('required')">
+            Введите отображаемое имя.
+          </mat-error>
+          <mat-hint align="end">Максимум 100 символов.</mat-hint>
+        </mat-form-field>
+
+        <div class="actions">
+          <span class="error" *ngIf="saveError">{{ saveError }}</span>
+          <span class="success" *ngIf="saveSuccess && !saveError">Изменения сохранены.</span>
+          <button mat-flat-button color="primary" type="submit" [disabled]="saving">
+            {{ saving ? 'Сохранение…' : 'Сохранить' }}
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>

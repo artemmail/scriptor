@@ -306,6 +306,10 @@ export class BlogTopicDetailComponent implements OnInit {
       return false;
     }
 
+    if (comment.userId && this.currentUser.id) {
+      return comment.userId === this.currentUser.id;
+    }
+
     const normalize = (value: string | undefined | null) =>
       (value ?? '').trim().toLowerCase();
 
@@ -313,6 +317,7 @@ export class BlogTopicDetailComponent implements OnInit {
     return (
       commentUser !== '' &&
       (commentUser === normalize(this.currentUser.email) ||
+        commentUser === normalize(this.currentUser.displayName) ||
         commentUser === normalize(this.currentUser.name))
     );
   }
