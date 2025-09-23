@@ -272,7 +272,10 @@ namespace YandexSpeech.services
 
         private async Task<string> TranscribeWithOpenAiAsync(string audioFilePath)
         {
-            using var client = new HttpClient();
+            using var client = new HttpClient
+            {
+                Timeout = TimeSpan.FromMinutes(5)
+            };
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _openAiApiKey);
 
             await using var fileStream = File.OpenRead(audioFilePath);
@@ -303,7 +306,7 @@ namespace YandexSpeech.services
 
         private async Task<string> CreateDialogueMarkdownAsync(string transcription)
         {
-            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
+            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _openAiApiKey);
 
             var messages = new[]
