@@ -43,8 +43,11 @@ namespace YandexSpeech.Controllers
         }
 
         [HttpPost]
-        [RequestSizeLimit(200_000_000)]
-        [RequestFormLimits(MultipartBodyLengthLimit = 200_000_000)]
+        [DisableRequestSizeLimit]
+        [RequestFormLimits(
+            MultipartBodyLengthLimit = long.MaxValue,
+            ValueLengthLimit = int.MaxValue,
+            MultipartHeadersLengthLimit = int.MaxValue)]
         public async Task<ActionResult<OpenAiTranscriptionTaskDto>> Upload([FromForm] IFormFile file)
         {
             if (file == null || file.Length == 0)
