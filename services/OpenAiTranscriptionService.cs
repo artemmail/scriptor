@@ -274,7 +274,7 @@ namespace YandexSpeech.services
         {
             using var client = new HttpClient
             {
-                Timeout = TimeSpan.FromMinutes(5)
+                Timeout = TimeSpan.FromMinutes(50)
             };
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _openAiApiKey);
 
@@ -306,7 +306,7 @@ namespace YandexSpeech.services
 
         private async Task<string> CreateDialogueMarkdownAsync(string transcription)
         {
-            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(50) };
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _openAiApiKey);
 
             var messages = new[]
