@@ -1,26 +1,19 @@
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, OnInit } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs/operators';
-import { BlogService, BlogTopic, BlogComment } from '../services/blog.service';
+import { BlogService, BlogTopic } from '../services/blog.service';
 import { InfiniteScrollModule } from 'ngx-infinite-scroll';
-import { AuthService, UserInfo } from '../services/AuthService.service';
+import { AuthService } from '../services/AuthService.service';
 import { RouterModule } from '@angular/router';
 import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
 
 interface BlogTopicViewModel extends BlogTopic {
   collapsed: boolean;
   textIsTooLong: boolean;
-  newComment: string;
-  submittingComment: boolean;
-  commentError?: string;
   renderedText: string;
 }
 
@@ -29,12 +22,8 @@ interface BlogTopicViewModel extends BlogTopic {
   standalone: true,
   imports: [
     CommonModule,
-    FormsModule,
     MatCardModule,
     MatButtonModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatDividerModule,
     MatProgressSpinnerModule,
     InfiniteScrollModule,
     RouterModule
@@ -53,7 +42,6 @@ export class BlogFeedComponent implements OnInit {
   initialLoad = false;
   feedError = '';
 
-  currentUser: UserInfo | null = null;
   canCreateTopics = false;
 
   constructor(
@@ -65,17 +53,12 @@ export class BlogFeedComponent implements OnInit {
     this.authService.user$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(user => {
-        this.currentUser = user;
         const roles = user?.roles ?? [];
         this.canCreateTopics = roles.some(r => r.toLowerCase() === 'moderator');
       });
   }
 
   ngOnInit(): void {
-    this.loadTopics();
-  }
-
-  onLoadMore(): void {
     this.loadTopics();
   }
 
@@ -87,44 +70,8 @@ export class BlogFeedComponent implements OnInit {
     topic.collapsed = !topic.collapsed;
   }
 
-  submitComment(topic: BlogTopicViewModel): void {
-    if (!this.currentUser || topic.submittingComment) {
-      return;
-    }
-
-    topic.commentError = '';
-    const text = (topic.newComment ?? '').trim();
-    if (!text) {
-      topic.commentError = 'Введите текст комментария.';
-      return;
-    }
-
-    topic.submittingComment = true;
-    this.blogService
-      .addComment(topic.id, { text })
-      .pipe(
-        finalize(() => {
-          topic.submittingComment = false;
-        })
-      )
-      .subscribe({
-        next: comment => {
-          topic.comments = [...topic.comments, comment];
-          topic.commentCount = topic.comments.length;
-          topic.newComment = '';
-        },
-        error: () => {
-          topic.commentError = 'Не удалось отправить комментарий. Попробуйте позже.';
-        }
-      });
-  }
-
   trackByTopicId(_: number, topic: BlogTopicViewModel): number {
     return topic.id;
-  }
-
-  trackByCommentId(_: number, comment: BlogComment): number {
-    return comment.id;
   }
 
   private loadTopics(): void {
@@ -170,8 +117,6 @@ export class BlogFeedComponent implements OnInit {
       ...topic,
       collapsed: isTooLong,
       textIsTooLong: isTooLong,
-      newComment: '',
-      submittingComment: false,
       renderedText: rendered
     };
   }
