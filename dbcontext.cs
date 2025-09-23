@@ -35,6 +35,9 @@ namespace YandexSpeech
         public DbSet<YoutubeChannel> YoutubeChannels { get; set; }
         public DbSet<YoutubeStreamCache> YoutubeStreamCaches { get; set; }
 
+        public DbSet<OpenAiTranscriptionTask> OpenAiTranscriptionTasks { get; set; }
+        public DbSet<OpenAiTranscriptionStep> OpenAiTranscriptionSteps { get; set; }
+
 
         // Новая таблица
         public DbSet<AudioFile> AudioFiles { get; set; }

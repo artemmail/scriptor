@@ -111,6 +111,7 @@ builder.Services.AddAuthentication(o =>
 
 builder.Services.AddScoped<IAudioFileService, AudioFileService>();
 builder.Services.AddScoped<ISpeechWorkflowService, SpeechWorkflowService>();
+builder.Services.AddScoped<IOpenAiTranscriptionService, OpenAiTranscriptionService>();
 
 
 // 7. Сервисы приложения
