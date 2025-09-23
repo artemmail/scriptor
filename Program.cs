@@ -1,5 +1,6 @@
 ﻿// Program.cs
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -160,9 +161,20 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
+    var staticFileContentTypeProvider = new FileExtensionContentTypeProvider();
+    if (!staticFileContentTypeProvider.Mappings.ContainsKey(".webp"))
+    {
+        staticFileContentTypeProvider.Mappings[".webp"] = "image/webp";
+    }
+
+    var staticFileOptions = new StaticFileOptions
+    {
+        ContentTypeProvider = staticFileContentTypeProvider
+    };
+
     app.UseDefaultFiles();
-    app.UseStaticFiles();
-    app.UseSpaStaticFiles();
+    app.UseStaticFiles(staticFileOptions);
+    app.UseSpaStaticFiles(staticFileOptions);
     app.UseSpa(spa =>
     {
         spa.Options.SourcePath = "C:\\stock\\8.0\\YandexSpeech\\Angular\\youtube-downloader\\dist\\youtube-downloader";
