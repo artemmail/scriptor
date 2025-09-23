@@ -2,19 +2,24 @@
 <mat-nav-list>
   <ng-container *ngIf="user$ | async as user; else guestMenu">
     <a mat-list-item (click)="navigate('/recognition')">
-      <mat-icon>home</mat-icon><span>Распознавание</span>
+      <mat-icon matListItemIcon>home</mat-icon>
+      <span matListItemTitle>Распознавание</span>
     </a>
     <a mat-list-item (click)="navigate('/tasks')">
-      <mat-icon>subtitles</mat-icon><span>Скрипториум</span>
+      <mat-icon matListItemIcon>subtitles</mat-icon>
+      <span matListItemTitle>Скрипториум</span>
     </a>
     <a mat-list-item (click)="navigate('/down')">
-      <mat-icon>download-icons</mat-icon><span>Скачать ролик</span>
+      <mat-icon matListItemIcon>download-icons</mat-icon>
+      <span matListItemTitle>Скачать ролик</span>
     </a>
     <a mat-list-item (click)="navigate('/markdown-converter')">
-      <mat-icon>sync_alt</mat-icon><span>Конвертер Markdown </span>
+      <mat-icon matListItemIcon>sync_alt</mat-icon>
+      <span matListItemTitle>Конвертер Markdown </span>
     </a>
     <a mat-list-item (click)="navigate('/blog')">
-      <mat-icon>article</mat-icon><span>Блоги</span>
+      <mat-icon matListItemIcon>article</mat-icon>
+      <span matListItemTitle>Блоги</span>
     </a>
     <mat-divider></mat-divider>
     <a mat-list-item (click)="onLogout()">
@@ -23,20 +28,25 @@
   </ng-container>
   <ng-template #guestMenu>
     <a mat-list-item (click)="navigate('/recognition')">
-      <mat-icon>home</mat-icon><span>Распознавание</span>
+      <mat-icon matListItemIcon>home</mat-icon>
+      <span matListItemTitle>Распознавание</span>
     </a>
     <a mat-list-item (click)="navigate('/tasks')">
-      <mat-icon>subtitles</mat-icon><span>Скрипториум</span>
+      <mat-icon matListItemIcon>subtitles</mat-icon>
+      <span matListItemTitle>Скрипториум</span>
     </a>
     <a mat-list-item (click)="navigate('/markdown-converter')">
-      <mat-icon>sync_alt</mat-icon><span>Конвертер Markdown</span>
+      <mat-icon matListItemIcon>sync_alt</mat-icon>
+      <span matListItemTitle>Конвертер Markdown</span>
     </a>
     <a mat-list-item (click)="navigate('/blog')">
-      <mat-icon>article</mat-icon><span>Блоги</span>
+      <mat-icon matListItemIcon>article</mat-icon>
+      <span matListItemTitle>Блоги</span>
     </a>
     <mat-divider></mat-divider>
     <a mat-list-item (click)="navigate('/login')">
-      <mat-icon>login</mat-icon><span>Войти</span>
+      <mat-icon matListItemIcon>login</mat-icon>
+      <span matListItemTitle>Войти</span>
     </a>
   </ng-template>
 </mat-nav-list>
