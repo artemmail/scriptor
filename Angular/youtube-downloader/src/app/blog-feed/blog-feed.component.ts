@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, OnInit } from '@angular/core';
-import { ReactiveFormsModule, FormBuilder, Validators, FormGroup, FormsModule } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -12,6 +12,8 @@ import { finalize } from 'rxjs/operators';
 import { BlogService, BlogTopic, BlogComment } from '../services/blog.service';
 import { InfiniteScrollModule } from 'ngx-infinite-scroll';
 import { AuthService, UserInfo } from '../services/AuthService.service';
+import { RouterModule } from '@angular/router';
+import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
 
 interface BlogTopicViewModel extends BlogTopic {
   collapsed: boolean;
@@ -19,6 +21,7 @@ interface BlogTopicViewModel extends BlogTopic {
   newComment: string;
   submittingComment: boolean;
   commentError?: string;
+  renderedText: string;
 }
 
 @Component({
@@ -27,14 +30,14 @@ interface BlogTopicViewModel extends BlogTopic {
   imports: [
     CommonModule,
     FormsModule,
-    ReactiveFormsModule,
     MatCardModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
     MatDividerModule,
     MatProgressSpinnerModule,
-    InfiniteScrollModule
+    InfiniteScrollModule,
+    RouterModule
   ],
   templateUrl: './blog-feed.component.html',
   styleUrls: ['./blog-feed.component.css']
@@ -50,24 +53,15 @@ export class BlogFeedComponent implements OnInit {
   initialLoad = false;
   feedError = '';
 
-  topicForm: FormGroup;
-  topicSubmitting = false;
-  topicError = '';
-
   currentUser: UserInfo | null = null;
   canCreateTopics = false;
 
   constructor(
     private readonly blogService: BlogService,
-    private readonly fb: FormBuilder,
     private readonly authService: AuthService,
-    private readonly destroyRef: DestroyRef
+    private readonly destroyRef: DestroyRef,
+    private readonly markdownRenderer: MarkdownRendererService1
   ) {
-    this.topicForm = this.fb.group({
-      title: ['', [Validators.required, Validators.maxLength(256)]],
-      text: ['', [Validators.required, Validators.maxLength(10000)]]
-    });
-
     this.authService.user$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(user => {
@@ -91,48 +85,6 @@ export class BlogFeedComponent implements OnInit {
 
   toggleCollapse(topic: BlogTopicViewModel): void {
     topic.collapsed = !topic.collapsed;
-  }
-
-  submitTopic(): void {
-    if (!this.canCreateTopics || this.topicSubmitting) {
-      return;
-    }
-
-    this.topicError = '';
-
-    if (this.topicForm.invalid) {
-      this.topicForm.markAllAsTouched();
-      return;
-    }
-
-    const title = (this.topicForm.value.title ?? '').trim();
-    const text = (this.topicForm.value.text ?? '').trim();
-
-    if (!title || !text) {
-      this.topicError = 'Заполните заголовок и текст темы.';
-      return;
-    }
-
-    this.topicSubmitting = true;
-    this.blogService
-      .createTopic({ title, text })
-      .pipe(
-        finalize(() => {
-          this.topicSubmitting = false;
-        })
-      )
-      .subscribe({
-        next: topic => {
-          const mapped = this.mapTopic(topic);
-          this.topics = [mapped, ...this.topics];
-          this.skip += 1;
-          this.allLoaded = false;
-          this.topicForm.reset();
-        },
-        error: () => {
-          this.topicError = 'Не удалось создать тему. Попробуйте позже.';
-        }
-      });
   }
 
   submitComment(topic: BlogTopicViewModel): void {
@@ -213,12 +165,14 @@ export class BlogFeedComponent implements OnInit {
 
   private mapTopic(topic: BlogTopic): BlogTopicViewModel {
     const isTooLong = topic.text.length > this.collapseThreshold;
+    const rendered = this.markdownRenderer.renderMath(topic.text);
     return {
       ...topic,
       collapsed: isTooLong,
       textIsTooLong: isTooLong,
       newComment: '',
-      submittingComment: false
+      submittingComment: false,
+      renderedText: rendered
     };
   }
 }

@@ -24,8 +24,12 @@ export class SideMenuComponent {
   user$: Observable<UserInfo | null>;
 
   constructor(private auth: AuthService, private router: Router) {
-    
+
     this.user$ = this.auth.user$;
+  }
+
+  hasRole(user: UserInfo | null, role: string): boolean {
+    return !!user?.roles?.some(r => r.toLowerCase() === role.toLowerCase());
   }
 
   navigate(path: string) {
