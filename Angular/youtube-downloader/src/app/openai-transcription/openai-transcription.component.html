@@ -1,0 +1,117 @@
+<div class="transcription-page">
+  <mat-card class="upload-card">
+    <h2>Новая расшифровка</h2>
+    <p class="upload-hint">
+      Загрузите аудио или видео файл, чтобы отправить его в обработку через OpenAI.
+    </p>
+    <div class="upload-controls">
+      <input
+        type="file"
+        (change)="onFileSelected($event)"
+        accept="audio/*,video/*"
+      />
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="upload()"
+        [disabled]="!selectedFile || uploading"
+      >
+        <mat-icon>cloud_upload</mat-icon>
+        <span>Отправить</span>
+      </button>
+    </div>
+    <div class="file-name" *ngIf="selectedFile">
+      Выбран файл: <strong>{{ selectedFile.name }}</strong>
+    </div>
+    <mat-progress-bar *ngIf="uploading" mode="indeterminate"></mat-progress-bar>
+    <div class="error" *ngIf="uploadError">{{ uploadError }}</div>
+  </mat-card>
+
+  <div class="layout">
+    <mat-card class="tasks-card">
+      <div class="card-header">
+        <h2>Мои расшифровки</h2>
+        <button mat-icon-button (click)="loadTasks()" [disabled]="uploading">
+          <mat-icon>refresh</mat-icon>
+        </button>
+      </div>
+      <div class="error" *ngIf="listError">{{ listError }}</div>
+      <mat-nav-list *ngIf="tasks.length; else emptyTasks">
+        <a
+          mat-list-item
+          *ngFor="let task of tasks; trackBy: trackTask"
+          (click)="selectTask(task)"
+          [class.active]="task.id === selectedTaskId"
+        >
+          <mat-icon matListItemIcon>{{ getTaskIcon(task) }}</mat-icon>
+          <span matListItemTitle>{{ task.displayName }}</span>
+          <span matListItemLine>
+            {{ getStatusText(task.status) }} · {{ task.modifiedAt | localTime }}
+          </span>
+        </a>
+      </mat-nav-list>
+      <ng-template #emptyTasks>
+        <div class="empty-state">Здесь появятся ваши распознанные файлы.</div>
+      </ng-template>
+    </mat-card>
+
+    <mat-card class="details-card" *ngIf="selectedTaskId; else selectPrompt">
+      <ng-container *ngIf="detailsLoading; else taskDetails">
+        <div class="loading-state">
+          <mat-progress-spinner mode="indeterminate" diameter="40"></mat-progress-spinner>
+          <p>Загружаем данные задачи…</p>
+        </div>
+      </ng-container>
+
+      <ng-template #taskDetails>
+        <ng-container *ngIf="selectedTask; else detailsErrorBlock">
+          <div class="details-header">
+            <h2>{{ selectedTask.displayName }}</h2>
+            <span class="status-chip" [ngClass]="getStatusClass(selectedTask.status)">
+              {{ getStatusText(selectedTask.status) }}
+            </span>
+          </div>
+
+          <div class="error" *ngIf="selectedTask.error">{{ selectedTask.error }}</div>
+
+          <section class="steps-section" *ngIf="selectedTask.steps.length">
+            <h3>Прогресс</h3>
+            <ul class="steps-list">
+              <li *ngFor="let step of selectedTask.steps; trackBy: trackStep" [class]="getStepClass(step.status)">
+                <mat-icon class="step-icon">{{ getStepIcon(step.status) }}</mat-icon>
+                <div class="step-info">
+                  <div class="step-title">{{ getStatusText(step.step) }}</div>
+                  <div class="step-meta">
+                    <span>{{ getStepStatusText(step.status) }}</span>
+                    <span *ngIf="step.startedAt">· {{ step.startedAt | localTime }}</span>
+                  </div>
+                  <div class="step-error" *ngIf="step.error">{{ step.error }}</div>
+                </div>
+              </li>
+            </ul>
+          </section>
+
+          <section class="result-block" *ngIf="selectedTask.recognizedText">
+            <h3>Распознанный текст</h3>
+            <pre>{{ selectedTask.recognizedText }}</pre>
+          </section>
+
+          <section class="result-block" *ngIf="selectedTask.markdownText">
+            <h3>Форматированный Markdown</h3>
+            <pre>{{ selectedTask.markdownText }}</pre>
+          </section>
+        </ng-container>
+      </ng-template>
+
+      <ng-template #detailsErrorBlock>
+        <div class="error" *ngIf="detailsError">{{ detailsError }}</div>
+      </ng-template>
+    </mat-card>
+
+    <ng-template #selectPrompt>
+      <mat-card class="details-card placeholder-card">
+        <p>Выберите задачу из списка, чтобы просмотреть прогресс и результат.</p>
+      </mat-card>
+    </ng-template>
+  </div>
+</div>
