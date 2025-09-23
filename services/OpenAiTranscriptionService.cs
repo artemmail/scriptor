@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -20,9 +21,10 @@ namespace YandexSpeech.services
         private readonly string _ffmpegPath;
         private readonly string _openAiApiKey;
         private readonly string _workingDirectory;
-        private const string TranscriptionModel = "gpt-4o-mini-transcribe";
-        private const string TranscriptionBetaHeader = "gpt-4o-audio-transcriptions";
         private const string FormattingModel = "gpt-4.1-mini";
+        private readonly string _whisperExecutableSetting;
+        private readonly string _whisperModel;
+        private readonly string _whisperDevice;
 
         public OpenAiTranscriptionService(
             MyDbContext dbContext,
@@ -37,6 +39,21 @@ namespace YandexSpeech.services
                              ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured.");
             _workingDirectory = Path.Combine(Path.GetTempPath(), "openai-transcriptions");
             Directory.CreateDirectory(_workingDirectory);
+
+            var whisperSection = configuration.GetSection("Whisper");
+            _whisperExecutableSetting = whisperSection.GetValue<string>("ExecutablePath") ?? "whisper";
+            _whisperModel = whisperSection.GetValue<string>("Model") ?? "medium";
+
+            var configuredDevice = whisperSection.GetValue<string>("Device");
+            if (!string.IsNullOrWhiteSpace(configuredDevice))
+            {
+                _whisperDevice = configuredDevice;
+            }
+            else
+            {
+                var useGpu = whisperSection.GetValue<bool?>("UseGpu") ?? false;
+                _whisperDevice = useGpu ? "cuda" : "cpu";
+            }
         }
 
         public async Task<OpenAiTranscriptionTask> StartTranscriptionAsync(string sourceFilePath, string createdBy)
@@ -273,38 +290,97 @@ namespace YandexSpeech.services
 
         private async Task<string> TranscribeWithOpenAiAsync(string audioFilePath)
         {
-            using var client = new HttpClient
+            var whisperExecutable = ResolveWhisperExecutable();
+            var outputDirectory = Path.Combine(_workingDirectory, $"whisper-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(outputDirectory);
+            var arguments = BuildWhisperArguments(audioFilePath, outputDirectory);
+
+            using var process = new Process
             {
-                Timeout = TimeSpan.FromMinutes(50)
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = whisperExecutable,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                }
             };
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _openAiApiKey);
-            client.DefaultRequestHeaders.Add("OpenAI-Beta", TranscriptionBetaHeader);
 
-            await using var fileStream = File.OpenRead(audioFilePath);
-            using var content = new MultipartFormDataContent();
-            var fileContent = new StreamContent(fileStream);
-            fileContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
-            content.Add(fileContent, "file", Path.GetFileName(audioFilePath));
-            content.Add(new StringContent(TranscriptionModel), "model");
-
-            var response = await client.PostAsync("https://api.openai.com/v1/audio/transcriptions", content);
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                var error = await response.Content.ReadAsStringAsync();
-                throw new InvalidOperationException(
-                    $"OpenAI transcription failed: {error} (StatusCode: {(int)response.StatusCode} {response.ReasonPhrase})");
+                process.Start();
+
+                var waitForExitTask = process.WaitForExitAsync();
+                var standardErrorTask = process.StandardError.ReadToEndAsync();
+                var standardOutputTask = process.StandardOutput.ReadToEndAsync();
+
+                await Task.WhenAll(waitForExitTask, standardErrorTask, standardOutputTask);
+
+                if (process.ExitCode != 0)
+                {
+                    var error = await standardErrorTask;
+                    throw new InvalidOperationException($"Whisper transcription failed (exit code {process.ExitCode}): {error}");
+                }
+
+                var transcriptFile = Directory.EnumerateFiles(outputDirectory, "*.txt").FirstOrDefault();
+                if (transcriptFile == null)
+                {
+                    var output = await standardOutputTask;
+                    throw new InvalidOperationException($"Whisper transcription did not produce a text file. Output: {output}");
+                }
+
+                var transcription = await File.ReadAllTextAsync(transcriptFile);
+                if (string.IsNullOrWhiteSpace(transcription))
+                    throw new InvalidOperationException("Whisper transcription result is empty.");
+
+                return transcription.Trim();
+            }
+            finally
+            {
+                try
+                {
+                    Directory.Delete(outputDirectory, true);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to remove Whisper output directory {OutputDirectory}", outputDirectory);
+                }
+            }
+        }
+
+        private string ResolveWhisperExecutable()
+        {
+            if (File.Exists(_whisperExecutableSetting))
+                return _whisperExecutableSetting;
+
+            if (Directory.Exists(_whisperExecutableSetting))
+            {
+                var executableName = OperatingSystem.IsWindows() ? "whisper.exe" : "whisper";
+                var candidate = Path.Combine(_whisperExecutableSetting, executableName);
+                if (File.Exists(candidate))
+                    return candidate;
             }
 
-            var json = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("text", out var textElement))
+            return _whisperExecutableSetting;
+        }
+
+        private string BuildWhisperArguments(string audioFilePath, string outputDirectory)
+        {
+            var builder = new StringBuilder();
+            builder.Append($"\"{audioFilePath}\" --model {_whisperModel} --task transcribe --output_format txt --output_dir \"{outputDirectory}\"");
+            if (!string.IsNullOrWhiteSpace(_whisperDevice))
             {
-                var text = textElement.GetString();
-                if (!string.IsNullOrWhiteSpace(text))
-                    return text.Trim();
+                builder.Append($" --device {_whisperDevice}");
             }
 
-            throw new InvalidOperationException("OpenAI transcription response did not contain text.");
+            if (string.Equals(_whisperDevice, "cpu", StringComparison.OrdinalIgnoreCase))
+            {
+                builder.Append(" --fp16 False");
+            }
+
+            return builder.ToString();
         }
 
         private async Task<string> CreateDialogueMarkdownAsync(string transcription)
