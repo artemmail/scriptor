@@ -900,7 +900,7 @@ namespace YandexSpeech.Migrations
                     b.HasOne("YandexSpeech.models.DB.ApplicationUser", "CreatedBy")
                         .WithMany()
                         .HasForeignKey("CreatedById")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("YandexSpeech.models.DB.BlogTopic", "Topic")

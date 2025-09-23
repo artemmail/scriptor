@@ -53,7 +53,7 @@ namespace YandexSpeech.Migrations
                         column: x => x.CreatedById,
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_BlogComments_BlogTopics_TopicId",
                         column: x => x.TopicId,
