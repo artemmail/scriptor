@@ -62,7 +62,6 @@ namespace YandexSpeech.services
             _dbContext.OpenAiTranscriptionTasks.Add(task);
             await _dbContext.SaveChangesAsync();
 
-            await ContinueTranscriptionAsync(task.Id);
             return task;
         }
 

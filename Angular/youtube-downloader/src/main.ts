@@ -30,6 +30,7 @@ import { BlogTopicDetailComponent } from './app/blog-topic-detail/blog-topic-det
 import { RoleGuard } from './app/services/role.guard';
 import { ProfileComponent } from './app/profile/profile.component';
 import { AuthGuard } from './app/services/auth.guard';
+import { OpenAiTranscriptionComponent } from './app/openai-transcription/openai-transcription.component';
 
 
 
@@ -50,6 +51,12 @@ const routes: Routes = [
   {
     path: 'audio',
     component: AudioFilesComponent, // главная страница
+  },
+
+  {
+    path: 'transcriptions',
+    component: OpenAiTranscriptionComponent,
+    canActivate: [AuthGuard],
   },
 
 
