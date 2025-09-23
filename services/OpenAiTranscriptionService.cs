@@ -136,11 +136,14 @@ namespace YandexSpeech.services
                 };
 
                 process.Start();
-                await process.WaitForExitAsync();
+
+                var standardErrorTask = process.StandardError.ReadToEndAsync();
+                var standardOutputTask = process.StandardOutput.ReadToEndAsync();
+                await Task.WhenAll(process.WaitForExitAsync(), standardErrorTask, standardOutputTask);
 
                 if (process.ExitCode != 0)
                 {
-                    var error = await process.StandardError.ReadToEndAsync();
+                    var error = await standardErrorTask;
                     throw new InvalidOperationException($"FFmpeg conversion failed (exit code {process.ExitCode}): {error}");
                 }
 
