@@ -21,6 +21,7 @@ namespace YandexSpeech.services
         private readonly string _openAiApiKey;
         private readonly string _workingDirectory;
         private const string TranscriptionModel = "gpt-4o-mini-transcribe";
+        private const string TranscriptionBetaHeader = "gpt-4o-audio-transcriptions";
         private const string FormattingModel = "gpt-4.1-mini";
 
         public OpenAiTranscriptionService(
@@ -277,6 +278,7 @@ namespace YandexSpeech.services
                 Timeout = TimeSpan.FromMinutes(50)
             };
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _openAiApiKey);
+            client.DefaultRequestHeaders.Add("OpenAI-Beta", TranscriptionBetaHeader);
 
             await using var fileStream = File.OpenRead(audioFilePath);
             using var content = new MultipartFormDataContent();
@@ -289,7 +291,8 @@ namespace YandexSpeech.services
             if (!response.IsSuccessStatusCode)
             {
                 var error = await response.Content.ReadAsStringAsync();
-                throw new InvalidOperationException($"OpenAI transcription failed: {error}");
+                throw new InvalidOperationException(
+                    $"OpenAI transcription failed: {error} (StatusCode: {(int)response.StatusCode} {response.ReasonPhrase})");
             }
 
             var json = await response.Content.ReadAsStringAsync();
