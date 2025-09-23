@@ -81,12 +81,13 @@ namespace YandexSpeech.services
                     switch (task.Status)
                     {
                         case OpenAiTranscriptionStatus.Created:
+                        case OpenAiTranscriptionStatus.Converting:
                             await RunConversionStepAsync(task);
                             break;
-                        case OpenAiTranscriptionStatus.Converting:
+                        case OpenAiTranscriptionStatus.Transcribing:
                             await RunTranscriptionStepAsync(task);
                             break;
-                        case OpenAiTranscriptionStatus.Transcribing:
+                        case OpenAiTranscriptionStatus.Formatting:
                             await RunFormattingStepAsync(task);
                             break;
                         default:
