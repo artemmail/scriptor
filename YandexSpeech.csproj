@@ -65,7 +65,7 @@
     </ItemGroup>
     <RemoveDir Directories="$(ProjectDir)wwwroot" />
     <Copy SourceFiles="@(AngularDistFiles)"
-          DestinationFiles="@(AngularDistFiles->'$(ProjectDir)wwwroot/%(RelativeOutputPath)')"
+          DestinationFiles="@(AngularDistFiles->'$(ProjectDir)wwwroot/%(AngularDistFiles.RelativeOutputPath)')"
           SkipUnchangedFiles="true" />
   </Target>
 
@@ -80,7 +80,7 @@
     </ItemGroup>
     <RemoveDir Directories="$(PublishDir)wwwroot" />
     <Copy SourceFiles="@(AngularDistFiles)"
-          DestinationFiles="@(AngularDistFiles->'$(PublishDir)wwwroot/%(RelativeOutputPath)')"
+          DestinationFiles="@(AngularDistFiles->'$(PublishDir)wwwroot/%(AngularDistFiles.RelativeOutputPath)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>
