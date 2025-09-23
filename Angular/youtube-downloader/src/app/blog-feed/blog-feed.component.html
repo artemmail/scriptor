@@ -1,0 +1,133 @@
+<div class="blog-container">
+  <section class="topic-creation" *ngIf="canCreateTopics">
+    <mat-card>
+      <mat-card-title>Новая тема</mat-card-title>
+      <mat-card-content>
+        <form [formGroup]="topicForm" (ngSubmit)="submitTopic()">
+          <mat-form-field class="full-width" appearance="outline">
+            <mat-label>Заголовок</mat-label>
+            <input matInput formControlName="title" maxlength="256" />
+            <mat-hint align="end">{{ topicForm.value.title?.length || 0 }}/256</mat-hint>
+            <mat-error *ngIf="topicForm.controls['title'].hasError('required')">
+              Укажите заголовок
+            </mat-error>
+          </mat-form-field>
+
+          <mat-form-field class="full-width" appearance="outline">
+            <mat-label>Текст</mat-label>
+            <textarea matInput formControlName="text" rows="6" maxlength="10000"></textarea>
+            <mat-hint align="end">{{ topicForm.value.text?.length || 0 }}/10000</mat-hint>
+            <mat-error *ngIf="topicForm.controls['text'].hasError('required')">
+              Укажите текст темы
+            </mat-error>
+          </mat-form-field>
+
+          <div class="form-actions">
+            <span class="error" *ngIf="topicError">{{ topicError }}</span>
+            <button mat-flat-button color="primary" type="submit" [disabled]="topicSubmitting">
+              Опубликовать
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  </section>
+
+  <div class="feed-state" *ngIf="feedError">{{ feedError }}</div>
+  <div class="feed-state" *ngIf="!loading && initialLoad && topics.length === 0 && !feedError">
+    Пока нет тем. Создайте первую!
+  </div>
+
+  <ng-template #topicCard let-topic>
+    <mat-card class="blogblock">
+      <mat-card-header>
+        <mat-card-title>{{ topic.header }}</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="topic-meta">
+          <b>{{ topic.user }}</b>
+          <span>{{ topic.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
+        </div>
+        <div class="topic-comments-count" *ngIf="topic.commentCount > 0">
+          <b>Число ответов:</b> {{ topic.commentCount }}
+        </div>
+
+        <div class="content" [class.collapsed]="topic.collapsed" [innerHTML]="topic.text"></div>
+        <p *ngIf="topic.textIsTooLong" class="toggle">
+          <button mat-button color="primary" (click)="toggleCollapse(topic)">
+            {{ topic.collapsed ? 'Развернуть' : 'Свернуть' }}
+          </button>
+        </p>
+
+        <mat-divider></mat-divider>
+
+        <section class="comments">
+          <h4>Комментарии</h4>
+          <div class="comment" *ngFor="let comment of topic.comments; trackBy: trackByCommentId">
+            <div class="comment-header">
+              <b>{{ comment.user }}</b>
+              <span>{{ comment.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
+            </div>
+            <div class="comment-text">{{ comment.text }}</div>
+          </div>
+          <div class="empty-comments" *ngIf="topic.comments.length === 0">
+            Пока нет комментариев
+          </div>
+        </section>
+
+        <mat-divider></mat-divider>
+
+        <section class="comment-form" *ngIf="currentUser; else loginHint">
+          <mat-form-field class="full-width" appearance="outline">
+            <mat-label>Комментарий</mat-label>
+            <textarea
+              matInput
+              rows="3"
+              [(ngModel)]="topic.newComment"
+              [ngModelOptions]="{ standalone: true }"
+              maxlength="2000"
+            ></textarea>
+          </mat-form-field>
+          <div class="form-actions">
+            <span class="error" *ngIf="topic.commentError">{{ topic.commentError }}</span>
+            <button mat-stroked-button color="primary" (click)="submitComment(topic)" [disabled]="topic.submittingComment">
+              Отправить
+            </button>
+          </div>
+        </section>
+        <ng-template #loginHint>
+          <div class="login-hint">Чтобы оставить комментарий, войдите в систему.</div>
+        </ng-template>
+      </mat-card-content>
+    </mat-card>
+  </ng-template>
+
+  <div class="desktop-only">
+    <ng-container *ngFor="let topic of topics; trackBy: trackByTopicId">
+      <ng-container *ngTemplateOutlet="topicCard; context: { $implicit: topic }"></ng-container>
+    </ng-container>
+    <div class="desktop-pagination" *ngIf="topics.length > 0">
+      <button mat-stroked-button color="primary" (click)="onLoadMore()" [disabled]="loading || allLoaded">
+        {{ allLoaded ? 'Больше нет записей' : 'Загрузить ещё' }}
+      </button>
+    </div>
+    <div class="loading-overlay" *ngIf="loading && topics.length === 0">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+  </div>
+
+  <div class="mobile-only">
+    <ng-container *ngFor="let topic of topics; trackBy: trackByTopicId">
+      <ng-container *ngTemplateOutlet="topicCard; context: { $implicit: topic }"></ng-container>
+    </ng-container>
+    <div
+      infiniteScroll
+      [infiniteScrollDistance]="2"
+      [infiniteScrollThrottle]="300"
+      (scrolled)="onScrollDown()"
+      class="mobile-scroll-anchor"
+    >
+      <mat-spinner *ngIf="loading" diameter="36"></mat-spinner>
+    </div>
+  </div>
+</div>
