@@ -59,13 +59,11 @@
           AfterTargets="Build"
           BeforeTargets="Publish">
     <ItemGroup>
-      <AngularDistFiles Include="$(AngularDistDir)**/*.*">
-        <RelativeOutputPath>$([System.String]::Copy('%(RecursiveDir)%(Filename)%(Extension)').Replace('\\','/'))</RelativeOutputPath>
-      </AngularDistFiles>
+      <AngularDistFiles Include="$(AngularDistDir)**/*.*" />
     </ItemGroup>
     <RemoveDir Directories="$(ProjectDir)wwwroot" />
     <Copy SourceFiles="@(AngularDistFiles)"
-          DestinationFiles="@(AngularDistFiles->'$(ProjectDir)wwwroot/%(AngularDistFiles.RelativeOutputPath)')"
+          DestinationFiles="@(AngularDistFiles->'$(ProjectDir)wwwroot\\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 
@@ -74,13 +72,11 @@
           DependsOnTargets="BuildAngularApp"
           AfterTargets="Publish">
     <ItemGroup>
-      <AngularDistFiles Include="$(AngularDistDir)**/*.*">
-        <RelativeOutputPath>$([System.String]::Copy('%(RecursiveDir)%(Filename)%(Extension)').Replace('\\','/'))</RelativeOutputPath>
-      </AngularDistFiles>
+      <AngularDistFiles Include="$(AngularDistDir)**/*.*" />
     </ItemGroup>
     <RemoveDir Directories="$(PublishDir)wwwroot" />
     <Copy SourceFiles="@(AngularDistFiles)"
-          DestinationFiles="@(AngularDistFiles->'$(PublishDir)wwwroot/%(AngularDistFiles.RelativeOutputPath)')"
+          DestinationFiles="@(AngularDistFiles->'$(PublishDir)wwwroot\\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>
