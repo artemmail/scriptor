@@ -138,6 +138,8 @@ builder.Services.AddSpaStaticFiles(opts => opts.RootPath = "wwwroot");
 
 var app = builder.Build();
 
+await EnsureRolesAsync(app.Services);
+
 // (пропущена инициализация ролей и IndexNow для краткости)
 
 app.UseRouting();
@@ -168,3 +170,19 @@ else
 }
 
 app.Run();
+
+static async Task EnsureRolesAsync(IServiceProvider services)
+{
+    using var scope = services.CreateScope();
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+
+    var rolesToEnsure = new[] { "Free", "Moderator" };
+
+    foreach (var roleName in rolesToEnsure)
+    {
+        if (!await roleManager.RoleExistsAsync(roleName))
+        {
+            await roleManager.CreateAsync(new IdentityRole(roleName));
+        }
+    }
+}

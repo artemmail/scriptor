@@ -3,32 +3,10 @@
     <mat-card>
       <mat-card-title>Новая тема</mat-card-title>
       <mat-card-content>
-        <form [formGroup]="topicForm" (ngSubmit)="submitTopic()">
-          <mat-form-field class="full-width" appearance="outline">
-            <mat-label>Заголовок</mat-label>
-            <input matInput formControlName="title" maxlength="256" />
-            <mat-hint align="end">{{ topicForm.value.title?.length || 0 }}/256</mat-hint>
-            <mat-error *ngIf="topicForm.controls['title'].hasError('required')">
-              Укажите заголовок
-            </mat-error>
-          </mat-form-field>
-
-          <mat-form-field class="full-width" appearance="outline">
-            <mat-label>Текст</mat-label>
-            <textarea matInput formControlName="text" rows="6" maxlength="10000"></textarea>
-            <mat-hint align="end">{{ topicForm.value.text?.length || 0 }}/10000</mat-hint>
-            <mat-error *ngIf="topicForm.controls['text'].hasError('required')">
-              Укажите текст темы
-            </mat-error>
-          </mat-form-field>
-
-          <div class="form-actions">
-            <span class="error" *ngIf="topicError">{{ topicError }}</span>
-            <button mat-flat-button color="primary" type="submit" [disabled]="topicSubmitting">
-              Опубликовать
-            </button>
-          </div>
-        </form>
+        <p>Используйте редактор с поддержкой Markdown и LaTeX, чтобы оформить новую публикацию.</p>
+        <button mat-flat-button color="primary" [routerLink]="['/blog/new']">
+          Открыть редактор
+        </button>
       </mat-card-content>
     </mat-card>
   </section>
@@ -52,7 +30,7 @@
           <b>Число ответов:</b> {{ topic.commentCount }}
         </div>
 
-        <div class="content" [class.collapsed]="topic.collapsed" [innerHTML]="topic.text"></div>
+        <div class="content" [class.collapsed]="topic.collapsed" [innerHTML]="topic.renderedText"></div>
         <p *ngIf="topic.textIsTooLong" class="toggle">
           <button mat-button color="primary" (click)="toggleCollapse(topic)">
             {{ topic.collapsed ? 'Развернуть' : 'Свернуть' }}

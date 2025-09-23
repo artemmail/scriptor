@@ -25,6 +25,8 @@ import { EditorPageComponent } from './app/editor-pade/editor-page.component';
 import { AudioFilesComponent } from './app/audio-file/audio-files.component';
 import { MarkdownConverterComponent } from './app/Markdown-converter/markdown-converter.component';
 import { BlogFeedComponent } from './app/blog-feed/blog-feed.component';
+import { BlogTopicCreateComponent } from './app/blog-topic-create/blog-topic-create.component';
+import { RoleGuard } from './app/services/role.guard';
 
 
 
@@ -79,6 +81,12 @@ const routes: Routes = [
   {
     path: 'tasks',
     component: SubtitlesTasksComponent, // страница со списком задач
+  },
+  {
+    path: 'blog/new',
+    component: BlogTopicCreateComponent,
+    canActivate: [RoleGuard],
+    data: { roles: ['Moderator'] }
   },
   {
     path: 'ServiceNews',
