@@ -21,13 +21,17 @@
       <mat-icon matListItemIcon>article</mat-icon>
       <span matListItemTitle>Блоги</span>
     </a>
+    <a mat-list-item (click)="navigate('/profile')">
+      <mat-icon matListItemIcon>account_circle</mat-icon>
+      <span matListItemTitle>Профиль</span>
+    </a>
     <a mat-list-item *ngIf="hasRole(user, 'Moderator')" (click)="navigate('/blog/new')">
       <mat-icon matListItemIcon>post_add</mat-icon>
       <span matListItemTitle>Новая тема</span>
     </a>
     <mat-divider></mat-divider>
     <a mat-list-item (click)="onLogout()">
-      <mat-icon>logout</mat-icon><span>Выйти ({{user.email}})</span>
+      <mat-icon>logout</mat-icon><span>Выйти ({{ user.displayName || user.email }})</span>
     </a>
   </ng-container>
   <ng-template #guestMenu>

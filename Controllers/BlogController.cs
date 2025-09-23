@@ -310,7 +310,11 @@ namespace YandexSpeech.Controllers
                 Slug = topic.Slug,
                 Header = topic.Title,
                 Text = topic.Content,
-                User = topic.CreatedBy?.UserName ?? topic.CreatedBy?.Email ?? string.Empty,
+                UserId = topic.CreatedById,
+                User = topic.CreatedBy?.DisplayName
+                    ?? topic.CreatedBy?.UserName
+                    ?? topic.CreatedBy?.Email
+                    ?? string.Empty,
                 CreatedAt = topic.CreatedAt,
                 CommentCount = comments.Count,
                 Comments = comments
@@ -323,7 +327,11 @@ namespace YandexSpeech.Controllers
             {
                 Id = comment.Id,
                 Text = comment.Content,
-                User = comment.CreatedBy?.UserName ?? comment.CreatedBy?.Email ?? string.Empty,
+                UserId = comment.CreatedById,
+                User = comment.CreatedBy?.DisplayName
+                    ?? comment.CreatedBy?.UserName
+                    ?? comment.CreatedBy?.Email
+                    ?? string.Empty,
                 CreatedAt = comment.CreatedAt
             };
         }

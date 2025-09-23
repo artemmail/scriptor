@@ -28,6 +28,8 @@ import { BlogFeedComponent } from './app/blog-feed/blog-feed.component';
 import { BlogTopicCreateComponent } from './app/blog-topic-create/blog-topic-create.component';
 import { BlogTopicDetailComponent } from './app/blog-topic-detail/blog-topic-detail.component';
 import { RoleGuard } from './app/services/role.guard';
+import { ProfileComponent } from './app/profile/profile.component';
+import { AuthGuard } from './app/services/auth.guard';
 
 
 
@@ -106,6 +108,11 @@ const routes: Routes = [
   {
     path: 'blog',
     component: BlogFeedComponent,
+  },
+  {
+    path: 'profile',
+    component: ProfileComponent,
+    canActivate: [AuthGuard]
   },
   { path: 'login', component: LoginComponent },
   { path: 'auth/callback', component: AuthCallbackComponent },

@@ -6,7 +6,13 @@ import { tap, catchError } from 'rxjs/operators';
 import { jwtDecode } from 'jwt-decode';
 
 export interface TokenResponse { token: string; }
-export interface UserInfo { id: string; name: string; email: string; roles: string[]; }
+export interface UserInfo {
+  id: string;
+  name: string;
+  displayName: string;
+  email: string;
+  roles: string[];
+}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -23,11 +29,17 @@ export class AuthService {
     // 2) Если уже был сохранён userInfo (например, после перезагрузки)
     const saved = localStorage.getItem('userInfo');
     if (saved) {
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed.roles)) {
-        parsed.roles = parsed.roles ? [parsed.roles] : [];
-      }
-      this.userSubject.next(parsed);
+      const parsed = JSON.parse(saved) as Partial<UserInfo> & { name?: string };
+      const roles = Array.isArray(parsed.roles) ? parsed.roles : parsed.roles ? [parsed.roles] : [];
+      const displayName = parsed.displayName ?? parsed.name ?? '';
+      const restored: UserInfo = {
+        id: parsed.id ?? '',
+        name: displayName,
+        displayName,
+        email: parsed.email ?? '',
+        roles,
+      };
+      this.userSubject.next(restored);
     }
   }
 
@@ -62,9 +74,17 @@ export class AuthService {
           ? [rawRoles]
           : [];
 
+      const rawDisplayName =
+        payload.displayName ||
+        payload.DisplayName ||
+        payload.name ||
+        payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] ||
+        '';
+
       const user: UserInfo = {
-        id:    payload.sub,
-        name:  payload.name  || '',
+        id:    payload.sub ?? '',
+        name:  rawDisplayName,
+        displayName: rawDisplayName,
         email: payload.email || '',
         roles
       };
@@ -104,5 +124,20 @@ export class AuthService {
         this.saveUser(null);
       })
     );
+  }
+
+  updateDisplayName(displayName: string): void {
+    const current = this.userSubject.value;
+    if (!current) {
+      return;
+    }
+
+    const updated: UserInfo = {
+      ...current,
+      name: displayName,
+      displayName
+    };
+
+    this.saveUser(updated);
   }
 }

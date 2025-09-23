@@ -6,6 +6,7 @@ namespace YandexSpeech.models.DTO
         public string Slug { get; set; } = string.Empty;
         public string Header { get; set; } = string.Empty;
         public string Text { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
         public string User { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public int CommentCount { get; set; }
