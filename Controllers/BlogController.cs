@@ -278,8 +278,8 @@ namespace YandexSpeech.Controllers
 
         private async Task<string> GenerateSlugAsync(string title, int? excludeTopicId = null)
         {
-            var normalized = Regex.Replace(title.ToLowerInvariant(), "[^a-z0-9а-яё\s-]", "").Trim();
-            normalized = Regex.Replace(normalized, "\s+", "-");
+            var normalized = Regex.Replace(title.ToLowerInvariant(), "[^a-z0-9а-яё\\s-]", "").Trim();
+            normalized = Regex.Replace(normalized, "\\s+", "-");
             normalized = Regex.Replace(normalized, "-+", "-");
             if (string.IsNullOrWhiteSpace(normalized))
             {
