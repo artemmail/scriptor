@@ -12,6 +12,8 @@ using YandexSpeech.Services;
 using YoutubeDownload.Managers;
 using YoutubeDownload.Services;
 using YoutubeExplode;
+using System.IO;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -167,17 +169,27 @@ else
         staticFileContentTypeProvider.Mappings[".webp"] = "image/webp";
     }
 
+    var spaRoot = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+
     var staticFileOptions = new StaticFileOptions
     {
+        FileProvider = new PhysicalFileProvider(spaRoot),
         ContentTypeProvider = staticFileContentTypeProvider
     };
 
-    app.UseDefaultFiles();
+    var defaultFilesOptions = new DefaultFilesOptions
+    {
+        FileProvider = staticFileOptions.FileProvider
+    };
+
+    app.UseDefaultFiles(defaultFilesOptions);
     app.UseStaticFiles(staticFileOptions);
     app.UseSpaStaticFiles(staticFileOptions);
     app.UseSpa(spa =>
     {
-        spa.Options.SourcePath = "C:\\stock\\8.0\\YandexSpeech\\Angular\\youtube-downloader\\dist\\youtube-downloader";
+        spa.Options.SourcePath = spaRoot;
+        spa.Options.DefaultPage = "/index.html";
+        spa.Options.DefaultPageStaticFileOptions = staticFileOptions;
     });
 }
 
