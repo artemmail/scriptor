@@ -55,6 +55,12 @@ namespace YandexSpeech
                 .WithOne(c => c.Topic)
                 .HasForeignKey(c => c.TopicId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<BlogComment>()
+                .HasOne(c => c.CreatedBy)
+                .WithMany()
+                .HasForeignKey(c => c.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict);
         }
 
     }
