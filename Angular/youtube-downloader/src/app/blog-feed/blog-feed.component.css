@@ -1,0 +1,168 @@
+.blog-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.topic-creation mat-card {
+  background: #fafafa;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.error {
+  color: #c62828;
+  font-size: 0.9rem;
+}
+
+.feed-state {
+  text-align: center;
+  color: #666;
+}
+
+.blogblock {
+  margin-bottom: 16px;
+}
+
+.topic-meta {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.95rem;
+}
+
+.topic-meta span {
+  color: #777;
+}
+
+.topic-comments-count {
+  margin: 8px 0;
+}
+
+.content {
+  margin-top: 12px;
+  line-height: 1.6;
+  overflow: hidden;
+}
+
+.content.collapsed {
+  max-height: 200px;
+  position: relative;
+}
+
+.content.collapsed::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 60px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #fff 100%);
+}
+
+.toggle {
+  margin-top: 8px;
+}
+
+.comments {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.comment {
+  padding: 8px 0;
+  border-bottom: 1px solid #ececec;
+}
+
+.comment:last-child {
+  border-bottom: none;
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  color: #757575;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.comment-text {
+  white-space: pre-wrap;
+}
+
+.empty-comments {
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.comment-form {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-hint {
+  color: #888;
+  margin-top: 12px;
+}
+
+.desktop-only {
+  display: block;
+}
+
+.mobile-only {
+  display: none;
+}
+
+.desktop-pagination {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0;
+}
+
+.loading-overlay {
+  display: flex;
+  justify-content: center;
+  margin: 24px 0;
+}
+
+.mobile-scroll-anchor {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+@media (max-width: 768px) {
+  .blog-container {
+    padding: 12px;
+    gap: 16px;
+  }
+
+  .desktop-only {
+    display: none;
+  }
+
+  .mobile-only {
+    display: block;
+  }
+
+  .topic-creation mat-card {
+    padding: 12px;
+  }
+}

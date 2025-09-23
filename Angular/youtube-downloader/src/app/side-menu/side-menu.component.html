@@ -13,6 +13,9 @@
     <a mat-list-item (click)="navigate('/markdown-converter')">
       <mat-icon>sync_alt</mat-icon><span>Конвертер Markdown </span>
     </a>
+    <a mat-list-item (click)="navigate('/blog')">
+      <mat-icon>article</mat-icon><span>Блоги</span>
+    </a>
     <mat-divider></mat-divider>
     <a mat-list-item (click)="onLogout()">
       <mat-icon>logout</mat-icon><span>Выйти ({{user.email}})</span>
@@ -27,6 +30,9 @@
     </a>
     <a mat-list-item (click)="navigate('/markdown-converter')">
       <mat-icon>sync_alt</mat-icon><span>Конвертер Markdown</span>
+    </a>
+    <a mat-list-item (click)="navigate('/blog')">
+      <mat-icon>article</mat-icon><span>Блоги</span>
     </a>
     <mat-divider></mat-divider>
     <a mat-list-item (click)="navigate('/login')">

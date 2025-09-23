@@ -39,5 +39,23 @@ namespace YandexSpeech
         // Новая таблица
         public DbSet<AudioFile> AudioFiles { get; set; }
 
+        public DbSet<BlogTopic> BlogTopics { get; set; }
+        public DbSet<BlogComment> BlogComments { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            base.OnModelCreating(builder);
+
+            builder.Entity<BlogTopic>()
+                .HasIndex(t => t.Slug)
+                .IsUnique();
+
+            builder.Entity<BlogTopic>()
+                .HasMany(t => t.Comments)
+                .WithOne(c => c.Topic)
+                .HasForeignKey(c => c.TopicId)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
+
     }
 }

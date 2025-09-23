@@ -24,6 +24,7 @@ import { AuthCallbackComponent } from './app/AuthCallbackComponent/auth-callback
 import { EditorPageComponent } from './app/editor-pade/editor-page.component';
 import { AudioFilesComponent } from './app/audio-file/audio-files.component';
 import { MarkdownConverterComponent } from './app/Markdown-converter/markdown-converter.component';
+import { BlogFeedComponent } from './app/blog-feed/blog-feed.component';
 
 
 
@@ -82,6 +83,10 @@ const routes: Routes = [
   {
     path: 'ServiceNews',
     component: ServiceNewsComponent, // страница со списком задач
+  },
+  {
+    path: 'blog',
+    component: BlogFeedComponent,
   },
   { path: 'login', component: LoginComponent },
   { path: 'auth/callback', component: AuthCallbackComponent },

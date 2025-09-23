@@ -6,7 +6,7 @@ import { tap, catchError } from 'rxjs/operators';
 import { jwtDecode } from 'jwt-decode';
 
 export interface TokenResponse { token: string; }
-export interface UserInfo { id: string; name: string; email: string; }
+export interface UserInfo { id: string; name: string; email: string; roles: string[]; }
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -23,7 +23,11 @@ export class AuthService {
     // 2) Если уже был сохранён userInfo (например, после перезагрузки)
     const saved = localStorage.getItem('userInfo');
     if (saved) {
-      this.userSubject.next(JSON.parse(saved));
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed.roles)) {
+        parsed.roles = parsed.roles ? [parsed.roles] : [];
+      }
+      this.userSubject.next(parsed);
     }
   }
 
@@ -49,10 +53,20 @@ export class AuthService {
   private decodeAndSaveUser(token: string) {
     try {
       const payload: any = jwtDecode(token);
+      const rawRoles = payload.role
+        ?? payload.roles
+        ?? payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'];
+      const roles = Array.isArray(rawRoles)
+        ? rawRoles
+        : rawRoles
+          ? [rawRoles]
+          : [];
+
       const user: UserInfo = {
         id:    payload.sub,
         name:  payload.name  || '',
-        email: payload.email || ''
+        email: payload.email || '',
+        roles
       };
       this.saveUser(user);
     } catch {
