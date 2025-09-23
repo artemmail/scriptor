@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs/operators';
 
@@ -16,11 +16,22 @@ import { BlogService, BlogTopic, BlogComment } from '../services/blog.service';
 import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
 import { AuthService, UserInfo } from '../services/AuthService.service';
 
+interface BlogCommentViewModel extends BlogComment {
+  editing: boolean;
+  editText: string;
+  submittingEdit: boolean;
+  deleting: boolean;
+  actionError: string;
+}
+
 interface BlogTopicDetailViewModel extends BlogTopic {
   renderedText: string;
   newComment: string;
   submittingComment: boolean;
   commentError?: string;
+  comments: BlogCommentViewModel[];
+  deletingTopic: boolean;
+  topicActionError: string;
 }
 
 @Component({
@@ -45,18 +56,22 @@ export class BlogTopicDetailComponent implements OnInit {
   loading = false;
   loadError = '';
   currentUser: UserInfo | null = null;
+  isModerator = false;
 
   constructor(
     private readonly blogService: BlogService,
     private readonly route: ActivatedRoute,
     private readonly markdownRenderer: MarkdownRendererService1,
     private readonly authService: AuthService,
-    private readonly destroyRef: DestroyRef
+    private readonly destroyRef: DestroyRef,
+    private readonly router: Router
   ) {
     this.authService.user$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(user => {
         this.currentUser = user;
+        const roles = user?.roles ?? [];
+        this.isModerator = roles.some(r => r.toLowerCase() === 'moderator');
       });
   }
 
@@ -97,7 +112,7 @@ export class BlogTopicDetailComponent implements OnInit {
       )
       .subscribe({
         next: comment => {
-          topic.comments = [...topic.comments, comment];
+          topic.comments = [...topic.comments, this.mapComment(comment)];
           topic.commentCount = topic.comments.length;
           topic.newComment = '';
         },
@@ -107,8 +122,138 @@ export class BlogTopicDetailComponent implements OnInit {
       });
   }
 
-  trackByCommentId(_: number, comment: BlogComment): number {
+  trackByCommentId(_: number, comment: BlogCommentViewModel): number {
     return comment.id;
+  }
+
+  canEditComment(comment: BlogCommentViewModel): boolean {
+    return this.isModerator || this.isOwnComment(comment);
+  }
+
+  canDeleteComment(comment: BlogCommentViewModel): boolean {
+    return this.isModerator || this.isOwnComment(comment);
+  }
+
+  startEditComment(comment: BlogCommentViewModel): void {
+    if (!this.canEditComment(comment) || comment.submittingEdit || comment.editing) {
+      return;
+    }
+
+    comment.editing = true;
+    comment.editText = comment.text;
+    comment.actionError = '';
+  }
+
+  cancelEditComment(comment: BlogCommentViewModel): void {
+    if (comment.submittingEdit) {
+      return;
+    }
+
+    comment.editing = false;
+    comment.editText = comment.text;
+    comment.actionError = '';
+  }
+
+  saveComment(topic: BlogTopicDetailViewModel, comment: BlogCommentViewModel): void {
+    if (!this.canEditComment(comment) || comment.submittingEdit) {
+      return;
+    }
+
+    const text = (comment.editText ?? '').trim();
+    if (!text) {
+      comment.actionError = 'Введите текст комментария.';
+      return;
+    }
+
+    comment.submittingEdit = true;
+    comment.actionError = '';
+
+    this.blogService
+      .updateComment(topic.id, comment.id, { text })
+      .pipe(
+        finalize(() => {
+          comment.submittingEdit = false;
+        })
+      )
+      .subscribe({
+        next: updated => {
+          comment.text = updated.text;
+          comment.editText = updated.text;
+          comment.editing = false;
+        },
+        error: () => {
+          comment.actionError = 'Не удалось сохранить изменения. Попробуйте позже.';
+        }
+      });
+  }
+
+  deleteComment(topic: BlogTopicDetailViewModel, comment: BlogCommentViewModel): void {
+    if (!this.canDeleteComment(comment) || comment.deleting) {
+      return;
+    }
+
+    const confirmed = confirm('Удалить комментарий?');
+    if (!confirmed) {
+      return;
+    }
+
+    comment.deleting = true;
+    comment.actionError = '';
+
+    this.blogService
+      .deleteComment(topic.id, comment.id)
+      .pipe(
+        finalize(() => {
+          comment.deleting = false;
+        })
+      )
+      .subscribe({
+        next: () => {
+          topic.comments = topic.comments.filter(c => c.id !== comment.id);
+          topic.commentCount = topic.comments.length;
+        },
+        error: () => {
+          comment.actionError = 'Не удалось удалить комментарий. Попробуйте позже.';
+        }
+      });
+  }
+
+  editTopic(topic: BlogTopicDetailViewModel): void {
+    if (!this.isModerator) {
+      return;
+    }
+
+    this.router.navigate(['/blog', topic.slug, 'edit']);
+  }
+
+  deleteTopic(topic: BlogTopicDetailViewModel): void {
+    if (!this.isModerator || topic.deletingTopic) {
+      return;
+    }
+
+    const confirmed = confirm('Удалить тему целиком?');
+    if (!confirmed) {
+      return;
+    }
+
+    topic.deletingTopic = true;
+    topic.topicActionError = '';
+
+    this.blogService
+      .deleteTopic(topic.id)
+      .pipe(
+        finalize(() => {
+          topic.deletingTopic = false;
+        })
+      )
+      .subscribe({
+        next: () => {
+          this.router.navigate(['/blog']);
+        },
+        error: () => {
+          topic.topicActionError = 'Не удалось удалить тему. Попробуйте позже.';
+        }
+      });
   }
 
   private fetchTopic(slug: string): void {
@@ -138,7 +283,37 @@ export class BlogTopicDetailComponent implements OnInit {
       ...topic,
       renderedText: this.markdownRenderer.renderMath(topic.text),
       newComment: '',
-      submittingComment: false
+      submittingComment: false,
+      comments: topic.comments.map(comment => this.mapComment(comment)),
+      deletingTopic: false,
+      topicActionError: ''
     };
+  }
+
+  private mapComment(comment: BlogComment): BlogCommentViewModel {
+    return {
+      ...comment,
+      editing: false,
+      editText: comment.text,
+      submittingEdit: false,
+      deleting: false,
+      actionError: ''
+    };
+  }
+
+  private isOwnComment(comment: BlogComment): boolean {
+    if (!this.currentUser) {
+      return false;
+    }
+
+    const normalize = (value: string | undefined | null) =>
+      (value ?? '').trim().toLowerCase();
+
+    const commentUser = normalize(comment.user);
+    return (
+      commentUser !== '' &&
+      (commentUser === normalize(this.currentUser.email) ||
+        commentUser === normalize(this.currentUser.name))
+    );
   }
 }

@@ -40,6 +40,18 @@
   overflow-wrap: anywhere;
 }
 
+.topic-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+
+.actions-spacer {
+  flex: 1 1 auto;
+}
+
 .comments {
   margin-top: 24px;
   display: flex;
@@ -66,6 +78,26 @@
 
 .comment-text {
   white-space: pre-wrap;
+}
+
+.comment-controls,
+.comment-edit-actions {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.comment-edit-section {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.controls-spacer {
+  flex: 1 1 auto;
 }
 
 .empty {

@@ -58,6 +58,21 @@
   font-size: 0.9rem;
 }
 
+.load-state {
+  margin: 24px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  color: #666;
+  flex-wrap: wrap;
+  text-align: center;
+}
+
+.load-state.error {
+  color: #c62828;
+}
+
 @media (max-width: 768px) {
   .create-topic-container {
     padding: 12px;

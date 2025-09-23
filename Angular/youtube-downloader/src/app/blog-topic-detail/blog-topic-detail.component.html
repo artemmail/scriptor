@@ -24,6 +24,22 @@
     <mat-card-content>
       <div class="topic-content" [innerHTML]="topic.renderedText"></div>
 
+      <div class="topic-actions" *ngIf="isModerator">
+        <span class="error" *ngIf="topic.topicActionError">{{ topic.topicActionError }}</span>
+        <span class="actions-spacer"></span>
+        <button mat-stroked-button color="primary" (click)="editTopic(topic)">
+          Редактировать тему
+        </button>
+        <button
+          mat-stroked-button
+          color="warn"
+          (click)="deleteTopic(topic)"
+          [disabled]="topic.deletingTopic"
+        >
+          {{ topic.deletingTopic ? 'Удаление…' : 'Удалить тему' }}
+        </button>
+      </div>
+
       <mat-divider></mat-divider>
 
       <section class="comments">
@@ -33,7 +49,65 @@
             <b>{{ comment.user }}</b>
             <span>{{ comment.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
           </div>
-          <div class="comment-text">{{ comment.text }}</div>
+          <ng-container *ngIf="comment.editing; else viewComment">
+            <div class="comment-edit-section">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Текст комментария</mat-label>
+                <textarea
+                  matInput
+                  rows="4"
+                  maxlength="2000"
+                  [(ngModel)]="comment.editText"
+                  [ngModelOptions]="{ standalone: true }"
+                ></textarea>
+              </mat-form-field>
+              <div class="comment-edit-actions">
+                <span class="error" *ngIf="comment.actionError">{{ comment.actionError }}</span>
+                <span class="controls-spacer"></span>
+                <button
+                  mat-flat-button
+                  color="primary"
+                  (click)="saveComment(topic, comment)"
+                  [disabled]="comment.submittingEdit"
+                >
+                  Сохранить
+                </button>
+                <button
+                  mat-button
+                  type="button"
+                  (click)="cancelEditComment(comment)"
+                  [disabled]="comment.submittingEdit"
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          </ng-container>
+          <ng-template #viewComment>
+            <div class="comment-text">{{ comment.text }}</div>
+            <div class="comment-controls" *ngIf="canEditComment(comment) || canDeleteComment(comment)">
+              <span class="error" *ngIf="comment.actionError">{{ comment.actionError }}</span>
+              <span class="controls-spacer"></span>
+              <button
+                mat-button
+                color="primary"
+                *ngIf="canEditComment(comment)"
+                (click)="startEditComment(comment)"
+                [disabled]="comment.editing"
+              >
+                Редактировать
+              </button>
+              <button
+                mat-button
+                color="warn"
+                *ngIf="canDeleteComment(comment)"
+                (click)="deleteComment(topic, comment)"
+                [disabled]="comment.deleting"
+              >
+                {{ comment.deleting ? 'Удаление…' : 'Удалить' }}
+              </button>
+            </div>
+          </ng-template>
         </div>
         <div class="empty" *ngIf="topic.comments.length === 0">
           Пока нет комментариев
