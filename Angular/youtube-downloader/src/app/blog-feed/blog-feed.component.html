@@ -53,6 +53,20 @@
           <a mat-stroked-button color="primary" [routerLink]="['/blog', topic.slug]">
             Читать полностью
           </a>
+          <div class="moderation-actions" *ngIf="isModerator">
+            <span class="action-error" *ngIf="topic.actionError">{{ topic.actionError }}</span>
+            <button mat-stroked-button color="primary" (click)="editTopic(topic)">
+              Редактировать
+            </button>
+            <button
+              mat-stroked-button
+              color="warn"
+              (click)="deleteTopic(topic)"
+              [disabled]="topic.deleting"
+            >
+              {{ topic.deleting ? 'Удаление…' : 'Удалить' }}
+            </button>
+          </div>
         </div>
       </mat-card-content>
     </mat-card>

@@ -8,13 +8,15 @@ import { finalize } from 'rxjs/operators';
 import { BlogService, BlogTopic } from '../services/blog.service';
 import { InfiniteScrollModule } from 'ngx-infinite-scroll';
 import { AuthService } from '../services/AuthService.service';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
 
 interface BlogTopicViewModel extends BlogTopic {
   collapsed: boolean;
   textIsTooLong: boolean;
   renderedText: string;
+  deleting?: boolean;
+  actionError?: string;
 }
 
 @Component({
@@ -43,18 +45,21 @@ export class BlogFeedComponent implements OnInit {
   feedError = '';
 
   canCreateTopics = false;
+  isModerator = false;
 
   constructor(
     private readonly blogService: BlogService,
     private readonly authService: AuthService,
     private readonly destroyRef: DestroyRef,
+    private readonly router: Router,
     private readonly markdownRenderer: MarkdownRendererService1
   ) {
     this.authService.user$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(user => {
         const roles = user?.roles ?? [];
-        this.canCreateTopics = roles.some(r => r.toLowerCase() === 'moderator');
+        this.isModerator = roles.some(r => r.toLowerCase() === 'moderator');
+        this.canCreateTopics = this.isModerator;
       });
   }
 
@@ -72,6 +77,44 @@ export class BlogFeedComponent implements OnInit {
 
   trackByTopicId(_: number, topic: BlogTopicViewModel): number {
     return topic.id;
+  }
+
+  editTopic(topic: BlogTopicViewModel): void {
+    if (!this.isModerator) {
+      return;
+    }
+
+    this.router.navigate(['/blog', topic.slug, 'edit']);
+  }
+
+  deleteTopic(topic: BlogTopicViewModel): void {
+    if (!this.isModerator || topic.deleting) {
+      return;
+    }
+
+    const confirmed = confirm(`Удалить тему «${topic.header}»?`);
+    if (!confirmed) {
+      return;
+    }
+
+    topic.deleting = true;
+    topic.actionError = '';
+
+    this.blogService
+      .deleteTopic(topic.id)
+      .pipe(
+        finalize(() => {
+          topic.deleting = false;
+        })
+      )
+      .subscribe({
+        next: () => {
+          this.topics = this.topics.filter(t => t.id !== topic.id);
+        },
+        error: () => {
+          topic.actionError = 'Не удалось удалить тему. Попробуйте позже.';
+        }
+      });
   }
 
   private loadTopics(): void {
@@ -117,7 +160,9 @@ export class BlogFeedComponent implements OnInit {
       ...topic,
       collapsed: isTooLong,
       textIsTooLong: isTooLong,
-      renderedText: rendered
+      renderedText: rendered,
+      deleting: false,
+      actionError: ''
     };
   }
 }

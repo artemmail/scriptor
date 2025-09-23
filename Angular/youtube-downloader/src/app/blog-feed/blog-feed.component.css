@@ -75,6 +75,19 @@
   margin-right: auto;
 }
 
+.moderation-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.action-error {
+  color: #c62828;
+  font-size: 0.9rem;
+}
+
 .feed-loader,
 .feed-end,
 .initial-loader {

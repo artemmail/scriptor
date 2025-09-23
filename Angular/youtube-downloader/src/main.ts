@@ -90,6 +90,12 @@ const routes: Routes = [
     data: { roles: ['Moderator'] }
   },
   {
+    path: 'blog/:slug/edit',
+    component: BlogTopicCreateComponent,
+    canActivate: [RoleGuard],
+    data: { roles: ['Moderator'] }
+  },
+  {
     path: 'blog/:slug',
     component: BlogTopicDetailComponent,
   },

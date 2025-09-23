@@ -42,7 +42,26 @@ export class BlogService {
     return this.http.post<BlogTopic>(`${this.apiUrl}/topics`, payload);
   }
 
+  updateTopic(topicId: number, payload: { title: string; text: string }): Observable<BlogTopic> {
+    return this.http.put<BlogTopic>(`${this.apiUrl}/topics/${topicId}`, payload);
+  }
+
+  deleteTopic(topicId: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/topics/${topicId}`);
+  }
+
   addComment(topicId: number, payload: { text: string }): Observable<BlogComment> {
     return this.http.post<BlogComment>(`${this.apiUrl}/topics/${topicId}/comments`, payload);
+  }
+
+  updateComment(topicId: number, commentId: number, payload: { text: string }): Observable<BlogComment> {
+    return this.http.put<BlogComment>(
+      `${this.apiUrl}/topics/${topicId}/comments/${commentId}`,
+      payload
+    );
+  }
+
+  deleteComment(topicId: number, commentId: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/topics/${topicId}/comments/${commentId}`);
   }
 }
