@@ -151,33 +151,51 @@ namespace YandexSpeech.services
 
             try
             {
-                var outputPath = Path.Combine(_workingDirectory, $"{task.Id}.wav");
+                var sourcePath = Path.GetFullPath(task.SourceFilePath);
+                var outputPath = Path.GetFullPath(Path.Combine(_workingDirectory, $"{task.Id}.wav"));
                 var ffmpegExecutable = ResolveFfmpegExecutable();
-                var arguments = BuildFfmpegArguments(task.SourceFilePath, outputPath);
 
-                using var process = new Process
+                var startInfo = new ProcessStartInfo
                 {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = ffmpegExecutable,
-                        Arguments = arguments,
-                        UseShellExecute = false,
-                        RedirectStandardError = true,
-                        RedirectStandardOutput = true,
-                        CreateNoWindow = true
-                    }
+                    FileName = ffmpegExecutable,
+                    UseShellExecute = false,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
                 };
+
+                startInfo.ArgumentList.Add("-y");
+                startInfo.ArgumentList.Add("-i");
+                startInfo.ArgumentList.Add(sourcePath);
+                startInfo.ArgumentList.Add("-vn");
+                startInfo.ArgumentList.Add("-ac");
+                startInfo.ArgumentList.Add("1");
+                startInfo.ArgumentList.Add("-ar");
+                startInfo.ArgumentList.Add("16000");
+                startInfo.ArgumentList.Add("-acodec");
+                startInfo.ArgumentList.Add("pcm_s16le");
+                startInfo.ArgumentList.Add(outputPath);
+
+                using var process = new Process { StartInfo = startInfo };
 
                 process.Start();
 
+                var waitForExitTask = process.WaitForExitAsync();
                 var standardErrorTask = process.StandardError.ReadToEndAsync();
                 var standardOutputTask = process.StandardOutput.ReadToEndAsync();
-                await Task.WhenAll(process.WaitForExitAsync(), standardErrorTask, standardOutputTask);
+                await Task.WhenAll(waitForExitTask, standardErrorTask, standardOutputTask);
+
+                var standardError = await standardErrorTask;
+                var standardOutput = await standardOutputTask;
 
                 if (process.ExitCode != 0)
                 {
-                    var error = await standardErrorTask;
-                    throw new InvalidOperationException($"FFmpeg conversion failed (exit code {process.ExitCode}): {error}");
+                    throw new InvalidOperationException($"FFmpeg conversion failed (exit code {process.ExitCode}): {standardError}\n{standardOutput}");
+                }
+
+                if (!File.Exists(outputPath))
+                {
+                    throw new InvalidOperationException($"FFmpeg conversion did not produce an output file at '{outputPath}'. Output: {standardOutput} Error: {standardError}");
                 }
 
                 task.ConvertedFilePath = outputPath;
@@ -492,30 +510,50 @@ namespace YandexSpeech.services
             return executableName;
         }
 
-        private static string BuildFfmpegArguments(string source, string target)
-        {
-            return $"-y -i \"{source}\" -vn -ac 1 -ar 16000 -acodec pcm_s16le \"{target}\"";
-        }
-
         private async Task<WhisperTranscriptionResult> TranscribeWithOpenAiAsync(string audioFilePath)
         {
             var whisperExecutable = ResolveWhisperExecutable();
-            var outputDirectory = Path.Combine(_workingDirectory, $"whisper-{Guid.NewGuid():N}");
+            var outputDirectory = Path.GetFullPath(Path.Combine(_workingDirectory, $"whisper-{Guid.NewGuid():N}"));
             Directory.CreateDirectory(outputDirectory);
-            var arguments = BuildWhisperArguments(audioFilePath, outputDirectory);
 
-            using var process = new Process
+            var audioPath = Path.GetFullPath(audioFilePath);
+            if (!File.Exists(audioPath))
+                throw new FileNotFoundException("Audio file not found for Whisper transcription.", audioPath);
+
+            var startInfo = new ProcessStartInfo
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = whisperExecutable,
-                    Arguments = arguments,
-                    UseShellExecute = false,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow = true
-                }
+                FileName = whisperExecutable,
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true
             };
+
+            startInfo.ArgumentList.Add(audioPath);
+            startInfo.ArgumentList.Add("--model");
+            startInfo.ArgumentList.Add(_whisperModel);
+            startInfo.ArgumentList.Add("--task");
+            startInfo.ArgumentList.Add("transcribe");
+            startInfo.ArgumentList.Add("--output_format");
+            startInfo.ArgumentList.Add("json");
+            startInfo.ArgumentList.Add("--word_timestamps");
+            startInfo.ArgumentList.Add("True");
+            startInfo.ArgumentList.Add("--output_dir");
+            startInfo.ArgumentList.Add(outputDirectory);
+
+            if (!string.IsNullOrWhiteSpace(_whisperDevice))
+            {
+                startInfo.ArgumentList.Add("--device");
+                startInfo.ArgumentList.Add(_whisperDevice);
+
+                if (string.Equals(_whisperDevice, "cpu", StringComparison.OrdinalIgnoreCase))
+                {
+                    startInfo.ArgumentList.Add("--fp16");
+                    startInfo.ArgumentList.Add("False");
+                }
+            }
+
+            using var process = new Process { StartInfo = startInfo };
 
             try
             {
@@ -527,17 +565,18 @@ namespace YandexSpeech.services
 
                 await Task.WhenAll(waitForExitTask, standardErrorTask, standardOutputTask);
 
+                var standardError = await standardErrorTask;
+                var standardOutput = await standardOutputTask;
+
                 if (process.ExitCode != 0)
                 {
-                    var error = await standardErrorTask;
-                    throw new InvalidOperationException($"Whisper transcription failed (exit code {process.ExitCode}): {error}");
+                    throw new InvalidOperationException($"Whisper transcription failed (exit code {process.ExitCode}): {standardError}\n{standardOutput}");
                 }
 
                 var transcriptFile = Directory.EnumerateFiles(outputDirectory, "*.json").FirstOrDefault();
                 if (transcriptFile == null)
                 {
-                    var output = await standardOutputTask;
-                    throw new InvalidOperationException($"Whisper transcription did not produce a text file. Output: {output}");
+                    throw new InvalidOperationException($"Whisper transcription did not produce a text file. Output: {standardOutput} Error: {standardError}");
                 }
 
                 var transcription = await File.ReadAllTextAsync(transcriptFile);
@@ -600,23 +639,6 @@ namespace YandexSpeech.services
             }
 
             return _whisperExecutableSetting;
-        }
-
-        private string BuildWhisperArguments(string audioFilePath, string outputDirectory)
-        {
-            var builder = new StringBuilder();
-            builder.Append($"\"{audioFilePath}\" --model {_whisperModel} --task transcribe --output_format json --word_timestamps True --output_dir \"{outputDirectory}\"");
-            if (!string.IsNullOrWhiteSpace(_whisperDevice))
-            {
-                builder.Append($" --device {_whisperDevice}");
-            }
-
-            if (string.Equals(_whisperDevice, "cpu", StringComparison.OrdinalIgnoreCase))
-            {
-                builder.Append(" --fp16 False");
-            }
-
-            return builder.ToString();
         }
 
         private static int ClampIndex(int value, int length)
