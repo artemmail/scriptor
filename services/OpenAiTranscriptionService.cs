@@ -513,6 +513,7 @@ namespace YandexSpeech.services
         private async Task<WhisperTranscriptionResult> TranscribeWithOpenAiAsync(string audioFilePath)
         {
             var whisperExecutable = ResolveWhisperExecutable();
+            var ffmpegExecutable = ResolveFfmpegExecutable();
             var outputDirectory = Path.GetFullPath(Path.Combine(_workingDirectory, $"whisper-{Guid.NewGuid():N}"));
             Directory.CreateDirectory(outputDirectory);
 
@@ -528,6 +529,31 @@ namespace YandexSpeech.services
                 RedirectStandardOutput = true,
                 CreateNoWindow = true
             };
+
+            if (!string.IsNullOrWhiteSpace(ffmpegExecutable))
+            {
+                startInfo.Environment["FFMPEG_BINARY"] = ffmpegExecutable;
+
+                var ffmpegDirectory = Path.GetDirectoryName(ffmpegExecutable);
+                if (!string.IsNullOrWhiteSpace(ffmpegDirectory))
+                {
+                    var pathVariableName = OperatingSystem.IsWindows() ? "Path" : "PATH";
+                    if (!startInfo.Environment.TryGetValue(pathVariableName, out var currentPath) || string.IsNullOrWhiteSpace(currentPath))
+                    {
+                        currentPath = Environment.GetEnvironmentVariable(pathVariableName);
+                    }
+
+                    if (string.IsNullOrWhiteSpace(currentPath))
+                    {
+                        startInfo.Environment[pathVariableName] = ffmpegDirectory;
+                    }
+                    else if (!currentPath.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+                        .Any(p => string.Equals(p, ffmpegDirectory, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)))
+                    {
+                        startInfo.Environment[pathVariableName] = string.Concat(ffmpegDirectory, Path.PathSeparator, currentPath);
+                    }
+                }
+            }
 
             startInfo.ArgumentList.Add(audioPath);
             startInfo.ArgumentList.Add("--model");
