@@ -6,6 +6,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using YandexSpeech.models.DB;
 using YandexSpeech.services;
+using YandexSpeech.Extensions;
 using YoutubeExplode.Videos;
 using YoutubeDownload.Services; // <-- добавили
 using System.Text;
@@ -240,7 +241,7 @@ namespace YandexSpeech.Controllers
             if (!User.Identity?.IsAuthenticated ?? true)
                 return Unauthorized("not authenticated");
 
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             if (userId == null)
                 return Unauthorized("User is not authenticated");
 

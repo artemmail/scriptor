@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using YandexSpeech.services;
+using YandexSpeech.Extensions;
 
 namespace YandexSpeech.Controllers
 {
@@ -23,7 +24,7 @@ namespace YandexSpeech.Controllers
         [HttpPost("{fileId}/recognize")]
         public async Task<ActionResult<string>> StartRecognition(string fileId)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             if (string.IsNullOrEmpty(userId))
                 return Unauthorized();
 

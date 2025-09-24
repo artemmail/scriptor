@@ -10,6 +10,7 @@ using YoutubeDownload.Managers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;             // StreamDto, MergedVideoDto
+using YandexSpeech.Extensions;
 
 namespace YourNamespace.Controllers
 {
@@ -120,7 +121,7 @@ namespace YourNamespace.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]       
         public async Task<IActionResult> MergeVideoAndAudios([FromBody] MergeRequestDto dto)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             if (userId == null)
                 return Unauthorized("User is not authenticated");
 
@@ -208,7 +209,7 @@ namespace YourNamespace.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<ActionResult<List<MergedVideoDto>>> GetMergedVideos()
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             if (userId == null)
                 return Unauthorized("User is not authenticated");
 

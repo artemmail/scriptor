@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 using YandexSpeech.services;
+using YandexSpeech.Extensions;
 
 namespace YandexSpeech.Controllers
 {
@@ -55,7 +56,7 @@ namespace YandexSpeech.Controllers
                 return BadRequest("File not provided.");
             }
 
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             if (string.IsNullOrEmpty(userId))
             {
                 return Unauthorized();
@@ -95,7 +96,7 @@ namespace YandexSpeech.Controllers
         [HttpGet]
         public async Task<ActionResult> List()
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             if (string.IsNullOrEmpty(userId))
             {
                 return Unauthorized();
@@ -113,7 +114,7 @@ namespace YandexSpeech.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<OpenAiTranscriptionTaskDetailsDto>> GetById(string id)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             if (string.IsNullOrEmpty(userId))
             {
                 return Unauthorized();
@@ -135,7 +136,7 @@ namespace YandexSpeech.Controllers
         [HttpPost("{id}/continue")]
         public async Task<ActionResult<OpenAiTranscriptionTaskDetailsDto>> Continue(string id)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             if (string.IsNullOrEmpty(userId))
             {
                 return Unauthorized();
