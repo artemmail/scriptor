@@ -22,16 +22,44 @@ namespace YandexSpeech.models.DTO
         public DateTime CreatedAt { get; set; }
 
         public DateTime ModifiedAt { get; set; }
+
+        public int SegmentsTotal { get; set; }
+
+        public int SegmentsProcessed { get; set; }
     }
 
     public class OpenAiTranscriptionTaskDetailsDto : OpenAiTranscriptionTaskDto
     {
         public string? RecognizedText { get; set; }
 
+        public string? ProcessedText { get; set; }
+
         public string? MarkdownText { get; set; }
 
         public IReadOnlyList<OpenAiTranscriptionStepDto> Steps { get; set; }
             = Array.Empty<OpenAiTranscriptionStepDto>();
+
+        public IReadOnlyList<OpenAiRecognizedSegmentDto> Segments { get; set; }
+            = Array.Empty<OpenAiRecognizedSegmentDto>();
+    }
+
+    public class OpenAiRecognizedSegmentDto
+    {
+        public int SegmentId { get; set; }
+
+        public int Order { get; set; }
+
+        public string Text { get; set; } = string.Empty;
+
+        public string? ProcessedText { get; set; }
+
+        public bool IsProcessed { get; set; }
+
+        public bool IsProcessing { get; set; }
+
+        public double? StartSeconds { get; set; }
+
+        public double? EndSeconds { get; set; }
     }
 
     public class OpenAiTranscriptionStepDto
