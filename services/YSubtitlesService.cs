@@ -233,7 +233,9 @@ namespace YandexSpeech.services
             string sortOrder,
             string filter)
         {
-            var query = _dbContext.YoutubeCaptionTasks.AsQueryable();
+            var query = _dbContext.YoutubeCaptionTasks
+                .AsQueryable()
+                .Where(x => x.ChannelId != "UCa0jIrHPmqCHopklH8ltmVw"); 
 
             // Фильтрация
             if (!string.IsNullOrEmpty(filter))
