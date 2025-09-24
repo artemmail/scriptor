@@ -10,6 +10,8 @@ namespace YandexSpeech.models.DB
         Created = 0,
         Converting = 10,
         Transcribing = 20,
+        Segmenting = 25,
+        ProcessingSegments = 27,
         Formatting = 30,
         Done = 900,
         Error = 999
@@ -36,6 +38,10 @@ namespace YandexSpeech.models.DB
 
         public string? RecognizedText { get; set; }
 
+        public string? SegmentsJson { get; set; }
+
+        public string? ProcessedText { get; set; }
+
         public string? MarkdownText { get; set; }
 
         public OpenAiTranscriptionStatus Status { get; set; } = OpenAiTranscriptionStatus.Created;
@@ -51,8 +57,15 @@ namespace YandexSpeech.models.DB
         [Required]
         public string CreatedBy { get; set; } = null!;
 
+        public int SegmentsTotal { get; set; }
+
+        public int SegmentsProcessed { get; set; }
+
         public virtual ICollection<OpenAiTranscriptionStep> Steps { get; set; }
             = new List<OpenAiTranscriptionStep>();
+
+        public virtual ICollection<OpenAiRecognizedSegment> Segments { get; set; }
+            = new List<OpenAiRecognizedSegment>();
     }
 
     [Table("OpenAiTranscriptionSteps")]

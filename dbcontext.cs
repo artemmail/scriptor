@@ -37,6 +37,7 @@ namespace YandexSpeech
 
         public DbSet<OpenAiTranscriptionTask> OpenAiTranscriptionTasks { get; set; }
         public DbSet<OpenAiTranscriptionStep> OpenAiTranscriptionSteps { get; set; }
+        public DbSet<OpenAiRecognizedSegment> OpenAiRecognizedSegments { get; set; }
 
 
         // Новая таблица

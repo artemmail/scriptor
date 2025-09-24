@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -6,6 +7,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -25,14 +27,21 @@ namespace YandexSpeech.services
         private readonly string _whisperExecutableSetting;
         private readonly string _whisperModel;
         private readonly string _whisperDevice;
+        private readonly IPunctuationService _punctuationService;
+        private static readonly JsonSerializerOptions WhisperJsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true,
+        };
 
         public OpenAiTranscriptionService(
             MyDbContext dbContext,
             IConfiguration configuration,
-            ILogger<OpenAiTranscriptionService> logger)
+            ILogger<OpenAiTranscriptionService> logger,
+            IPunctuationService punctuationService)
         {
             _dbContext = dbContext;
             _logger = logger;
+            _punctuationService = punctuationService;
             _ffmpegPath = configuration.GetValue<string>("FfmpegExePath")
                            ?? throw new InvalidOperationException("FfmpegExePath is not configured.");
             _openAiApiKey = configuration["OpenAI:ApiKey"]
@@ -104,6 +113,12 @@ namespace YandexSpeech.services
                             break;
                         case OpenAiTranscriptionStatus.Transcribing:
                             await RunTranscriptionStepAsync(task);
+                            break;
+                        case OpenAiTranscriptionStatus.Segmenting:
+                            await RunSegmentingStepAsync(task);
+                            break;
+                        case OpenAiTranscriptionStatus.ProcessingSegments:
+                            await RunSegmentProcessingStepAsync(task);
                             break;
                         case OpenAiTranscriptionStatus.Formatting:
                             await RunFormattingStepAsync(task);
@@ -193,8 +208,11 @@ namespace YandexSpeech.services
             try
             {
                 var transcription = await TranscribeWithOpenAiAsync(task.ConvertedFilePath!);
-                task.RecognizedText = transcription;
-                task.Status = OpenAiTranscriptionStatus.Formatting;
+                task.RecognizedText = transcription.TimecodedText;
+                task.SegmentsJson = transcription.RawJson;
+                task.SegmentsTotal = 0;
+                task.SegmentsProcessed = 0;
+                task.Status = OpenAiTranscriptionStatus.Segmenting;
                 task.ModifiedAt = DateTime.UtcNow;
                 await _dbContext.SaveChangesAsync();
 
@@ -207,10 +225,171 @@ namespace YandexSpeech.services
             }
         }
 
+        private async Task RunSegmentingStepAsync(OpenAiTranscriptionTask task)
+        {
+            if (string.IsNullOrWhiteSpace(task.SegmentsJson))
+                throw new InvalidOperationException("No transcription segments available for processing.");
+
+            task.Status = OpenAiTranscriptionStatus.Segmenting;
+            task.ModifiedAt = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
+
+            var step = await StartStepAsync(task, OpenAiTranscriptionStatus.Segmenting);
+
+            try
+            {
+                var parsed = ParseWhisperResult(task.SegmentsJson);
+                if (parsed?.Segments == null || parsed.Segments.Count == 0)
+                    throw new InvalidOperationException("Unable to parse segments for transcription task.");
+
+                var captionSegments = BuildCaptionSegmentsFromWhisper(parsed);
+                var processor = new CaptionProcessor();
+                var blocks = processor.SegmentCaptionSegmentsDetailed(
+                    captionSegments,
+                    maxWordsInSegment: 4000,
+                    windowSize: 400,
+                    pauseThreshold: 1.0);
+
+                var existing = _dbContext.OpenAiRecognizedSegments.Where(s => s.TaskId == task.Id);
+                _dbContext.OpenAiRecognizedSegments.RemoveRange(existing);
+                await _dbContext.SaveChangesAsync();
+
+                var newSegments = new List<OpenAiRecognizedSegment>();
+                int order = 0;
+
+                foreach (var block in blocks)
+                {
+                    if (string.IsNullOrWhiteSpace(block.Text))
+                        continue;
+
+                    var startIndex = ClampIndex(block.StartIndex, captionSegments.Count);
+                    var endIndex = ClampIndex(block.EndIndex, captionSegments.Count);
+
+                    var startSegment = captionSegments[startIndex];
+                    var endSegment = captionSegments[endIndex];
+
+                    var recognized = new OpenAiRecognizedSegment
+                    {
+                        TaskId = task.Id,
+                        Order = order++,
+                        Text = block.Text,
+                        IsProcessed = false,
+                        IsProcessing = false,
+                        StartSeconds = startSegment.Time,
+                        EndSeconds = endSegment.EndTime ?? endSegment.Time
+                    };
+
+                    newSegments.Add(recognized);
+                }
+
+                if (newSegments.Count == 0)
+                    throw new InvalidOperationException("Segmenting produced no blocks to process.");
+
+                await _dbContext.OpenAiRecognizedSegments.AddRangeAsync(newSegments);
+
+                task.SegmentsTotal = newSegments.Count;
+                task.SegmentsProcessed = 0;
+                task.Status = OpenAiTranscriptionStatus.ProcessingSegments;
+                task.ModifiedAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync();
+
+                await CompleteStepAsync(step);
+            }
+            catch (Exception ex)
+            {
+                await FailStepAsync(step, ex.Message);
+                throw;
+            }
+        }
+
+        private async Task RunSegmentProcessingStepAsync(OpenAiTranscriptionTask task)
+        {
+            task.Status = OpenAiTranscriptionStatus.ProcessingSegments;
+            task.ModifiedAt = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
+
+            var step = await GetOrStartStepAsync(task, OpenAiTranscriptionStatus.ProcessingSegments);
+
+            var stuck = _dbContext.OpenAiRecognizedSegments
+                .Where(s => s.TaskId == task.Id && s.IsProcessing && !s.IsProcessed);
+            foreach (var segment in stuck)
+            {
+                segment.IsProcessing = false;
+            }
+            await _dbContext.SaveChangesAsync();
+
+            var next = await _dbContext.OpenAiRecognizedSegments
+                .Where(s => s.TaskId == task.Id && !s.IsProcessed && !s.IsProcessing)
+                .OrderBy(s => s.Order)
+                .FirstOrDefaultAsync();
+
+            if (next == null)
+            {
+                await CompleteSegmentProcessingAsync(task, step);
+                return;
+            }
+
+            next.IsProcessing = true;
+            await _dbContext.SaveChangesAsync();
+
+            var succeeded = false;
+
+            try
+            {
+                var previousContext = await _dbContext.OpenAiRecognizedSegments
+                    .Where(s => s.TaskId == task.Id && s.IsProcessed && s.Order < next.Order)
+                    .OrderBy(s => s.Order)
+                    .Select(s => s.ProcessedText ?? s.Text)
+                    .ToListAsync();
+
+                string processedText;
+                try
+                {
+                    var context = string.Join("\n", previousContext);
+                    processedText = await _punctuationService.FixPunctuationAsync(next.Text, context);
+                }
+                catch
+                {
+                    processedText = next.Text;
+                }
+
+                next.ProcessedText = processedText;
+                next.IsProcessed = true;
+                succeeded = true;
+            }
+            catch (Exception ex)
+            {
+                if (step.Status == OpenAiTranscriptionStepStatus.InProgress)
+                {
+                    await FailStepAsync(step, ex.Message);
+                }
+                throw;
+            }
+            finally
+            {
+                next.IsProcessing = false;
+                task.SegmentsProcessed = await _dbContext.OpenAiRecognizedSegments
+                    .CountAsync(s => s.TaskId == task.Id && s.IsProcessed);
+                task.ModifiedAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync();
+            }
+
+            if (succeeded)
+            {
+                var anyLeft = await _dbContext.OpenAiRecognizedSegments
+                    .AnyAsync(s => s.TaskId == task.Id && !s.IsProcessed);
+
+                if (!anyLeft)
+                {
+                    await CompleteSegmentProcessingAsync(task, step);
+                }
+            }
+        }
+
         private async Task RunFormattingStepAsync(OpenAiTranscriptionTask task)
         {
-            if (string.IsNullOrWhiteSpace(task.RecognizedText))
-                throw new InvalidOperationException("No transcription text is available for formatting.");
+            if (string.IsNullOrWhiteSpace(task.ProcessedText))
+                throw new InvalidOperationException("No processed transcription text is available for formatting.");
 
             task.Status = OpenAiTranscriptionStatus.Formatting;
             task.ModifiedAt = DateTime.UtcNow;
@@ -220,7 +399,7 @@ namespace YandexSpeech.services
 
             try
             {
-                var markdown = await CreateDialogueMarkdownAsync(task.RecognizedText!);
+                var markdown = await CreateDialogueMarkdownAsync(task.ProcessedText!);
                 task.MarkdownText = markdown;
                 task.Status = OpenAiTranscriptionStatus.Done;
                 task.Done = true;
@@ -266,6 +445,36 @@ namespace YandexSpeech.services
             await _dbContext.SaveChangesAsync();
         }
 
+        private async Task<OpenAiTranscriptionStep> GetOrStartStepAsync(OpenAiTranscriptionTask task, OpenAiTranscriptionStatus stepType)
+        {
+            var existing = await _dbContext.OpenAiTranscriptionSteps
+                .Where(s => s.TaskId == task.Id && s.Step == stepType && s.Status == OpenAiTranscriptionStepStatus.InProgress)
+                .OrderByDescending(s => s.StartedAt)
+                .FirstOrDefaultAsync();
+
+            return existing ?? await StartStepAsync(task, stepType);
+        }
+
+        private async Task CompleteSegmentProcessingAsync(OpenAiTranscriptionTask task, OpenAiTranscriptionStep step)
+        {
+            if (step.Status == OpenAiTranscriptionStepStatus.InProgress)
+            {
+                await CompleteStepAsync(step);
+            }
+
+            var processedSegments = await _dbContext.OpenAiRecognizedSegments
+                .Where(s => s.TaskId == task.Id)
+                .OrderBy(s => s.Order)
+                .Select(s => s.ProcessedText ?? s.Text)
+                .ToListAsync();
+
+            task.SegmentsProcessed = task.SegmentsTotal;
+            task.ProcessedText = string.Join("\n", processedSegments);
+            task.Status = OpenAiTranscriptionStatus.Formatting;
+            task.ModifiedAt = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
+        }
+
         private string ResolveFfmpegExecutable()
         {
             var executableName = OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg";
@@ -288,7 +497,7 @@ namespace YandexSpeech.services
             return $"-y -i \"{source}\" -vn -ac 1 -ar 16000 -acodec pcm_s16le \"{target}\"";
         }
 
-        private async Task<string> TranscribeWithOpenAiAsync(string audioFilePath)
+        private async Task<WhisperTranscriptionResult> TranscribeWithOpenAiAsync(string audioFilePath)
         {
             var whisperExecutable = ResolveWhisperExecutable();
             var outputDirectory = Path.Combine(_workingDirectory, $"whisper-{Guid.NewGuid():N}");
@@ -324,7 +533,7 @@ namespace YandexSpeech.services
                     throw new InvalidOperationException($"Whisper transcription failed (exit code {process.ExitCode}): {error}");
                 }
 
-                var transcriptFile = Directory.EnumerateFiles(outputDirectory, "*.txt").FirstOrDefault();
+                var transcriptFile = Directory.EnumerateFiles(outputDirectory, "*.json").FirstOrDefault();
                 if (transcriptFile == null)
                 {
                     var output = await standardOutputTask;
@@ -335,7 +544,34 @@ namespace YandexSpeech.services
                 if (string.IsNullOrWhiteSpace(transcription))
                     throw new InvalidOperationException("Whisper transcription result is empty.");
 
-                return transcription.Trim();
+                var parsed = ParseWhisperResult(transcription);
+                if (parsed?.Segments == null || parsed.Segments.Count == 0)
+                    throw new InvalidOperationException("Whisper transcription does not contain segments.");
+
+                var builder = new StringBuilder();
+                foreach (var segment in parsed.Segments)
+                {
+                    var start = TimeSpan.FromSeconds(segment.Start);
+                    var end = TimeSpan.FromSeconds(segment.End);
+                    var text = (segment.Text ?? string.Empty).Trim();
+                    if (string.IsNullOrWhiteSpace(text))
+                        continue;
+
+                    builder.Append('[')
+                        .Append(FormatTimestamp(start))
+                        .Append(" --> ")
+                        .Append(FormatTimestamp(end))
+                        .Append("] ")
+                        .AppendLine(text);
+                }
+
+                var timecodedText = builder.ToString().Trim();
+
+                return new WhisperTranscriptionResult
+                {
+                    TimecodedText = timecodedText,
+                    RawJson = transcription
+                };
             }
             finally
             {
@@ -369,7 +605,7 @@ namespace YandexSpeech.services
         private string BuildWhisperArguments(string audioFilePath, string outputDirectory)
         {
             var builder = new StringBuilder();
-            builder.Append($"\"{audioFilePath}\" --model {_whisperModel} --task transcribe --output_format txt --output_dir \"{outputDirectory}\"");
+            builder.Append($"\"{audioFilePath}\" --model {_whisperModel} --task transcribe --output_format json --word_timestamps True --output_dir \"{outputDirectory}\"");
             if (!string.IsNullOrWhiteSpace(_whisperDevice))
             {
                 builder.Append($" --device {_whisperDevice}");
@@ -381,6 +617,97 @@ namespace YandexSpeech.services
             }
 
             return builder.ToString();
+        }
+
+        private static int ClampIndex(int value, int length)
+        {
+            if (length <= 0)
+                return 0;
+            if (value < 0)
+                return 0;
+            if (value >= length)
+                return length - 1;
+            return value;
+        }
+
+        private static List<CaptionSegment> BuildCaptionSegmentsFromWhisper(WhisperTranscriptionResponse parsed)
+        {
+            var segments = new List<CaptionSegment>();
+
+            if (parsed.Segments == null)
+                return segments;
+
+            foreach (var segment in parsed.Segments)
+            {
+                if (segment.Words != null && segment.Words.Count > 0)
+                {
+                    foreach (var word in segment.Words)
+                    {
+                        var text = (word.Word ?? string.Empty).Trim();
+                        if (string.IsNullOrEmpty(text))
+                            continue;
+
+                        var start = word.Start ?? segment.Start;
+                        var end = word.End ?? segment.End;
+
+                        segments.Add(new CaptionSegment
+                        {
+                            Text = text,
+                            WordCount = 1,
+                            Time = start,
+                            EndTime = end,
+                            PauseBeforeNext = 0
+                        });
+                    }
+                }
+                else
+                {
+                    var text = (segment.Text ?? string.Empty).Trim();
+                    if (string.IsNullOrEmpty(text))
+                        continue;
+
+                    var words = text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (words.Length == 0)
+                        continue;
+
+                    var duration = Math.Max(segment.End - segment.Start, 0);
+                    var perWord = duration > 0 ? duration / words.Length : (double?)null;
+                    var cursor = segment.Start;
+
+                    foreach (var word in words)
+                    {
+                        var trimmed = word.Trim();
+                        if (string.IsNullOrEmpty(trimmed))
+                            continue;
+
+                        double? end = perWord.HasValue ? cursor + perWord.Value : (double?)null;
+
+                        segments.Add(new CaptionSegment
+                        {
+                            Text = trimmed,
+                            WordCount = 1,
+                            Time = cursor,
+                            EndTime = end ?? cursor,
+                            PauseBeforeNext = 0
+                        });
+
+                        if (perWord.HasValue)
+                        {
+                            cursor += perWord.Value;
+                        }
+                    }
+                }
+            }
+
+            segments.Sort((a, b) => a.Time.CompareTo(b.Time));
+            return segments;
+        }
+
+        private static string FormatTimestamp(TimeSpan time) => time.ToString(@"hh\:mm\:ss\.fff");
+
+        private static WhisperTranscriptionResponse? ParseWhisperResult(string json)
+        {
+            return JsonSerializer.Deserialize<WhisperTranscriptionResponse>(json, WhisperJsonOptions);
         }
 
         private async Task<string> CreateDialogueMarkdownAsync(string transcription)
@@ -424,6 +751,45 @@ namespace YandexSpeech.services
                 throw new InvalidOperationException("OpenAI formatting response is empty.");
 
             return content.Trim();
+        }
+
+        private sealed class WhisperTranscriptionResult
+        {
+            public string TimecodedText { get; init; } = string.Empty;
+            public string RawJson { get; init; } = string.Empty;
+        }
+
+        private sealed class WhisperTranscriptionResponse
+        {
+            [JsonPropertyName("segments")]
+            public List<WhisperSegment> Segments { get; set; } = new();
+        }
+
+        private sealed class WhisperSegment
+        {
+            [JsonPropertyName("start")]
+            public double Start { get; set; }
+
+            [JsonPropertyName("end")]
+            public double End { get; set; }
+
+            [JsonPropertyName("text")]
+            public string? Text { get; set; }
+
+            [JsonPropertyName("words")]
+            public List<WhisperWord>? Words { get; set; }
+        }
+
+        private sealed class WhisperWord
+        {
+            [JsonPropertyName("word")]
+            public string? Word { get; set; }
+
+            [JsonPropertyName("start")]
+            public double? Start { get; set; }
+
+            [JsonPropertyName("end")]
+            public double? End { get; set; }
         }
     }
 }

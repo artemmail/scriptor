@@ -121,6 +121,7 @@ namespace YandexSpeech.Controllers
 
             var task = await _dbContext.OpenAiTranscriptionTasks
                 .Include(t => t.Steps)
+                .Include(t => t.Segments)
                 .FirstOrDefaultAsync(t => t.Id == id && t.CreatedBy == userId);
 
             if (task == null)
@@ -181,7 +182,9 @@ namespace YandexSpeech.Controllers
                 Done = task.Done,
                 Error = task.Error,
                 CreatedAt = task.CreatedAt,
-                ModifiedAt = task.ModifiedAt
+                ModifiedAt = task.ModifiedAt,
+                SegmentsTotal = task.SegmentsTotal,
+                SegmentsProcessed = task.SegmentsProcessed
             };
         }
 
@@ -198,6 +201,7 @@ namespace YandexSpeech.Controllers
                 CreatedAt = task.CreatedAt,
                 ModifiedAt = task.ModifiedAt,
                 RecognizedText = task.RecognizedText,
+                ProcessedText = task.ProcessedText,
                 MarkdownText = task.MarkdownText
             };
 
@@ -214,6 +218,21 @@ namespace YandexSpeech.Controllers
                     Error = step.Error
                 })
                 .ToList() ?? new List<OpenAiTranscriptionStepDto>();
+
+            dto.Segments = task.Segments?
+                .OrderBy(s => s.Order)
+                .Select(segment => new OpenAiRecognizedSegmentDto
+                {
+                    SegmentId = segment.SegmentId,
+                    Order = segment.Order,
+                    Text = segment.Text,
+                    ProcessedText = segment.ProcessedText,
+                    IsProcessed = segment.IsProcessed,
+                    IsProcessing = segment.IsProcessing,
+                    StartSeconds = segment.StartSeconds,
+                    EndSeconds = segment.EndSeconds
+                })
+                .ToList() ?? new List<OpenAiRecognizedSegmentDto>();
 
             return dto;
         }
