@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using YandexSpeech.models.DB;
 using YandexSpeech.services;
+using YandexSpeech.Extensions;
 
 namespace YandexSpeech.Controllers
 {
@@ -39,7 +40,7 @@ namespace YandexSpeech.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest("File not provided.");
 
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             if (string.IsNullOrEmpty(userId))
                 return Unauthorized();
 
@@ -51,7 +52,7 @@ namespace YandexSpeech.Controllers
         [HttpGet]
         public async Task<ActionResult> List()
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             if (string.IsNullOrEmpty(userId)) return Unauthorized();
 
             var files = await _db.AudioFiles
@@ -73,7 +74,7 @@ namespace YandexSpeech.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<AudioFile>> GetById(string id)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             var file = await _db.AudioFiles.FirstOrDefaultAsync(f => f.Id == id && f.CreatedBy == userId);
             if (file == null)
                 return NotFound();
@@ -85,7 +86,7 @@ namespace YandexSpeech.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             var file = await _db.AudioFiles.FirstOrDefaultAsync(f => f.Id == id && f.CreatedBy == userId);
             if (file == null)
                 return NotFound();
