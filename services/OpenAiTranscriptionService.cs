@@ -28,6 +28,8 @@ namespace YandexSpeech.services
         private readonly string _whisperModel;
         private readonly string _whisperDevice;
         private readonly IPunctuationService _punctuationService;
+        private const int FormattingMaxAttempts = 5;
+        private static readonly TimeSpan FormattingRetryDelay = TimeSpan.FromSeconds(5);
         private static readonly JsonSerializerOptions WhisperJsonOptions = new()
         {
             PropertyNameCaseInsensitive = true,
@@ -92,13 +94,30 @@ namespace YandexSpeech.services
             return task;
         }
 
-        public async Task<OpenAiTranscriptionTask?> ContinueTranscriptionAsync(string taskId)
+        public async Task<OpenAiTranscriptionTask?> PrepareForContinuationAsync(string taskId)
         {
             var task = await _dbContext.OpenAiTranscriptionTasks
+                .Include(t => t.Steps)
+                .Include(t => t.Segments)
                 .FirstOrDefaultAsync(t => t.Id == taskId);
 
             if (task == null)
                 return null;
+
+            await PrepareTaskForContinuationAsync(task);
+            return task;
+        }
+
+        public async Task<OpenAiTranscriptionTask?> ContinueTranscriptionAsync(string taskId)
+        {
+            var task = await _dbContext.OpenAiTranscriptionTasks
+                .Include(t => t.Steps)
+                .FirstOrDefaultAsync(t => t.Id == taskId);
+
+            if (task == null)
+                return null;
+
+            await PrepareTaskForContinuationAsync(task);
 
             try
             {
@@ -793,25 +812,96 @@ namespace YandexSpeech.services
                 temperature = 0.2
             };
 
-            using var requestContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("https://api.openai.com/v1/chat/completions", requestContent);
-            if (!response.IsSuccessStatusCode)
+            for (var attempt = 1; attempt <= FormattingMaxAttempts; attempt++)
             {
-                var error = await response.Content.ReadAsStringAsync();
-                throw new InvalidOperationException($"OpenAI formatting failed: {error}");
+                try
+                {
+                    using var requestContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+                    using var response = await client.PostAsync("https://api.openai.com/v1/chat/completions", requestContent);
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var error = await response.Content.ReadAsStringAsync();
+                        throw new InvalidOperationException($"OpenAI formatting failed: {error}");
+                    }
+
+                    var json = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(json);
+                    var choices = doc.RootElement.GetProperty("choices");
+                    if (choices.GetArrayLength() == 0)
+                        throw new InvalidOperationException("OpenAI formatting response did not contain choices.");
+
+                    var content = choices[0].GetProperty("message").GetProperty("content").GetString();
+                    if (string.IsNullOrWhiteSpace(content))
+                        throw new InvalidOperationException("OpenAI formatting response is empty.");
+
+                    return content.Trim();
+                }
+                catch (HttpRequestException ex) when (attempt < FormattingMaxAttempts)
+                {
+                    _logger.LogWarning(ex, "Не удалось связаться с OpenAI для форматирования (попытка {Attempt}/{Total}).", attempt, FormattingMaxAttempts);
+                }
+                catch (TaskCanceledException ex) when (attempt < FormattingMaxAttempts)
+                {
+                    _logger.LogWarning(ex, "Запрос на форматирование OpenAI завершился по таймауту (попытка {Attempt}/{Total}).", attempt, FormattingMaxAttempts);
+                }
+                catch (InvalidOperationException ex) when (attempt < FormattingMaxAttempts && ex.Message.StartsWith("OpenAI formatting failed", StringComparison.Ordinal))
+                {
+                    _logger.LogWarning(ex, "OpenAI вернул ошибку при форматировании (попытка {Attempt}/{Total}).", attempt, FormattingMaxAttempts);
+                }
+
+                await Task.Delay(TimeSpan.FromTicks(FormattingRetryDelay.Ticks * attempt));
             }
 
-            var json = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(json);
-            var choices = doc.RootElement.GetProperty("choices");
-            if (choices.GetArrayLength() == 0)
-                throw new InvalidOperationException("OpenAI formatting response did not contain choices.");
+            throw new InvalidOperationException($"OpenAI formatting failed after {FormattingMaxAttempts} attempts.");
+        }
 
-            var content = choices[0].GetProperty("message").GetProperty("content").GetString();
-            if (string.IsNullOrWhiteSpace(content))
-                throw new InvalidOperationException("OpenAI formatting response is empty.");
+        private async Task PrepareTaskForContinuationAsync(OpenAiTranscriptionTask task)
+        {
+            if (task.Status != OpenAiTranscriptionStatus.Error)
+            {
+                return;
+            }
 
-            return content.Trim();
+            if (task.Steps == null || !task.Steps.Any())
+            {
+                await _dbContext.Entry(task).Collection(t => t.Steps).LoadAsync();
+            }
+
+            var lastErrorStep = task.Steps?
+                .Where(s => s.Status == OpenAiTranscriptionStepStatus.Error)
+                .OrderByDescending(s => s.StartedAt)
+                .ThenByDescending(s => s.Id)
+                .FirstOrDefault();
+
+            var targetStatus = lastErrorStep?.Step ?? OpenAiTranscriptionStatus.Created;
+
+            if (task.Status == targetStatus && !task.Done && string.IsNullOrEmpty(task.Error))
+            {
+                return;
+            }
+
+            task.Status = targetStatus;
+            task.Done = false;
+            task.Error = null;
+            task.ModifiedAt = DateTime.UtcNow;
+
+            if (targetStatus == OpenAiTranscriptionStatus.ProcessingSegments)
+            {
+                var stuckSegments = await _dbContext.OpenAiRecognizedSegments
+                    .Where(s => s.TaskId == task.Id && s.IsProcessing)
+                    .ToListAsync();
+
+                if (stuckSegments.Count > 0)
+                {
+                    foreach (var segment in stuckSegments)
+                    {
+                        segment.IsProcessing = false;
+                    }
+                }
+            }
+
+            await _dbContext.SaveChangesAsync();
         }
 
         private sealed class WhisperTranscriptionResult

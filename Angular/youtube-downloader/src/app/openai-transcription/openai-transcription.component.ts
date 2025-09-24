@@ -45,6 +45,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   listError: string | null = null;
   detailsError: string | null = null;
   detailsLoading = false;
+  continueError: string | null = null;
+  continueInProgress = false;
 
   readonly OpenAiTranscriptionStatus = OpenAiTranscriptionStatus;
   readonly OpenAiTranscriptionStepStatus = OpenAiTranscriptionStepStatus;
@@ -135,7 +137,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     }
 
     this.stopPolling();
-    this.detailsLoading = true;
+    this.detailsLoading = !this.selectedTask;
 
     this.pollSubscription = timer(0, 5000)
       .pipe(switchMap(() => this.transcriptionService.getTask(this.selectedTaskId!)))
@@ -174,6 +176,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
             done: task.done,
             error: task.error,
             modifiedAt: task.modifiedAt,
+            segmentsProcessed: task.segmentsProcessed,
+            segmentsTotal: task.segmentsTotal,
           }
         : existing
     );
@@ -233,11 +237,35 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
         return 'status-error';
       case OpenAiTranscriptionStatus.Converting:
       case OpenAiTranscriptionStatus.Transcribing:
+      case OpenAiTranscriptionStatus.Segmenting:
+      case OpenAiTranscriptionStatus.ProcessingSegments:
       case OpenAiTranscriptionStatus.Formatting:
         return 'status-progress';
       default:
         return 'status-pending';
     }
+  }
+
+  continueTask(): void {
+    if (!this.selectedTaskId || this.continueInProgress) {
+      return;
+    }
+
+    this.continueInProgress = true;
+    this.continueError = null;
+
+    this.transcriptionService.continueTask(this.selectedTaskId).subscribe({
+      next: (task) => {
+        this.continueInProgress = false;
+        this.detailsError = null;
+        this.applyTaskUpdate(task);
+        this.startPolling();
+      },
+      error: (error) => {
+        this.continueInProgress = false;
+        this.continueError = this.extractError(error) ?? 'Не удалось продолжить задачу.';
+      },
+    });
   }
 
   trackTask(_: number, task: OpenAiTranscriptionTaskDto): string {
