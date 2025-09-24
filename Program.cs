@@ -14,8 +14,26 @@ using YoutubeDownload.Services;
 using YoutubeExplode;
 using System.IO;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = long.MaxValue;
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartHeadersLengthLimit = int.MaxValue;
+});
+
+builder.Services.Configure<IISServerOptions>(options =>
+{
+    options.MaxRequestBodySize = long.MaxValue;
+});
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = long.MaxValue;
+});
 
 // 1. Настройка CORS
 builder.Services.AddCors(opts =>
