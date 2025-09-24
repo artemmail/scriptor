@@ -6,6 +6,8 @@ export enum OpenAiTranscriptionStatus {
   Created = 0,
   Converting = 10,
   Transcribing = 20,
+  Segmenting = 25,
+  ProcessingSegments = 27,
   Formatting = 30,
   Done = 900,
   Error = 999,
@@ -27,12 +29,16 @@ export interface OpenAiTranscriptionTaskDto {
   error: string | null;
   createdAt: string;
   modifiedAt: string;
+  segmentsTotal: number;
+  segmentsProcessed: number;
 }
 
 export interface OpenAiTranscriptionTaskDetailsDto extends OpenAiTranscriptionTaskDto {
   recognizedText: string | null;
+  processedText: string | null;
   markdownText: string | null;
   steps: OpenAiTranscriptionStepDto[];
+  segments: OpenAiRecognizedSegmentDto[];
 }
 
 export interface OpenAiTranscriptionStepDto {
@@ -42,6 +48,17 @@ export interface OpenAiTranscriptionStepDto {
   startedAt: string;
   finishedAt: string | null;
   error: string | null;
+}
+
+export interface OpenAiRecognizedSegmentDto {
+  segmentId: number;
+  order: number;
+  text: string;
+  processedText: string | null;
+  isProcessed: boolean;
+  isProcessing: boolean;
+  startSeconds: number | null;
+  endSeconds: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -72,6 +89,10 @@ export class OpenAiTranscriptionService {
         return 'Преобразование аудио';
       case OpenAiTranscriptionStatus.Transcribing:
         return 'Распознавание текста';
+      case OpenAiTranscriptionStatus.Segmenting:
+        return 'Разбиение на сегменты';
+      case OpenAiTranscriptionStatus.ProcessingSegments:
+        return 'Обработка сегментов';
       case OpenAiTranscriptionStatus.Formatting:
         return 'Форматирование результата';
       case OpenAiTranscriptionStatus.Done:
@@ -96,5 +117,9 @@ export class OpenAiTranscriptionService {
       default:
         return 'Неизвестно';
     }
+  }
+
+  continueTask(id: string): Observable<OpenAiTranscriptionTaskDetailsDto> {
+    return this.http.post<OpenAiTranscriptionTaskDetailsDto>(`${this.apiUrl}/${id}/continue`, {});
   }
 }

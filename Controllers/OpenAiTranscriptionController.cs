@@ -132,6 +132,48 @@ namespace YandexSpeech.Controllers
             return Ok(MapToDetailsDto(task));
         }
 
+        [HttpPost("{id}/continue")]
+        public async Task<ActionResult<OpenAiTranscriptionTaskDetailsDto>> Continue(string id)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
+
+            var task = await _dbContext.OpenAiTranscriptionTasks
+                .Include(t => t.Steps)
+                .Include(t => t.Segments)
+                .FirstOrDefaultAsync(t => t.Id == id && t.CreatedBy == userId);
+
+            if (task == null)
+            {
+                return NotFound();
+            }
+
+            var preparedTask = await _transcriptionService.PrepareForContinuationAsync(task.Id);
+            if (preparedTask == null)
+            {
+                return NotFound();
+            }
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var scopedService = scope.ServiceProvider.GetRequiredService<IOpenAiTranscriptionService>();
+                    await scopedService.ContinueTranscriptionAsync(task.Id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to continue OpenAI transcription task {TaskId}", task.Id);
+                }
+            });
+
+            return Ok(MapToDetailsDto(preparedTask));
+        }
+
         private static string SanitizeFileName(string fileName)
         {
             var invalidChars = Path.GetInvalidFileNameChars();

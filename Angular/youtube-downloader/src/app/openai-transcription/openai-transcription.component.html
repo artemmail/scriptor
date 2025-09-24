@@ -74,6 +74,29 @@
 
           <div class="error" *ngIf="selectedTask.error">{{ selectedTask.error }}</div>
 
+          <div
+            class="details-actions"
+            *ngIf="selectedTask.status === OpenAiTranscriptionStatus.Error"
+          >
+            <button
+              mat-stroked-button
+              color="primary"
+              (click)="continueTask()"
+              [disabled]="continueInProgress"
+            >
+              <mat-icon>play_arrow</mat-icon>
+              <span>Продолжить задачу</span>
+            </button>
+            <mat-progress-spinner
+              *ngIf="continueInProgress"
+              class="inline-spinner"
+              mode="indeterminate"
+              diameter="28"
+            ></mat-progress-spinner>
+          </div>
+
+          <div class="error" *ngIf="continueError">{{ continueError }}</div>
+
           <section class="steps-section" *ngIf="selectedTask.steps.length">
             <h3>Прогресс</h3>
             <ul class="steps-list">

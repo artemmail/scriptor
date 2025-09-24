@@ -102,6 +102,17 @@
   color: rgba(0, 0, 0, 0.6);
 }
 
+.details-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.inline-spinner {
+  width: 28px !important;
+  height: 28px !important;
+}
+
 .steps-section h3,
 .result-block h3 {
   margin-top: 0;
