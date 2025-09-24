@@ -530,6 +530,19 @@ namespace YandexSpeech.services
                 CreateNoWindow = true
             };
 
+            if (!startInfo.Environment.ContainsKey("PYTHONIOENCODING"))
+            {
+                startInfo.Environment["PYTHONIOENCODING"] = "utf-8";
+            }
+
+            if (OperatingSystem.IsWindows())
+            {
+                startInfo.Environment["PYTHONUTF8"] = "1";
+            }
+
+            startInfo.StandardErrorEncoding = Encoding.UTF8;
+            startInfo.StandardOutputEncoding = Encoding.UTF8;
+
             if (!string.IsNullOrWhiteSpace(ffmpegExecutable))
             {
                 startInfo.Environment["FFMPEG_BINARY"] = ffmpegExecutable;
