@@ -7,12 +7,12 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using YandexSpeech.models.DB;
+using YandexSpeech.services.Whisper;
 
 namespace YandexSpeech.services
 {
@@ -24,47 +24,28 @@ namespace YandexSpeech.services
         private readonly string _openAiApiKey;
         private readonly string _workingDirectory;
         private const string FormattingModel = "gpt-4.1-mini";
-        private readonly string _whisperExecutableSetting;
-        private readonly string _whisperModel;
-        private readonly string _whisperDevice;
+        private readonly IWhisperTranscriptionService _whisperTranscriptionService;
         private readonly IPunctuationService _punctuationService;
         private const int FormattingMaxAttempts = 5;
         private static readonly TimeSpan FormattingRetryDelay = TimeSpan.FromSeconds(5);
-        private static readonly JsonSerializerOptions WhisperJsonOptions = new()
-        {
-            PropertyNameCaseInsensitive = true,
-        };
 
         public OpenAiTranscriptionService(
             MyDbContext dbContext,
             IConfiguration configuration,
             ILogger<OpenAiTranscriptionService> logger,
-            IPunctuationService punctuationService)
+            IPunctuationService punctuationService,
+            IWhisperTranscriptionService whisperTranscriptionService)
         {
             _dbContext = dbContext;
             _logger = logger;
             _punctuationService = punctuationService;
+            _whisperTranscriptionService = whisperTranscriptionService;
             _ffmpegPath = configuration.GetValue<string>("FfmpegExePath")
                            ?? throw new InvalidOperationException("FfmpegExePath is not configured.");
             _openAiApiKey = configuration["OpenAI:ApiKey"]
                              ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured.");
             _workingDirectory = Path.Combine(Path.GetTempPath(), "openai-transcriptions");
             Directory.CreateDirectory(_workingDirectory);
-
-            var whisperSection = configuration.GetSection("Whisper");
-            _whisperExecutableSetting = whisperSection.GetValue<string>("ExecutablePath") ?? "whisper";
-            _whisperModel = whisperSection.GetValue<string>("Model") ?? "medium";
-
-            var configuredDevice = whisperSection.GetValue<string>("Device");
-            if (!string.IsNullOrWhiteSpace(configuredDevice))
-            {
-                _whisperDevice = configuredDevice;
-            }
-            else
-            {
-                var useGpu = whisperSection.GetValue<bool?>("UseGpu") ?? false;
-                _whisperDevice = useGpu ? "cuda" : "cpu";
-            }
         }
 
         public async Task<OpenAiTranscriptionTask> StartTranscriptionAsync(string sourceFilePath, string createdBy)
@@ -244,7 +225,11 @@ namespace YandexSpeech.services
 
             try
             {
-                var transcription = await TranscribeWithOpenAiAsync(task.ConvertedFilePath!);
+                var ffmpegExecutable = ResolveFfmpegExecutable();
+                var transcription = await _whisperTranscriptionService.TranscribeAsync(
+                    task.ConvertedFilePath!,
+                    _workingDirectory,
+                    ffmpegExecutable);
                 task.RecognizedText = transcription.TimecodedText;
                 task.SegmentsJson = transcription.RawJson;
                 task.SegmentsTotal = 0;
@@ -275,7 +260,7 @@ namespace YandexSpeech.services
 
             try
             {
-                var parsed = ParseWhisperResult(task.SegmentsJson);
+                var parsed = WhisperTranscriptionHelper.Parse(task.SegmentsJson);
                 if (parsed?.Segments == null || parsed.Segments.Count == 0)
                     throw new InvalidOperationException("Unable to parse segments for transcription task.");
 
@@ -529,176 +514,6 @@ namespace YandexSpeech.services
             return executableName;
         }
 
-        private async Task<WhisperTranscriptionResult> TranscribeWithOpenAiAsync(string audioFilePath)
-        {
-            var whisperExecutable = ResolveWhisperExecutable();
-            var ffmpegExecutable = ResolveFfmpegExecutable();
-            var outputDirectory = Path.GetFullPath(Path.Combine(_workingDirectory, $"whisper-{Guid.NewGuid():N}"));
-            Directory.CreateDirectory(outputDirectory);
-
-            var audioPath = Path.GetFullPath(audioFilePath);
-            if (!File.Exists(audioPath))
-                throw new FileNotFoundException("Audio file not found for Whisper transcription.", audioPath);
-
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = whisperExecutable,
-                UseShellExecute = false,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                CreateNoWindow = true
-            };
-
-            if (!startInfo.Environment.ContainsKey("PYTHONIOENCODING"))
-            {
-                startInfo.Environment["PYTHONIOENCODING"] = "utf-8";
-            }
-
-            if (OperatingSystem.IsWindows())
-            {
-                startInfo.Environment["PYTHONUTF8"] = "1";
-            }
-
-            startInfo.StandardErrorEncoding = Encoding.UTF8;
-            startInfo.StandardOutputEncoding = Encoding.UTF8;
-
-            if (!string.IsNullOrWhiteSpace(ffmpegExecutable))
-            {
-                startInfo.Environment["FFMPEG_BINARY"] = ffmpegExecutable;
-
-                var ffmpegDirectory = Path.GetDirectoryName(ffmpegExecutable);
-                if (!string.IsNullOrWhiteSpace(ffmpegDirectory))
-                {
-                    var pathVariableName = OperatingSystem.IsWindows() ? "Path" : "PATH";
-                    if (!startInfo.Environment.TryGetValue(pathVariableName, out var currentPath) || string.IsNullOrWhiteSpace(currentPath))
-                    {
-                        currentPath = Environment.GetEnvironmentVariable(pathVariableName);
-                    }
-
-                    if (string.IsNullOrWhiteSpace(currentPath))
-                    {
-                        startInfo.Environment[pathVariableName] = ffmpegDirectory;
-                    }
-                    else if (!currentPath.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
-                        .Any(p => string.Equals(p, ffmpegDirectory, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)))
-                    {
-                        startInfo.Environment[pathVariableName] = string.Concat(ffmpegDirectory, Path.PathSeparator, currentPath);
-                    }
-                }
-            }
-
-            startInfo.ArgumentList.Add(audioPath);
-            startInfo.ArgumentList.Add("--model");
-            startInfo.ArgumentList.Add(_whisperModel);
-            startInfo.ArgumentList.Add("--task");
-            startInfo.ArgumentList.Add("transcribe");
-            startInfo.ArgumentList.Add("--output_format");
-            startInfo.ArgumentList.Add("json");
-            startInfo.ArgumentList.Add("--word_timestamps");
-            startInfo.ArgumentList.Add("True");
-            startInfo.ArgumentList.Add("--output_dir");
-            startInfo.ArgumentList.Add(outputDirectory);
-
-            if (!string.IsNullOrWhiteSpace(_whisperDevice))
-            {
-                startInfo.ArgumentList.Add("--device");
-                startInfo.ArgumentList.Add(_whisperDevice);
-
-                if (string.Equals(_whisperDevice, "cpu", StringComparison.OrdinalIgnoreCase))
-                {
-                    startInfo.ArgumentList.Add("--fp16");
-                    startInfo.ArgumentList.Add("False");
-                }
-            }
-
-            using var process = new Process { StartInfo = startInfo };
-
-            try
-            {
-                process.Start();
-
-                var waitForExitTask = process.WaitForExitAsync();
-                var standardErrorTask = process.StandardError.ReadToEndAsync();
-                var standardOutputTask = process.StandardOutput.ReadToEndAsync();
-
-                await Task.WhenAll(waitForExitTask, standardErrorTask, standardOutputTask);
-
-                var standardError = await standardErrorTask;
-                var standardOutput = await standardOutputTask;
-
-                if (process.ExitCode != 0)
-                {
-                    throw new InvalidOperationException($"Whisper transcription failed (exit code {process.ExitCode}): {standardError}\n{standardOutput}");
-                }
-
-                var transcriptFile = Directory.EnumerateFiles(outputDirectory, "*.json").FirstOrDefault();
-                if (transcriptFile == null)
-                {
-                    throw new InvalidOperationException($"Whisper transcription did not produce a text file. Output: {standardOutput} Error: {standardError}");
-                }
-
-                var transcription = await File.ReadAllTextAsync(transcriptFile);
-                if (string.IsNullOrWhiteSpace(transcription))
-                    throw new InvalidOperationException("Whisper transcription result is empty.");
-
-                var parsed = ParseWhisperResult(transcription);
-                if (parsed?.Segments == null || parsed.Segments.Count == 0)
-                    throw new InvalidOperationException("Whisper transcription does not contain segments.");
-
-                var builder = new StringBuilder();
-                foreach (var segment in parsed.Segments)
-                {
-                    var start = TimeSpan.FromSeconds(segment.Start);
-                    var end = TimeSpan.FromSeconds(segment.End);
-                    var text = (segment.Text ?? string.Empty).Trim();
-                    if (string.IsNullOrWhiteSpace(text))
-                        continue;
-
-                    builder.Append('[')
-                        .Append(FormatTimestamp(start))
-                        .Append(" --> ")
-                        .Append(FormatTimestamp(end))
-                        .Append("] ")
-                        .AppendLine(text);
-                }
-
-                var timecodedText = builder.ToString().Trim();
-
-                return new WhisperTranscriptionResult
-                {
-                    TimecodedText = timecodedText,
-                    RawJson = transcription
-                };
-            }
-            finally
-            {
-                try
-                {
-                    Directory.Delete(outputDirectory, true);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to remove Whisper output directory {OutputDirectory}", outputDirectory);
-                }
-            }
-        }
-
-        private string ResolveWhisperExecutable()
-        {
-            if (File.Exists(_whisperExecutableSetting))
-                return _whisperExecutableSetting;
-
-            if (Directory.Exists(_whisperExecutableSetting))
-            {
-                var executableName = OperatingSystem.IsWindows() ? "whisper.exe" : "whisper";
-                var candidate = Path.Combine(_whisperExecutableSetting, executableName);
-                if (File.Exists(candidate))
-                    return candidate;
-            }
-
-            return _whisperExecutableSetting;
-        }
-
         private static int ClampIndex(int value, int length)
         {
             if (length <= 0)
@@ -781,13 +596,6 @@ namespace YandexSpeech.services
 
             segments.Sort((a, b) => a.Time.CompareTo(b.Time));
             return segments;
-        }
-
-        private static string FormatTimestamp(TimeSpan time) => time.ToString(@"hh\:mm\:ss\.fff");
-
-        private static WhisperTranscriptionResponse? ParseWhisperResult(string json)
-        {
-            return JsonSerializer.Deserialize<WhisperTranscriptionResponse>(json, WhisperJsonOptions);
         }
 
         private async Task<string> CreateDialogueMarkdownAsync(string transcription)
@@ -904,43 +712,5 @@ namespace YandexSpeech.services
             await _dbContext.SaveChangesAsync();
         }
 
-        private sealed class WhisperTranscriptionResult
-        {
-            public string TimecodedText { get; init; } = string.Empty;
-            public string RawJson { get; init; } = string.Empty;
-        }
-
-        private sealed class WhisperTranscriptionResponse
-        {
-            [JsonPropertyName("segments")]
-            public List<WhisperSegment> Segments { get; set; } = new();
-        }
-
-        private sealed class WhisperSegment
-        {
-            [JsonPropertyName("start")]
-            public double Start { get; set; }
-
-            [JsonPropertyName("end")]
-            public double End { get; set; }
-
-            [JsonPropertyName("text")]
-            public string? Text { get; set; }
-
-            [JsonPropertyName("words")]
-            public List<WhisperWord>? Words { get; set; }
-        }
-
-        private sealed class WhisperWord
-        {
-            [JsonPropertyName("word")]
-            public string? Word { get; set; }
-
-            [JsonPropertyName("start")]
-            public double? Start { get; set; }
-
-            [JsonPropertyName("end")]
-            public double? End { get; set; }
-        }
     }
 }

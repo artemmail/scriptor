@@ -9,6 +9,7 @@ using YandexSpeech;
 using YandexSpeech.models.DB;
 using YandexSpeech.services;
 using YandexSpeech.services.Interface;
+using YandexSpeech.services.Whisper;
 using YandexSpeech.Services;
 using YoutubeDownload.Managers;
 using YoutubeDownload.Services;
@@ -130,6 +131,18 @@ builder.Services.AddAuthentication(o =>
 
 builder.Services.AddScoped<IAudioFileService, AudioFileService>();
 builder.Services.AddScoped<ISpeechWorkflowService, SpeechWorkflowService>();
+
+var whisperProvider = builder.Configuration.GetValue<string>("Whisper:Provider");
+if (string.Equals(whisperProvider, "faster", StringComparison.OrdinalIgnoreCase)
+    || string.Equals(whisperProvider, "faster-whisper", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddScoped<IWhisperTranscriptionService, FasterWhisperTranscriptionService>();
+}
+else
+{
+    builder.Services.AddScoped<IWhisperTranscriptionService, WhisperCliTranscriptionService>();
+}
+
 builder.Services.AddScoped<IOpenAiTranscriptionService, OpenAiTranscriptionService>();
 
 
