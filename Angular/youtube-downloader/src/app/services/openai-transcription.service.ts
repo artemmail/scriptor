@@ -81,6 +81,13 @@ export class OpenAiTranscriptionService {
     return this.http.get<OpenAiTranscriptionTaskDetailsDto>(`${this.apiUrl}/${id}`);
   }
 
+  updateRecognizedText(id: string, recognizedText: string, markdownText?: string | null): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/${id}/recognized-text`, {
+      recognizedText,
+      markdownText,
+    });
+  }
+
   getStatusText(status: OpenAiTranscriptionStatus | null | undefined): string {
     switch (status) {
       case OpenAiTranscriptionStatus.Created:

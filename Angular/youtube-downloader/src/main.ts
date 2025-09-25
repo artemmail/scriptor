@@ -31,6 +31,7 @@ import { RoleGuard } from './app/services/role.guard';
 import { ProfileComponent } from './app/profile/profile.component';
 import { AuthGuard } from './app/services/auth.guard';
 import { OpenAiTranscriptionComponent } from './app/openai-transcription/openai-transcription.component';
+import { OpenAiTranscriptionEditorComponent } from './app/openai-transcription-editor/openai-transcription-editor.component';
 
 
 
@@ -51,6 +52,12 @@ const routes: Routes = [
   {
     path: 'audio',
     component: AudioFilesComponent, // главная страница
+  },
+
+  {
+    path: 'transcriptions/:id/edit',
+    component: OpenAiTranscriptionEditorComponent,
+    canActivate: [AuthGuard],
   },
 
   {
