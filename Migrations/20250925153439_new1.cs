@@ -278,7 +278,7 @@ namespace YandexSpeech.Migrations
                         column: x => x.UserId,
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_UserSubscriptions_SubscriptionPlans_PlanId",
                         column: x => x.PlanId,

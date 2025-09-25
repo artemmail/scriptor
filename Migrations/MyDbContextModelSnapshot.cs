@@ -1566,7 +1566,7 @@ namespace YandexSpeech.Migrations
                     b.HasOne("YandexSpeech.models.DB.ApplicationUser", "User")
                         .WithMany("Subscriptions")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Plan");
