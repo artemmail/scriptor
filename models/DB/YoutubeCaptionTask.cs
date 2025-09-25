@@ -5,6 +5,13 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace YandexSpeech.models.DB
 {
+    public enum YoutubeCaptionVisibility
+    {
+        Public = 0,
+        Hidden = 1,
+        Deleted = 2
+    }
+
     [Table("YoutubeCaptions")]
     public class YoutubeCaptionTask
     {
@@ -56,5 +63,9 @@ namespace YandexSpeech.models.DB
 
         // Навигационное свойство к пользователю
         public virtual ApplicationUser? User { get; set; }
+
+        public YoutubeCaptionVisibility Visibility { get; set; } = YoutubeCaptionVisibility.Public;
+
+        public DateTime? VisibilityChangedAt { get; set; }
     }
 }

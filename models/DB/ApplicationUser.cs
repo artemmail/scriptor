@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace YandexSpeech.models.DB
@@ -7,11 +8,43 @@ namespace YandexSpeech.models.DB
 {
     public class ApplicationUser : IdentityUser
     {
-        // Дополнительные поля (например, для платной подписки)
-        public bool IsSubscribed { get; set; }
-        public DateTime? SubscriptionExpiry { get; set; }
-
         [MaxLength(100)]
         public string DisplayName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Текущая активная подписка пользователя (если есть).
+        /// </summary>
+        public Guid? CurrentSubscriptionId { get; set; }
+
+        public virtual UserSubscription? CurrentSubscription { get; set; }
+
+        /// <summary>
+        /// Флаг пожизненного доступа к премиум-функциям.
+        /// </summary>
+        public bool HasLifetimeAccess { get; set; }
+
+        /// <summary>
+        /// Количество распознаваний, выполненных за текущие сутки.
+        /// </summary>
+        public int RecognitionsToday { get; set; }
+
+        /// <summary>
+        /// Время, когда счётчик распознаваний должен быть сброшен.
+        /// </summary>
+        public DateTime? RecognitionsResetAt { get; set; }
+
+        /// <summary>
+        /// Навигационное свойство для активных возможностей (feature flags).
+        /// </summary>
+        public ICollection<UserFeatureFlag> FeatureFlags { get; set; } = new List<UserFeatureFlag>();
+
+        /// <summary>
+        /// Навигационное свойство для кошелька.
+        /// </summary>
+        public virtual UserWallet? Wallet { get; set; }
+
+        public ICollection<UserSubscription> Subscriptions { get; set; } = new List<UserSubscription>();
+
+        public ICollection<WalletTransaction> WalletTransactions { get; set; } = new List<WalletTransaction>();
     }
 }

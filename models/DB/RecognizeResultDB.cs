@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace YandexSpeech.models.DB;
@@ -21,10 +22,8 @@ public enum RecognizeStatus
 
     InProgress = 250,
 
-
-
-// 300–399: этапы, связанные с обработкой YouTube-субтитров
-FetchingMetadata = 300,      // Получение списка треков (метаданных)
+    // 300–399: этапы, связанные с обработкой YouTube-субтитров
+    FetchingMetadata = 300,      // Получение списка треков (метаданных)
     DownloadingCaptions = 310,    // Скачивание субтитров
     SegmentingCaptions = 320,     // Сегментация субтитров
     ApplyingPunctuationSegment = 330, // Пунктуация по одному сегменту
@@ -36,17 +35,23 @@ FetchingMetadata = 300,      // Получение списка треков (м
     Error = 999
 }
 
+public enum RecognitionBillingType
+{
+    Unknown = 0,
+    Subscription = 1,
+    Wallet = 2,
+    FreeTier = 3,
+    Bonus = 4
+}
 
 public class RecognizeResultDB
 {
     public bool done { get; set; }
-    public string response { get; set; }
-    public string id { get; set; }
+    public string response { get; set; } = string.Empty;
+    public string id { get; set; } = string.Empty;
     public DateTime createdAt { get; set; }
-    public string createdBy { get; set; }
+    public string createdBy { get; set; } = string.Empty;
     public DateTime modifiedAt { get; set; }
-
-
 
     // Заменяем string на RecognizeStatus
     public RecognizeStatus Status { get; set; }
@@ -56,7 +61,7 @@ public class RecognizeResultDB
 public class SpeechRecognitionTask
 {
     [Key]
-    public string Id { get; set; }
+    public string Id { get; set; } = string.Empty;
 
     /// <summary>
     /// Путь к исходному mp3 (или другому) файлу на локальной машине.
@@ -134,4 +139,47 @@ public class SpeechRecognitionTask
     /// Язык для субтитров (возможно, null)
     /// </summary>
     public string? Language { get; set; }
+
+    /// <summary>
+    /// Тип тарификации, применённый к задаче.
+    /// </summary>
+    public RecognitionBillingType BillingType { get; set; } = RecognitionBillingType.Unknown;
+
+    /// <summary>
+    /// Сумма, списанная за задачу.
+    /// </summary>
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? BillingAmount { get; set; }
+
+    /// <summary>
+    /// Валюта списания.
+    /// </summary>
+    [MaxLength(8)]
+    public string? BillingCurrency { get; set; }
+
+    /// <summary>
+    /// Дата списания.
+    /// </summary>
+    public DateTime? BilledAt { get; set; }
+
+    /// <summary>
+    /// Идентификатор транзакции кошелька, если она была создана.
+    /// </summary>
+    public Guid? WalletTransactionId { get; set; }
+
+    /// <summary>
+    /// Идентификатор подписки, использованной для тарификации.
+    /// </summary>
+    public Guid? SubscriptionId { get; set; }
+
+    /// <summary>
+    /// Ссылка на запись об использовании лимита.
+    /// </summary>
+    public Guid? UsageRecordId { get; set; }
+
+    /// <summary>
+    /// Дополнительный комментарий для биллинга.
+    /// </summary>
+    [MaxLength(512)]
+    public string? BillingComment { get; set; }
 }

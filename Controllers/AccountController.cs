@@ -5,8 +5,10 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -96,8 +98,8 @@ namespace YandexSpeech.Controllers
                     {
                         Email = email,
                         UserName = email,
-                        IsSubscribed = false,
-                        DisplayName = GenerateDefaultDisplayName()
+                        DisplayName = GenerateDefaultDisplayName(),
+                        RecognitionsResetAt = DateTime.UtcNow.Date.AddDays(1)
                     };
 
                     var createRes = await _userManager.CreateAsync(user);
@@ -121,6 +123,8 @@ namespace YandexSpeech.Controllers
             }
 
             await EnsureDisplayNameAsync(user);
+            await EnsureFinancialProfileAsync(user);
+            await EnsureFinancialProfileAsync(user);
 
             // ---------- выдаём JWT + refresh ----------
             var accessToken = await GenerateJwtToken(user);
@@ -187,6 +191,7 @@ namespace YandexSpeech.Controllers
             }
 
             await EnsureDisplayNameAsync(user);
+            await EnsureFinancialProfileAsync(user);
 
             return Ok(new UserProfileDto
             {
@@ -308,10 +313,54 @@ namespace YandexSpeech.Controllers
                 new(JwtRegisteredClaimNames.Name, user.DisplayName ?? string.Empty),
                 new(ClaimTypes.Name, user.DisplayName ?? string.Empty),
                 new("displayName", user.DisplayName ?? string.Empty),
-                new("IsSubscribed", user.IsSubscribed.ToString())
+                new("lifetimeAccess", user.HasLifetimeAccess.ToString()),
+                new("recognitionsToday", user.RecognitionsToday.ToString()),
+                new("recognitionsResetAt", user.RecognitionsResetAt?.ToString("o") ?? string.Empty)
             };
-            if (user.SubscriptionExpiry.HasValue)
-                claims.Add(new Claim("SubscriptionExpiry", user.SubscriptionExpiry.Value.ToString("o")));
+
+            UserSubscription? activeSubscription = null;
+            SubscriptionPlan? activePlan = null;
+
+            if (user.CurrentSubscriptionId.HasValue)
+            {
+                activeSubscription = await _dbContext.UserSubscriptions
+                    .Include(s => s.Plan)
+                    .FirstOrDefaultAsync(s => s.Id == user.CurrentSubscriptionId.Value);
+
+                activePlan = activeSubscription?.Plan;
+            }
+
+            if (activeSubscription != null)
+            {
+                claims.Add(new Claim("subscriptionId", activeSubscription.Id.ToString()));
+                claims.Add(new Claim("subscriptionStatus", activeSubscription.Status.ToString()));
+                if (activeSubscription.EndDate.HasValue)
+                {
+                    claims.Add(new Claim("subscriptionEndsAt", activeSubscription.EndDate.Value.ToString("o")));
+                }
+            }
+
+            if (activePlan != null)
+            {
+                claims.Add(new Claim("subscriptionPlanCode", activePlan.Code));
+                claims.Add(new Claim("subscriptionPlanPeriod", activePlan.BillingPeriod.ToString()));
+                claims.Add(new Claim("subscriptionCanHideCaptions", activePlan.CanHideCaptions.ToString()));
+                claims.Add(new Claim("subscriptionUnlimited", activePlan.IsUnlimitedRecognitions.ToString()));
+                if (activePlan.MaxRecognitionsPerDay.HasValue)
+                {
+                    claims.Add(new Claim("subscriptionDailyLimit", activePlan.MaxRecognitionsPerDay.Value.ToString()));
+                }
+            }
+
+            var now = DateTime.UtcNow;
+            var featureFlags = await _dbContext.UserFeatureFlags
+                .Where(f => f.UserId == user.Id && (f.ExpiresAt == null || f.ExpiresAt > now))
+                .ToListAsync();
+
+            foreach (var flag in featureFlags)
+            {
+                claims.Add(new Claim($"feature:{flag.FeatureCode}", flag.Value ?? "true"));
+            }
 
             var roles = await _userManager.GetRolesAsync(user);
             claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
@@ -335,6 +384,28 @@ namespace YandexSpeech.Controllers
 
             user.DisplayName = GenerateDefaultDisplayName();
             await _userManager.UpdateAsync(user);
+        }
+
+        private async Task EnsureFinancialProfileAsync(ApplicationUser user)
+        {
+            if (user.RecognitionsResetAt == null)
+            {
+                user.RecognitionsResetAt = DateTime.UtcNow.Date.AddDays(1);
+                await _userManager.UpdateAsync(user);
+            }
+
+            var hasWallet = await _dbContext.UserWallets.AnyAsync(w => w.UserId == user.Id);
+            if (!hasWallet)
+            {
+                _dbContext.UserWallets.Add(new UserWallet
+                {
+                    UserId = user.Id,
+                    Balance = 0,
+                    Currency = "RUB",
+                    UpdatedAt = DateTime.UtcNow
+                });
+                await _dbContext.SaveChangesAsync();
+            }
         }
 
         private static string GenerateDefaultDisplayName()
