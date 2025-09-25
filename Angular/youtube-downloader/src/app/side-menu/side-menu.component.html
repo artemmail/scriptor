@@ -35,7 +35,8 @@
     </a>
     <mat-divider></mat-divider>
     <a mat-list-item (click)="onLogout()">
-      <mat-icon>logout</mat-icon><span>Выйти ({{ user.displayName || user.email }})</span>
+      <mat-icon matListItemIcon>logout</mat-icon>
+      <span matListItemTitle>Выйти ({{ user.displayName || user.email }})</span>
     </a>
   </ng-container>
   <ng-template #guestMenu>
