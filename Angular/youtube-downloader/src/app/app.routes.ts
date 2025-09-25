@@ -4,11 +4,13 @@ import { RecognitionTasksComponent } from './recognition-tasks/recognition-tasks
 import { SubtitlesTasksComponent } from './subtitles-task/subtitles-tasks.component';
 import { MarkdownConverterComponent } from './Markdown-converter/markdown-converter.component';
 import { OpenAiTranscriptionComponent } from './openai-transcription/openai-transcription.component';
+import { OpenAiTranscriptionEditorComponent } from './openai-transcription-editor/openai-transcription-editor.component';
 
 export const appRoutes: Routes = [
   { path: '', redirectTo: 'youtube-downloader', pathMatch: 'full' },
   { path: 'youtube-downloader', component: YoutubeDownloaderComponent },
   { path: 'recognition-tasks', component: SubtitlesTasksComponent },
+  { path: 'transcriptions/:id/edit', component: OpenAiTranscriptionEditorComponent },
   { path: 'transcriptions', component: OpenAiTranscriptionComponent },
   { path: 'markdown-converter', component: MarkdownConverterComponent },
 

@@ -117,6 +117,16 @@
           <section class="result-block" *ngIf="selectedTask.recognizedText">
             <h3>Распознанный текст</h3>
             <pre>{{ selectedTask.recognizedText }}</pre>
+            <div class="result-actions">
+              <button
+                mat-stroked-button
+                color="primary"
+                [routerLink]="['/transcriptions', selectedTask.id, 'edit']"
+              >
+                <mat-icon>edit</mat-icon>
+                <span>Редактировать</span>
+              </button>
+            </div>
           </section>
 
           <section class="result-block" *ngIf="selectedTask.markdownText">

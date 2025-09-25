@@ -1,0 +1,67 @@
+<div class="editor-page">
+  <ng-container *ngIf="!loading && !errorMessage; else loadingOrError">
+    <div class="page-header">
+      <button mat-button type="button" (click)="goBack()">
+        <mat-icon>arrow_back</mat-icon>
+        К списку расшифровок
+      </button>
+
+      <div class="title-block">
+        <h1>{{ task?.displayName || 'Расшифровка' }}</h1>
+        <p class="subtitle" *ngIf="task?.modifiedAt">
+          Обновлено: {{ task?.modifiedAt | date: 'dd.MM.yyyy HH:mm' }}
+        </p>
+      </div>
+
+      <button
+        mat-icon-button
+        type="button"
+        (click)="refresh()"
+        [disabled]="loading || reloading"
+        aria-label="Обновить"
+      >
+        <mat-progress-spinner
+          *ngIf="reloading"
+          diameter="20"
+          mode="indeterminate"
+        ></mat-progress-spinner>
+        <mat-icon *ngIf="!reloading">refresh</mat-icon>
+      </button>
+    </div>
+
+    <mat-card class="editor-card">
+      <md-editor
+        name="transcriptionEditor"
+        [(ngModel)]="recognizedContent"
+        preview="vertical"
+        height="'100%'"
+        [options]="editorOptions"
+      ></md-editor>
+    </mat-card>
+
+    <div class="actions">
+      <button mat-raised-button type="button" color="primary" (click)="download()" [disabled]="!recognizedContent">
+        <mat-icon>download</mat-icon>
+        Скачать .txt
+      </button>
+      <button mat-raised-button type="button" color="accent" (click)="save()" [disabled]="!canSave">
+        <mat-icon>save</mat-icon>
+        Сохранить
+      </button>
+    </div>
+  </ng-container>
+
+  <ng-template #loadingOrError>
+    <div class="state-card" *ngIf="loading">
+      <mat-progress-spinner diameter="48" mode="indeterminate"></mat-progress-spinner>
+      <p>Загружаем расшифровку…</p>
+    </div>
+    <div class="state-card error" *ngIf="!loading && errorMessage">
+      <p>{{ errorMessage }}</p>
+      <button mat-stroked-button type="button" color="primary" (click)="refresh()">
+        <mat-icon>refresh</mat-icon>
+        Повторить
+      </button>
+    </div>
+  </ng-template>
+</div>

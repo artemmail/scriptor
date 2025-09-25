@@ -8,6 +8,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Subscription, timer } from 'rxjs';
 import { exhaustMap } from 'rxjs/operators';
+import { RouterModule } from '@angular/router';
 import {
   OpenAiTranscriptionService,
   OpenAiTranscriptionStatus,
@@ -30,6 +31,7 @@ import { LocalTimePipe } from '../pipe/local-time.pipe';
     MatProgressBarModule,
     MatProgressSpinnerModule,
     LocalTimePipe,
+    RouterModule,
   ],
   templateUrl: './openai-transcription.component.html',
   styleUrls: ['./openai-transcription.component.css'],

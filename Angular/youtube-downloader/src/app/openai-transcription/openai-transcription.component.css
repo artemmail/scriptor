@@ -183,6 +183,12 @@
   overflow: auto;
 }
 
+.result-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
 .tasks-card a.active {
   background: rgba(63, 81, 181, 0.08);
 }

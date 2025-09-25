@@ -171,6 +171,53 @@ namespace YandexSpeech.Controllers
             return Ok(MapToDetailsDto(preparedTask));
         }
 
+        [HttpPut("{id}/recognized-text")]
+        public async Task<IActionResult> UpdateRecognizedText(string id, [FromBody] UpdateOpenAiTranscriptionTextRequest request)
+        {
+            if (request == null)
+            {
+                return BadRequest("Request body is required.");
+            }
+
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
+
+            var task = await _dbContext.OpenAiTranscriptionTasks
+                .FirstOrDefaultAsync(t => t.Id == id && t.CreatedBy == userId);
+
+            if (task == null)
+            {
+                return NotFound();
+            }
+
+            var hasChanges = false;
+
+            if (request.RecognizedText != null && request.RecognizedText != task.RecognizedText)
+            {
+                task.RecognizedText = request.RecognizedText;
+                hasChanges = true;
+            }
+
+            if (request.MarkdownText != null && request.MarkdownText != task.MarkdownText)
+            {
+                task.MarkdownText = request.MarkdownText;
+                hasChanges = true;
+            }
+
+            if (!hasChanges)
+            {
+                return NoContent();
+            }
+
+            task.ModifiedAt = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
+
+            return NoContent();
+        }
+
         private async Task<OpenAiTranscriptionTask?> LoadTaskWithDetailsAsync(string taskId, string createdBy)
         {
             var task = await _dbContext.OpenAiTranscriptionTasks
