@@ -1,14 +1,17 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Subscription, timer } from 'rxjs';
 import { exhaustMap } from 'rxjs/operators';
 import { RouterModule } from '@angular/router';
+import { LMarkdownEditorModule } from 'ngx-markdown-editor';
 import {
   OpenAiTranscriptionService,
   OpenAiTranscriptionStatus,
@@ -24,12 +27,15 @@ import { LocalTimePipe } from '../pipe/local-time.pipe';
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
     MatListModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
+    MatSnackBarModule,
+    LMarkdownEditorModule,
     LocalTimePipe,
     RouterModule,
   ],
@@ -50,12 +56,29 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   continueError: string | null = null;
   continueInProgress = false;
 
+  markdownEditing = false;
+  markdownDraft = '';
+  markdownSaving = false;
+  markdownError: string | null = null;
+  deleteInProgress = false;
+  markdownEditorOptions = {
+    placeholder: 'Отредактируйте итоговый Markdown…',
+    theme: 'github',
+    lineNumbers: true,
+    dragDrop: true,
+    showPreviewPanel: true,
+    hideIcons: [] as string[],
+  };
+
   readonly OpenAiTranscriptionStatus = OpenAiTranscriptionStatus;
   readonly OpenAiTranscriptionStepStatus = OpenAiTranscriptionStepStatus;
 
   private pollSubscription?: Subscription;
 
-  constructor(private readonly transcriptionService: OpenAiTranscriptionService) {}
+  constructor(
+    private readonly transcriptionService: OpenAiTranscriptionService,
+    private readonly snackBar: MatSnackBar,
+  ) {}
 
   ngOnInit(): void {
     this.loadTasks(true);
@@ -107,6 +130,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
           this.stopPolling();
           this.selectedTaskId = null;
           this.selectedTask = null;
+          this.resetMarkdownState();
           if (selectFirstAvailable && tasks.length > 0) {
             this.selectTask(tasks[0]);
           }
@@ -130,6 +154,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.selectedTaskId = taskId;
     this.selectedTask = null;
     this.detailsError = null;
+    this.resetMarkdownState();
     this.startPolling();
   }
 
@@ -183,6 +208,153 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
           }
         : existing
     );
+  }
+
+  private resetMarkdownState(): void {
+    this.markdownEditing = false;
+    this.markdownDraft = '';
+    this.markdownSaving = false;
+    this.markdownError = null;
+    this.deleteInProgress = false;
+  }
+
+  get canEditMarkdown(): boolean {
+    return !!this.selectedTask && this.selectedTask.done && !this.markdownSaving && !this.deleteInProgress;
+  }
+
+  get canSaveMarkdown(): boolean {
+    return this.markdownEditing && !this.markdownSaving && this.markdownDraft.trim().length > 0;
+  }
+
+  get canDownloadMarkdown(): boolean {
+    const content = this.markdownEditing ? this.markdownDraft : this.selectedTask?.markdownText;
+    return !!content && content.trim().length > 0;
+  }
+
+  get canDeleteTask(): boolean {
+    return !!this.selectedTaskId && !this.deleteInProgress && !this.markdownSaving;
+  }
+
+  startMarkdownEditing(): void {
+    if (!this.canEditMarkdown) {
+      return;
+    }
+
+    this.markdownDraft = this.selectedTask?.markdownText ?? '';
+    this.markdownError = null;
+    this.markdownEditing = true;
+  }
+
+  cancelMarkdownEditing(): void {
+    if (this.markdownSaving) {
+      return;
+    }
+
+    this.markdownEditing = false;
+    this.markdownDraft = '';
+    this.markdownError = null;
+  }
+
+  saveMarkdown(): void {
+    if (!this.canSaveMarkdown || !this.selectedTaskId) {
+      return;
+    }
+
+    this.markdownSaving = true;
+    this.markdownError = null;
+
+    const markdownText = this.markdownDraft;
+    const recognizedText = this.selectedTask?.recognizedText ?? null;
+
+    this.transcriptionService
+      .updateRecognizedText(this.selectedTaskId, recognizedText, markdownText)
+      .subscribe({
+        next: () => {
+          this.markdownSaving = false;
+          this.markdownEditing = false;
+          const updatedAt = new Date().toISOString();
+          if (this.selectedTask) {
+            this.selectedTask = {
+              ...this.selectedTask,
+              markdownText,
+              modifiedAt: updatedAt,
+            };
+          }
+          this.tasks = this.tasks.map((existing) =>
+            existing.id === this.selectedTaskId
+              ? { ...existing, modifiedAt: updatedAt }
+              : existing
+          );
+          this.markdownDraft = '';
+          this.snackBar.open('Markdown сохранён', '', { duration: 2000 });
+        },
+        error: (error) => {
+          this.markdownSaving = false;
+          const message = this.extractError(error) ?? 'Не удалось сохранить Markdown.';
+          this.markdownError = message;
+          this.snackBar.open(message, 'OK', { duration: 3000 });
+        },
+      });
+  }
+
+  downloadMarkdown(): void {
+    const content = this.markdownEditing
+      ? this.markdownDraft
+      : this.selectedTask?.markdownText ?? '';
+
+    if (!content.trim()) {
+      return;
+    }
+
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const fileName = this.selectedTask?.displayName || this.selectedTaskId || 'transcription';
+    a.download = `${fileName}.md`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  deleteTask(): void {
+    if (!this.selectedTaskId || this.deleteInProgress) {
+      return;
+    }
+
+    const displayName = this.selectedTask?.displayName;
+    const confirmed = confirm(
+      displayName ? `Удалить расшифровку «${displayName}»?` : 'Удалить расшифровку?'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.deleteInProgress = true;
+    this.markdownError = null;
+
+    const taskId = this.selectedTaskId;
+
+    this.transcriptionService.deleteTask(taskId).subscribe({
+      next: () => {
+        this.deleteInProgress = false;
+        this.snackBar.open('Расшифровка удалена', '', { duration: 2000 });
+        this.stopPolling();
+        this.tasks = this.tasks.filter((task) => task.id !== taskId);
+        this.selectedTaskId = null;
+        this.selectedTask = null;
+        this.resetMarkdownState();
+        this.detailsError = null;
+        this.detailsLoading = false;
+        this.loadTasks(true);
+      },
+      error: (error) => {
+        this.deleteInProgress = false;
+        const message = this.extractError(error) ?? 'Не удалось удалить расшифровку.';
+        this.markdownError = message;
+        this.snackBar.open(message, 'OK', { duration: 3000 });
+      },
+    });
   }
 
   getStatusText(status: OpenAiTranscriptionStatus | null | undefined): string {

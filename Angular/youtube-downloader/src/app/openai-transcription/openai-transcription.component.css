@@ -187,6 +187,8 @@
   display: flex;
   justify-content: flex-end;
   margin-top: 12px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .tasks-card a.active {
@@ -198,6 +200,44 @@
   justify-content: center;
   min-height: 160px;
   text-align: center;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.section-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.markdown-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.markdown-editor md-editor {
+  min-height: 320px;
+}
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.markdown-placeholder {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.6);
+  font-style: italic;
 }
 
 @media (min-width: 960px) {
