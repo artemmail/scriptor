@@ -8,6 +8,7 @@ using System.Text;
 using YandexSpeech;
 using YandexSpeech.models.DB;
 using YandexSpeech.services;
+using YandexSpeech.services.Interface;
 using YandexSpeech.Services;
 using YoutubeDownload.Managers;
 using YoutubeDownload.Services;
@@ -138,6 +139,9 @@ builder.Services.AddSingleton<CaptionService>();
 builder.Services.AddScoped<IYSpeechService, YSpeechService>();
 builder.Services.AddSingleton<IPunctuationService, PunctuationService>();
 builder.Services.AddScoped<ISpeechWorkflowService, SpeechWorkflowService>();
+
+builder.Services.Configure<YooMoneyOptions>(builder.Configuration.GetSection("YooMoney"));
+builder.Services.AddHttpClient<IYooMoneyRepository, YooMoneyRepository>();
 
 builder.Services.AddAudioTaskManager();  // ← вот эта строка
 
