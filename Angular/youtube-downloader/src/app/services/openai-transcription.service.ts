@@ -81,6 +81,26 @@ export class OpenAiTranscriptionService {
     return this.http.get<OpenAiTranscriptionTaskDetailsDto>(`${this.apiUrl}/${id}`);
   }
 
+  updateMarkdown(id: string, markdown: string): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/${id}/markdown`, { markdown });
+  }
+
+  deleteTask(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
+
+  exportPdf(id: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${id}/export/pdf`, { responseType: 'blob' });
+  }
+
+  exportDocx(id: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${id}/export/docx`, { responseType: 'blob' });
+  }
+
+  exportBbcode(id: string): Observable<string> {
+    return this.http.get(`${this.apiUrl}/${id}/export/bbcode`, { responseType: 'text' });
+  }
+
   getStatusText(status: OpenAiTranscriptionStatus | null | undefined): string {
     switch (status) {
       case OpenAiTranscriptionStatus.Created:
