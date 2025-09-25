@@ -7,7 +7,7 @@ import { MatListModule } from '@angular/material/list';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Subscription, timer } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { exhaustMap } from 'rxjs/operators';
 import {
   OpenAiTranscriptionService,
   OpenAiTranscriptionStatus,
@@ -140,7 +140,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.detailsLoading = !this.selectedTask;
 
     this.pollSubscription = timer(0, 5000)
-      .pipe(switchMap(() => this.transcriptionService.getTask(this.selectedTaskId!)))
+      .pipe(exhaustMap(() => this.transcriptionService.getTask(this.selectedTaskId!)))
       .subscribe({
         next: (task) => {
           this.detailsLoading = false;
