@@ -120,10 +120,7 @@ namespace YandexSpeech.Controllers
                 return Unauthorized();
             }
 
-            var task = await _dbContext.OpenAiTranscriptionTasks
-                .Include(t => t.Steps)
-                .Include(t => t.Segments)
-                .FirstOrDefaultAsync(t => t.Id == id && t.CreatedBy == userId);
+            var task = await LoadTaskWithDetailsAsync(id, userId);
 
             if (task == null)
             {
@@ -142,17 +139,16 @@ namespace YandexSpeech.Controllers
                 return Unauthorized();
             }
 
-            var task = await _dbContext.OpenAiTranscriptionTasks
-                .Include(t => t.Steps)
-                .Include(t => t.Segments)
-                .FirstOrDefaultAsync(t => t.Id == id && t.CreatedBy == userId);
+            var taskExists = await _dbContext.OpenAiTranscriptionTasks
+                .AsNoTracking()
+                .AnyAsync(t => t.Id == id && t.CreatedBy == userId);
 
-            if (task == null)
+            if (!taskExists)
             {
                 return NotFound();
             }
 
-            var preparedTask = await _transcriptionService.PrepareForContinuationAsync(task.Id);
+            var preparedTask = await _transcriptionService.PrepareForContinuationAsync(id);
             if (preparedTask == null)
             {
                 return NotFound();
@@ -164,15 +160,45 @@ namespace YandexSpeech.Controllers
                 {
                     using var scope = _scopeFactory.CreateScope();
                     var scopedService = scope.ServiceProvider.GetRequiredService<IOpenAiTranscriptionService>();
-                    await scopedService.ContinueTranscriptionAsync(task.Id);
+                    await scopedService.ContinueTranscriptionAsync(id);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to continue OpenAI transcription task {TaskId}", task.Id);
+                    _logger.LogError(ex, "Failed to continue OpenAI transcription task {TaskId}", id);
                 }
             });
 
             return Ok(MapToDetailsDto(preparedTask));
+        }
+
+        private async Task<OpenAiTranscriptionTask?> LoadTaskWithDetailsAsync(string taskId, string createdBy)
+        {
+            var task = await _dbContext.OpenAiTranscriptionTasks
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == taskId && t.CreatedBy == createdBy);
+
+            if (task == null)
+            {
+                return null;
+            }
+
+            var steps = await _dbContext.OpenAiTranscriptionSteps
+                .AsNoTracking()
+                .Where(s => s.TaskId == task.Id)
+                .OrderBy(s => s.StartedAt)
+                .ThenBy(s => s.Id)
+                .ToListAsync();
+
+            var segments = await _dbContext.OpenAiRecognizedSegments
+                .AsNoTracking()
+                .Where(s => s.TaskId == task.Id)
+                .OrderBy(s => s.Order)
+                .ToListAsync();
+
+            task.Steps = steps;
+            task.Segments = segments;
+
+            return task;
         }
 
         private static string SanitizeFileName(string fileName)
