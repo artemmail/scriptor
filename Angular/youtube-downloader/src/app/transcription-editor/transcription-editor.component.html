@@ -1,0 +1,87 @@
+<div class="page-container" *ngIf="!loading && !errorMessage; else loadingOrError">
+  <mat-card class="editor-card">
+    <md-editor
+      name="transcriptionEditor"
+      [(ngModel)]="markdownContent"
+      preview="vertical"
+      height="'100%'"
+      [options]="editorOptions"
+      [preRender]="renderWithMath"
+    >
+    </md-editor>
+  </mat-card>
+
+  <div class="actions">
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="onDownloadMd()"
+      [disabled]="!hasContent() || exporting"
+    >
+      <mat-icon>download</mat-icon>
+      Скачать .md
+    </button>
+
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="onDownloadPdf()"
+      [disabled]="!hasContent() || exporting"
+    >
+      <mat-icon>picture_as_pdf</mat-icon>
+      PDF
+    </button>
+
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="onDownloadDocx()"
+      [disabled]="!hasContent() || exporting"
+    >
+      <mat-icon>description</mat-icon>
+      DOCX
+    </button>
+
+    <button
+      mat-stroked-button
+      color="primary"
+      (click)="onCopyBbcode()"
+      [disabled]="!hasContent() || exporting"
+    >
+      <mat-icon>content_copy</mat-icon>
+      BBCode
+    </button>
+
+    <span class="spacer"></span>
+
+    <button
+      mat-raised-button
+      color="accent"
+      (click)="onSave()"
+      [disabled]="!hasContent() || saving"
+    >
+      <mat-icon>save</mat-icon>
+      Сохранить
+    </button>
+
+    <button
+      mat-raised-button
+      color="warn"
+      (click)="onDelete()"
+      [disabled]="deleting"
+    >
+      <mat-icon>delete</mat-icon>
+      Удалить
+    </button>
+  </div>
+</div>
+
+<ng-template #loadingOrError>
+  <div class="status-block" *ngIf="loading">
+    <mat-progress-spinner mode="indeterminate" diameter="40"></mat-progress-spinner>
+    <p>Загружаем данные…</p>
+  </div>
+  <div class="status-block error" *ngIf="!loading && errorMessage">
+    <p>{{ errorMessage }}</p>
+  </div>
+</ng-template>

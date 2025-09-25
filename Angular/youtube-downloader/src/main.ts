@@ -31,6 +31,7 @@ import { RoleGuard } from './app/services/role.guard';
 import { ProfileComponent } from './app/profile/profile.component';
 import { AuthGuard } from './app/services/auth.guard';
 import { OpenAiTranscriptionComponent } from './app/openai-transcription/openai-transcription.component';
+import { TranscriptionEditorComponent } from './app/transcription-editor/transcription-editor.component';
 
 
 
@@ -56,6 +57,11 @@ const routes: Routes = [
   {
     path: 'transcriptions',
     component: OpenAiTranscriptionComponent,
+    canActivate: [AuthGuard],
+  },
+  {
+    path: 'transcriptions/:id/edit',
+    component: TranscriptionEditorComponent,
     canActivate: [AuthGuard],
   },
 

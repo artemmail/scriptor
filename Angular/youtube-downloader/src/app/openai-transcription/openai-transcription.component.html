@@ -121,6 +121,16 @@
 
           <section class="result-block" *ngIf="selectedTask.markdownText">
             <h3>Форматированный Markdown</h3>
+            <div class="result-actions">
+              <button
+                mat-stroked-button
+                color="primary"
+                [routerLink]="['/transcriptions', selectedTask.id, 'edit']"
+              >
+                <mat-icon>edit</mat-icon>
+                <span>Редактировать</span>
+              </button>
+            </div>
             <pre>{{ selectedTask.markdownText }}</pre>
           </section>
         </ng-container>
