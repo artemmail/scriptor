@@ -87,7 +87,7 @@ namespace YandexSpeech
                 .HasOne(us => us.User)
                 .WithMany(u => u.Subscriptions)
                 .HasForeignKey(us => us.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<UserSubscription>()
                 .HasOne(us => us.Plan)
