@@ -144,17 +144,15 @@
                   <mat-icon>download</mat-icon>
                   <span>Скачать .md</span>
                 </button>
-                <button
+                <a
                   mat-stroked-button
-                  type="button"
                   color="accent"
-                  *ngIf="!markdownEditing"
-                  (click)="startMarkdownEditing()"
-                  [disabled]="!canEditMarkdown"
+                  *ngIf="selectedTask?.done"
+                  [routerLink]="['/transcriptions', selectedTask.id, 'markdown']"
                 >
                   <mat-icon>edit</mat-icon>
                   <span>Редактировать</span>
-                </button>
+                </a>
                 <button
                   mat-stroked-button
                   type="button"
@@ -168,51 +166,12 @@
               </div>
             </div>
 
-            <div class="markdown-editor" *ngIf="markdownEditing; else markdownPreview">
-              <md-editor
-                name="markdownEditor"
-                [(ngModel)]="markdownDraft"
-                preview="vertical"
-                height="'100%'"
-                [options]="markdownEditorOptions"
-              ></md-editor>
-              <div class="editor-actions">
-                <button
-                  mat-raised-button
-                  type="button"
-                  color="accent"
-                  (click)="saveMarkdown()"
-                  [disabled]="!canSaveMarkdown"
-                >
-                  <mat-icon>save</mat-icon>
-                  <span>Сохранить</span>
-                </button>
-                <button
-                  mat-button
-                  type="button"
-                  (click)="cancelMarkdownEditing()"
-                  [disabled]="markdownSaving"
-                >
-                  <mat-icon>close</mat-icon>
-                  <span>Отмена</span>
-                </button>
-                <mat-progress-spinner
-                  *ngIf="markdownSaving"
-                  class="inline-spinner"
-                  mode="indeterminate"
-                  diameter="28"
-                ></mat-progress-spinner>
-              </div>
-            </div>
-
-            <ng-template #markdownPreview>
-              <pre *ngIf="selectedTask.markdownText; else emptyMarkdown">{{ selectedTask.markdownText }}</pre>
-              <ng-template #emptyMarkdown>
-                <p class="markdown-placeholder">Markdown ещё не сформирован.</p>
-              </ng-template>
+            <pre *ngIf="selectedTask.markdownText; else emptyMarkdown">{{ selectedTask.markdownText }}</pre>
+            <ng-template #emptyMarkdown>
+              <p class="markdown-placeholder">Markdown ещё не сформирован.</p>
             </ng-template>
 
-            <div class="error" *ngIf="markdownError">{{ markdownError }}</div>
+            <div class="error" *ngIf="taskActionError">{{ taskActionError }}</div>
           </section>
         </ng-container>
       </ng-template>

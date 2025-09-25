@@ -1,6 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -11,7 +10,6 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Subscription, timer } from 'rxjs';
 import { exhaustMap } from 'rxjs/operators';
 import { RouterModule } from '@angular/router';
-import { LMarkdownEditorModule } from 'ngx-markdown-editor';
 import {
   OpenAiTranscriptionService,
   OpenAiTranscriptionStatus,
@@ -27,7 +25,6 @@ import { LocalTimePipe } from '../pipe/local-time.pipe';
   standalone: true,
   imports: [
     CommonModule,
-    FormsModule,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -35,7 +32,6 @@ import { LocalTimePipe } from '../pipe/local-time.pipe';
     MatProgressBarModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
-    LMarkdownEditorModule,
     LocalTimePipe,
     RouterModule,
   ],
@@ -56,19 +52,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   continueError: string | null = null;
   continueInProgress = false;
 
-  markdownEditing = false;
-  markdownDraft = '';
-  markdownSaving = false;
-  markdownError: string | null = null;
+  taskActionError: string | null = null;
   deleteInProgress = false;
-  markdownEditorOptions = {
-    placeholder: 'Отредактируйте итоговый Markdown…',
-    theme: 'github',
-    lineNumbers: true,
-    dragDrop: true,
-    showPreviewPanel: true,
-    hideIcons: [] as string[],
-  };
 
   readonly OpenAiTranscriptionStatus = OpenAiTranscriptionStatus;
   readonly OpenAiTranscriptionStepStatus = OpenAiTranscriptionStepStatus;
@@ -130,7 +115,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
           this.stopPolling();
           this.selectedTaskId = null;
           this.selectedTask = null;
-          this.resetMarkdownState();
+          this.resetTaskActions();
           if (selectFirstAvailable && tasks.length > 0) {
             this.selectTask(tasks[0]);
           }
@@ -154,7 +139,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.selectedTaskId = taskId;
     this.selectedTask = null;
     this.detailsError = null;
-    this.resetMarkdownState();
+    this.resetTaskActions();
     this.startPolling();
   }
 
@@ -210,97 +195,22 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     );
   }
 
-  private resetMarkdownState(): void {
-    this.markdownEditing = false;
-    this.markdownDraft = '';
-    this.markdownSaving = false;
-    this.markdownError = null;
+  private resetTaskActions(): void {
+    this.taskActionError = null;
     this.deleteInProgress = false;
   }
 
-  get canEditMarkdown(): boolean {
-    return !!this.selectedTask && this.selectedTask.done && !this.markdownSaving && !this.deleteInProgress;
-  }
-
-  get canSaveMarkdown(): boolean {
-    return this.markdownEditing && !this.markdownSaving && this.markdownDraft.trim().length > 0;
-  }
-
   get canDownloadMarkdown(): boolean {
-    const content = this.markdownEditing ? this.markdownDraft : this.selectedTask?.markdownText;
+    const content = this.selectedTask?.markdownText;
     return !!content && content.trim().length > 0;
   }
 
   get canDeleteTask(): boolean {
-    return !!this.selectedTaskId && !this.deleteInProgress && !this.markdownSaving;
-  }
-
-  startMarkdownEditing(): void {
-    if (!this.canEditMarkdown) {
-      return;
-    }
-
-    this.markdownDraft = this.selectedTask?.markdownText ?? '';
-    this.markdownError = null;
-    this.markdownEditing = true;
-  }
-
-  cancelMarkdownEditing(): void {
-    if (this.markdownSaving) {
-      return;
-    }
-
-    this.markdownEditing = false;
-    this.markdownDraft = '';
-    this.markdownError = null;
-  }
-
-  saveMarkdown(): void {
-    if (!this.canSaveMarkdown || !this.selectedTaskId) {
-      return;
-    }
-
-    this.markdownSaving = true;
-    this.markdownError = null;
-
-    const markdownText = this.markdownDraft;
-    const recognizedText = this.selectedTask?.recognizedText ?? null;
-
-    this.transcriptionService
-      .updateRecognizedText(this.selectedTaskId, recognizedText, markdownText)
-      .subscribe({
-        next: () => {
-          this.markdownSaving = false;
-          this.markdownEditing = false;
-          const updatedAt = new Date().toISOString();
-          if (this.selectedTask) {
-            this.selectedTask = {
-              ...this.selectedTask,
-              markdownText,
-              modifiedAt: updatedAt,
-            };
-          }
-          this.tasks = this.tasks.map((existing) =>
-            existing.id === this.selectedTaskId
-              ? { ...existing, modifiedAt: updatedAt }
-              : existing
-          );
-          this.markdownDraft = '';
-          this.snackBar.open('Markdown сохранён', '', { duration: 2000 });
-        },
-        error: (error) => {
-          this.markdownSaving = false;
-          const message = this.extractError(error) ?? 'Не удалось сохранить Markdown.';
-          this.markdownError = message;
-          this.snackBar.open(message, 'OK', { duration: 3000 });
-        },
-      });
+    return !!this.selectedTaskId && !this.deleteInProgress;
   }
 
   downloadMarkdown(): void {
-    const content = this.markdownEditing
-      ? this.markdownDraft
-      : this.selectedTask?.markdownText ?? '';
+    const content = this.selectedTask?.markdownText ?? '';
 
     if (!content.trim()) {
       return;
@@ -331,7 +241,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     }
 
     this.deleteInProgress = true;
-    this.markdownError = null;
+    this.taskActionError = null;
 
     const taskId = this.selectedTaskId;
 
@@ -343,7 +253,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
         this.tasks = this.tasks.filter((task) => task.id !== taskId);
         this.selectedTaskId = null;
         this.selectedTask = null;
-        this.resetMarkdownState();
+        this.resetTaskActions();
         this.detailsError = null;
         this.detailsLoading = false;
         this.loadTasks(true);
@@ -351,7 +261,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       error: (error) => {
         this.deleteInProgress = false;
         const message = this.extractError(error) ?? 'Не удалось удалить расшифровку.';
-        this.markdownError = message;
+        this.taskActionError = message;
         this.snackBar.open(message, 'OK', { duration: 3000 });
       },
     });

@@ -216,24 +216,6 @@
   flex-wrap: wrap;
 }
 
-.markdown-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.markdown-editor md-editor {
-  min-height: 320px;
-}
-
-.editor-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
 .markdown-placeholder {
   margin: 0;
   color: rgba(0, 0, 0, 0.6);

@@ -4,12 +4,14 @@ import { YoutubeDownloaderComponent } from './youtube-downloader/youtube-downloa
 import { RecognitionTasksComponent } from './recognition-tasks/recognition-tasks.component';
 import { OpenAiTranscriptionComponent } from './openai-transcription/openai-transcription.component';
 import { OpenAiTranscriptionEditorComponent } from './openai-transcription-editor/openai-transcription-editor.component';
+import { OpenAiTranscriptionMarkdownEditorComponent } from './openai-transcription-markdown-editor/openai-transcription-markdown-editor.component';
 
 const routes: Routes = [
   { path: '', redirectTo: 'youtube-downloader', pathMatch: 'full' },
   { path: 'youtube-downloader', component: YoutubeDownloaderComponent },
   { path: 'recognition-tasks', component: RecognitionTasksComponent },
   { path: 'transcriptions/:id/edit', component: OpenAiTranscriptionEditorComponent },
+  { path: 'transcriptions/:id/markdown', component: OpenAiTranscriptionMarkdownEditorComponent },
   { path: 'transcriptions', component: OpenAiTranscriptionComponent },
 ];
 
