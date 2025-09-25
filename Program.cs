@@ -139,6 +139,10 @@ builder.Services.AddSingleton<CaptionService>();
 builder.Services.AddScoped<IYSpeechService, YSpeechService>();
 builder.Services.AddSingleton<IPunctuationService, PunctuationService>();
 builder.Services.AddScoped<ISpeechWorkflowService, SpeechWorkflowService>();
+builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
+builder.Services.AddScoped<IWalletService, WalletService>();
+builder.Services.AddScoped<IUsageService, UsageService>();
+builder.Services.AddScoped<IPaymentGatewayService, PaymentGatewayService>();
 
 builder.Services.Configure<YooMoneyOptions>(builder.Configuration.GetSection("YooMoney"));
 builder.Services.AddHttpClient<IYooMoneyRepository, YooMoneyRepository>();
@@ -223,7 +227,7 @@ static async Task EnsureRolesAsync(IServiceProvider services)
     using var scope = services.CreateScope();
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
-    var rolesToEnsure = new[] { "Free", "Moderator" };
+    var rolesToEnsure = new[] { "Free", "Subscriber", "Lifetime", "Moderator", "Admin" };
 
     foreach (var roleName in rolesToEnsure)
     {
