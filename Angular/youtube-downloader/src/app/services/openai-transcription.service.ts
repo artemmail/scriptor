@@ -81,11 +81,19 @@ export class OpenAiTranscriptionService {
     return this.http.get<OpenAiTranscriptionTaskDetailsDto>(`${this.apiUrl}/${id}`);
   }
 
-  updateRecognizedText(id: string, recognizedText: string, markdownText?: string | null): Observable<void> {
+  updateRecognizedText(
+    id: string,
+    recognizedText?: string | null,
+    markdownText?: string | null,
+  ): Observable<void> {
     return this.http.put<void>(`${this.apiUrl}/${id}/recognized-text`, {
-      recognizedText,
-      markdownText,
+      recognizedText: recognizedText ?? null,
+      markdownText: markdownText ?? null,
     });
+  }
+
+  deleteTask(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }
 
   getStatusText(status: OpenAiTranscriptionStatus | null | undefined): string {

@@ -171,6 +171,37 @@ namespace YandexSpeech.Controllers
             return Ok(MapToDetailsDto(preparedTask));
         }
 
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(string id)
+        {
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
+
+            var task = await _dbContext.OpenAiTranscriptionTasks
+                .Include(t => t.Steps)
+                .Include(t => t.Segments)
+                .FirstOrDefaultAsync(t => t.Id == id && t.CreatedBy == userId);
+
+            if (task == null)
+            {
+                return NotFound();
+            }
+
+            var sourcePath = task.SourceFilePath;
+            var convertedPath = task.ConvertedFilePath;
+
+            _dbContext.OpenAiTranscriptionTasks.Remove(task);
+            await _dbContext.SaveChangesAsync();
+
+            TryDeleteFile(sourcePath, task.Id);
+            TryDeleteFile(convertedPath, task.Id);
+
+            return NoContent();
+        }
+
         [HttpPut("{id}/recognized-text")]
         public async Task<IActionResult> UpdateRecognizedText(string id, [FromBody] UpdateOpenAiTranscriptionTextRequest request)
         {
@@ -216,6 +247,26 @@ namespace YandexSpeech.Controllers
             await _dbContext.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        private void TryDeleteFile(string? path, string taskId)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            try
+            {
+                if (System.IO.File.Exists(path))
+                {
+                    System.IO.File.Delete(path);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete file {FilePath} for transcription task {TaskId}", path, taskId);
+            }
         }
 
         private async Task<OpenAiTranscriptionTask?> LoadTaskWithDetailsAsync(string taskId, string createdBy)
