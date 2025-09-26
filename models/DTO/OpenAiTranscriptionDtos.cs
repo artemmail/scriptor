@@ -26,6 +26,8 @@ namespace YandexSpeech.models.DTO
         public int SegmentsTotal { get; set; }
 
         public int SegmentsProcessed { get; set; }
+
+        public string? Clarification { get; set; }
     }
 
     public class OpenAiTranscriptionTaskDetailsDto : OpenAiTranscriptionTaskDto

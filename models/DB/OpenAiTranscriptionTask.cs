@@ -44,6 +44,8 @@ namespace YandexSpeech.models.DB
 
         public string? MarkdownText { get; set; }
 
+        public string? Clarification { get; set; }
+
         public OpenAiTranscriptionStatus Status { get; set; } = OpenAiTranscriptionStatus.Created;
 
         public bool Done { get; set; }

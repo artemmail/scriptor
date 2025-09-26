@@ -31,6 +31,7 @@ export interface OpenAiTranscriptionTaskDto {
   modifiedAt: string;
   segmentsTotal: number;
   segmentsProcessed: number;
+  clarification: string | null;
 }
 
 export interface OpenAiTranscriptionTaskDetailsDto extends OpenAiTranscriptionTaskDto {
@@ -67,9 +68,12 @@ export class OpenAiTranscriptionService {
 
   constructor(private readonly http: HttpClient) {}
 
-  upload(file: File): Observable<OpenAiTranscriptionTaskDto> {
+  upload(file: File, clarification?: string | null): Observable<OpenAiTranscriptionTaskDto> {
     const formData = new FormData();
     formData.append('file', file, file.name);
+    if (clarification && clarification.trim().length > 0) {
+      formData.append('clarification', clarification.trim());
+    }
     return this.http.post<OpenAiTranscriptionTaskDto>(this.apiUrl, formData);
   }
 

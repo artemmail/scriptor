@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { Subscription, timer } from 'rxjs';
 import { exhaustMap } from 'rxjs/operators';
@@ -30,6 +31,7 @@ import { LocalTimePipe } from '../pipe/local-time.pipe';
     MatListModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
+    FormsModule,
     LocalTimePipe,
     RouterModule,
   ],
@@ -42,6 +44,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   selectedTask: OpenAiTranscriptionTaskDetailsDto | null = null;
 
   selectedFile: File | null = null;
+  clarification = '';
   uploading = false;
   uploadError: string | null = null;
   listError: string | null = null;
@@ -78,13 +81,16 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.uploading = true;
     this.uploadError = null;
 
-    this.transcriptionService.upload(this.selectedFile).subscribe({
-      next: (task) => {
-        this.uploading = false;
-        this.selectedFile = null;
-        this.tasks = [task, ...this.tasks.filter((t) => t.id !== task.id)];
-        this.selectTaskById(task.id);
-      },
+    this.transcriptionService
+      .upload(this.selectedFile, this.clarification)
+      .subscribe({
+        next: (task) => {
+          this.uploading = false;
+          this.selectedFile = null;
+          this.clarification = '';
+          this.tasks = [task, ...this.tasks.filter((t) => t.id !== task.id)];
+          this.selectTaskById(task.id);
+        },
       error: (error) => {
         this.uploading = false;
         this.uploadError = this.extractError(error) ?? 'Не удалось загрузить файл.';
@@ -180,6 +186,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
             modifiedAt: task.modifiedAt,
             segmentsProcessed: task.segmentsProcessed,
             segmentsTotal: task.segmentsTotal,
+            clarification: task.clarification,
           }
         : existing
     );

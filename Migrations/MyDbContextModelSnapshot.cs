@@ -542,6 +542,9 @@ namespace YandexSpeech.Migrations
                     b.Property<string>("MarkdownText")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Clarification")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("ModifiedAt")
                         .HasColumnType("datetime2");
 

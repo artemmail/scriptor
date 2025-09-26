@@ -48,7 +48,10 @@ namespace YandexSpeech.services
             Directory.CreateDirectory(_workingDirectory);
         }
 
-        public async Task<OpenAiTranscriptionTask> StartTranscriptionAsync(string sourceFilePath, string createdBy)
+        public async Task<OpenAiTranscriptionTask> StartTranscriptionAsync(
+            string sourceFilePath,
+            string createdBy,
+            string? clarification = null)
         {
             if (string.IsNullOrWhiteSpace(sourceFilePath))
                 throw new ArgumentException("Source file path must be provided.", nameof(sourceFilePath));
@@ -63,6 +66,9 @@ namespace YandexSpeech.services
             {
                 SourceFilePath = sourceFilePath,
                 CreatedBy = createdBy,
+                Clarification = string.IsNullOrWhiteSpace(clarification)
+                    ? null
+                    : clarification.Trim(),
                 Status = OpenAiTranscriptionStatus.Created,
                 Done = false,
                 CreatedAt = DateTime.UtcNow,
@@ -368,7 +374,10 @@ namespace YandexSpeech.services
                 try
                 {
                     var context = string.Join("\n", previousContext);
-                    processedText = await _punctuationService.FixPunctuationAsync(next.Text, context);
+                    processedText = await _punctuationService.FixPunctuationAsync(
+                        next.Text,
+                        context,
+                        task.Clarification);
                 }
                 catch
                 {
@@ -421,7 +430,7 @@ namespace YandexSpeech.services
 
             try
             {
-                var markdown = await CreateDialogueMarkdownAsync(task.ProcessedText!);
+                var markdown = await CreateDialogueMarkdownAsync(task.ProcessedText!, task.Clarification);
                 task.MarkdownText = markdown;
                 task.Status = OpenAiTranscriptionStatus.Done;
                 task.Done = true;
@@ -598,20 +607,30 @@ namespace YandexSpeech.services
             return segments;
         }
 
-        private async Task<string> CreateDialogueMarkdownAsync(string transcription)
+        private async Task<string> CreateDialogueMarkdownAsync(string transcription, string? clarification)
         {
             using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(50) };
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _openAiApiKey);
 
-            var messages = new[]
+            var messages = new List<object>
             {
                 new
                 {
                     role = "system",
                     content = "You format transcripts into Markdown dialogue. Identify speakers and label them with bold names (either real names found in the text or Speaker 1, Speaker 2, etc.). Each replica must begin with the speaker label followed by a colon. Do not add commentary or analysis."
-                },
-                new { role = "user", content = transcription }
+                }
             };
+
+            if (!string.IsNullOrWhiteSpace(clarification))
+            {
+                messages.Add(new
+                {
+                    role = "system",
+                    content = $"Follow these additional instructions while formatting: {clarification.Trim()}"
+                });
+            }
+
+            messages.Add(new { role = "user", content = transcription });
 
             var body = new
             {
