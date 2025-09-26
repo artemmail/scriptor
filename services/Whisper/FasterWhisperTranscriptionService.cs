@@ -1,5 +1,10 @@
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
+using System.Linq;
 using System.Text;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace YandexSpeech.services.Whisper
 {
@@ -11,10 +16,15 @@ namespace YandexSpeech.services.Whisper
         private readonly string _device;
         private readonly string _computeType;
         private readonly string _language;
+        private readonly IReadOnlyList<double> _temperatures;
+        private readonly double _compressionRatioThreshold;
+        private readonly double _logProbThreshold;
+        private readonly double _noSpeechThreshold;
+        private readonly bool _conditionOnPreviousText;
 
-        // === Диагностика/артефакты при падении ===
-        private const bool KeepFailedOutput = true; // не удалять папку вывода при ошибке
-        private const int PreviewLogLines = 50;     // сколько строк STDOUT/STDERR показать в исключении
+        // === Р”РёР°РіРЅРѕСЃС‚РёРєР°/Р°СЂС‚РµС„Р°РєС‚С‹ РїСЂРё РїР°РґРµРЅРёРё ===
+        private const bool KeepFailedOutput = true; // РЅРµ СѓРґР°Р»СЏС‚СЊ РїР°РїРєСѓ РІС‹РІРѕРґР° РїСЂРё РѕС€РёР±РєРµ
+        private const int PreviewLogLines = 50;     // СЃРєРѕР»СЊРєРѕ СЃС‚СЂРѕРє STDOUT/STDERR РїРѕРєР°Р·Р°С‚СЊ РІ РёСЃРєР»СЋС‡РµРЅРёРё
 
         public FasterWhisperTranscriptionService(
             IConfiguration configuration,
@@ -26,11 +36,43 @@ namespace YandexSpeech.services.Whisper
             _executableSetting = section.GetValue<string>("ExecutablePath") ?? "faster-whisper";
             _model = section.GetValue<string>("Model") ?? configuration.GetValue<string>("Whisper:Model") ?? "medium";
             _device = section.GetValue<string>("Device") ?? configuration.GetValue<string>("Whisper:Device") ?? "cpu";
-            // CPU-safe по умолчанию; для CUDA нормализуем далее
+            // CPU-safe РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ; РґР»СЏ CUDA РЅРѕСЂРјР°Р»РёР·СѓРµРј РґР°Р»РµРµ
             _computeType = section.GetValue<string>("ComputeType") ?? "int8";
             _language = section.GetValue<string>("Language")
                 ?? configuration.GetValue<string>("Whisper:Language")
                 ?? "ru";
+
+            _temperatures = ParseTemperatures(section) ?? new[] { 0.0, 0.2, 0.4, 0.6, 0.8, 1.0 };
+            _compressionRatioThreshold = section.GetValue<double?>("CompressionRatioThreshold") ?? 2.4;
+            _logProbThreshold = section.GetValue<double?>("LogProbThreshold") ?? -1.0;
+            _noSpeechThreshold = section.GetValue<double?>("NoSpeechThreshold") ?? 0.6;
+            _conditionOnPreviousText = section.GetValue<bool?>("ConditionOnPreviousText") ?? true;
+        }
+
+        private static IReadOnlyList<double>? ParseTemperatures(IConfiguration section)
+        {
+            var array = section.GetSection("Temperatures").Get<double[]?>();
+            if (array is { Length: > 0 })
+                return Array.AsReadOnly(array);
+
+            var temperaturesValue = section.GetValue<string?>("Temperatures");
+            if (string.IsNullOrWhiteSpace(temperaturesValue))
+                return null;
+
+            var parts = temperaturesValue
+                .Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+            if (parts.Length == 0)
+                return null;
+
+            var values = new List<double>();
+            foreach (var part in parts)
+            {
+                if (double.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+                    values.Add(parsed);
+            }
+
+            return values.Count == 0 ? null : values.AsReadOnly();
         }
 
         public async Task<WhisperTranscriptionResult> TranscribeAsync(
@@ -81,7 +123,7 @@ namespace YandexSpeech.services.Whisper
                 var standardError = await stderrTask;
                 var standardOutput = await stdoutTask;
 
-                // Всегда сохраняем логи в файлы
+                // Р’СЃРµРіРґР° СЃРѕС…СЂР°РЅСЏРµРј Р»РѕРіРё РІ С„Р°Р№Р»С‹
                 var preview = SaveAndPreviewLogs(outputDirectory, standardOutput, standardError);
 
                 if (process.ExitCode != 0)
@@ -149,7 +191,7 @@ namespace YandexSpeech.services.Whisper
 
             if (useCli)
             {
-                // === ветка CLI faster-whisper ===
+                // === РІРµС‚РєР° CLI faster-whisper ===
                 var psi = new ProcessStartInfo
                 {
                     FileName = exe,
@@ -174,7 +216,7 @@ namespace YandexSpeech.services.Whisper
             }
             else
             {
-                // === фолбэк: Python-раннер, использующий библиотеку faster_whisper ===
+                // === С„РѕР»Р±СЌРє: Python-СЂР°РЅРЅРµСЂ, РёСЃРїРѕР»СЊР·СѓСЋС‰РёР№ Р±РёР±Р»РёРѕС‚РµРєСѓ faster_whisper ===
                 var scriptPath = WriteInlinePythonRunner(outputDirectory);
 
                 var psi = new ProcessStartInfo
@@ -188,7 +230,7 @@ namespace YandexSpeech.services.Whisper
                 EnsureEnvironmentEncoding(psi);
                 ConfigureFfmpegEnvironment(psi, ffmpegExecutable);
 
-                // Безопасные ENV для CTranslate2 на Windows Server
+                // Р‘РµР·РѕРїР°СЃРЅС‹Рµ ENV РґР»СЏ CTranslate2 РЅР° Windows Server
                 psi.Environment["CT2_CUDA_DISABLE_CUDNN"] = "1";
                 psi.Environment["CT2_CUDA_USE_TF32"] = "1";
                 psi.Environment["CT2_VERBOSE"] = "1";
@@ -213,7 +255,7 @@ namespace YandexSpeech.services.Whisper
 
             if (d == "cuda" || d == "gpu" || d.StartsWith("cuda:"))
             {
-                // допустимо на CUDA:
+                // РґРѕРїСѓСЃС‚РёРјРѕ РЅР° CUDA:
                 //   float16 | int8_float16 | float32
                 return ct switch
                 {
@@ -225,7 +267,7 @@ namespace YandexSpeech.services.Whisper
             }
             else
             {
-                // CPU: int8 | float32 (float16 допускаем — будет проигнорирован)
+                // CPU: int8 | float32 (float16 РґРѕРїСѓСЃРєР°РµРј вЂ” Р±СѓРґРµС‚ РїСЂРѕРёРіРЅРѕСЂРёСЂРѕРІР°РЅ)
                 return ct switch
                 {
                     "int8" => "int8",
@@ -249,14 +291,14 @@ namespace YandexSpeech.services.Whisper
                     return candidate;
             }
 
-            return _executableSetting; // имя в PATH
+            return _executableSetting; // РёРјСЏ РІ PATH
         }
 
         private static bool IsInPath(string nameOrExe)
         {
             if (string.IsNullOrWhiteSpace(nameOrExe)) return false;
 
-            // если содержит путь/разделители — не PATH-режим
+            // РµСЃР»Рё СЃРѕРґРµСЂР¶РёС‚ РїСѓС‚СЊ/СЂР°Р·РґРµР»РёС‚РµР»Рё вЂ” РЅРµ PATH-СЂРµР¶РёРј
             if (nameOrExe.Contains(Path.DirectorySeparatorChar) || nameOrExe.Contains(Path.AltDirectorySeparatorChar))
                 return false;
 
@@ -365,6 +407,24 @@ namespace YandexSpeech.services.Whisper
         private string WriteInlinePythonRunner(string outputDirectory)
         {
             var scriptPath = Path.Combine(outputDirectory, "fw_runner.py");
+            string FormatDouble(double value)
+            {
+                var formatted = value.ToString("0.###############################", CultureInfo.InvariantCulture);
+                if (!formatted.Contains('.') && !formatted.Contains('e') && !formatted.Contains('E'))
+                    formatted += ".0";
+                return formatted;
+            }
+            var temperatureLiteral = _temperatures.Count switch
+            {
+                0 => "0.0",
+                1 => FormatDouble(_temperatures[0]),
+                _ => "(" + string.Join(", ", _temperatures.Select(FormatDouble)) + ")"
+            };
+            var compressionLiteral = FormatDouble(_compressionRatioThreshold);
+            var logProbLiteral = FormatDouble(_logProbThreshold);
+            var noSpeechLiteral = FormatDouble(_noSpeechThreshold);
+            var conditionLiteral = _conditionOnPreviousText ? "True" : "False";
+
             var py = @"
 import sys, json, os, traceback
 from pathlib import Path
@@ -399,10 +459,14 @@ def main():
             audio,
             language=language if language and language.lower() != 'auto' else None,
             word_timestamps=True,
-            vad_filter=False,         # без ORT/VAD
+            vad_filter=False,         # Р±РµР· ORT/VAD
             beam_size=5,
-            temperature=0.0,
-            without_timestamps=False  # нужны таймкоды сегментов
+            temperature=__TEMPERATURE__,
+            compression_ratio_threshold=__COMPRESSION_RATIO_THRESHOLD__,
+            logprob_threshold=__LOGPROB_THRESHOLD__,
+            no_speech_threshold=__NO_SPEECH_THRESHOLD__,
+            condition_on_previous_text=__CONDITION_ON_PREVIOUS_TEXT__,
+            without_timestamps=False  # РЅСѓР¶РЅС‹ С‚Р°Р№РјРєРѕРґС‹ СЃРµРіРјРµРЅС‚РѕРІ
         )
         data = {
             'language': getattr(info, 'language', None),
@@ -435,6 +499,13 @@ def main():
 if __name__ == '__main__':
     main()
 ";
+
+            py = py.Replace("__TEMPERATURE__", temperatureLiteral)
+                .Replace("__COMPRESSION_RATIO_THRESHOLD__", compressionLiteral)
+                .Replace("__LOGPROB_THRESHOLD__", logProbLiteral)
+                .Replace("__NO_SPEECH_THRESHOLD__", noSpeechLiteral)
+                .Replace("__CONDITION_ON_PREVIOUS_TEXT__", conditionLiteral);
+
             File.WriteAllText(scriptPath, py, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             return scriptPath;
         }
