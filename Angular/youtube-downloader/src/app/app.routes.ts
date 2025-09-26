@@ -4,6 +4,8 @@ import { RecognitionTasksComponent } from './recognition-tasks/recognition-tasks
 import { SubtitlesTasksComponent } from './subtitles-task/subtitles-tasks.component';
 import { MarkdownConverterComponent } from './Markdown-converter/markdown-converter.component';
 import { OpenAiTranscriptionComponent } from './openai-transcription/openai-transcription.component';
+import { BillingComponent } from './billing/billing.component';
+import { AuthGuard } from './services/auth.guard';
 
 export const appRoutes: Routes = [
   { path: '', redirectTo: 'youtube-downloader', pathMatch: 'full' },
@@ -11,5 +13,6 @@ export const appRoutes: Routes = [
   { path: 'recognition-tasks', component: SubtitlesTasksComponent },
   { path: 'transcriptions', component: OpenAiTranscriptionComponent },
   { path: 'markdown-converter', component: MarkdownConverterComponent },
+  { path: 'billing', component: BillingComponent, canActivate: [AuthGuard] },
 
 ];
