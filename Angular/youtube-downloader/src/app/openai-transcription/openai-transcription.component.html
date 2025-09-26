@@ -20,6 +20,18 @@
         <span>Отправить</span>
       </button>
     </div>
+    <div class="clarification-field">
+      <label class="clarification-label" for="clarification-input"
+        >Уточнение (необязательно)</label
+      >
+      <textarea
+        id="clarification-input"
+        rows="3"
+        [(ngModel)]="clarification"
+        [ngModelOptions]="{ standalone: true }"
+        placeholder="Например: отметить важных спикеров или уточнить терминологию"
+      ></textarea>
+    </div>
     <div class="file-name" *ngIf="selectedFile">
       Выбран файл: <strong>{{ selectedFile.name }}</strong>
     </div>
@@ -70,6 +82,11 @@
             <span class="status-chip" [ngClass]="getStatusClass(selectedTask.status)">
               {{ getStatusText(selectedTask.status) }}
             </span>
+          </div>
+
+          <div class="clarification-display" *ngIf="selectedTask.clarification">
+            <strong>Уточнение:</strong>
+            <span>{{ selectedTask.clarification }}</span>
           </div>
 
           <div class="error" *ngIf="selectedTask.error">{{ selectedTask.error }}</div>

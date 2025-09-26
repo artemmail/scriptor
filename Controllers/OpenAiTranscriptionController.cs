@@ -53,7 +53,9 @@ namespace YandexSpeech.Controllers
             MultipartBodyLengthLimit = long.MaxValue,
             ValueLengthLimit = int.MaxValue,
             MultipartHeadersLengthLimit = int.MaxValue)]
-        public async Task<ActionResult<OpenAiTranscriptionTaskDto>> Upload([FromForm] IFormFile file)
+        public async Task<ActionResult<OpenAiTranscriptionTaskDto>> Upload(
+            [FromForm] IFormFile file,
+            [FromForm] string? clarification)
         {
             if (file == null || file.Length == 0)
             {
@@ -78,7 +80,14 @@ namespace YandexSpeech.Controllers
                 await file.CopyToAsync(stream);
             }
 
-            var task = await _transcriptionService.StartTranscriptionAsync(storedFilePath, userId);
+            var sanitizedClarification = string.IsNullOrWhiteSpace(clarification)
+                ? null
+                : clarification.Trim();
+
+            var task = await _transcriptionService.StartTranscriptionAsync(
+                storedFilePath,
+                userId,
+                sanitizedClarification);
 
             _ = Task.Run(async () =>
             {
@@ -119,7 +128,8 @@ namespace YandexSpeech.Controllers
                     t.CreatedAt,
                     t.ModifiedAt,
                     t.SegmentsTotal,
-                    t.SegmentsProcessed
+                    t.SegmentsProcessed,
+                    t.Clarification
                 })
                 .ToListAsync();
 
@@ -133,7 +143,8 @@ namespace YandexSpeech.Controllers
                     t.CreatedAt,
                     t.ModifiedAt,
                     t.SegmentsTotal,
-                    t.SegmentsProcessed))
+                    t.SegmentsProcessed,
+                    t.Clarification))
                 .ToList();
             return Ok(result);
         }
@@ -414,7 +425,8 @@ namespace YandexSpeech.Controllers
                 task.CreatedAt,
                 task.ModifiedAt,
                 task.SegmentsTotal,
-                task.SegmentsProcessed);
+                task.SegmentsProcessed,
+                task.Clarification);
         }
 
         private static OpenAiTranscriptionTaskDto MapToDto(
@@ -426,7 +438,8 @@ namespace YandexSpeech.Controllers
             DateTime createdAt,
             DateTime modifiedAt,
             int segmentsTotal,
-            int segmentsProcessed)
+            int segmentsProcessed,
+            string? clarification)
         {
             return new OpenAiTranscriptionTaskDto
             {
@@ -439,7 +452,8 @@ namespace YandexSpeech.Controllers
                 CreatedAt = createdAt,
                 ModifiedAt = modifiedAt,
                 SegmentsTotal = segmentsTotal,
-                SegmentsProcessed = segmentsProcessed
+                SegmentsProcessed = segmentsProcessed,
+                Clarification = clarification
             };
         }
 
@@ -457,7 +471,8 @@ namespace YandexSpeech.Controllers
                 ModifiedAt = task.ModifiedAt,
                 RecognizedText = task.RecognizedText,
                 ProcessedText = task.ProcessedText,
-                MarkdownText = task.MarkdownText
+                MarkdownText = task.MarkdownText,
+                Clarification = task.Clarification
             };
 
             dto.Steps = task.Steps?

@@ -8,7 +8,7 @@ namespace YandexSpeech.services
     public interface IPunctuationService
     {
         Task<string> GetAvailableModelsAsync();
-        Task<string> FixPunctuationAsync(string rawText, string previousContext);
+        Task<string> FixPunctuationAsync(string rawText, string previousContext, string? clarification = null);
     }
 
     public class PunctuationService : IPunctuationService
@@ -56,7 +56,7 @@ namespace YandexSpeech.services
             throw new Exception($"Не удалось получить список моделей после {MaxRetries} попыток.");
         }
 
-        public async Task<string> FixPunctuationAsync(string rawText, string previousContext)
+        public async Task<string> FixPunctuationAsync(string rawText, string previousContext, string? clarification = null)
         {
             using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _openAiApiKey);
@@ -74,6 +74,14 @@ Do not include any additional comments or explanations."
             if (!string.IsNullOrWhiteSpace(previousContext))
             {
                 messages.Add(new { role = "assistant", content = previousContext });
+            }
+            if (!string.IsNullOrWhiteSpace(clarification))
+            {
+                messages.Add(new
+                {
+                    role = "system",
+                    content = $"Apply the following additional requirements while editing: {clarification.Trim()}"
+                });
             }
             messages.Add(new { role = "user", content = rawText });
 
