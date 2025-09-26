@@ -202,6 +202,7 @@ namespace YandexSpeech.services.Whisper
                 };
                 EnsureEnvironmentEncoding(psi);
                 ConfigureFfmpegEnvironment(psi, ffmpegExecutable);
+                ConfigureCTranslate2Environment(psi);
 
                 psi.ArgumentList.Add(audioPath);
                 psi.ArgumentList.Add("--model"); psi.ArgumentList.Add(_model);
@@ -229,12 +230,7 @@ namespace YandexSpeech.services.Whisper
                 };
                 EnsureEnvironmentEncoding(psi);
                 ConfigureFfmpegEnvironment(psi, ffmpegExecutable);
-
-                // Безопасные ENV для CTranslate2 на Windows Server
-                psi.Environment["CT2_CUDA_DISABLE_CUDNN"] = "1";
-                psi.Environment["CT2_CUDA_USE_TF32"] = "1";
-                psi.Environment["CT2_VERBOSE"] = "1";
-                psi.Environment["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1";
+                ConfigureCTranslate2Environment(psi);
 
                 psi.ArgumentList.Add(scriptPath);
                 psi.ArgumentList.Add(audioPath);
@@ -246,6 +242,25 @@ namespace YandexSpeech.services.Whisper
 
                 return psi;
             }
+        }
+
+        private void ConfigureCTranslate2Environment(ProcessStartInfo psi)
+        {
+            var envVars = new Dictionary<string, string>
+            {
+                ["CT2_CUDA_DISABLE_CUDNN"] = "1",
+                ["CT2_CUDA_USE_TF32"] = "1",
+                ["CT2_VERBOSE"] = "1",
+                ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+            };
+
+            foreach (var pair in envVars)
+            {
+                psi.Environment[pair.Key] = pair.Value;
+            }
+
+            var formatted = string.Join(", ", envVars.Select(kv => $"{kv.Key}={kv.Value}"));
+            _logger.LogInformation("Configured CTranslate2 environment variables: {Variables}", formatted);
         }
 
         private static string NormalizeCt2(string device, string computeType)
