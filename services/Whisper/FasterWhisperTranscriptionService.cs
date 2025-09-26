@@ -463,7 +463,7 @@ def main():
             beam_size=5,
             temperature=__TEMPERATURE__,
             compression_ratio_threshold=__COMPRESSION_RATIO_THRESHOLD__,
-            logprob_threshold=__LOGPROB_THRESHOLD__,
+            log_prob_threshold=__LOGPROB_THRESHOLD__,
             no_speech_threshold=__NO_SPEECH_THRESHOLD__,
             condition_on_previous_text=__CONDITION_ON_PREVIOUS_TEXT__,
             without_timestamps=False  # нужны таймкоды сегментов
