@@ -17,6 +17,18 @@ namespace YandexSpeech.services
         public string? AccessToken { get; set; }
 
         public string? RedirectUri { get; set; }
+
+        public string? Receiver { get; set; }
+
+        public string QuickpayForm { get; set; } = "shop";
+
+        public string PaymentType { get; set; } = "AC";
+
+        public string? SuccessUrl { get; set; }
+
+        public string? FailUrl { get; set; }
+
+        public string? NotificationSecret { get; set; }
     }
 
     public class YooMoneyRepository : IYooMoneyRepository

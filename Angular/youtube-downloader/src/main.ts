@@ -32,6 +32,7 @@ import { ProfileComponent } from './app/profile/profile.component';
 import { AuthGuard } from './app/services/auth.guard';
 import { OpenAiTranscriptionComponent } from './app/openai-transcription/openai-transcription.component';
 import { TranscriptionEditorComponent } from './app/transcription-editor/transcription-editor.component';
+import { BillingComponent } from './app/billing/billing.component';
 
 
 
@@ -121,6 +122,11 @@ const routes: Routes = [
   {
     path: 'blog',
     component: BlogFeedComponent,
+  },
+  {
+    path: 'billing',
+    component: BillingComponent,
+    canActivate: [AuthGuard]
   },
   {
     path: 'profile',
