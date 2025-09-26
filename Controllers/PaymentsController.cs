@@ -17,6 +17,7 @@ using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 using YandexSpeech.services;
 using YandexSpeech.services.Interface;
+using System.Security.Claims;
 
 namespace YandexSpeech.Controllers
 {
