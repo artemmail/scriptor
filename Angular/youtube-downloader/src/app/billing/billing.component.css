@@ -1,0 +1,68 @@
+.billing-container {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 24px;
+}
+
+.wallet__balance {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.wallet__amount {
+  font-size: 32px;
+  font-weight: 600;
+}
+
+.wallet__hint {
+  font-size: 14px;
+  color: #1976d2;
+}
+
+.wallet__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.plans h2 {
+  margin: 0 0 16px;
+}
+
+.plans__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.plan-card__price {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.plan-card__description {
+  min-height: 48px;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+@media (max-width: 768px) {
+  .billing-container {
+    padding: 16px;
+  }
+
+  .wallet__form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

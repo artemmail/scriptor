@@ -182,6 +182,7 @@ builder.Services.AddSpaStaticFiles(opts => opts.RootPath = "wwwroot");
 var app = builder.Build();
 
 await EnsureRolesAsync(app.Services);
+await SubscriptionPlanSeeder.EnsureDefaultPlansAsync(app.Services);
 
 // (пропущена инициализация ролей и IndexNow для краткости)
 
