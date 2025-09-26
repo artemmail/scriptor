@@ -16,6 +16,7 @@ namespace YandexSpeech.services.Whisper
         private readonly string _whisperExecutableSetting;
         private readonly string _whisperModel;
         private readonly string _whisperDevice;
+        private readonly string _whisperLanguage;
 
         public WhisperCliTranscriptionService(
             IConfiguration configuration,
@@ -26,6 +27,7 @@ namespace YandexSpeech.services.Whisper
             var whisperSection = configuration.GetSection("Whisper");
             _whisperExecutableSetting = whisperSection.GetValue<string>("ExecutablePath") ?? "whisper";
             _whisperModel = whisperSection.GetValue<string>("Model") ?? "medium";
+            _whisperLanguage = whisperSection.GetValue<string>("Language") ?? "ru";
 
             var configuredDevice = whisperSection.GetValue<string>("Device");
             if (!string.IsNullOrWhiteSpace(configuredDevice))
@@ -135,6 +137,8 @@ namespace YandexSpeech.services.Whisper
             startInfo.ArgumentList.Add("json");
             startInfo.ArgumentList.Add("--word_timestamps");
             startInfo.ArgumentList.Add("True");
+            startInfo.ArgumentList.Add("--language");
+            startInfo.ArgumentList.Add(_whisperLanguage);
             startInfo.ArgumentList.Add("--output_dir");
             startInfo.ArgumentList.Add(outputDirectory);
 
