@@ -136,7 +136,7 @@ namespace YandexSpeech
                 .HasPrecision(18, 2);
 
             builder.Entity<PaymentOperation>()
-                .HasOne<ApplicationUser>()
+                .HasOne(p => p.User)
                 .WithMany()
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
@@ -150,7 +150,7 @@ namespace YandexSpeech
                 .IsUnique();
 
             builder.Entity<RecognitionUsage>()
-                .HasOne<ApplicationUser>()
+                .HasOne(r => r.User)
                 .WithMany()
                 .HasForeignKey(r => r.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
