@@ -613,17 +613,12 @@ namespace YandexSpeech.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<string>("UserId1")
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<Guid?>("WalletTransactionId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
                     b.HasIndex("UserId");
-
-                    b.HasIndex("UserId1");
 
                     b.ToTable("PaymentOperations");
                 });
@@ -656,15 +651,10 @@ namespace YandexSpeech.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<string>("UserId1")
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<Guid?>("WalletTransactionId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("UserId1");
 
                     b.HasIndex("UserId", "Date")
                         .IsUnique();
@@ -1486,30 +1476,22 @@ namespace YandexSpeech.Migrations
 
             modelBuilder.Entity("YandexSpeech.models.DB.PaymentOperation", b =>
                 {
-                    b.HasOne("YandexSpeech.models.DB.ApplicationUser", null)
+                    b.HasOne("YandexSpeech.models.DB.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("YandexSpeech.models.DB.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId1");
 
                     b.Navigation("User");
                 });
 
             modelBuilder.Entity("YandexSpeech.models.DB.RecognitionUsage", b =>
                 {
-                    b.HasOne("YandexSpeech.models.DB.ApplicationUser", null)
+                    b.HasOne("YandexSpeech.models.DB.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("YandexSpeech.models.DB.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId1");
 
                     b.Navigation("User");
                 });
