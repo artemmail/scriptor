@@ -1,68 +1,81 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="AngleSharp" Version="1.2.0" />
-    <PackageReference Include="AspNet.Security.OAuth.Vkontakte" Version="9.2.0" />
-    <PackageReference Include="AWSSDK.Core" Version="3.7.400.70" />
-    <PackageReference Include="AWSSDK.S3" Version="3.7.410.12" />
-    <PackageReference Include="Concentus.OggFile" Version="1.0.6" />
-    <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="9.0.3" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.3" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.3" />
-    <PackageReference Include="Microsoft.AspNetCore.SpaServices" Version="3.1.32" />
-    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="9.0.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.3" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.3">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.3" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.3">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="NAudio" Version="2.2.1" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
-    <PackageReference Include="Xabe.FFmpeg" Version="5.2.6" />
-    <PackageReference Include="Xunit" Version="2.9.3" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="AngleSharp" Version="1.2.0" />
+		<PackageReference Include="AspNet.Security.OAuth.Vkontakte" Version="9.2.0" />
+		<PackageReference Include="AWSSDK.Core" Version="3.7.400.70" />
+		<PackageReference Include="AWSSDK.S3" Version="3.7.410.12" />
+		<PackageReference Include="Concentus.OggFile" Version="1.0.6" />
+		<PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="9.0.3" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.3" />
+		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.3" />
+		<PackageReference Include="Microsoft.AspNetCore.SpaServices" Version="3.1.32" />
+		<PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="9.0.1" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.3" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.3">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.3" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.3">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="NAudio" Version="2.2.1" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+		<PackageReference Include="Xabe.FFmpeg" Version="5.2.6" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Reference Include="YoutubeExplode">
-      <HintPath>YTExpl/YoutubeExplode.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-  <PropertyGroup>
-    <AngularProjectDir>$(MSBuildProjectDirectory)/Angular/youtube-downloader/</AngularProjectDir>
-    <AngularDistDir>$(AngularProjectDir)dist/youtube-downloader/</AngularDistDir>
-  </PropertyGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\..\..\YoutubeExplode-master\YoutubeExplode\YoutubeExplode.csproj" />
+	</ItemGroup>
+	<PropertyGroup>
+		<AngularProjectDir>$(MSBuildProjectDirectory)/Angular/youtube-downloader/</AngularProjectDir>
+		<AngularDistDir>$(AngularProjectDir)dist/youtube-downloader/</AngularDistDir>
+	</PropertyGroup>
 
-  <Target Name="BuildAngularApp" Condition="'$(DesignTimeBuild)' != 'true'" BeforeTargets="Build">
-    <Message Importance="high" Text="Building Angular client application..." />
-    <Exec WorkingDirectory="$(AngularProjectDir)" Command="npm install" Condition="!Exists('$(AngularProjectDir)node_modules')" />
-    <Exec WorkingDirectory="$(AngularProjectDir)" Command="npm run build -- --configuration production --progress false" />
-  </Target>
+	<Target Name="BuildAngularApp"
+			Condition="'$(DesignTimeBuild)' != 'true'"
+			BeforeTargets="Build">
+		<Message Importance="high" Text="Building Angular client application..." />
+		<Exec WorkingDirectory="$(AngularProjectDir)"
+			  Command="npm install"
+			  Condition="!Exists('$(AngularProjectDir)node_modules')" />
+		<Exec WorkingDirectory="$(AngularProjectDir)"
+			  Command="npm run build -- --configuration production --progress false" />
+	</Target>
 
-  <Target Name="CopyAngularDistToProject" Condition="'$(DesignTimeBuild)' != 'true'" DependsOnTargets="BuildAngularApp" AfterTargets="Build" BeforeTargets="Publish">
-    <ItemGroup>
-      <AngularDistFiles Include="$(AngularDistDir)**/*.*" />
-    </ItemGroup>
-    <RemoveDir Directories="$(ProjectDir)wwwroot" />
-    <Copy SourceFiles="@(AngularDistFiles)" DestinationFiles="@(AngularDistFiles->'$(ProjectDir)wwwroot\\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
-  </Target>
+	<Target Name="CopyAngularDistToProject"
+			Condition="'$(DesignTimeBuild)' != 'true'"
+			DependsOnTargets="BuildAngularApp"
+			AfterTargets="Build"
+			BeforeTargets="Publish">
+		<ItemGroup>
+			<AngularDistFiles Include="$(AngularDistDir)**/*.*" />
+		</ItemGroup>
+		<RemoveDir Directories="$(ProjectDir)wwwroot" />
+		<Copy SourceFiles="@(AngularDistFiles)"
+			  DestinationFiles="@(AngularDistFiles->'$(ProjectDir)wwwroot\\%(RecursiveDir)%(Filename)%(Extension)')"
+			  SkipUnchangedFiles="true" />
+	</Target>
 
-  <Target Name="CopyAngularDistToPublish" Condition="'$(DesignTimeBuild)' != 'true'" DependsOnTargets="BuildAngularApp" AfterTargets="Publish">
-    <ItemGroup>
-      <AngularDistFiles Include="$(AngularDistDir)**/*.*" />
-    </ItemGroup>
-    <RemoveDir Directories="$(PublishDir)wwwroot" />
-    <Copy SourceFiles="@(AngularDistFiles)" DestinationFiles="@(AngularDistFiles->'$(PublishDir)wwwroot\\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
-  </Target>
+	<Target Name="CopyAngularDistToPublish"
+			Condition="'$(DesignTimeBuild)' != 'true'"
+			DependsOnTargets="BuildAngularApp"
+			AfterTargets="Publish">
+		<ItemGroup>
+			<AngularDistFiles Include="$(AngularDistDir)**/*.*" />
+		</ItemGroup>
+		<RemoveDir Directories="$(PublishDir)wwwroot" />
+		<Copy SourceFiles="@(AngularDistFiles)"
+			  DestinationFiles="@(AngularDistFiles->'$(PublishDir)wwwroot\\%(RecursiveDir)%(Filename)%(Extension)')"
+			  SkipUnchangedFiles="true" />
+	</Target>
 </Project>
