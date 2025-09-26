@@ -109,9 +109,32 @@ namespace YandexSpeech.Controllers
             var tasks = await _dbContext.OpenAiTranscriptionTasks
                 .Where(t => t.CreatedBy == userId)
                 .OrderByDescending(t => t.CreatedAt)
+                .Select(t => new
+                {
+                    t.Id,
+                    t.SourceFilePath,
+                    t.Status,
+                    t.Done,
+                    t.Error,
+                    t.CreatedAt,
+                    t.ModifiedAt,
+                    t.SegmentsTotal,
+                    t.SegmentsProcessed
+                })
                 .ToListAsync();
 
-            var result = tasks.Select(MapToDto).ToList();
+            var result = tasks
+                .Select(t => MapToDto(
+                    t.Id,
+                    t.SourceFilePath,
+                    t.Status,
+                    t.Done,
+                    t.Error,
+                    t.CreatedAt,
+                    t.ModifiedAt,
+                    t.SegmentsTotal,
+                    t.SegmentsProcessed))
+                .ToList();
             return Ok(result);
         }
 
@@ -382,18 +405,41 @@ namespace YandexSpeech.Controllers
 
         private static OpenAiTranscriptionTaskDto MapToDto(OpenAiTranscriptionTask task)
         {
+            return MapToDto(
+                task.Id,
+                task.SourceFilePath,
+                task.Status,
+                task.Done,
+                task.Error,
+                task.CreatedAt,
+                task.ModifiedAt,
+                task.SegmentsTotal,
+                task.SegmentsProcessed);
+        }
+
+        private static OpenAiTranscriptionTaskDto MapToDto(
+            string id,
+            string sourceFilePath,
+            OpenAiTranscriptionStatus status,
+            bool done,
+            string? error,
+            DateTime createdAt,
+            DateTime modifiedAt,
+            int segmentsTotal,
+            int segmentsProcessed)
+        {
             return new OpenAiTranscriptionTaskDto
             {
-                Id = task.Id,
-                FileName = Path.GetFileName(task.SourceFilePath) ?? task.SourceFilePath,
-                DisplayName = ResolveDisplayName(task.SourceFilePath),
-                Status = task.Status,
-                Done = task.Done,
-                Error = task.Error,
-                CreatedAt = task.CreatedAt,
-                ModifiedAt = task.ModifiedAt,
-                SegmentsTotal = task.SegmentsTotal,
-                SegmentsProcessed = task.SegmentsProcessed
+                Id = id,
+                FileName = Path.GetFileName(sourceFilePath) ?? sourceFilePath,
+                DisplayName = ResolveDisplayName(sourceFilePath),
+                Status = status,
+                Done = done,
+                Error = error,
+                CreatedAt = createdAt,
+                ModifiedAt = modifiedAt,
+                SegmentsTotal = segmentsTotal,
+                SegmentsProcessed = segmentsProcessed
             };
         }
 
