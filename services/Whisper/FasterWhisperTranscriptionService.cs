@@ -126,22 +126,55 @@ namespace YandexSpeech.services.Whisper
                 // Всегда сохраняем логи в файлы
                 var preview = SaveAndPreviewLogs(outputDirectory, standardOutput, standardError);
 
-                if (process.ExitCode != 0)
+                var transcriptFile = WhisperTranscriptionHelper.FindFirstJsonFile(outputDirectory);
+                string? transcription = null;
+                WhisperTranscriptionResponse? parsed = null;
+
+                if (transcriptFile != null)
                 {
-                    _logger.LogError("Transcription failed. ExitCode={Code}\n{Preview}",
-                        process.ExitCode, preview);
-
-                    if (KeepFailedOutput)
-                        _logger.LogWarning("Keeping failed output directory: {OutDir}", outputDirectory);
-
-                    throw new InvalidOperationException(
-                        $"FasterWhisper transcription failed (exit code {process.ExitCode}). " +
-                        $"See {Path.Combine(outputDirectory, "stdout.log")} and {Path.Combine(outputDirectory, "stderr.log")}.\n\n" +
-                        preview
-                    );
+                    try
+                    {
+                        transcription = await File.ReadAllTextAsync(transcriptFile, cancellationToken);
+                        if (string.IsNullOrWhiteSpace(transcription))
+                        {
+                            transcription = null;
+                        }
+                        else
+                        {
+                            parsed = WhisperTranscriptionHelper.Parse(transcription);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to read or parse transcription JSON: {File}", transcriptFile);
+                        transcription = null;
+                        parsed = null;
+                    }
                 }
 
-                var transcriptFile = WhisperTranscriptionHelper.FindFirstJsonFile(outputDirectory);
+                if (process.ExitCode != 0)
+                {
+                    if (parsed?.Segments != null && parsed.Segments.Count > 0)
+                    {
+                        _logger.LogWarning("Transcription exited with non-zero exit code {Code} but produced transcript.\n{Preview}",
+                            process.ExitCode, preview);
+                    }
+                    else
+                    {
+                        _logger.LogError("Transcription failed. ExitCode={Code}\n{Preview}",
+                            process.ExitCode, preview);
+
+                        if (KeepFailedOutput)
+                            _logger.LogWarning("Keeping failed output directory: {OutDir}", outputDirectory);
+
+                        throw new InvalidOperationException(
+                            $"FasterWhisper transcription failed (exit code {process.ExitCode}). " +
+                            $"See {Path.Combine(outputDirectory, "stdout.log")} and {Path.Combine(outputDirectory, "stderr.log")}.\n\n" +
+                            preview
+                        );
+                    }
+                }
+
                 if (transcriptFile == null)
                 {
                     _logger.LogError("No JSON output produced.\n{Preview}", preview);
@@ -154,15 +187,13 @@ namespace YandexSpeech.services.Whisper
                     );
                 }
 
-                var transcription = await File.ReadAllTextAsync(transcriptFile, cancellationToken);
                 if (string.IsNullOrWhiteSpace(transcription))
                     throw new InvalidOperationException("FasterWhisper transcription result is empty.");
 
-                var parsed = WhisperTranscriptionHelper.Parse(transcription);
                 if (parsed?.Segments == null || parsed.Segments.Count == 0)
                     throw new InvalidOperationException("FasterWhisper transcription does not contain segments.");
 
-                var timecodedText = WhisperTranscriptionHelper.BuildTimecodedText(parsed);
+                var timecodedText = WhisperTranscriptionHelper.BuildTimecodedText(parsed!);
 
                 return new WhisperTranscriptionResult
                 {
