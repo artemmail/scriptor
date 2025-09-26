@@ -35,7 +35,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\YoutubeExplode-master\YoutubeExplode\YoutubeExplode.csproj" />
+    <Reference Include="YoutubeExplode">
+      <HintPath>YTExpl/YoutubeExplode.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <PropertyGroup>
     <AngularProjectDir>$(MSBuildProjectDirectory)/Angular/youtube-downloader/</AngularProjectDir>
