@@ -17,6 +17,7 @@ namespace YandexSpeech.services.Whisper
         private readonly string _model;
         private readonly string _device;
         private readonly string _computeType;
+        private readonly string _language;
 
         public FasterWhisperTranscriptionService(
             IConfiguration configuration,
@@ -29,6 +30,9 @@ namespace YandexSpeech.services.Whisper
             _model = section.GetValue<string>("Model") ?? configuration.GetValue<string>("Whisper:Model") ?? "medium";
             _device = section.GetValue<string>("Device") ?? configuration.GetValue<string>("Whisper:Device") ?? "cpu";
             _computeType = section.GetValue<string>("ComputeType") ?? "int8";
+            _language = section.GetValue<string>("Language")
+                ?? configuration.GetValue<string>("Whisper:Language")
+                ?? "ru";
         }
 
         public async Task<WhisperTranscriptionResult> TranscribeAsync(
@@ -131,6 +135,8 @@ namespace YandexSpeech.services.Whisper
             startInfo.ArgumentList.Add("json");
             startInfo.ArgumentList.Add("--word_timestamps");
             startInfo.ArgumentList.Add("True");
+            startInfo.ArgumentList.Add("--language");
+            startInfo.ArgumentList.Add(_language);
 
             return startInfo;
         }
