@@ -20,7 +20,7 @@ public sealed class FasterWhisperTranscriptionServiceTests
     {
         if (OperatingSystem.IsWindows())
         {
-            throw new SkipException("FasterWhisper mock script requires Unix-like environment.");
+            throw new Exception("FasterWhisper mock script requires Unix-like environment.");
         }
 
         var tempRoot = Path.Combine(Path.GetTempPath(), "faster-whisper-tests", Guid.NewGuid().ToString("N"));

@@ -253,7 +253,7 @@ namespace YandexSpeech.services.Whisper
 
                 var psi = new ProcessStartInfo
                 {
-                    FileName = " C:\\Python312\\python.exe",
+                    FileName = "python.exe",
                     UseShellExecute = false,
                     RedirectStandardError = true,
                     RedirectStandardOutput = true,
