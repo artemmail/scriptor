@@ -7,8 +7,28 @@ import time
 import traceback
 from pathlib import Path
 from typing import Dict, Tuple
+import types
 
 import pika
+
+try:
+    PIKA_EXCEPTIONS = pika.exceptions  # type: ignore[attr-defined]
+except AttributeError:  # pragma: no cover - fallback for test stubs
+    class _AMQPError(Exception):
+        pass
+
+    class _ChannelWrongStateError(_AMQPError):
+        pass
+
+    class _ChannelClosedByBroker(_AMQPError):
+        def __init__(self, code, text):
+            super().__init__(f"{code}: {text}")
+
+    PIKA_EXCEPTIONS = types.SimpleNamespace(
+        AMQPError=_AMQPError,
+        ChannelWrongStateError=_ChannelWrongStateError,
+        ChannelClosedByBroker=_ChannelClosedByBroker,
+    )
 
 try:
     from faster_whisper import WhisperModel
@@ -178,7 +198,23 @@ def _publish_response(channel: pika.adapters.blocking_connection.BlockingChannel
         correlation_id=correlation_id,
         delivery_mode=2,  # persistent
     )
+    if not getattr(channel, "is_open", False):
+        raise PIKA_EXCEPTIONS.ChannelClosedByBroker(0, "Channel closed before publish")
+
     channel.basic_publish(exchange="", routing_key=routing_key, properties=properties, body=body)
+
+
+def _ack_message(channel: pika.adapters.blocking_connection.BlockingChannel, delivery_tag: int) -> None:
+    if not getattr(channel, "is_open", False):
+        LOGGER.warning("Channel already closed, skipping ack for delivery_tag=%s", delivery_tag)
+        return
+
+    try:
+        channel.basic_ack(delivery_tag=delivery_tag)
+    except PIKA_EXCEPTIONS.ChannelWrongStateError:
+        LOGGER.warning("Channel closed while acknowledging delivery_tag=%s", delivery_tag)
+    except PIKA_EXCEPTIONS.AMQPError:
+        LOGGER.exception("Failed to acknowledge delivery_tag=%s", delivery_tag)
 
 
 def _on_message(channel: pika.adapters.blocking_connection.BlockingChannel, method, properties, body: bytes) -> None:
@@ -195,7 +231,7 @@ def _on_message(channel: pika.adapters.blocking_connection.BlockingChannel, meth
                 "error": "Invalid payload",
                 "diagnostics": traceback.format_exc(),
             })
-        channel.basic_ack(delivery_tag=method.delivery_tag)
+        _ack_message(channel, method.delivery_tag)
         return
 
     try:
@@ -222,7 +258,7 @@ def _on_message(channel: pika.adapters.blocking_connection.BlockingChannel, meth
     else:
         LOGGER.warning("No correlation id provided, skipping response publish")
 
-    channel.basic_ack(delivery_tag=method.delivery_tag)
+    _ack_message(channel, method.delivery_tag)
 
 
 def _connect() -> pika.BlockingConnection:
@@ -269,7 +305,7 @@ def main() -> None:
                 raise
             time.sleep(RETRY_DELAY_SECONDS)
         finally:
-            if connection is not None:
+            if connection is not None and getattr(connection, "is_open", False):
                 try:
                     connection.close()
                 except Exception:
