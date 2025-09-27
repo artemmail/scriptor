@@ -66,16 +66,23 @@
 			  SkipUnchangedFiles="true" />
 	</Target>
 
-	<Target Name="CopyAngularDistToPublish"
-			Condition="'$(DesignTimeBuild)' != 'true'"
-			DependsOnTargets="BuildAngularApp"
-			AfterTargets="Publish">
-		<ItemGroup>
-			<AngularDistFiles Include="$(AngularDistDir)**/*.*" />
-		</ItemGroup>
-		<RemoveDir Directories="$(PublishDir)wwwroot" />
-		<Copy SourceFiles="@(AngularDistFiles)"
-			  DestinationFiles="@(AngularDistFiles->'$(PublishDir)wwwroot\\%(RecursiveDir)%(Filename)%(Extension)')"
-			  SkipUnchangedFiles="true" />
-	</Target>
+        <Target Name="CopyAngularDistToPublish"
+                        Condition="'$(DesignTimeBuild)' != 'true'"
+                        DependsOnTargets="BuildAngularApp"
+                        AfterTargets="Publish">
+                <ItemGroup>
+                        <AngularDistFiles Include="$(AngularDistDir)**/*.*" />
+                </ItemGroup>
+                <RemoveDir Directories="$(PublishDir)wwwroot" />
+                <Copy SourceFiles="@(AngularDistFiles)"
+                          DestinationFiles="@(AngularDistFiles->'$(PublishDir)wwwroot\\%(RecursiveDir)%(Filename)%(Extension)')"
+                          SkipUnchangedFiles="true" />
+        </Target>
+
+        <ItemGroup>
+                <None Update="services\Whisper\fw_runner.py">
+                        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+                        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+                </None>
+        </ItemGroup>
 </Project>

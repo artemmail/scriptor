@@ -21,6 +21,11 @@ namespace YandexSpeech.services.Whisper
         private readonly double _logProbThreshold;
         private readonly double _noSpeechThreshold;
         private readonly bool _conditionOnPreviousText;
+        private readonly string _temperatureLiteral;
+        private readonly string _compressionLiteral;
+        private readonly string _logProbLiteral;
+        private readonly string _noSpeechLiteral;
+        private readonly string _conditionLiteral;
 
         // === Диагностика/артефакты при падении ===
         private const bool KeepFailedOutput = true; // не удалять папку вывода при ошибке
@@ -47,6 +52,12 @@ namespace YandexSpeech.services.Whisper
             _logProbThreshold = section.GetValue<double?>("LogProbThreshold") ?? -1.0;
             _noSpeechThreshold = section.GetValue<double?>("NoSpeechThreshold") ?? 0.6;
             _conditionOnPreviousText = section.GetValue<bool?>("ConditionOnPreviousText") ?? true;
+
+            _temperatureLiteral = BuildTemperatureLiteral(_temperatures);
+            _compressionLiteral = FormatDouble(_compressionRatioThreshold);
+            _logProbLiteral = FormatDouble(_logProbThreshold);
+            _noSpeechLiteral = FormatDouble(_noSpeechThreshold);
+            _conditionLiteral = _conditionOnPreviousText ? "True" : "False";
         }
 
         private static IReadOnlyList<double>? ParseTemperatures(IConfiguration section)
@@ -249,7 +260,7 @@ namespace YandexSpeech.services.Whisper
             else
             {
                 // === фолбэк: Python-раннер, использующий библиотеку faster_whisper ===
-                var scriptPath = WriteInlinePythonRunner(outputDirectory);
+                var scriptPath = ResolvePythonRunnerPath();
 
                 var psi = new ProcessStartInfo
                 {
@@ -270,6 +281,11 @@ namespace YandexSpeech.services.Whisper
                 psi.ArgumentList.Add(safeComputeType);
                 psi.ArgumentList.Add(_language);
                 psi.ArgumentList.Add(outputDirectory);
+                psi.ArgumentList.Add(_temperatureLiteral);
+                psi.ArgumentList.Add(_compressionLiteral);
+                psi.ArgumentList.Add(_logProbLiteral);
+                psi.ArgumentList.Add(_noSpeechLiteral);
+                psi.ArgumentList.Add(_conditionLiteral);
 
                 return psi;
             }
@@ -450,110 +466,47 @@ namespace YandexSpeech.services.Whisper
             return sb.ToString();
         }
 
-        private string WriteInlinePythonRunner(string outputDirectory)
+        private string ResolvePythonRunnerPath()
         {
-            var scriptPath = Path.Combine(outputDirectory, "fw_runner.py");
-            string FormatDouble(double value)
+            static string? TryCandidate(params string[] parts)
             {
-                var formatted = value.ToString("0.###############################", CultureInfo.InvariantCulture);
-                if (!formatted.Contains('.') && !formatted.Contains('e') && !formatted.Contains('E'))
-                    formatted += ".0";
-                return formatted;
+                var candidate = Path.Combine(parts);
+                return File.Exists(candidate) ? candidate : null;
             }
-            var temperatureLiteral = _temperatures.Count switch
+
+            var baseDirectory = AppContext.BaseDirectory;
+            var candidates = new List<string?>
             {
-                0 => "0.0",
-                1 => FormatDouble(_temperatures[0]),
-                _ => "(" + string.Join(", ", _temperatures.Select(FormatDouble)) + ")"
+                TryCandidate(baseDirectory, "fw_runner.py"),
+                TryCandidate(baseDirectory, "services", "Whisper", "fw_runner.py"),
+                TryCandidate(Directory.GetCurrentDirectory(), "fw_runner.py"),
+                TryCandidate(Directory.GetCurrentDirectory(), "services", "Whisper", "fw_runner.py")
             };
-            var compressionLiteral = FormatDouble(_compressionRatioThreshold);
-            var logProbLiteral = FormatDouble(_logProbThreshold);
-            var noSpeechLiteral = FormatDouble(_noSpeechThreshold);
-            var conditionLiteral = _conditionOnPreviousText ? "True" : "False";
 
-            var py = @"
-import sys, json, os, traceback
-from pathlib import Path
-print('fw_runner: PY', sys.version)
-print('fw_runner: CT2_CUDA_DISABLE_CUDNN=', os.getenv('CT2_CUDA_DISABLE_CUDNN'))
-print('fw_runner: CT2_CUDA_USE_TF32=', os.getenv('CT2_CUDA_USE_TF32'))
-try:
-    from faster_whisper import WhisperModel
-except Exception as e:
-    print('IMPORT ERROR faster_whisper:', e, file=sys.stderr)
-    traceback.print_exc()
-    sys.exit(3)
+            var existing = candidates.FirstOrDefault(path => !string.IsNullOrEmpty(path));
+            if (existing != null)
+                return existing;
 
-def main():
-    if len(sys.argv) != 7:
-        print('usage: fw_runner.py <audio> <model> <device> <compute_type> <language> <output_dir>', file=sys.stderr)
-        sys.exit(2)
-    audio, model, device, compute_type, language, out_dir = sys.argv[1:]
-    print('fw_runner args:', audio, model, device, compute_type, language, out_dir)
-
-    out = Path(out_dir); out.mkdir(parents=True, exist_ok=True)
-
-    try:
-        m = WhisperModel(model, device=device, compute_type=compute_type)
-    except Exception as e:
-        print('MODEL INIT ERROR:', e, file=sys.stderr)
-        traceback.print_exc()
-        sys.exit(4)
-
-    try:
-        segments, info = m.transcribe(
-            audio,
-            language=language if language and language.lower() != 'auto' else None,
-            word_timestamps=True,
-            vad_filter=False,         # без ORT/VAD
-            beam_size=5,
-            temperature=__TEMPERATURE__,
-            compression_ratio_threshold=__COMPRESSION_RATIO_THRESHOLD__,
-            log_prob_threshold=__LOGPROB_THRESHOLD__,
-            no_speech_threshold=__NO_SPEECH_THRESHOLD__,
-            condition_on_previous_text=__CONDITION_ON_PREVIOUS_TEXT__,
-            without_timestamps=False  # нужны таймкоды сегментов
-        )
-        data = {
-            'language': getattr(info, 'language', None),
-            'language_probability': float(getattr(info, 'language_probability', 0.0) or 0.0),
-            'segments': []
+            throw new FileNotFoundException("FasterWhisper Python runner script was not found in the output directory.");
         }
-        for seg in segments:
-            item = {
-                'start': float(getattr(seg, 'start', 0.0) or 0.0),
-                'end': float(getattr(seg, 'end', 0.0) or 0.0),
-                'text': (getattr(seg, 'text', '') or '').strip(),
-                'words': []
-            }
-            for w in getattr(seg, 'words', []) or []:
-                item['words'].append({
-                    'start': float(getattr(w, 'start', 0.0) or 0.0),
-                    'end': float(getattr(w, 'end', 0.0) or 0.0),
-                    'word': (getattr(w, 'word', '') or '')
-                })
-            data['segments'].append(item)
 
-        out_file = out / 'transcript.json'
-        out_file.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
-        print('fw_runner OK ->', str(out_file))
-    except Exception as e:
-        print('INFERENCE ERROR:', e, file=sys.stderr)
-        traceback.print_exc()
-        sys.exit(5)
+        private static string BuildTemperatureLiteral(IReadOnlyCollection<double> temperatures)
+        {
+            if (temperatures.Count == 0)
+                return "0.0";
 
-if __name__ == '__main__':
-    main()
-";
+            if (temperatures.Count == 1)
+                return FormatDouble(temperatures.First());
 
-            py = py.Replace("__TEMPERATURE__", temperatureLiteral)
-                .Replace("__COMPRESSION_RATIO_THRESHOLD__", compressionLiteral)
-                .Replace("__LOGPROB_THRESHOLD__", logProbLiteral)
-                .Replace("__NO_SPEECH_THRESHOLD__", noSpeechLiteral)
-                .Replace("__CONDITION_ON_PREVIOUS_TEXT__", conditionLiteral);
+            return "(" + string.Join(", ", temperatures.Select(FormatDouble)) + ")";
+        }
 
-            File.WriteAllText(scriptPath, py, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            return scriptPath;
+        private static string FormatDouble(double value)
+        {
+            var formatted = value.ToString("0.###############################", CultureInfo.InvariantCulture);
+            if (!formatted.Contains('.') && !formatted.Contains('e') && !formatted.Contains('E'))
+                formatted += ".0";
+            return formatted;
         }
 
         private void CleanupDirectory(string directory)
