@@ -1,4 +1,5 @@
 import ast
+import concurrent.futures
 import json
 import logging
 import os
@@ -192,6 +193,31 @@ def _transcribe(payload: dict) -> Dict[str, object]:
     return data
 
 
+def _transcribe_with_heartbeat(
+    channel: pika.adapters.blocking_connection.BlockingChannel,
+    payload: dict,
+    poll_interval: float = 5.0,
+) -> Dict[str, object]:
+    """Run transcription asynchronously while ensuring RabbitMQ heartbeats are processed."""
+
+    interval = max(0.1, float(poll_interval))
+    connection = getattr(channel, "connection", None)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_transcribe, payload)
+
+        while True:
+            try:
+                return future.result(timeout=interval)
+            except concurrent.futures.TimeoutError:
+                if connection is not None and getattr(connection, "is_open", False):
+                    try:
+                        connection.process_data_events(time_limit=0)
+                    except Exception:
+                        LOGGER.debug("Heartbeat pump failed", exc_info=True)
+                continue
+
+
 def _publish_response(channel: pika.adapters.blocking_connection.BlockingChannel, routing_key: str, correlation_id: str, message: dict) -> None:
     body = json.dumps(message, ensure_ascii=False).encode("utf-8")
     properties = pika.BasicProperties(
@@ -235,8 +261,12 @@ def _on_message(channel: pika.adapters.blocking_connection.BlockingChannel, meth
         return
 
     try:
-        LOGGER.info("Processing transcription request correlation_id=%s audio=%s", correlation_id, payload.get("audio"))
-        result = _transcribe(payload)
+        LOGGER.info(
+            "Processing transcription request correlation_id=%s audio=%s",
+            correlation_id,
+            payload.get("audio"),
+        )
+        result = _transcribe_with_heartbeat(channel, payload)
         response = {
             "success": True,
             "transcriptJson": json.dumps(result, ensure_ascii=False),
