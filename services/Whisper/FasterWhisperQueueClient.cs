@@ -139,7 +139,7 @@ namespace YandexSpeech.services.Whisper
         }
     }
 
-    internal sealed record FasterWhisperQueueRequest
+    public sealed record FasterWhisperQueueRequest
     {
         public string Audio { get; init; } = string.Empty;
         public string Model { get; init; } = string.Empty;
@@ -154,7 +154,7 @@ namespace YandexSpeech.services.Whisper
         public string? FfmpegExecutable { get; init; }
     }
 
-    internal sealed class FasterWhisperQueueResponse
+    public sealed class FasterWhisperQueueResponse
     {
         public bool Success { get; set; }
         public string? Error { get; set; }

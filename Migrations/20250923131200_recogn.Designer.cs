@@ -13,7 +13,7 @@ namespace YandexSpeech.Migrations
 {
     [DbContext(typeof(MyDbContext))]
     [Migration("20250923131200_recogn")]
-    partial class recogn
+    partial class Recogn
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
