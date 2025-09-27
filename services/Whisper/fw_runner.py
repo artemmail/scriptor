@@ -41,6 +41,14 @@ RETRY_DELAY_SECONDS = float(os.getenv("EVENTBUS_RETRY_DELAY", "5"))
 MODEL_CACHE: Dict[Tuple[str, str, str], WhisperModel] = {}
 
 
+def _configure_ffmpeg_binary(ffmpeg_executable) -> None:
+    value = str(ffmpeg_executable).strip() if ffmpeg_executable is not None else ""
+    if value:
+        os.environ["FFMPEG_BINARY"] = value
+    else:
+        os.environ.pop("FFMPEG_BINARY", None)
+
+
 def _parse_temperatures(value: str):
     value = (value or "").strip()
     if not value:
@@ -93,6 +101,9 @@ def _ensure_model(model: str, device: str, compute_type: str) -> WhisperModel:
 
 
 def _transcribe(payload: dict) -> Dict[str, object]:
+    ffmpeg_executable = payload.get("ffmpegExecutable")
+    _configure_ffmpeg_binary(ffmpeg_executable)
+
     audio = payload.get("audio")
     if not audio:
         raise ValueError("Audio path was not provided")
@@ -110,10 +121,6 @@ def _transcribe(payload: dict) -> Dict[str, object]:
     log_prob_literal = payload.get("logProbThreshold") or "-1.0"
     no_speech_literal = payload.get("noSpeechThreshold") or "0.6"
     condition_literal = payload.get("conditionOnPreviousText") or "True"
-    ffmpeg_executable = payload.get("ffmpegExecutable")
-
-    if ffmpeg_executable:
-        os.environ["FFMPEG_BINARY"] = ffmpeg_executable
 
     model_instance = _ensure_model(model_name, device, compute_type)
 
