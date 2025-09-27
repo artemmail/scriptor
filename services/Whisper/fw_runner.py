@@ -151,6 +151,15 @@ def _transcribe(payload: dict) -> Dict[str, object]:
     no_speech_threshold = _parse_float(no_speech_literal, default=0.6)
     condition_on_previous_text = _parse_bool(condition_literal)
 
+    LOGGER.info(
+        "Starting transcription audio=%s model=%s device=%s compute_type=%s",
+        audio_path,
+        model_name,
+        device,
+        compute_type,
+    )
+
+    start_time = time.monotonic()
     segments, info = model_instance.transcribe(
         str(audio_path),
         language=language if language and str(language).lower() != "auto" else None,
@@ -171,6 +180,7 @@ def _transcribe(payload: dict) -> Dict[str, object]:
         "segments": [],
     }
 
+    segment_count = 0
     for seg in segments:
         item = {
             "start": float(getattr(seg, "start", 0.0) or 0.0),
@@ -189,6 +199,21 @@ def _transcribe(payload: dict) -> Dict[str, object]:
             )
 
         data["segments"].append(item)
+        segment_count += 1
+        LOGGER.info(
+            "Transcription progress: processed %s segment(s); last segment %.2f-%.2f",
+            segment_count,
+            item["start"],
+            item["end"],
+        )
+
+    duration = time.monotonic() - start_time
+    LOGGER.info(
+        "Transcription finished audio=%s segments=%s duration=%.2fs",
+        audio_path,
+        segment_count,
+        duration,
+    )
 
     return data
 
