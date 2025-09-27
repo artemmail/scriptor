@@ -19,4 +19,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\YandexSpeech.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\services\Whisper\fw_runner.py">
+      <Link>fw_runner.py</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>
