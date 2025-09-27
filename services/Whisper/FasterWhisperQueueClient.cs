@@ -12,7 +12,7 @@ using YandexSpeech.services.Options;
 
 namespace YandexSpeech.services.Whisper
 {
-    internal sealed class FasterWhisperQueueClient : IAsyncDisposable
+    public sealed class FasterWhisperQueueClient : IAsyncDisposable
     {
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
