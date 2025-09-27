@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace YandexSpeech.Migrations
 {
     /// <inheritdoc />
-    public partial class recogn : Migration
+    public partial class Recogn : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
