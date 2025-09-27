@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
-using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +13,7 @@ namespace YandexSpeech.services.Whisper
     public sealed class FasterWhisperTranscriptionService : IWhisperTranscriptionService
     {
         private readonly ILogger<FasterWhisperTranscriptionService> _logger;
-        private readonly string _executableSetting;
+        private readonly FasterWhisperQueueClient _queueClient;
         private readonly string _model;
         private readonly string _device;
         private readonly string _computeType;
@@ -27,21 +29,17 @@ namespace YandexSpeech.services.Whisper
         private readonly string _noSpeechLiteral;
         private readonly string _conditionLiteral;
 
-        // === Диагностика/артефакты при падении ===
-        private const bool KeepFailedOutput = true; // не удалять папку вывода при ошибке
-        private const int PreviewLogLines = 50;     // сколько строк STDOUT/STDERR показать в исключении
-
         public FasterWhisperTranscriptionService(
             IConfiguration configuration,
-            ILogger<FasterWhisperTranscriptionService> logger)
+            ILogger<FasterWhisperTranscriptionService> logger,
+            FasterWhisperQueueClient queueClient)
         {
             _logger = logger;
+            _queueClient = queueClient;
 
             var section = configuration.GetSection("FasterWhisper");
-            _executableSetting = section.GetValue<string>("ExecutablePath") ?? "faster-whisper";
             _model = section.GetValue<string>("Model") ?? configuration.GetValue<string>("Whisper:Model") ?? "medium";
             _device = section.GetValue<string>("Device") ?? configuration.GetValue<string>("Whisper:Device") ?? "cpu";
-            // CPU-safe по умолчанию; для CUDA нормализуем далее
             _computeType = section.GetValue<string>("ComputeType") ?? "int8";
             _language = section.GetValue<string>("Language")
                 ?? configuration.GetValue<string>("Whisper:Language")
@@ -99,226 +97,90 @@ namespace YandexSpeech.services.Whisper
             if (!File.Exists(audioPath))
                 throw new FileNotFoundException("Audio file not found for Whisper transcription.", audioPath);
 
-            if (string.IsNullOrWhiteSpace(workingDirectory))
-                workingDirectory = Path.Combine(Path.GetTempPath(), "openai-transcriptions");
+            _ = workingDirectory; // working directory is managed by the microservice
 
-            Directory.CreateDirectory(workingDirectory);
-
-            var outputDirectory = Path.Combine(workingDirectory, $"faster-whisper-{Guid.NewGuid():N}");
-            Directory.CreateDirectory(outputDirectory);
-
-            var startInfo = BuildProcessStartInfo(audioPath, outputDirectory, ffmpegExecutable);
-
-            using var process = new Process { StartInfo = startInfo };
-
-            try
+            var request = new FasterWhisperQueueRequest
             {
-                _logger.LogInformation("Starting transcription: {File} -> {OutDir}", audioPath, outputDirectory);
-
-                try
-                {
-                    if (!process.Start())
-                        throw new InvalidOperationException("Failed to start transcription process.");
-                }
-                catch (System.ComponentModel.Win32Exception w32)
-                {
-                    _logger.LogError(w32, "Failed to start process. FileName={FileName}", startInfo.FileName);
-                    throw;
-                }
-
-                var stderrTask = process.StandardError.ReadToEndAsync();
-                var stdoutTask = process.StandardOutput.ReadToEndAsync();
-
-                await process.WaitForExitAsync(cancellationToken);
-
-                var standardError = await stderrTask;
-                var standardOutput = await stdoutTask;
-
-                // Всегда сохраняем логи в файлы
-                var preview = SaveAndPreviewLogs(outputDirectory, standardOutput, standardError);
-
-                var transcriptFile = WhisperTranscriptionHelper.FindFirstJsonFile(outputDirectory);
-                string? transcription = null;
-                WhisperTranscriptionResponse? parsed = null;
-
-                if (transcriptFile != null)
-                {
-                    try
-                    {
-                        transcription = await File.ReadAllTextAsync(transcriptFile, cancellationToken);
-                        if (string.IsNullOrWhiteSpace(transcription))
-                        {
-                            transcription = null;
-                        }
-                        else
-                        {
-                            parsed = WhisperTranscriptionHelper.Parse(transcription);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to read or parse transcription JSON: {File}", transcriptFile);
-                        transcription = null;
-                        parsed = null;
-                    }
-                }
-
-                if (process.ExitCode != 0)
-                {
-                    if (parsed?.Segments != null && parsed.Segments.Count > 0)
-                    {
-                        _logger.LogWarning("Transcription exited with non-zero exit code {Code} but produced transcript.\n{Preview}",
-                            process.ExitCode, preview);
-                    }
-                    else
-                    {
-                        _logger.LogError("Transcription failed. ExitCode={Code}\n{Preview}",
-                            process.ExitCode, preview);
-
-                        if (KeepFailedOutput)
-                            _logger.LogWarning("Keeping failed output directory: {OutDir}", outputDirectory);
-
-                        throw new InvalidOperationException(
-                            $"FasterWhisper transcription failed (exit code {process.ExitCode}). " +
-                            $"See {Path.Combine(outputDirectory, "stdout.log")} and {Path.Combine(outputDirectory, "stderr.log")}.\n\n" +
-                            preview
-                        );
-                    }
-                }
-
-                if (transcriptFile == null)
-                {
-                    _logger.LogError("No JSON output produced.\n{Preview}", preview);
-
-                    if (KeepFailedOutput)
-                        _logger.LogWarning("Keeping output directory without JSON: {OutDir}", outputDirectory);
-
-                    throw new InvalidOperationException(
-                        "FasterWhisper transcription did not produce a JSON file.\n\n" + preview
-                    );
-                }
-
-                if (string.IsNullOrWhiteSpace(transcription))
-                    throw new InvalidOperationException("FasterWhisper transcription result is empty.");
-
-                if (parsed?.Segments == null || parsed.Segments.Count == 0)
-                    throw new InvalidOperationException("FasterWhisper transcription does not contain segments.");
-
-                var timecodedText = WhisperTranscriptionHelper.BuildTimecodedText(parsed!);
-
-                return new WhisperTranscriptionResult
-                {
-                    TimecodedText = timecodedText,
-                    RawJson = transcription
-                };
-            }
-            finally
-            {
-                if (!KeepFailedOutput && Directory.Exists(outputDirectory))
-                {
-                    try { Directory.Delete(outputDirectory, true); }
-                    catch (Exception ex) { _logger.LogWarning(ex, "Failed to remove output {OutDir}", outputDirectory); }
-                }
-            }
-        }
-
-        // -------------------- helpers --------------------
-
-        private ProcessStartInfo BuildProcessStartInfo(string audioPath, string outputDirectory, string? ffmpegExecutable)
-        {
-            var safeComputeType = NormalizeCt2(_device, _computeType);
-
-            var exe = ResolveExecutable();
-            var useCli = File.Exists(exe) || IsInPath(exe);
-
-            if (useCli)
-            {
-                // === ветка CLI faster-whisper ===
-                var psi = new ProcessStartInfo
-                {
-                    FileName = exe,
-                    UseShellExecute = false,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow = true,
-                };
-                EnsureEnvironmentEncoding(psi);
-                ConfigureFfmpegEnvironment(psi, ffmpegExecutable);
-                ConfigureCTranslate2Environment(psi);
-
-                psi.ArgumentList.Add(audioPath);
-                psi.ArgumentList.Add("--model"); psi.ArgumentList.Add(_model);
-                psi.ArgumentList.Add("--device"); psi.ArgumentList.Add(_device);
-                psi.ArgumentList.Add("--compute_type"); psi.ArgumentList.Add(safeComputeType);
-                psi.ArgumentList.Add("--output_dir"); psi.ArgumentList.Add(outputDirectory);
-                psi.ArgumentList.Add("--output_format"); psi.ArgumentList.Add("json");
-                psi.ArgumentList.Add("--word_timestamps"); psi.ArgumentList.Add("True");
-                psi.ArgumentList.Add("--language"); psi.ArgumentList.Add(_language);
-
-                return psi;
-            }
-            else
-            {
-                // === фолбэк: Python-раннер, использующий библиотеку faster_whisper ===
-                var scriptPath = ResolvePythonRunnerPath();
-
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "python.exe",
-                    UseShellExecute = false,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow = true,
-                };
-                EnsureEnvironmentEncoding(psi);
-                ConfigureFfmpegEnvironment(psi, ffmpegExecutable);
-                ConfigureCTranslate2Environment(psi);
-
-                psi.ArgumentList.Add(scriptPath);
-                psi.ArgumentList.Add(audioPath);
-                psi.ArgumentList.Add(_model);
-                psi.ArgumentList.Add(_device);
-                psi.ArgumentList.Add(safeComputeType);
-                psi.ArgumentList.Add(_language);
-                psi.ArgumentList.Add(outputDirectory);
-                psi.ArgumentList.Add(_temperatureLiteral);
-                psi.ArgumentList.Add(_compressionLiteral);
-                psi.ArgumentList.Add(_logProbLiteral);
-                psi.ArgumentList.Add(_noSpeechLiteral);
-                psi.ArgumentList.Add(_conditionLiteral);
-
-                return psi;
-            }
-        }
-
-        private void ConfigureCTranslate2Environment(ProcessStartInfo psi)
-        {
-            var envVars = new Dictionary<string, string>
-            {
-                ["CT2_CUDA_DISABLE_CUDNN"] = "1",
-                ["CT2_CUDA_USE_TF32"] = "1",
-                ["CT2_VERBOSE"] = "1",
-                ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+                Audio = audioPath,
+                Model = _model,
+                Device = _device,
+                ComputeType = NormalizeCt2(_device, _computeType),
+                Language = _language,
+                Temperature = _temperatureLiteral,
+                CompressionRatioThreshold = _compressionLiteral,
+                LogProbThreshold = _logProbLiteral,
+                NoSpeechThreshold = _noSpeechLiteral,
+                ConditionOnPreviousText = _conditionLiteral,
+                FfmpegExecutable = ffmpegExecutable
             };
 
-            foreach (var pair in envVars)
+            FasterWhisperQueueResponse response;
+            try
             {
-                psi.Environment[pair.Key] = pair.Value;
+                _logger.LogInformation("Dispatching FasterWhisper transcription via RabbitMQ: {File}", audioPath);
+                response = await _queueClient.TranscribeAsync(request, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Transcription cancelled for {File}", audioPath);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to dispatch FasterWhisper transcription for {File}", audioPath);
+                throw;
             }
 
-            var formatted = string.Join(", ", envVars.Select(kv => $"{kv.Key}={kv.Value}"));
-            _logger.LogInformation("Configured CTranslate2 environment variables: {Variables}", formatted);
+            if (!response.Success)
+            {
+                var errorMessage = string.IsNullOrWhiteSpace(response.Error) ? "Unknown error" : response.Error;
+                if (!string.IsNullOrWhiteSpace(response.Diagnostics))
+                {
+                    _logger.LogError("FasterWhisper transcription failed for {File}: {Error}\n{Diagnostics}",
+                        audioPath, errorMessage, response.Diagnostics);
+                }
+                else
+                {
+                    _logger.LogError("FasterWhisper transcription failed for {File}: {Error}", audioPath, errorMessage);
+                }
+
+                throw new InvalidOperationException($"FasterWhisper transcription failed: {errorMessage}");
+            }
+
+            var transcription = response.TranscriptJson;
+            if (string.IsNullOrWhiteSpace(transcription))
+                throw new InvalidOperationException("FasterWhisper transcription result is empty.");
+
+            WhisperTranscriptionResponse? parsed;
+            try
+            {
+                parsed = WhisperTranscriptionHelper.Parse(transcription);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to parse FasterWhisper transcription payload for {File}", audioPath);
+                throw;
+            }
+
+            if (parsed?.Segments == null || parsed.Segments.Count == 0)
+                throw new InvalidOperationException("FasterWhisper transcription does not contain segments.");
+
+            var timecodedText = WhisperTranscriptionHelper.BuildTimecodedText(parsed);
+
+            return new WhisperTranscriptionResult
+            {
+                TimecodedText = timecodedText,
+                RawJson = transcription
+            };
         }
 
         private static string NormalizeCt2(string device, string computeType)
         {
             var d = (device ?? "cpu").Trim().ToLowerInvariant();
-            var ct = (computeType ?? "").Trim().ToLowerInvariant();
+            var ct = (computeType ?? string.Empty).Trim().ToLowerInvariant();
 
             if (d == "cuda" || d == "gpu" || d.StartsWith("cuda:"))
             {
-                // допустимо на CUDA:
-                //   float16 | int8_float16 | float32
                 return ct switch
                 {
                     "float16" => "float16",
@@ -327,167 +189,14 @@ namespace YandexSpeech.services.Whisper
                     _ => "float16"
                 };
             }
-            else
+
+            return ct switch
             {
-                // CPU: int8 | float32 (float16 допускаем — будет проигнорирован)
-                return ct switch
-                {
-                    "int8" => "int8",
-                    "float32" => "float32",
-                    "float16" => "float16",
-                    _ => "int8"
-                };
-            }
-        }
-
-        private string ResolveExecutable()
-        {
-            if (File.Exists(_executableSetting))
-                return _executableSetting;
-
-            if (Directory.Exists(_executableSetting))
-            {
-                var executableName = OperatingSystem.IsWindows() ? "faster-whisper.exe" : "faster-whisper";
-                var candidate = Path.Combine(_executableSetting, executableName);
-                if (File.Exists(candidate))
-                    return candidate;
-            }
-
-            return _executableSetting; // имя в PATH
-        }
-
-        private static bool IsInPath(string nameOrExe)
-        {
-            if (string.IsNullOrWhiteSpace(nameOrExe)) return false;
-
-            // если содержит путь/разделители — не PATH-режим
-            if (nameOrExe.Contains(Path.DirectorySeparatorChar) || nameOrExe.Contains(Path.AltDirectorySeparatorChar))
-                return false;
-
-            try
-            {
-                var envName = OperatingSystem.IsWindows() ? "Path" : "PATH";
-                var values = (Environment.GetEnvironmentVariable(envName) ?? "")
-                    .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
-
-                var candidates = OperatingSystem.IsWindows()
-                    ? new[] { nameOrExe, nameOrExe + ".exe", nameOrExe + ".cmd", nameOrExe + ".bat" }
-                    : new[] { nameOrExe };
-
-                foreach (var dir in values)
-                {
-                    foreach (var c in candidates)
-                    {
-                        var full = Path.Combine(dir, c);
-                        if (File.Exists(full))
-                            return true;
-                    }
-                }
-            }
-            catch { /* ignore */ }
-
-            return false;
-        }
-
-        private static void EnsureEnvironmentEncoding(ProcessStartInfo startInfo)
-        {
-            if (!startInfo.Environment.ContainsKey("PYTHONIOENCODING"))
-                startInfo.Environment["PYTHONIOENCODING"] = "utf-8";
-
-            if (OperatingSystem.IsWindows())
-                startInfo.Environment["PYTHONUTF8"] = "1";
-
-            startInfo.StandardErrorEncoding = Encoding.UTF8;
-            startInfo.StandardOutputEncoding = Encoding.UTF8;
-        }
-
-        private static void ConfigureFfmpegEnvironment(ProcessStartInfo startInfo, string? ffmpegExecutable)
-        {
-            if (string.IsNullOrWhiteSpace(ffmpegExecutable))
-                return;
-
-            startInfo.Environment["FFMPEG_BINARY"] = ffmpegExecutable;
-
-            var ffmpegDirectory = Path.GetDirectoryName(ffmpegExecutable);
-            if (string.IsNullOrWhiteSpace(ffmpegDirectory) || !Directory.Exists(ffmpegDirectory))
-                return;
-
-            var pathVariableName = OperatingSystem.IsWindows() ? "Path" : "PATH";
-            if (!startInfo.Environment.TryGetValue(pathVariableName, out var currentPath) || string.IsNullOrWhiteSpace(currentPath))
-                currentPath = Environment.GetEnvironmentVariable(pathVariableName);
-
-            if (string.IsNullOrWhiteSpace(currentPath))
-            {
-                startInfo.Environment[pathVariableName] = ffmpegDirectory;
-                return;
-            }
-
-            var segments = currentPath.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
-            var exists = segments.Any(p => string.Equals(
-                p, ffmpegDirectory,
-                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
-
-            if (!exists)
-                startInfo.Environment[pathVariableName] = string.Concat(ffmpegDirectory, Path.PathSeparator, currentPath);
-        }
-
-        private static string SaveAndPreviewLogs(string outputDirectory, string stdOut, string stdErr)
-        {
-            try
-            {
-                var so = Path.Combine(outputDirectory, "stdout.log");
-                var se = Path.Combine(outputDirectory, "stderr.log");
-                File.WriteAllText(so, stdOut ?? string.Empty, new UTF8Encoding(false));
-                File.WriteAllText(se, stdErr ?? string.Empty, new UTF8Encoding(false));
-            }
-            catch { /* ignore file errors */ }
-
-            static string Head(string s, int n)
-            {
-                if (string.IsNullOrEmpty(s)) return string.Empty;
-                var lines = s.Replace("\r\n", "\n").Split('\n');
-                return string.Join(Environment.NewLine, lines.Take(n));
-            }
-
-            var headOut = Head(stdOut, PreviewLogLines);
-            var headErr = Head(stdErr, PreviewLogLines);
-
-            var sb = new StringBuilder();
-            if (!string.IsNullOrWhiteSpace(headOut))
-            {
-                sb.AppendLine("STDOUT (preview):");
-                sb.AppendLine(headOut);
-            }
-            if (!string.IsNullOrWhiteSpace(headErr))
-            {
-                sb.AppendLine("STDERR (preview):");
-                sb.AppendLine(headErr);
-            }
-            return sb.ToString();
-        }
-
-        private string ResolvePythonRunnerPath()
-        {
-            static string? TryCandidate(params string[] parts)
-            {
-                var candidate = Path.Combine(parts);
-                return File.Exists(candidate) ? candidate : null;
-            }
-
-            var baseDirectory = AppContext.BaseDirectory;
-            var candidates = new List<string?>
-            {
-                TryCandidate(baseDirectory, "fw_runner.py"),
-                TryCandidate(baseDirectory, "services", "Whisper", "fw_runner.py"),
-                TryCandidate(Directory.GetCurrentDirectory(), "fw_runner.py"),
-                TryCandidate(Directory.GetCurrentDirectory(), "services", "Whisper", "fw_runner.py")
+                "int8" => "int8",
+                "float32" => "float32",
+                "float16" => "float16",
+                _ => "int8"
             };
-
-            var existing = candidates.FirstOrDefault(path => !string.IsNullOrEmpty(path));
-            if (existing != null)
-                return existing;
-
-            throw new FileNotFoundException("FasterWhisper Python runner script was not found in the output directory.");
         }
 
         private static string BuildTemperatureLiteral(IReadOnlyCollection<double> temperatures)
@@ -507,21 +216,6 @@ namespace YandexSpeech.services.Whisper
             if (!formatted.Contains('.') && !formatted.Contains('e') && !formatted.Contains('E'))
                 formatted += ".0";
             return formatted;
-        }
-
-        private void CleanupDirectory(string directory)
-        {
-            try
-            {
-                if (Directory.Exists(directory))
-                {
-                    Directory.Delete(directory, true);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to remove FasterWhisper output directory {OutputDirectory}", directory);
-            }
         }
     }
 }
