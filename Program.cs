@@ -51,6 +51,9 @@ builder.Services.AddCors(opts =>
 // 2. Контроллеры
 builder.Services.AddControllers();
 
+// Общий HttpClient для внешних запросов
+builder.Services.AddHttpClient();
+
 // 3. DbContext
 var conn = builder.Configuration.GetConnectionString("DefaultConnection")
            ?? throw new InvalidOperationException("DefaultConnection not found");

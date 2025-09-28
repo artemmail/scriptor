@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,6 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -30,6 +33,7 @@ namespace YandexSpeech.Controllers
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<OpenAiTranscriptionController> _logger;
         private readonly IDocumentGeneratorService _documentGeneratorService;
+        private readonly IHttpClientFactory _httpClientFactory;
 
         public OpenAiTranscriptionController(
             IOpenAiTranscriptionService transcriptionService,
@@ -37,7 +41,8 @@ namespace YandexSpeech.Controllers
             IWebHostEnvironment environment,
             IServiceScopeFactory scopeFactory,
             ILogger<OpenAiTranscriptionController> logger,
-            IDocumentGeneratorService documentGeneratorService)
+            IDocumentGeneratorService documentGeneratorService,
+            IHttpClientFactory httpClientFactory)
         {
             _transcriptionService = transcriptionService;
             _dbContext = dbContext;
@@ -45,6 +50,7 @@ namespace YandexSpeech.Controllers
             _scopeFactory = scopeFactory;
             _logger = logger;
             _documentGeneratorService = documentGeneratorService;
+            _httpClientFactory = httpClientFactory;
         }
 
         [HttpPost]
@@ -54,12 +60,22 @@ namespace YandexSpeech.Controllers
             ValueLengthLimit = int.MaxValue,
             MultipartHeadersLengthLimit = int.MaxValue)]
         public async Task<ActionResult<OpenAiTranscriptionTaskDto>> Upload(
-            [FromForm] IFormFile file,
+            [FromForm] IFormFile? file,
+            [FromForm] string? fileUrl,
             [FromForm] string? clarification)
         {
-            if (file == null || file.Length == 0)
+            var normalizedUrl = string.IsNullOrWhiteSpace(fileUrl) ? null : fileUrl.Trim();
+            var hasFile = file != null && file.Length > 0;
+            var hasUrl = !string.IsNullOrEmpty(normalizedUrl);
+
+            if (file != null && file.Length == 0)
             {
-                return BadRequest("File not provided.");
+                return BadRequest("Uploaded file is empty.");
+            }
+
+            if (!hasFile && !hasUrl)
+            {
+                return BadRequest("Either a file or a file URL must be provided.");
             }
 
             var userId = User.GetUserId();
@@ -71,13 +87,21 @@ namespace YandexSpeech.Controllers
             var uploadsDirectory = Path.Combine(_environment.ContentRootPath, "App_Data", "transcriptions");
             Directory.CreateDirectory(uploadsDirectory);
 
-            var sanitizedName = SanitizeFileName(file.FileName);
-            var storedFileName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}__{sanitizedName}";
-            var storedFilePath = Path.Combine(uploadsDirectory, storedFileName);
+            string storedFilePath;
 
-            await using (var stream = System.IO.File.Create(storedFilePath))
+            if (hasFile)
             {
-                await file.CopyToAsync(stream);
+                storedFilePath = await SaveUploadedFileAsync(file!, uploadsDirectory);
+            }
+            else
+            {
+                var downloadResult = await TryDownloadExternalFileAsync(normalizedUrl!, uploadsDirectory);
+                if (!downloadResult.Success)
+                {
+                    return BadRequest(downloadResult.ErrorMessage ?? "Unable to download file from the provided URL.");
+                }
+
+                storedFilePath = downloadResult.FilePath!;
             }
 
             var sanitizedClarification = string.IsNullOrWhiteSpace(clarification)
@@ -373,6 +397,146 @@ namespace YandexSpeech.Controllers
             task.Segments = segments;
 
             return task;
+        }
+
+        private static async Task<string> SaveUploadedFileAsync(IFormFile file, string uploadsDirectory)
+        {
+            var sanitizedName = SanitizeFileName(file.FileName);
+            var storedFilePath = GenerateStoredFilePath(uploadsDirectory, sanitizedName);
+
+            await using var stream = System.IO.File.Create(storedFilePath);
+            await file.CopyToAsync(stream);
+
+            return storedFilePath;
+        }
+
+        private async Task<(bool Success, string? FilePath, string? ErrorMessage)> TryDownloadExternalFileAsync(
+            string fileUrl,
+            string uploadsDirectory)
+        {
+            if (!Uri.TryCreate(fileUrl, UriKind.Absolute, out var uri))
+            {
+                return (false, null, "Invalid file URL provided.");
+            }
+
+            if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, null, "Only HTTP and HTTPS URLs are supported.");
+            }
+
+            try
+            {
+                var httpClient = _httpClientFactory.CreateClient();
+                httpClient.Timeout = TimeSpan.FromMinutes(10);
+
+                using var response = await httpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning(
+                        "Failed to download transcription source file from {Url}. Status code: {StatusCode}",
+                        uri,
+                        response.StatusCode);
+                    return (false, null, "Unable to download file from the provided URL.");
+                }
+
+                var remoteFileName = ResolveRemoteFileName(response, uri);
+                var sanitizedName = SanitizeFileName(remoteFileName);
+                var storedFilePath = GenerateStoredFilePath(uploadsDirectory, sanitizedName);
+
+                await using var fileStream = System.IO.File.Create(storedFilePath);
+                await response.Content.CopyToAsync(fileStream);
+
+                return (true, storedFilePath, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to download transcription source file from {Url}", fileUrl);
+                return (false, null, "Unable to download file from the provided URL.");
+            }
+        }
+
+        private static string ResolveRemoteFileName(HttpResponseMessage response, Uri uri)
+        {
+            var contentDisposition = response.Content.Headers.ContentDisposition;
+            var fileName = contentDisposition?.FileNameStar ?? contentDisposition?.FileName;
+            if (!string.IsNullOrWhiteSpace(fileName))
+            {
+                return fileName.Trim('"');
+            }
+
+            var queryFileName = TryExtractFileNameFromQuery(uri);
+            if (!string.IsNullOrWhiteSpace(queryFileName))
+            {
+                return queryFileName;
+            }
+
+            var pathFileName = Path.GetFileName(uri.LocalPath);
+            if (!string.IsNullOrWhiteSpace(pathFileName))
+            {
+                return pathFileName;
+            }
+
+            var extension = TryGetExtensionFromContentType(response.Content.Headers.ContentType?.MediaType);
+            return string.IsNullOrEmpty(extension)
+                ? "external-file"
+                : $"external-file{extension}";
+        }
+
+        private static string? TryExtractFileNameFromQuery(Uri uri)
+        {
+            if (string.IsNullOrEmpty(uri.Query))
+            {
+                return null;
+            }
+
+            var queryValues = QueryHelpers.ParseQuery(uri.Query);
+            foreach (var key in new[] { "filename", "file", "name", "download" })
+            {
+                if (queryValues.TryGetValue(key, out var values))
+                {
+                    var candidate = values.FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(candidate))
+                    {
+                        return candidate;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static string? TryGetExtensionFromContentType(string? mediaType)
+        {
+            if (string.IsNullOrWhiteSpace(mediaType))
+            {
+                return null;
+            }
+
+            return mediaType.ToLowerInvariant() switch
+            {
+                "audio/mpeg" => ".mp3",
+                "audio/mp3" => ".mp3",
+                "audio/wav" => ".wav",
+                "audio/x-wav" => ".wav",
+                "audio/webm" => ".webm",
+                "audio/ogg" => ".ogg",
+                "audio/aac" => ".aac",
+                "audio/x-m4a" => ".m4a",
+                "audio/flac" => ".flac",
+                "video/mp4" => ".mp4",
+                "video/webm" => ".webm",
+                "video/quicktime" => ".mov",
+                "video/x-msvideo" => ".avi",
+                "video/mpeg" => ".mpeg",
+                _ => null,
+            };
+        }
+
+        private static string GenerateStoredFilePath(string uploadsDirectory, string sanitizedName)
+        {
+            var storedFileName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}__{sanitizedName}";
+            return Path.Combine(uploadsDirectory, storedFileName);
         }
 
         private static string SanitizeFileName(string fileName)

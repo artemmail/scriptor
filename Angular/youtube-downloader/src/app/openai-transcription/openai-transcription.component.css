@@ -18,6 +18,28 @@
   align-items: center;
 }
 
+.link-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.link-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.link-input-row input {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  font-family: inherit;
+}
+
 .clarification-field {
   display: flex;
   flex-direction: column;

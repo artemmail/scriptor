@@ -44,6 +44,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   selectedTask: OpenAiTranscriptionTaskDetailsDto | null = null;
 
   selectedFile: File | null = null;
+  fileUrl = '';
   clarification = '';
   uploading = false;
   uploadError: string | null = null;
@@ -71,6 +72,9 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.selectedFile = input.files && input.files.length > 0 ? input.files[0] : null;
+    if (this.selectedFile) {
+      this.fileUrl = '';
+    }
   }
 
   upload(): void {
@@ -84,16 +88,30 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.transcriptionService
       .upload(this.selectedFile, this.clarification)
       .subscribe({
-        next: (task) => {
+        next: (task) => this.handleUploadSuccess(task),
+        error: (error) => {
           this.uploading = false;
-          this.selectedFile = null;
-          this.clarification = '';
-          this.tasks = [task, ...this.tasks.filter((t) => t.id !== task.id)];
-          this.selectTaskById(task.id);
+          this.uploadError = this.extractError(error) ?? 'Не удалось загрузить файл.';
         },
+      });
+  }
+
+  uploadFromUrl(): void {
+    const trimmedUrl = this.fileUrl.trim();
+    if (!trimmedUrl || this.uploading) {
+      return;
+    }
+
+    this.uploading = true;
+    this.uploadError = null;
+    this.selectedFile = null;
+
+    this.transcriptionService.uploadFromUrl(trimmedUrl, this.clarification).subscribe({
+      next: (task) => this.handleUploadSuccess(task),
       error: (error) => {
         this.uploading = false;
-        this.uploadError = this.extractError(error) ?? 'Не удалось загрузить файл.';
+        this.uploadError =
+          this.extractError(error) ?? 'Не удалось загрузить файл по ссылке.';
       },
     });
   }
@@ -171,6 +189,16 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       this.pollSubscription.unsubscribe();
       this.pollSubscription = undefined;
     }
+  }
+
+  private handleUploadSuccess(task: OpenAiTranscriptionTaskDto): void {
+    this.uploading = false;
+    this.uploadError = null;
+    this.selectedFile = null;
+    this.fileUrl = '';
+    this.clarification = '';
+    this.tasks = [task, ...this.tasks.filter((t) => t.id !== task.id)];
+    this.selectTaskById(task.id);
   }
 
   private applyTaskUpdate(task: OpenAiTranscriptionTaskDetailsDto): void {

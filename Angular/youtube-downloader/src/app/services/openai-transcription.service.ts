@@ -77,6 +77,15 @@ export class OpenAiTranscriptionService {
     return this.http.post<OpenAiTranscriptionTaskDto>(this.apiUrl, formData);
   }
 
+  uploadFromUrl(fileUrl: string, clarification?: string | null): Observable<OpenAiTranscriptionTaskDto> {
+    const formData = new FormData();
+    formData.append('fileUrl', fileUrl);
+    if (clarification && clarification.trim().length > 0) {
+      formData.append('clarification', clarification.trim());
+    }
+    return this.http.post<OpenAiTranscriptionTaskDto>(this.apiUrl, formData);
+  }
+
   list(): Observable<OpenAiTranscriptionTaskDto[]> {
     return this.http.get<OpenAiTranscriptionTaskDto[]>(this.apiUrl);
   }
