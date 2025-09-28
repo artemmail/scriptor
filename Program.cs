@@ -151,14 +151,14 @@ else
     builder.Services.AddScoped<IWhisperTranscriptionService, WhisperCliTranscriptionService>();
 }
 
-builder.Services.AddScoped<IOpenAiTranscriptionService, OpenAiTranscriptionService>();
+builder.Services.AddScoped<IOpenAiTranscriptionService, IntegratedFormattingOpenAiTranscriptionService>();
 
 
 // 7. Сервисы приложения
 builder.Services.AddSingleton<YoutubeClient>();
 builder.Services.AddSingleton<CaptionService>();
 builder.Services.AddScoped<IYSpeechService, YSpeechService>();
-builder.Services.AddSingleton<IPunctuationService, PunctuationService>();
+builder.Services.AddSingleton<IPunctuationService, IntegratedFormattingPunctuationService>();
 builder.Services.AddScoped<ISpeechWorkflowService, SpeechWorkflowService>();
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
