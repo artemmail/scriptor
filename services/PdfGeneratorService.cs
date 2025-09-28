@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using YandexSpeech.models.DB; // DbContext + YoutubeCaptionText, YoutubeCaptionTask
+using YandexSpeech.services;
 
 
 public interface IDocumentGeneratorService
@@ -286,56 +287,20 @@ header-includes:
 
     // ЗАМЕНИ целиком метод BuildSrtFromJson
 
-    private sealed class ParsedCaption
-    {
-        public TimeSpan Start { get; set; }
-        public TimeSpan? End { get; set; }
-        public string Text { get; set; } = "";
-    }
     private static string BuildSrtFromJson(IEnumerable<CaptionItemJson> items)
     {
-        var parsed = items
-            .Select(i => new ParsedCaption
+        var entries = items
+            .Select(i => new SrtFormatter.SrtEntry
             {
                 Start = ParseTs(i.Offset),
-                End = string.IsNullOrWhiteSpace(i.Duration) ? (TimeSpan?)null : ParseTs(i.Offset) + ParseTs(i.Duration),
+                End = string.IsNullOrWhiteSpace(i.Duration)
+                    ? (TimeSpan?)null
+                    : ParseTs(i.Offset) + ParseTs(i.Duration),
                 Text = SanitizeText(i.Text, i.Parts)
             })
-            .OrderBy(x => x.Start)
             .ToList();
 
-        var sb = new StringBuilder();
-        int idx = 1;
-
-        for (int i = 0; i < parsed.Count; i++)
-        {
-            var cur = parsed[i];
-            if (string.IsNullOrWhiteSpace(cur.Text) || cur.Text.Trim() == "\\n" || cur.Text.Trim() == "\n")
-                continue;
-
-            var start = cur.Start;
-            var end = cur.End ?? FindNextStart(parsed, i) - TimeSpan.FromMilliseconds(1);
-            if (end <= start) end = start + TimeSpan.FromMilliseconds(500);
-
-            sb.AppendLine(idx.ToString());
-            sb.AppendLine($"{Fmt(start)} --> {Fmt(end)}");
-            sb.AppendLine(cur.Text);
-            sb.AppendLine();
-            idx++;
-        }
-
-        return sb.ToString();
-
-        static TimeSpan FindNextStart(List<ParsedCaption> list, int i)
-        {
-            for (int j = i + 1; j < list.Count; j++)
-            {
-                var t = list[j].Text;
-                if (!string.IsNullOrWhiteSpace(t) && t.Trim() != "\\n" && t.Trim() != "\n")
-                    return list[j].Start;
-            }
-            return list[i].Start + TimeSpan.FromSeconds(2);
-        }
+        return SrtFormatter.Build(entries);
     }
 
 
@@ -352,9 +317,6 @@ header-includes:
         }
         return text.Replace("\r", "").Trim();
     }
-
-    private static string Fmt(TimeSpan t)
-        => $"{(int)t.TotalHours:00}:{t.Minutes:00}:{t.Seconds:00},{t.Milliseconds:000}";
 
     private static string MakeSafeFileName(string? s, int maxLen = 120)
     {

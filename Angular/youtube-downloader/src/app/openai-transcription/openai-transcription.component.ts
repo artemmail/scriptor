@@ -58,6 +58,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   exportError: string | null = null;
   exportingPdf = false;
   exportingDocx = false;
+  downloadingSrt = false;
   renderedMarkdown: SafeHtml | null = null;
   private markdownSource = '';
 
@@ -272,13 +273,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   }
 
   canDownloadSrt(): boolean {
-    if (!this.selectedTask || !this.selectedTask.segments?.length) {
-      return false;
-    }
-
-    return this.selectedTask.segments.some(
-      (segment) => segment.startSeconds != null && segment.endSeconds != null
-    );
+    return !!this.selectedTask?.hasSegments;
   }
 
   downloadMarkdown(): void {
@@ -291,28 +286,24 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   }
 
   downloadSrt(): void {
-    if (!this.selectedTask || !this.canDownloadSrt()) {
+    if (!this.selectedTaskId || !this.selectedTask?.hasSegments || this.downloadingSrt) {
       return;
     }
 
-    const segments = this.selectedTask.segments
-      .filter((segment) => segment.startSeconds != null && segment.endSeconds != null)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    this.exportError = null;
+    this.downloadingSrt = true;
 
-    const lines = segments.map((segment, index) => {
-      const text = (segment.processedText || segment.text || '').trim();
-      const start = this.formatSrtTime(segment.startSeconds!);
-      const end = this.formatSrtTime(segment.endSeconds!);
-
-      return `${index + 1}\n${start} --> ${end}\n${text}\n`;
+    this.transcriptionService.exportSrt(this.selectedTaskId).subscribe({
+      next: (blob) => {
+        this.downloadingSrt = false;
+        this.saveBlob(blob, this.buildFileName('srt'));
+      },
+      error: (error) => {
+        this.downloadingSrt = false;
+        this.exportError =
+          this.extractError(error) ?? 'Не удалось экспортировать SRT.';
+      },
     });
-
-    if (!lines.length) {
-      return;
-    }
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
-    this.saveBlob(blob, this.buildFileName('srt'));
   }
 
   exportPdf(): void {
@@ -371,21 +362,6 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
 
   private sanitizeFileName(value: string): string {
     return value.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
-  }
-
-  private formatSrtTime(totalSeconds: number): string {
-    const clamped = Math.max(0, totalSeconds);
-    const wholeSeconds = Math.floor(clamped);
-    const fractional = clamped - wholeSeconds;
-    const hours = Math.floor(wholeSeconds / 3600);
-    const minutes = Math.floor((wholeSeconds % 3600) / 60);
-    const seconds = wholeSeconds % 60;
-    const milliseconds = Math.floor(fractional * 1000);
-
-    const pad = (value: number, length = 2) => value.toString().padStart(length, '0');
-    const padMs = (value: number) => value.toString().padStart(3, '0');
-
-    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)},${padMs(milliseconds)}`;
   }
 
   getStatusText(status: OpenAiTranscriptionStatus | null | undefined): string {

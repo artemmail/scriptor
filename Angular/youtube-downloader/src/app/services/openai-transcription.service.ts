@@ -38,6 +38,7 @@ export interface OpenAiTranscriptionTaskDetailsDto extends OpenAiTranscriptionTa
   recognizedText: string | null;
   processedText: string | null;
   markdownText: string | null;
+  hasSegments: boolean;
   steps: OpenAiTranscriptionStepDto[];
   segments: OpenAiRecognizedSegmentDto[];
 }
@@ -108,6 +109,10 @@ export class OpenAiTranscriptionService {
 
   exportDocx(id: string): Observable<Blob> {
     return this.http.get(`${this.apiUrl}/${id}/export/docx`, { responseType: 'blob' });
+  }
+
+  exportSrt(id: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${id}/export/srt`, { responseType: 'blob' });
   }
 
   exportBbcode(id: string): Observable<string> {

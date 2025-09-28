@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -18,6 +19,7 @@ using Microsoft.Extensions.Logging;
 using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 using YandexSpeech.services;
+using YandexSpeech.services.Whisper;
 using YandexSpeech.Extensions;
 
 namespace YandexSpeech.Controllers
@@ -305,6 +307,67 @@ namespace YandexSpeech.Controllers
             await _dbContext.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        [HttpGet("{id}/export/srt")]
+        [Produces("application/x-subrip")]
+        public async Task<IActionResult> ExportSrt(string id)
+        {
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
+
+            var task = await _dbContext.OpenAiTranscriptionTasks
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == id && t.CreatedBy == userId);
+
+            if (task == null)
+            {
+                return NotFound();
+            }
+
+            if (string.IsNullOrWhiteSpace(task.SegmentsJson))
+            {
+                return BadRequest("Task does not contain transcription segments.");
+            }
+
+            WhisperTranscriptionResponse? parsed;
+
+            try
+            {
+                parsed = WhisperTranscriptionHelper.Parse(task.SegmentsJson);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "Failed to parse transcription segments for task {TaskId}", id);
+                return StatusCode(StatusCodes.Status500InternalServerError, "Failed to parse transcription segments.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error while parsing transcription segments for task {TaskId}", id);
+                return StatusCode(StatusCodes.Status500InternalServerError, "Failed to parse transcription segments.");
+            }
+
+            if (parsed == null || parsed.Segments == null || parsed.Segments.Count == 0)
+            {
+                return BadRequest("Task does not contain transcription segments.");
+            }
+
+            var entries = BuildSrtEntriesFromWhisper(parsed);
+            var srtContent = SrtFormatter.Build(entries);
+
+            if (string.IsNullOrWhiteSpace(srtContent))
+            {
+                return BadRequest("Task does not contain transcription segments.");
+            }
+
+            var fileName = CreateExportFileName(task, "srt");
+            var encoding = new UTF8Encoding(false);
+            var bytes = encoding.GetBytes(srtContent);
+
+            return File(bytes, "application/x-subrip", fileName);
         }
 
         [HttpGet("{id}/export/pdf")]
@@ -636,6 +699,7 @@ namespace YandexSpeech.Controllers
                 RecognizedText = task.RecognizedText,
                 ProcessedText = task.ProcessedText,
                 MarkdownText = task.MarkdownText,
+                HasSegments = !string.IsNullOrWhiteSpace(task.SegmentsJson),
                 Clarification = task.Clarification
             };
 
@@ -733,6 +797,61 @@ namespace YandexSpeech.Controllers
         public class UpdateMarkdownRequest
         {
             public string Markdown { get; set; } = string.Empty;
+        }
+
+        private static List<SrtFormatter.SrtEntry> BuildSrtEntriesFromWhisper(WhisperTranscriptionResponse parsed)
+        {
+            var result = new List<SrtFormatter.SrtEntry>();
+
+            foreach (var segment in parsed.Segments)
+            {
+                if (segment == null)
+                {
+                    continue;
+                }
+
+                var start = ToSafeTimeSpan(segment.Start);
+                TimeSpan? end = null;
+
+                if (!double.IsNaN(segment.End) && !double.IsInfinity(segment.End))
+                {
+                    var endValue = ToSafeTimeSpan(segment.End);
+                    if (endValue > start)
+                    {
+                        end = endValue;
+                    }
+                }
+
+                var text = (segment.Text ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(text) && segment.Words != null && segment.Words.Count > 0)
+                {
+                    text = string.Concat(segment.Words.Select(word => word.Word ?? string.Empty)).Trim();
+                }
+
+                result.Add(new SrtFormatter.SrtEntry
+                {
+                    Start = start,
+                    End = end,
+                    Text = text
+                });
+            }
+
+            return result;
+        }
+
+        private static TimeSpan ToSafeTimeSpan(double seconds)
+        {
+            if (double.IsNaN(seconds) || double.IsInfinity(seconds))
+            {
+                return TimeSpan.Zero;
+            }
+
+            if (seconds < 0)
+            {
+                seconds = 0;
+            }
+
+            return TimeSpan.FromSeconds(seconds);
         }
     }
 }
