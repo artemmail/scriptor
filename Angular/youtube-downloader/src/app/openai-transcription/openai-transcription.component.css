@@ -152,6 +152,7 @@
   color: rgba(0, 0, 0, 0.6);
 }
 
+
 .details-actions {
   display: flex;
   align-items: center;
@@ -198,6 +199,35 @@
   background-color: rgba(244, 67, 54, 0.08);
 }
 
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 12px;
+}
+
+.markdown-content {
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  overflow-x: auto;
+  max-height: 60vh;
+}
+
+.markdown-content :is(p, ul, ol, pre, blockquote, h1, h2, h3, h4, h5, h6) {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.markdown-content pre {
+  background: rgba(0, 0, 0, 0.04);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
 .step-icon {
   font-size: 24px;
 }
@@ -233,11 +263,6 @@
   overflow: auto;
 }
 
-.result-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
-}
 
 .tasks-card a.active {
   background: rgba(63, 81, 181, 0.08);
