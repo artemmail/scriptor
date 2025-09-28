@@ -111,67 +111,128 @@
             <span>{{ selectedTask.clarification }}</span>
           </div>
 
-          <div class="error" *ngIf="selectedTask.error">{{ selectedTask.error }}</div>
-
-          <div
-            class="details-actions"
-            *ngIf="selectedTask.status === OpenAiTranscriptionStatus.Error"
-          >
-            <button
-              mat-stroked-button
-              color="primary"
-              (click)="continueTask()"
-              [disabled]="continueInProgress"
-            >
-              <mat-icon>play_arrow</mat-icon>
-              <span>Продолжить задачу</span>
-            </button>
-            <mat-progress-spinner
-              *ngIf="continueInProgress"
-              class="inline-spinner"
-              mode="indeterminate"
-              diameter="28"
-            ></mat-progress-spinner>
+          <div class="error" *ngIf="selectedTask.error && !isTaskCompleted(selectedTask)">
+            {{ selectedTask.error }}
           </div>
 
-          <div class="error" *ngIf="continueError">{{ continueError }}</div>
+          <ng-container *ngIf="isTaskCompleted(selectedTask); else processingView">
+            <section class="result-block">
+              <h3>Результат</h3>
+              <div class="result-actions">
+                <button
+                  mat-stroked-button
+                  color="primary"
+                  [routerLink]="['/transcriptions', selectedTask.id, 'edit']"
+                >
+                  <mat-icon>edit</mat-icon>
+                  <span>Редактировать</span>
+                </button>
+                <button
+                  mat-stroked-button
+                  color="primary"
+                  (click)="exportDocx()"
+                  [disabled]="exportingDocx"
+                >
+                  <mat-icon>description</mat-icon>
+                  <span>Word</span>
+                </button>
+                <button
+                  mat-stroked-button
+                  color="primary"
+                  (click)="exportPdf()"
+                  [disabled]="exportingPdf"
+                >
+                  <mat-icon>picture_as_pdf</mat-icon>
+                  <span>PDF</span>
+                </button>
+                <button
+                  mat-stroked-button
+                  color="primary"
+                  (click)="downloadMarkdown()"
+                  [disabled]="!hasMarkdown()"
+                >
+                  <mat-icon>code</mat-icon>
+                  <span>Markdown</span>
+                </button>
+                <button
+                  mat-stroked-button
+                  color="primary"
+                  (click)="downloadSrt()"
+                  [disabled]="!canDownloadSrt()"
+                >
+                  <mat-icon>subtitles</mat-icon>
+                  <span>SRT</span>
+                </button>
+              </div>
+              <div class="error" *ngIf="exportError">{{ exportError }}</div>
+              <div
+                class="markdown-content"
+                *ngIf="renderedMarkdown; else plainResult"
+                [innerHTML]="renderedMarkdown"
+              ></div>
+              <ng-template #plainResult>
+                <pre *ngIf="hasMarkdown(); else recognizedFallback">{{ markdownContent }}</pre>
+              </ng-template>
+              <ng-template #recognizedFallback>
+                <pre *ngIf="selectedTask.recognizedText; else emptyResult">{{ selectedTask.recognizedText }}</pre>
+              </ng-template>
+              <ng-template #emptyResult>
+                <div class="empty-state">Результат пока недоступен.</div>
+              </ng-template>
+            </section>
+          </ng-container>
 
-          <section class="steps-section" *ngIf="selectedTask.steps.length">
-            <h3>Прогресс</h3>
-            <ul class="steps-list">
-              <li *ngFor="let step of selectedTask.steps; trackBy: trackStep" [class]="getStepClass(step.status)">
-                <mat-icon class="step-icon">{{ getStepIcon(step.status) }}</mat-icon>
-                <div class="step-info">
-                  <div class="step-title">{{ getStatusText(step.step) }}</div>
-                  <div class="step-meta">
-                    <span>{{ getStepStatusText(step.status) }}</span>
-                    <span *ngIf="step.startedAt">· {{ step.startedAt | localTime }}</span>
-                  </div>
-                  <div class="step-error" *ngIf="step.error">{{ step.error }}</div>
-                </div>
-              </li>
-            </ul>
-          </section>
-
-          <section class="result-block" *ngIf="selectedTask.recognizedText">
-            <h3>Распознанный текст</h3>
-            <pre>{{ selectedTask.recognizedText }}</pre>
-          </section>
-
-          <section class="result-block" *ngIf="selectedTask.markdownText">
-            <h3>Форматированный Markdown</h3>
-            <div class="result-actions">
+          <ng-template #processingView>
+            <div
+              class="details-actions"
+              *ngIf="selectedTask.status === OpenAiTranscriptionStatus.Error"
+            >
               <button
                 mat-stroked-button
                 color="primary"
-                [routerLink]="['/transcriptions', selectedTask.id, 'edit']"
+                (click)="continueTask()"
+                [disabled]="continueInProgress"
               >
-                <mat-icon>edit</mat-icon>
-                <span>Редактировать</span>
+                <mat-icon>play_arrow</mat-icon>
+                <span>Продолжить задачу</span>
               </button>
+              <mat-progress-spinner
+                *ngIf="continueInProgress"
+                class="inline-spinner"
+                mode="indeterminate"
+                diameter="28"
+              ></mat-progress-spinner>
             </div>
-            <pre>{{ selectedTask.markdownText }}</pre>
-          </section>
+
+            <div class="error" *ngIf="continueError">{{ continueError }}</div>
+
+            <section class="steps-section" *ngIf="selectedTask.steps.length">
+              <h3>Прогресс</h3>
+              <ul class="steps-list">
+                <li *ngFor="let step of selectedTask.steps; trackBy: trackStep" [class]="getStepClass(step.status)">
+                  <mat-icon class="step-icon">{{ getStepIcon(step.status) }}</mat-icon>
+                  <div class="step-info">
+                    <div class="step-title">{{ getStatusText(step.step) }}</div>
+                    <div class="step-meta">
+                      <span>{{ getStepStatusText(step.status) }}</span>
+                      <span *ngIf="step.startedAt">· {{ step.startedAt | localTime }}</span>
+                    </div>
+                    <div class="step-error" *ngIf="step.error">{{ step.error }}</div>
+                  </div>
+                </li>
+              </ul>
+            </section>
+
+            <section class="result-block" *ngIf="selectedTask.recognizedText">
+              <h3>Распознанный текст</h3>
+              <pre>{{ selectedTask.recognizedText }}</pre>
+            </section>
+
+            <section class="result-block" *ngIf="selectedTask.markdownText">
+              <h3>Форматированный Markdown</h3>
+              <pre>{{ selectedTask.markdownText }}</pre>
+            </section>
+          </ng-template>
         </ng-container>
       </ng-template>
 

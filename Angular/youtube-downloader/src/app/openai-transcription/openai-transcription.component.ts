@@ -10,6 +10,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { Subscription, timer } from 'rxjs';
 import { exhaustMap } from 'rxjs/operators';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import {
   OpenAiTranscriptionService,
   OpenAiTranscriptionStatus,
@@ -19,6 +20,7 @@ import {
   OpenAiTranscriptionStepStatus,
 } from '../services/openai-transcription.service';
 import { LocalTimePipe } from '../pipe/local-time.pipe';
+import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
 
 @Component({
   selector: 'app-openai-transcriptions',
@@ -53,13 +55,22 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   detailsLoading = false;
   continueError: string | null = null;
   continueInProgress = false;
+  exportError: string | null = null;
+  exportingPdf = false;
+  exportingDocx = false;
+  renderedMarkdown: SafeHtml | null = null;
+  private markdownSource = '';
 
   readonly OpenAiTranscriptionStatus = OpenAiTranscriptionStatus;
   readonly OpenAiTranscriptionStepStatus = OpenAiTranscriptionStepStatus;
 
   private pollSubscription?: Subscription;
 
-  constructor(private readonly transcriptionService: OpenAiTranscriptionService) {}
+  constructor(
+    private readonly transcriptionService: OpenAiTranscriptionService,
+    private readonly markdownRenderer: MarkdownRendererService1,
+    private readonly sanitizer: DomSanitizer
+  ) {}
 
   ngOnInit(): void {
     this.loadTasks(true);
@@ -154,6 +165,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.selectedTaskId = taskId;
     this.selectedTask = null;
     this.detailsError = null;
+    this.updateRenderedMarkdown(null);
     this.startPolling();
   }
 
@@ -203,6 +215,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
 
   private applyTaskUpdate(task: OpenAiTranscriptionTaskDetailsDto): void {
     this.selectedTask = task;
+    this.updateRenderedMarkdown(task);
 
     this.tasks = this.tasks.map((existing) =>
       existing.id === task.id
@@ -218,6 +231,161 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
           }
         : existing
     );
+  }
+
+  private updateRenderedMarkdown(task: OpenAiTranscriptionTaskDetailsDto | null): void {
+    if (!task) {
+      this.renderedMarkdown = null;
+      this.markdownSource = '';
+      return;
+    }
+
+    const markdown = this.getMarkdownContent(task);
+    this.markdownSource = markdown ?? '';
+
+    if (markdown) {
+      const rendered = this.markdownRenderer.renderMath(markdown);
+      this.renderedMarkdown = this.sanitizer.bypassSecurityTrustHtml(rendered);
+    } else {
+      this.renderedMarkdown = null;
+    }
+  }
+
+  private getMarkdownContent(task: OpenAiTranscriptionTaskDetailsDto | null): string | null {
+    if (!task) {
+      return null;
+    }
+
+    return task.markdownText || task.processedText || task.recognizedText || null;
+  }
+
+  isTaskCompleted(task: OpenAiTranscriptionTaskDetailsDto | null): boolean {
+    return !!task && task.status === OpenAiTranscriptionStatus.Done;
+  }
+
+  hasMarkdown(): boolean {
+    return !!this.markdownSource && this.markdownSource.trim().length > 0;
+  }
+
+  get markdownContent(): string {
+    return this.markdownSource;
+  }
+
+  canDownloadSrt(): boolean {
+    if (!this.selectedTask || !this.selectedTask.segments?.length) {
+      return false;
+    }
+
+    return this.selectedTask.segments.some(
+      (segment) => segment.startSeconds != null && segment.endSeconds != null
+    );
+  }
+
+  downloadMarkdown(): void {
+    if (!this.selectedTask || !this.hasMarkdown()) {
+      return;
+    }
+
+    const blob = new Blob([this.markdownSource], { type: 'text/markdown' });
+    this.saveBlob(blob, this.buildFileName('md'));
+  }
+
+  downloadSrt(): void {
+    if (!this.selectedTask || !this.canDownloadSrt()) {
+      return;
+    }
+
+    const segments = this.selectedTask.segments
+      .filter((segment) => segment.startSeconds != null && segment.endSeconds != null)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+    const lines = segments.map((segment, index) => {
+      const text = (segment.processedText || segment.text || '').trim();
+      const start = this.formatSrtTime(segment.startSeconds!);
+      const end = this.formatSrtTime(segment.endSeconds!);
+
+      return `${index + 1}\n${start} --> ${end}\n${text}\n`;
+    });
+
+    if (!lines.length) {
+      return;
+    }
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    this.saveBlob(blob, this.buildFileName('srt'));
+  }
+
+  exportPdf(): void {
+    if (!this.selectedTaskId || this.exportingPdf) {
+      return;
+    }
+
+    this.exportError = null;
+    this.exportingPdf = true;
+
+    this.transcriptionService.exportPdf(this.selectedTaskId).subscribe({
+      next: (blob) => {
+        this.exportingPdf = false;
+        this.saveBlob(blob, this.buildFileName('pdf'));
+      },
+      error: (error) => {
+        this.exportingPdf = false;
+        this.exportError = this.extractError(error) ?? 'Не удалось экспортировать PDF.';
+      },
+    });
+  }
+
+  exportDocx(): void {
+    if (!this.selectedTaskId || this.exportingDocx) {
+      return;
+    }
+
+    this.exportError = null;
+    this.exportingDocx = true;
+
+    this.transcriptionService.exportDocx(this.selectedTaskId).subscribe({
+      next: (blob) => {
+        this.exportingDocx = false;
+        this.saveBlob(blob, this.buildFileName('docx'));
+      },
+      error: (error) => {
+        this.exportingDocx = false;
+        this.exportError = this.extractError(error) ?? 'Не удалось экспортировать DOCX.';
+      },
+    });
+  }
+
+  private saveBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  private buildFileName(extension: string): string {
+    const base = this.selectedTask?.displayName?.trim() || 'transcription';
+    return `${this.sanitizeFileName(base)}.${extension}`;
+  }
+
+  private sanitizeFileName(value: string): string {
+    return value.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
+  }
+
+  private formatSrtTime(totalSeconds: number): string {
+    const clamped = Math.max(0, totalSeconds);
+    const wholeSeconds = Math.floor(clamped);
+    const fractional = clamped - wholeSeconds;
+    const hours = Math.floor(wholeSeconds / 3600);
+    const minutes = Math.floor((wholeSeconds % 3600) / 60);
+    const seconds = wholeSeconds % 60;
+    const milliseconds = Math.floor(fractional * 1000);
+
+    const pad = (value: number, length = 2) => value.toString().padStart(length, '0');
+    const padMs = (value: number) => value.toString().padStart(3, '0');
+
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)},${padMs(milliseconds)}`;
   }
 
   getStatusText(status: OpenAiTranscriptionStatus | null | undefined): string {
