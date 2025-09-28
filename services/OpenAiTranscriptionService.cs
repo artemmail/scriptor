@@ -716,9 +716,10 @@ namespace YandexSpeech.services
                 return;
             }
 
-            if (task.Steps == null || !task.Steps.Any())
+            var stepsCollection = _dbContext.Entry(task).Collection(t => t.Steps);
+            if (!stepsCollection.IsLoaded)
             {
-                await _dbContext.Entry(task).Collection(t => t.Steps).LoadAsync();
+                await stepsCollection.LoadAsync();
             }
 
             var lastErrorStep = task.Steps?
@@ -727,7 +728,7 @@ namespace YandexSpeech.services
                 .ThenByDescending(s => s.Id)
                 .FirstOrDefault();
 
-            var targetStatus = lastErrorStep?.Step ?? OpenAiTranscriptionStatus.Created;
+            var targetStatus = await DetermineContinuationStatusAsync(task, lastErrorStep);
 
             if (task.Status == targetStatus && !task.Done && string.IsNullOrEmpty(task.Error))
             {
@@ -755,6 +756,52 @@ namespace YandexSpeech.services
             }
 
             await _dbContext.SaveChangesAsync();
+        }
+
+        private async Task<OpenAiTranscriptionStatus> DetermineContinuationStatusAsync(
+            OpenAiTranscriptionTask task,
+            OpenAiTranscriptionStep? lastErrorStep)
+        {
+            if (lastErrorStep != null)
+            {
+                return lastErrorStep.Step;
+            }
+
+            var segmentsCollection = _dbContext.Entry(task).Collection(t => t.Segments);
+            if (!segmentsCollection.IsLoaded)
+            {
+                await segmentsCollection.LoadAsync();
+            }
+
+            if (!string.IsNullOrWhiteSpace(task.MarkdownText))
+            {
+                return OpenAiTranscriptionStatus.Formatting;
+            }
+
+            if (task.Segments?.Any() == true)
+            {
+                if (task.Segments.Any(s => !s.IsProcessed || s.IsProcessing))
+                {
+                    return OpenAiTranscriptionStatus.ProcessingSegments;
+                }
+
+                if (!string.IsNullOrWhiteSpace(task.ProcessedText))
+                {
+                    return OpenAiTranscriptionStatus.Formatting;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(task.SegmentsJson) || !string.IsNullOrWhiteSpace(task.RecognizedText))
+            {
+                return OpenAiTranscriptionStatus.Segmenting;
+            }
+
+            if (!string.IsNullOrWhiteSpace(task.ConvertedFilePath))
+            {
+                return OpenAiTranscriptionStatus.Transcribing;
+            }
+
+            return OpenAiTranscriptionStatus.Converting;
         }
 
     }
