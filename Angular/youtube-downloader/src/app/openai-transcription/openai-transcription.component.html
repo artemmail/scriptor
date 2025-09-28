@@ -158,7 +158,7 @@
                   mat-stroked-button
                   color="primary"
                   (click)="downloadSrt()"
-                  [disabled]="!canDownloadSrt()"
+                  [disabled]="!canDownloadSrt() || downloadingSrt"
                 >
                   <mat-icon>subtitles</mat-icon>
                   <span>SRT</span>

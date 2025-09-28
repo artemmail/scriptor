@@ -38,6 +38,8 @@ namespace YandexSpeech.models.DTO
 
         public string? MarkdownText { get; set; }
 
+        public bool HasSegments { get; set; }
+
         public IReadOnlyList<OpenAiTranscriptionStepDto> Steps { get; set; }
             = Array.Empty<OpenAiTranscriptionStepDto>();
 
