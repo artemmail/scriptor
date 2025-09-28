@@ -2,7 +2,8 @@
   <mat-card class="upload-card">
     <h2>Новая расшифровка</h2>
     <p class="upload-hint">
-      Загрузите аудио или видео файл, чтобы отправить его в обработку через OpenAI.
+      Загрузите аудио или видео файл с компьютера или укажите прямую ссылку (Яндекс.Диск и т.д.),
+      чтобы отправить его в обработку через OpenAI.
     </p>
     <div class="upload-controls">
       <input
@@ -19,6 +20,27 @@
         <mat-icon>cloud_upload</mat-icon>
         <span>Отправить</span>
       </button>
+    </div>
+    <div class="link-upload">
+      <label class="clarification-label" for="file-url-input">Или вставьте ссылку на файл</label>
+      <div class="link-input-row">
+        <input
+          id="file-url-input"
+          type="url"
+          [(ngModel)]="fileUrl"
+          [ngModelOptions]="{ standalone: true }"
+          placeholder="https://disk.yandex.ru/i/..."
+        />
+        <button
+          mat-stroked-button
+          color="primary"
+          (click)="uploadFromUrl()"
+          [disabled]="!fileUrl || !fileUrl.trim() || uploading"
+        >
+          <mat-icon>link</mat-icon>
+          <span>Загрузить по ссылке</span>
+        </button>
+      </div>
     </div>
     <div class="clarification-field">
       <label class="clarification-label" for="clarification-input"
