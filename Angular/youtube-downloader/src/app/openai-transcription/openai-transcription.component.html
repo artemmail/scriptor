@@ -1,64 +1,19 @@
 <div class="transcription-page">
   <mat-card class="upload-card">
-    <h2>Новая расшифровка</h2>
-    <p class="upload-hint">
-      Загрузите аудио или видео файл с компьютера или укажите прямую ссылку (Яндекс.Диск и т.д.),
-      чтобы отправить его в обработку через OpenAI.
-    </p>
-    <div class="upload-controls">
-      <input
-        type="file"
-        (change)="onFileSelected($event)"
-        accept="audio/*,video/*"
-      />
-      <button
-        mat-raised-button
-        color="primary"
-        (click)="upload()"
-        [disabled]="!selectedFile || uploading"
-      >
+    <div class="upload-card-header">
+      <div class="upload-card-text">
+        <h2>Новая расшифровка</h2>
+        <p class="upload-hint">
+          Загрузите аудио или видео файл с компьютера или укажите прямую ссылку (Яндекс.Диск и т.д.),
+          чтобы отправить его в обработку через OpenAI.
+        </p>
+      </div>
+      <button mat-raised-button color="primary" (click)="openUploadDialog()" [disabled]="uploading">
         <mat-icon>cloud_upload</mat-icon>
-        <span>Отправить</span>
+        <span>Загрузить</span>
       </button>
     </div>
-    <div class="link-upload">
-      <label class="clarification-label" for="file-url-input">Или вставьте ссылку на файл</label>
-      <div class="link-input-row">
-        <input
-          id="file-url-input"
-          type="url"
-          [(ngModel)]="fileUrl"
-          [ngModelOptions]="{ standalone: true }"
-          placeholder="https://disk.yandex.ru/i/..."
-        />
-        <button
-          mat-stroked-button
-          color="primary"
-          (click)="uploadFromUrl()"
-          [disabled]="!fileUrl || !fileUrl.trim() || uploading"
-        >
-          <mat-icon>link</mat-icon>
-          <span>Загрузить по ссылке</span>
-        </button>
-      </div>
-    </div>
-    <div class="clarification-field">
-      <label class="clarification-label" for="clarification-input"
-        >Уточнение (необязательно)</label
-      >
-      <textarea
-        id="clarification-input"
-        rows="3"
-        [(ngModel)]="clarification"
-        [ngModelOptions]="{ standalone: true }"
-        placeholder="Например: отметить важных спикеров или уточнить терминологию"
-      ></textarea>
-    </div>
-    <div class="file-name" *ngIf="selectedFile">
-      Выбран файл: <strong>{{ selectedFile.name }}</strong>
-    </div>
-    <mat-progress-bar *ngIf="uploading" mode="indeterminate"></mat-progress-bar>
-    <div class="error" *ngIf="uploadError">{{ uploadError }}</div>
+    <div class="upload-caption">Все параметры загрузки доступны внутри диалога.</div>
   </mat-card>
 
   <div class="layout">
@@ -198,52 +153,42 @@
               </button>
               <mat-progress-spinner
                 *ngIf="continueInProgress"
-                class="inline-spinner"
                 mode="indeterminate"
                 diameter="28"
+                class="inline-spinner"
               ></mat-progress-spinner>
+              <div class="error" *ngIf="continueError">{{ continueError }}</div>
             </div>
 
-            <div class="error" *ngIf="continueError">{{ continueError }}</div>
-
             <section class="steps-section" *ngIf="selectedTask.steps.length">
-              <h3>Прогресс</h3>
+              <h3>Прогресс обработки</h3>
               <ul class="steps-list">
-                <li *ngFor="let step of selectedTask.steps; trackBy: trackStep" [class]="getStepClass(step.status)">
-                  <mat-icon class="step-icon">{{ getStepIcon(step.status) }}</mat-icon>
-                  <div class="step-info">
+                <li *ngFor="let step of selectedTask.steps; trackBy: trackStep" [ngClass]="getStepClass(step.status)">
+                  <mat-icon>{{ getStepIcon(step.status) }}</mat-icon>
+                  <div class="step-content">
                     <div class="step-title">{{ getStatusText(step.step) }}</div>
                     <div class="step-meta">
                       <span>{{ getStepStatusText(step.status) }}</span>
                       <span *ngIf="step.startedAt">· {{ step.startedAt | localTime }}</span>
+                      <span *ngIf="step.finishedAt">· {{ step.finishedAt | localTime }}</span>
                     </div>
                     <div class="step-error" *ngIf="step.error">{{ step.error }}</div>
                   </div>
                 </li>
               </ul>
             </section>
-
-            <section class="result-block" *ngIf="selectedTask.recognizedText">
-              <h3>Распознанный текст</h3>
-              <pre>{{ selectedTask.recognizedText }}</pre>
-            </section>
-
-            <section class="result-block" *ngIf="selectedTask.markdownText">
-              <h3>Форматированный Markdown</h3>
-              <pre>{{ selectedTask.markdownText }}</pre>
-            </section>
           </ng-template>
         </ng-container>
-      </ng-template>
 
-      <ng-template #detailsErrorBlock>
-        <div class="error" *ngIf="detailsError">{{ detailsError }}</div>
+        <ng-template #detailsErrorBlock>
+          <div class="error">{{ detailsError }}</div>
+        </ng-template>
       </ng-template>
     </mat-card>
 
     <ng-template #selectPrompt>
-      <mat-card class="details-card placeholder-card">
-        <p>Выберите задачу из списка, чтобы просмотреть прогресс и результат.</p>
+      <mat-card class="details-card empty-details">
+        <div class="empty-state">Выберите задачу, чтобы посмотреть подробности.</div>
       </mat-card>
     </ng-template>
   </div>

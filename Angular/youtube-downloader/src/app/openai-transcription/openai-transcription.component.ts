@@ -4,9 +4,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { Subscription, timer } from 'rxjs';
 import { exhaustMap } from 'rxjs/operators';
@@ -21,6 +19,8 @@ import {
 } from '../services/openai-transcription.service';
 import { LocalTimePipe } from '../pipe/local-time.pipe';
 import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
+import { MatDialog } from '@angular/material/dialog';
+import { OpenAiTranscriptionUploadDialogComponent } from './openai-transcription-upload-dialog.component';
 
 @Component({
   selector: 'app-openai-transcriptions',
@@ -31,9 +31,7 @@ import { MarkdownRendererService1 } from '../task-result/markdown-renderer.servi
     MatButtonModule,
     MatIconModule,
     MatListModule,
-    MatProgressBarModule,
     MatProgressSpinnerModule,
-    FormsModule,
     LocalTimePipe,
     RouterModule,
   ],
@@ -45,11 +43,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   selectedTaskId: string | null = null;
   selectedTask: OpenAiTranscriptionTaskDetailsDto | null = null;
 
-  selectedFile: File | null = null;
-  fileUrl = '';
-  clarification = '';
   uploading = false;
-  uploadError: string | null = null;
   listError: string | null = null;
   detailsError: string | null = null;
   detailsLoading = false;
@@ -70,7 +64,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   constructor(
     private readonly transcriptionService: OpenAiTranscriptionService,
     private readonly markdownRenderer: MarkdownRendererService1,
-    private readonly sanitizer: DomSanitizer
+    private readonly sanitizer: DomSanitizer,
+    private readonly dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -81,50 +76,31 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.stopPolling();
   }
 
-  onFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.selectedFile = input.files && input.files.length > 0 ? input.files[0] : null;
-    if (this.selectedFile) {
-      this.fileUrl = '';
-    }
-  }
+  openUploadDialog(): void {
+    const dialogRef = this.dialog.open(OpenAiTranscriptionUploadDialogComponent, {
+      width: '520px',
+      autoFocus: false,
+      restoreFocus: false,
+      disableClose: true,
+    });
 
-  upload(): void {
-    if (!this.selectedFile || this.uploading) {
-      return;
-    }
+    const component = dialogRef.componentInstance;
+    const subscriptions: Subscription[] = [];
 
-    this.uploading = true;
-    this.uploadError = null;
-
-    this.transcriptionService
-      .upload(this.selectedFile, this.clarification)
-      .subscribe({
-        next: (task) => this.handleUploadSuccess(task),
-        error: (error) => {
-          this.uploading = false;
-          this.uploadError = this.extractError(error) ?? 'Не удалось загрузить файл.';
-        },
-      });
-  }
-
-  uploadFromUrl(): void {
-    const trimmedUrl = this.fileUrl.trim();
-    if (!trimmedUrl || this.uploading) {
-      return;
+    if (component) {
+      subscriptions.push(
+        component.uploadingChange.subscribe((state) => {
+          this.uploading = state;
+        })
+      );
     }
 
-    this.uploading = true;
-    this.uploadError = null;
-    this.selectedFile = null;
-
-    this.transcriptionService.uploadFromUrl(trimmedUrl, this.clarification).subscribe({
-      next: (task) => this.handleUploadSuccess(task),
-      error: (error) => {
-        this.uploading = false;
-        this.uploadError =
-          this.extractError(error) ?? 'Не удалось загрузить файл по ссылке.';
-      },
+    dialogRef.afterClosed().subscribe((result) => {
+      subscriptions.forEach((sub) => sub.unsubscribe());
+      this.uploading = false;
+      if (result?.task) {
+        this.handleUploadSuccess(result.task);
+      }
     });
   }
 
@@ -205,11 +181,6 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   }
 
   private handleUploadSuccess(task: OpenAiTranscriptionTaskDto): void {
-    this.uploading = false;
-    this.uploadError = null;
-    this.selectedFile = null;
-    this.fileUrl = '';
-    this.clarification = '';
     this.tasks = [task, ...this.tasks.filter((t) => t.id !== task.id)];
     this.selectTaskById(task.id);
   }
