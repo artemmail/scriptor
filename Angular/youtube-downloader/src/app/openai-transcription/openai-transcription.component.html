@@ -1,13 +1,13 @@
 <div class="transcription-page">
   <mat-card class="upload-card">
-    <div class="upload-card-header">
-      <div class="upload-card-text">
-        <h2>Новая расшифровка</h2>
-        <p class="upload-hint">
-          Загрузите аудио или видео файл с компьютера или укажите прямую ссылку (Яндекс.Диск и т.д.),
-          чтобы отправить его в обработку через OpenAI.
-        </p>
-      </div>
+    <div class="upload-card-text">
+      <h2>Новая расшифровка</h2>
+      <p class="upload-hint">
+        Загрузите аудио или видео файл с компьютера или укажите прямую ссылку (Яндекс.Диск и т.д.),
+        чтобы отправить его в обработку через OpenAI.
+      </p>
+    </div>
+    <div class="upload-actions">
       <button mat-raised-button color="primary" (click)="openUploadDialog()" [disabled]="uploading">
         <mat-icon>cloud_upload</mat-icon>
         <span>Загрузить</span>

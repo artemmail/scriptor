@@ -8,13 +8,6 @@
 .upload-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.upload-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
   gap: 16px;
 }
 
@@ -22,6 +15,11 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.upload-actions {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .upload-card-text h2 {
@@ -202,25 +200,21 @@
 }
 
 .markdown-content {
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 8px;
   padding: 16px;
-  background-color: rgba(0, 0, 0, 0.02);
+  background-color: transparent;
 }
 
 pre {
-  background: rgba(0, 0, 0, 0.02);
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.12);
   padding: 16px;
   border-radius: 8px;
   overflow-x: auto;
 }
 
 @media (max-width: 768px) {
-  .upload-card-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
   .result-actions {
     flex-direction: column;
     align-items: stretch;
