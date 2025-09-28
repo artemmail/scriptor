@@ -106,11 +106,27 @@ namespace YandexSpeech.services
 
             await PrepareTaskForContinuationAsync(task);
 
+            var activeStatuses = new HashSet<OpenAiTranscriptionStatus>
+            {
+                OpenAiTranscriptionStatus.Created,
+                OpenAiTranscriptionStatus.Converting,
+                OpenAiTranscriptionStatus.Transcribing,
+                OpenAiTranscriptionStatus.Segmenting,
+                OpenAiTranscriptionStatus.ProcessingSegments,
+                OpenAiTranscriptionStatus.Formatting
+            };
+
             try
             {
-                var guard = 0;
-                while (guard++ < 6)
+                while (!task.Done
+                       && task.Status != OpenAiTranscriptionStatus.Error
+                       && activeStatuses.Contains(task.Status))
                 {
+                    var statusBefore = task.Status;
+                    var processedBefore = task.SegmentsProcessed;
+                    var modifiedBefore = task.ModifiedAt;
+                    var doneBefore = task.Done;
+
                     switch (task.Status)
                     {
                         case OpenAiTranscriptionStatus.Created:
@@ -129,8 +145,18 @@ namespace YandexSpeech.services
                         case OpenAiTranscriptionStatus.Formatting:
                             await RunFormattingStepAsync(task);
                             break;
-                        default:
-                            return task;
+                    }
+
+                    if (task.Status == statusBefore
+                        && task.SegmentsProcessed == processedBefore
+                        && task.ModifiedAt == modifiedBefore
+                        && task.Done == doneBefore)
+                    {
+                        _logger.LogWarning(
+                            "No progress detected while continuing transcription task {TaskId} at status {Status}. Breaking to avoid infinite loop.",
+                            task.Id,
+                            task.Status);
+                        break;
                     }
                 }
             }
@@ -607,7 +633,7 @@ namespace YandexSpeech.services
             return segments;
         }
 
-        private async Task<string> CreateDialogueMarkdownAsync(string transcription, string? clarification)
+        protected virtual async Task<string> CreateDialogueMarkdownAsync(string transcription, string? clarification)
         {
             using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(50) };
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _openAiApiKey);
