@@ -1,0 +1,78 @@
+.dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 320px;
+}
+
+.dialog-hint {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.upload-tabs {
+  margin-top: 8px;
+}
+
+.upload-tabs.uploading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 4px 4px;
+}
+
+.file-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.file-select input {
+  display: none;
+}
+
+.file-select:hover {
+  border-color: rgba(25, 118, 210, 0.6);
+  background-color: rgba(25, 118, 210, 0.04);
+}
+
+.file-select.disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.file-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: rgba(0, 0, 0, 0.75);
+}
+
+.full-width {
+  width: 100%;
+}
+
+.clarification-field textarea {
+  resize: vertical;
+}
+
+.error {
+  color: #d32f2f;
+}
+
+@media (max-width: 480px) {
+  .dialog-content {
+    min-width: 0;
+  }
+}

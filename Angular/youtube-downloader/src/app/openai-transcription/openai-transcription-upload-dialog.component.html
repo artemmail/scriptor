@@ -1,0 +1,59 @@
+<h2 mat-dialog-title>Новая расшифровка</h2>
+<mat-dialog-content class="dialog-content">
+  <p class="dialog-hint">
+    Выберите способ загрузки: добавьте файл или укажите ссылку. После распознавания запись появится в списке
+    задач.
+  </p>
+
+  <mat-tab-group [(selectedIndex)]="selectedTab" class="upload-tabs" [class.uploading]="uploading">
+    <mat-tab label="Файл">
+      <div class="tab-content">
+        <label class="file-select" [class.disabled]="uploading">
+          <input type="file" (change)="onFileSelected($event)" accept="audio/*,video/*" [disabled]="uploading" />
+          <mat-icon>attach_file</mat-icon>
+          <span>Выбрать файл</span>
+        </label>
+        <div class="file-name" *ngIf="selectedFile">
+          <mat-icon>insert_drive_file</mat-icon>
+          <span>{{ selectedFile.name }}</span>
+        </div>
+      </div>
+    </mat-tab>
+    <mat-tab label="Ссылка">
+      <div class="tab-content">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Ссылка на файл</mat-label>
+          <input
+            matInput
+            type="url"
+            [(ngModel)]="fileUrl"
+            [disabled]="uploading"
+            placeholder="https://disk.yandex.ru/i/..."
+          />
+        </mat-form-field>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+
+  <mat-form-field appearance="outline" class="full-width clarification-field">
+    <mat-label>Уточнение (необязательно)</mat-label>
+    <textarea
+      matInput
+      rows="3"
+      [(ngModel)]="clarification"
+      [disabled]="uploading"
+      placeholder="Например: отметить важных спикеров или уточнить терминологию"
+    ></textarea>
+  </mat-form-field>
+
+  <mat-progress-bar *ngIf="uploading" mode="indeterminate"></mat-progress-bar>
+  <div class="error" *ngIf="uploadError">{{ uploadError }}</div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()" [disabled]="uploading">Отмена</button>
+  <button mat-raised-button color="primary" (click)="onSubmit()" [disabled]="!canSubmit() || uploading">
+    <mat-icon>cloud_upload</mat-icon>
+    <span>Отправить</span>
+  </button>
+</mat-dialog-actions>
