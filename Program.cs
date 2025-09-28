@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Linq;
 using YandexSpeech;
 using YandexSpeech.models.DB;
 using YandexSpeech.services;
@@ -187,6 +188,7 @@ var app = builder.Build();
 
 await EnsureRolesAsync(app.Services);
 await SubscriptionPlanSeeder.EnsureDefaultPlansAsync(app.Services);
+await MarkIncompleteOpenAiTasksAsErroredAsync(app.Services);
 
 // (пропущена инициализация ролей и IndexNow для краткости)
 
@@ -254,4 +256,52 @@ static async Task EnsureRolesAsync(IServiceProvider services)
             await roleManager.CreateAsync(new IdentityRole(roleName));
         }
     }
+}
+
+static async Task MarkIncompleteOpenAiTasksAsErroredAsync(IServiceProvider services)
+{
+    using var scope = services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+
+    var incompleteTasks = await dbContext.OpenAiTranscriptionTasks
+        .Where(t => !t.Done)
+        .Include(t => t.Steps)
+        .Include(t => t.Segments)
+        .ToListAsync();
+
+    if (incompleteTasks.Count == 0)
+    {
+        return;
+    }
+
+    var now = DateTime.UtcNow;
+    const string restartErrorMessage = "Задача была остановлена из-за перезапуска сервера. Перезапустите обработку вручную.";
+
+    foreach (var task in incompleteTasks)
+    {
+        task.Status = OpenAiTranscriptionStatus.Error;
+        task.Error = restartErrorMessage;
+        task.Done = false;
+        task.ModifiedAt = now;
+
+        if (task.Steps != null)
+        {
+            foreach (var step in task.Steps.Where(s => s.Status == OpenAiTranscriptionStepStatus.InProgress))
+            {
+                step.Status = OpenAiTranscriptionStepStatus.Error;
+                step.Error = restartErrorMessage;
+                step.FinishedAt = now;
+            }
+        }
+
+        if (task.Segments != null)
+        {
+            foreach (var segment in task.Segments.Where(s => s.IsProcessing))
+            {
+                segment.IsProcessing = false;
+            }
+        }
+    }
+
+    await dbContext.SaveChangesAsync();
 }
