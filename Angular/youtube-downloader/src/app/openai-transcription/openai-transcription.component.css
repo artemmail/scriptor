@@ -226,3 +226,17 @@ pre {
     align-items: stretch;
   }
 }
+
+@media (min-width: 960px) {
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .tasks-card,
+  .details-card,
+  .empty-details {
+    height: 100%;
+  }
+}
