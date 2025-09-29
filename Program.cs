@@ -1,4 +1,5 @@
 ﻿// Program.cs
+using AspNet.Security.OAuth.Yandex;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.Identity;
@@ -71,7 +72,7 @@ var jwtKeyId = jwtSection["KeyId"]!;
 var jwtIssuer = jwtSection["Issuer"]!;
 var jwtAudience = jwtSection["Audience"]!;
 
-// 6. Аутентификация (JWT + Google + VK)
+// 6. Аутентификация (JWT + Google + Yandex + VK)
 builder.Services.AddAuthentication(o =>
 {
     o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -117,6 +118,21 @@ builder.Services.AddAuthentication(o =>
         }
 
         // Для обычного (не-silent) входа — редиректим на callback с ошибкой
+        var redirect = $"/api/account/externallogincallback?remoteError={Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error")}";
+        ctx.Response.Redirect(redirect);
+        ctx.HandleResponse();
+        return Task.CompletedTask;
+    };
+})
+.AddYandex(opts =>
+{
+    opts.ClientId = builder.Configuration["Authentication:Yandex:ClientId"];
+    opts.ClientSecret = builder.Configuration["Authentication:Yandex:ClientSecret"];
+    opts.Scope.Add("login:email");
+    opts.SaveTokens = true;
+
+    opts.Events.OnRemoteFailure = ctx =>
+    {
         var redirect = $"/api/account/externallogincallback?remoteError={Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error")}";
         ctx.Response.Redirect(redirect);
         ctx.HandleResponse();

@@ -6,8 +6,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="AngleSharp" Version="1.2.0" />
-		<PackageReference Include="AspNet.Security.OAuth.Vkontakte" Version="9.2.0" />
+                <PackageReference Include="AngleSharp" Version="1.2.0" />
+                <PackageReference Include="AspNet.Security.OAuth.Yandex" Version="9.2.0" />
+                <PackageReference Include="AspNet.Security.OAuth.Vkontakte" Version="9.2.0" />
 		<PackageReference Include="AWSSDK.Core" Version="3.7.400.70" />
 		<PackageReference Include="AWSSDK.S3" Version="3.7.410.12" />
 		<PackageReference Include="Concentus.OggFile" Version="1.0.6" />

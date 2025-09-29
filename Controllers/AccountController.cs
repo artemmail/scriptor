@@ -40,16 +40,17 @@ namespace YandexSpeech.Controllers
             _dbContext = dbContext;
         }
 
-        // ---------- GOOGLE SIGN-IN ----------
+        // ---------- EXTERNAL SIGN-IN ----------
 
         [AllowAnonymous]
         [HttpGet("signin-google")]
         public IActionResult SignInWithGoogle(string? returnUrl = null)
-        {
-            var redirectUrl = Url.Action(nameof(ExternalLoginCallback), "Account", new { returnUrl });
-            var props = _signInManager.ConfigureExternalAuthenticationProperties("Google", redirectUrl);
-            return Challenge(props, "Google");
-        }
+            => SignInWithProvider("Google", returnUrl);
+
+        [AllowAnonymous]
+        [HttpGet("signin-yandex")]
+        public IActionResult SignInWithYandex(string? returnUrl = null)
+            => SignInWithProvider("Yandex", returnUrl);
 
         [AllowAnonymous]
         [HttpGet("externallogincallback")]
@@ -84,7 +85,8 @@ namespace YandexSpeech.Controllers
             else
             {
                 // ----- первый логин -----
-                var email = info.Principal.FindFirstValue(ClaimTypes.Email);
+                var email = info.Principal.FindFirstValue(ClaimTypes.Email)
+                            ?? info.Principal.FindFirstValue("urn:yandex:email");
                 if (string.IsNullOrEmpty(email))
                 {
                     Console.WriteLine("ExternalLoginCallback: EmailNotFound");
@@ -94,11 +96,15 @@ namespace YandexSpeech.Controllers
                 user = await _userManager.FindByEmailAsync(email);
                 if (user == null)
                 {
+                    var displayName = info.Principal.FindFirstValue(ClaimTypes.Name)
+                        ?? info.Principal.FindFirstValue("urn:yandex:login")
+                        ?? GenerateDefaultDisplayName();
+
                     user = new ApplicationUser
                     {
                         Email = email,
                         UserName = email,
-                        DisplayName = GenerateDefaultDisplayName(),
+                        DisplayName = displayName,
                         RecognitionsResetAt = DateTime.UtcNow.Date.AddDays(1)
                     };
 
@@ -293,6 +299,13 @@ namespace YandexSpeech.Controllers
         }
 
         // ---------- ВСПОМОГАТЕЛЬНЫЕ ----------
+
+        private IActionResult SignInWithProvider(string provider, string? returnUrl)
+        {
+            var redirectUrl = Url.Action(nameof(ExternalLoginCallback), "Account", new { returnUrl });
+            var props = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+            return Challenge(props, provider);
+        }
 
         private static string GenerateRefreshToken()
             => $"{Guid.NewGuid():N}{Guid.NewGuid():N}";
