@@ -1,0 +1,884 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/Angular/youtube-downloader/src/app/about2/about2.component.css b/Angular/youtube-downloader/src/app/about2/about2.component.css
+new file mode 100644
+index 0000000000000000000000000000000000000000..0f833f3b6afe74773df5b32986f9a476d4a75e6e
+--- /dev/null
++++ b/Angular/youtube-downloader/src/app/about2/about2.component.css
+@@ -0,0 +1,435 @@
++:host {
++  display: block;
++  color: #0b172a;
++  background: linear-gradient(180deg, #f6f8fc 0%, #ffffff 30%);
++}
++
++.teamlogs-page {
++  display: flex;
++  flex-direction: column;
++  gap: 6rem;
++  padding: 4rem clamp(1rem, 5vw, 7rem) 6rem;
++}
++
++section {
++  display: grid;
++  gap: 2.5rem;
++}
++
++.hero {
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++  align-items: center;
++  gap: clamp(2rem, 8vw, 6rem);
++}
++
++.hero__content {
++  display: grid;
++  gap: 1.5rem;
++  align-content: start;
++}
++
++.hero__badge {
++  display: inline-flex;
++  align-items: center;
++  padding: 0.35rem 0.8rem;
++  border-radius: 999px;
++  background: rgba(27, 82, 255, 0.08);
++  color: #1b52ff;
++  font-weight: 600;
++  text-transform: uppercase;
++  letter-spacing: 0.08em;
++  font-size: 0.75rem;
++}
++
++.hero h1 {
++  margin: 0;
++  font-size: clamp(2.25rem, 5vw, 3.5rem);
++  line-height: 1.1;
++}
++
++.hero__lead {
++  margin: 0;
++  font-size: 1.05rem;
++  line-height: 1.6;
++  color: #3b4963;
++}
++
++.hero__actions {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 1rem;
++}
++
++.btn {
++  border-radius: 999px;
++  padding: 0.85rem 1.9rem;
++  font-size: 0.95rem;
++  font-weight: 600;
++  border: none;
++  cursor: pointer;
++  transition: transform 0.2s ease, box-shadow 0.2s ease;
++}
++
++.btn--primary {
++  background: linear-gradient(135deg, #224cff, #0f8dff);
++  color: #ffffff;
++  box-shadow: 0 15px 30px -15px rgba(34, 76, 255, 0.6);
++}
++
++.btn--primary:hover {
++  transform: translateY(-2px);
++  box-shadow: 0 20px 40px -20px rgba(15, 141, 255, 0.7);
++}
++
++.btn--ghost {
++  background: rgba(34, 76, 255, 0.08);
++  color: #224cff;
++}
++
++.btn--ghost:hover {
++  transform: translateY(-2px);
++  background: rgba(34, 76, 255, 0.12);
++}
++
++.btn--large {
++  font-size: 1rem;
++  padding: 1rem 2.8rem;
++}
++
++.hero__metrics {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 1.25rem;
++  list-style: none;
++  padding: 0;
++  margin: 0;
++}
++
++.hero__metrics li {
++  padding: 1.5rem 1.2rem;
++  border-radius: 1.5rem;
++  background: #ffffff;
++  box-shadow: 0 20px 45px -30px rgba(22, 40, 80, 0.45);
++  display: grid;
++  gap: 0.35rem;
++}
++
++.metric__value {
++  font-size: 1.5rem;
++  font-weight: 700;
++  color: #0d1f44;
++}
++
++.metric__label {
++  font-size: 0.95rem;
++  color: #3b4963;
++  line-height: 1.5;
++}
++
++.hero__preview {
++  display: flex;
++  justify-content: center;
++}
++
++.preview-card {
++  width: min(100%, 420px);
++  background: #ffffff;
++  border-radius: 2rem;
++  box-shadow: 0 35px 60px -35px rgba(13, 31, 68, 0.45);
++  overflow: hidden;
++  display: grid;
++  gap: 0;
++}
++
++.preview-card__header {
++  padding: 1.75rem 2rem 1.5rem;
++  background: linear-gradient(145deg, #f3f6ff 0%, #ffffff 60%);
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  font-weight: 600;
++  color: #10244a;
++}
++
++.preview-card__tag {
++  padding: 0.35rem 0.8rem;
++  background: rgba(34, 76, 255, 0.12);
++  color: #1b52ff;
++  border-radius: 999px;
++  font-size: 0.75rem;
++  text-transform: uppercase;
++  letter-spacing: 0.08em;
++}
++
++.preview-card__body {
++  padding: 1.5rem 2rem 1.75rem;
++  display: grid;
++  gap: 1.5rem;
++}
++
++.preview-card__body h3 {
++  margin: 0 0 0.5rem;
++  font-size: 1.05rem;
++  color: #0b172a;
++}
++
++.preview-card__body ul {
++  margin: 0;
++  padding-left: 1.3rem;
++  color: #3b4963;
++  line-height: 1.5;
++}
++
++.preview-card__body p {
++  margin: 0;
++  color: #3b4963;
++  line-height: 1.5;
++}
++
++.preview-card__footer {
++  padding: 1.25rem 2rem;
++  border-top: 1px solid rgba(14, 36, 74, 0.08);
++  color: #224cff;
++  font-weight: 600;
++}
++
++.section-header {
++  max-width: 680px;
++  display: grid;
++  gap: 0.75rem;
++}
++
++.section-header--center {
++  margin: 0 auto;
++  text-align: center;
++}
++
++.section-header h2 {
++  margin: 0;
++  font-size: clamp(1.8rem, 4vw, 2.6rem);
++  line-height: 1.2;
++}
++
++.section-header p {
++  margin: 0;
++  color: #44526b;
++  line-height: 1.7;
++}
++
++.features__grid {
++  display: grid;
++  gap: 1.5rem;
++  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
++}
++
++.feature {
++  padding: 1.8rem;
++  border-radius: 1.5rem;
++  background: #ffffff;
++  box-shadow: 0 25px 40px -35px rgba(10, 24, 58, 0.45);
++}
++
++.feature h3 {
++  margin: 0 0 0.75rem;
++  font-size: 1.2rem;
++}
++
++.feature p {
++  margin: 0;
++  color: #3b4963;
++  line-height: 1.6;
++}
++
++.process__steps {
++  list-style: none;
++  margin: 0;
++  padding: 0;
++  display: grid;
++  gap: 1.5rem;
++}
++
++.process__steps li {
++  display: grid;
++  grid-template-columns: auto 1fr;
++  gap: 1.5rem;
++  padding: 1.75rem 2rem;
++  border-radius: 1.75rem;
++  background: #ffffff;
++  box-shadow: 0 30px 40px -35px rgba(16, 36, 74, 0.4);
++  align-items: start;
++}
++
++.step__index {
++  width: 48px;
++  height: 48px;
++  border-radius: 16px;
++  background: linear-gradient(135deg, #224cff, #0f8dff);
++  color: #ffffff;
++  font-weight: 700;
++  font-size: 1.1rem;
++  display: grid;
++  place-items: center;
++}
++
++.step__content h3 {
++  margin: 0 0 0.5rem;
++  font-size: 1.25rem;
++}
++
++.step__content p {
++  margin: 0;
++  color: #3b4963;
++  line-height: 1.6;
++}
++
++.use-cases__grid {
++  display: grid;
++  gap: 1.5rem;
++  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
++}
++
++.use-case {
++  padding: 2rem;
++  border-radius: 1.5rem;
++  background: #ffffff;
++  box-shadow: 0 25px 45px -35px rgba(12, 30, 64, 0.45);
++  display: grid;
++  gap: 1rem;
++}
++
++.use-case h3 {
++  margin: 0;
++  font-size: 1.2rem;
++}
++
++.use-case ul {
++  margin: 0;
++  padding-left: 1.2rem;
++  color: #3b4963;
++  line-height: 1.6;
++}
++
++.integrations__list {
++  display: grid;
++  gap: 1.25rem;
++  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
++}
++
++.integration {
++  padding: 1.8rem;
++  border-radius: 1.5rem;
++  background: #ffffff;
++  border: 1px solid rgba(15, 141, 255, 0.12);
++  display: grid;
++  gap: 0.75rem;
++}
++
++.integration h3 {
++  margin: 0;
++  font-size: 1.1rem;
++}
++
++.integration p {
++  margin: 0;
++  color: #3b4963;
++  line-height: 1.6;
++}
++
++.cta {
++  background: linear-gradient(135deg, #224cff, #0f8dff);
++  color: #ffffff;
++  border-radius: 2rem;
++  padding: clamp(2.5rem, 6vw, 4rem);
++  display: flex;
++  flex-wrap: wrap;
++  gap: 2rem;
++  align-items: center;
++  justify-content: space-between;
++}
++
++.cta__content {
++  max-width: 520px;
++  display: grid;
++  gap: 1rem;
++}
++
++.cta__content h2 {
++  margin: 0;
++  font-size: clamp(2rem, 5vw, 2.8rem);
++  line-height: 1.2;
++}
++
++.cta__content p {
++  margin: 0;
++  line-height: 1.7;
++}
++
++.cta .btn--primary {
++  background: #ffffff;
++  color: #224cff;
++  box-shadow: none;
++}
++
++.cta .btn--primary:hover {
++  box-shadow: 0 12px 25px -15px rgba(9, 43, 125, 0.4);
++}
++
++.faq__list {
++  display: grid;
++  gap: 1.25rem;
++  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
++}
++
++.faq__item {
++  padding: 1.8rem;
++  border-radius: 1.5rem;
++  background: #ffffff;
++  box-shadow: 0 25px 45px -35px rgba(8, 22, 52, 0.45);
++  display: grid;
++  gap: 0.75rem;
++}
++
++.faq__item h3 {
++  margin: 0;
++  font-size: 1.15rem;
++}
++
++.faq__item p {
++  margin: 0;
++  color: #3b4963;
++  line-height: 1.6;
++}
++
++@media (max-width: 1024px) {
++  .hero {
++    grid-template-columns: 1fr;
++  }
++
++  .hero__metrics {
++    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
++  }
++
++  .teamlogs-page {
++    padding-inline: clamp(1rem, 8vw, 3rem);
++  }
++}
++
++@media (max-width: 600px) {
++  .teamlogs-page {
++    padding-block: 3rem 4rem;
++    gap: 4rem;
++  }
++
++  .btn {
++    width: 100%;
++    justify-content: center;
++  }
++
++  .cta {
++    text-align: center;
++  }
++
++  .cta__content {
++    justify-items: center;
++  }
++}
+diff --git a/Angular/youtube-downloader/src/app/about2/about2.component.html b/Angular/youtube-downloader/src/app/about2/about2.component.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..04bb7466b28b036d83006ca066c98fdebd61a07a
+--- /dev/null
++++ b/Angular/youtube-downloader/src/app/about2/about2.component.html
+@@ -0,0 +1,125 @@
++<div class="teamlogs-page">
++  <section class="hero">
++    <div class="hero__content">
++      <p class="hero__badge">Teamlogs</p>
++      <h1>Цифровой протокол для каждой командной встречи</h1>
++      <p class="hero__lead">
++        Teamlogs автоматически фиксирует разговоры, собирает решения и превращает договорённости в понятный план действий. Все
++        участники команды получают итоги сразу после созвона.
++      </p>
++      <div class="hero__actions">
++        <button class="btn btn--primary">Запросить демо</button>
++        <button class="btn btn--ghost">Смотреть пример отчёта</button>
++      </div>
++      <ul class="hero__metrics">
++        <li *ngFor="let metric of metrics">
++          <span class="metric__value">{{ metric.value }}</span>
++          <span class="metric__label">{{ metric.label }}</span>
++        </li>
++      </ul>
++    </div>
++    <div class="hero__preview">
++      <div class="preview-card">
++        <header class="preview-card__header">
++          <span class="preview-card__title">Созвон с командой продукта</span>
++          <span class="preview-card__tag">AI-протокол</span>
++        </header>
++        <div class="preview-card__body">
++          <article>
++            <h3>Результаты встречи</h3>
++            <ul>
++              <li>?? Решения: перенос релиза на 18 марта, запуск доп. тестирования.</li>
++              <li>? Ответственные: продуктовый менеджер, тимлид разработки.</li>
++              <li>?? Следующие шаги: обновить роадмап, подготовить коммуникацию для клиентов.</li>
++            </ul>
++          </article>
++          <article>
++            <h3>Контекст</h3>
++            <p>Таймкоды и тезисы собраны автоматически — достаточно перейти к нужному моменту и продолжить работу.</p>
++          </article>
++        </div>
++        <footer class="preview-card__footer">
++          Экспорт в PDF · Word · Notion
++        </footer>
++      </div>
++    </div>
++  </section>
++
++  <section class="features">
++    <div class="section-header">
++      <h2>Ключевые возможности Teamlogs</h2>
++      <p>Платформа сочетает в себе распознавание речи, структурирование контента и удобные сценарии совместной работы.</p>
++    </div>
++    <div class="features__grid">
++      <article class="feature" *ngFor="let feature of features">
++        <h3>{{ feature.title }}</h3>
++        <p>{{ feature.description }}</p>
++      </article>
++    </div>
++  </section>
++
++  <section class="process">
++    <div class="section-header section-header--center">
++      <h2>Как Teamlogs помогает пройти путь от встречи к действиям</h2>
++      <p>Несколько шагов — и у вашей команды появляется готовый протокол с задачами, контекстом и ответственными.</p>
++    </div>
++    <ol class="process__steps">
++      <li *ngFor="let step of process; let index = index">
++        <div class="step__index">{{ index + 1 }}</div>
++        <div class="step__content">
++          <h3>{{ step.title }}</h3>
++          <p>{{ step.description }}</p>
++        </div>
++      </li>
++    </ol>
++  </section>
++
++  <section class="use-cases">
++    <div class="section-header">
++      <h2>Сценарии использования для разных подразделений</h2>
++      <p>Teamlogs одинаково полезен руководителям, клиентским командам и внутренним сервисам.</p>
++    </div>
++    <div class="use-cases__grid">
++      <article class="use-case" *ngFor="let useCase of useCases">
++        <h3>{{ useCase.title }}</h3>
++        <ul>
++          <li *ngFor="let bullet of useCase.bullets">{{ bullet }}</li>
++        </ul>
++      </article>
++    </div>
++  </section>
++
++  <section class="integrations">
++    <div class="section-header section-header--center">
++      <h2>Интеграции и автоматизация</h2>
++      <p>Подключайте Teamlogs к экосистеме компании и сокращайте время от договорённости до выполнения.</p>
++    </div>
++    <div class="integrations__list">
++      <article class="integration" *ngFor="let integration of integrations">
++        <h3>{{ integration.name }}</h3>
++        <p>{{ integration.description }}</p>
++      </article>
++    </div>
++  </section>
++
++  <section class="cta">
++    <div class="cta__content">
++      <h2>Готовы подключить Teamlogs к своей команде?</h2>
++      <p>Оставьте заявку — мы подготовим пилот, настроим интеграции и покажем, как экономить часы рутинной работы.</p>
++    </div>
++    <button class="btn btn--primary btn--large">Получить консультацию</button>
++  </section>
++
++  <section class="faq">
++    <div class="section-header section-header--center">
++      <h2>Частые вопросы</h2>
++      <p>Ответы помогут понять, как Teamlogs впишется в процессы вашей компании.</p>
++    </div>
++    <div class="faq__list">
++      <article class="faq__item" *ngFor="let item of faq">
++        <h3>{{ item.question }}</h3>
++        <p>{{ item.answer }}</p>
++      </article>
++    </div>
++  </section>
++</div>
+diff --git a/Angular/youtube-downloader/src/app/about2/about2.component.ts b/Angular/youtube-downloader/src/app/about2/about2.component.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d15e5c361be0ff1b1d4a072d1919c5e43419f929
+--- /dev/null
++++ b/Angular/youtube-downloader/src/app/about2/about2.component.ts
+@@ -0,0 +1,144 @@
++import { Component } from '@angular/core';
++import { CommonModule } from '@angular/common';
++
++interface Metric {
++  label: string;
++  value: string;
++}
++
++interface Feature {
++  title: string;
++  description: string;
++}
++
++interface ProcessStep {
++  title: string;
++  description: string;
++}
++
++interface UseCase {
++  title: string;
++  bullets: string[];
++}
++
++interface Integration {
++  name: string;
++  description: string;
++}
++
++interface FaqItem {
++  question: string;
++  answer: string;
++}
++
++@Component({
++  selector: 'app-about2',
++  standalone: true,
++  imports: [CommonModule],
++  templateUrl: './about2.component.html',
++  styleUrls: ['./about2.component.css'],
++})
++export class About2Component {
++  readonly metrics: Metric[] = [
++    { value: '5 минут', label: 'до готового протокола после встречи' },
++    { value: '24/7', label: 'автоматический сбор и структурирование заметок' },
++    { value: '100%', label: 'контроль договорённостей команды в едином окне' },
++  ];
++
++  readonly features: Feature[] = [
++    {
++      title: 'Фиксация диалогов и решений',
++      description:
++        'Teamlogs превращает каждый разговор в структурированный документ: выделяет темы, задачи, риски и фиксирует, кто и за что отвечает.',
++    },
++    {
++      title: 'Единое пространство для команды',
++      description:
++        'Все встречи хранятся в хронологическом порядке. Быстрый поиск и фильтры помогают мгновенно вернуть контекст и не потерять ни одну договорённость.',
++    },
++    {
++      title: 'Готовые шаблоны и автоматизация',
++      description:
++        'Настраивайте шаблоны протоколов, отправку итогов в почту, корпоративные мессенджеры и CRM, чтобы команда сразу получала задачи к исполнению.',
++    },
++  ];
++
++  readonly process: ProcessStep[] = [
++    {
++      title: 'Подключите источник встречи',
++      description:
++        'Импортируйте запись из Zoom, Google Meet, Microsoft Teams или загрузите файл вручную. Teamlogs поддерживает видео, аудио и текстовые стенограммы.',
++    },
++    {
++      title: 'Получите структурированную выжимку',
++      description:
++        'Платформа определяет спикеров, расставляет таймкоды, группирует темы и выделяет ключевые решения и задачи, готовые для передачи команде.',
++    },
++    {
++      title: 'Поделитесь результатом с коллегами',
++      description:
++        'Отправляйте протоколы в Slack, Telegram и почту, экспортируйте в PDF или Word и управляйте доступом для отдельных команд и клиентов.',
++    },
++  ];
++
++  readonly useCases: UseCase[] = [
++    {
++      title: 'Руководители и проектные команды',
++      bullets: [
++        'Контролируйте статус инициатив и своевременно отслеживайте выполнение договорённостей.',
++        'Сократите время на подготовку к встречам благодаря живой истории протоколов.',
++        'Передавайте контекст новым участникам команды без бесконечных вводных.',
++      ],
++    },
++    {
++      title: 'Продажи и клиентский успех',
++      bullets: [
++        'Фиксируйте ключевые вопросы клиента и автоматически ставьте задачи аккаунтам.',
++        'Храните историю созвонов, чтобы поддержка знала тонкости работы с каждым клиентом.',
++        'Собирайте обратную связь, чтобы быстрее находить точки роста продукта.',
++      ],
++    },
++    {
++      title: 'HR и внутренние коммуникации',
++      bullets: [
++        'Записывайте адаптационные встречи, 1:1 и ретро, сохраняя договорённости в надёжном архиве.',
++        'Автоматически отправляйте протоколы сотрудникам и их руководителям.',
++        'Собирайте аналитические отчёты по активности команд, чтобы вовремя помогать.',
++      ],
++    },
++  ];
++
++  readonly integrations: Integration[] = [
++    {
++      name: 'Zoom и Google Meet',
++      description: 'Автоматически синхронизируйте встречи и получайте протокол через несколько минут после окончания звонка.',
++    },
++    {
++      name: 'Slack, Telegram, корпоративная почта',
++      description: 'Рассылайте выжимки в привычные каналы, чтобы вся команда оставалась в курсе договорённостей.',
++    },
++    {
++      name: 'CRM и таск-трекеры',
++      description: 'Передавайте задачи в amoCRM, Bitrix24, Jira или Trello и не теряйте ни одного следующего шага.',
++    },
++  ];
++
++  readonly faq: FaqItem[] = [
++    {
++      question: 'Как обеспечить безопасность данных?',
++      answer:
++        'Данные шифруются при передаче и хранении. Доступ разграничивается по ролям, включена двухфакторная аутентификация и аудит действий.',
++    },
++    {
++      question: 'Подходит ли Teamlogs для больших компаний?',
++      answer:
++        'Платформа масштабируется под крупные команды: настраивайте структуры подразделений, права доступа и автоматизацию процессов для каждой группы.',
++    },
++    {
++      question: 'Можно ли попробовать сервис бесплатно?',
++      answer:
++        'Да, активируйте демо-доступ и протестируйте автоматические протоколы на своих встречах. Команда поддержки поможет с онбордингом.',
++    },
++  ];
++}
++
+diff --git a/Angular/youtube-downloader/src/app/app-routing.module.ts b/Angular/youtube-downloader/src/app/app-routing.module.ts
+index 495e573e7fc5b1ecef3e2a49b856cd04e0574ba1..fc87d2e884bd39c0100b1fef3191927b3236f83b 100644
+--- a/Angular/youtube-downloader/src/app/app-routing.module.ts
++++ b/Angular/youtube-downloader/src/app/app-routing.module.ts
+@@ -1,26 +1,28 @@
+ import { NgModule } from '@angular/core';
+ import { RouterModule, Routes } from '@angular/router';
+ import { YoutubeDownloaderComponent } from './youtube-downloader/youtube-downloader.component';
+ import { RecognitionTasksComponent } from './recognition-tasks/recognition-tasks.component';
+ import { OpenAiTranscriptionComponent } from './openai-transcription/openai-transcription.component';
+ import { BillingComponent } from './billing/billing.component';
+ import { AuthGuard } from './services/auth.guard';
+ import { AboutBusinessComponent } from './about-business/about-business.component';
+ import { About1Component } from './about1/about1.component';
++import { About2Component } from './about2/about2.component';
+ 
+ const routes: Routes = [
+   { path: '', redirectTo: 'youtube-downloader', pathMatch: 'full' },
+   { path: 'youtube-downloader', component: YoutubeDownloaderComponent },
+   { path: 'recognition-tasks', component: RecognitionTasksComponent },
+   { path: 'transcriptions', component: OpenAiTranscriptionComponent },
+   { path: 'billing', component: BillingComponent, canActivate: [AuthGuard] },
+   { path: 'about', component: AboutBusinessComponent },
+   { path: 'about1', component: About1Component },
++  { path: 'about2', component: About2Component },
+ ];
+ 
+ @NgModule({
+   imports: [RouterModule.forRoot(routes)],
+   exports: [RouterModule]
+ 
+ })
+ export class AppRoutingModule {}
+diff --git a/Angular/youtube-downloader/src/app/app.routes.ts b/Angular/youtube-downloader/src/app/app.routes.ts
+index 83195a1ef34fcba3a6f2a594c9ffd57472c692b1..05e11a29bb76e8fed32e15ef3e4d021f35e29ca0 100644
+--- a/Angular/youtube-downloader/src/app/app.routes.ts
++++ b/Angular/youtube-downloader/src/app/app.routes.ts
+@@ -1,22 +1,24 @@
+ import { Routes } from '@angular/router';
+ import { YoutubeDownloaderComponent } from './youtube-downloader/youtube-downloader.component';
+ import { RecognitionTasksComponent } from './recognition-tasks/recognition-tasks.component';
+ import { SubtitlesTasksComponent } from './subtitles-task/subtitles-tasks.component';
+ import { MarkdownConverterComponent } from './Markdown-converter/markdown-converter.component';
+ import { OpenAiTranscriptionComponent } from './openai-transcription/openai-transcription.component';
+ import { BillingComponent } from './billing/billing.component';
+ import { AuthGuard } from './services/auth.guard';
+ import { AboutBusinessComponent } from './about-business/about-business.component';
+ import { About1Component } from './about1/about1.component';
++import { About2Component } from './about2/about2.component';
+ 
+ export const appRoutes: Routes = [
+   { path: '', redirectTo: 'youtube-downloader', pathMatch: 'full' },
+   { path: 'youtube-downloader', component: YoutubeDownloaderComponent },
+   { path: 'recognition-tasks', component: SubtitlesTasksComponent },
+   { path: 'transcriptions', component: OpenAiTranscriptionComponent },
+   { path: 'markdown-converter', component: MarkdownConverterComponent },
+   { path: 'billing', component: BillingComponent, canActivate: [AuthGuard] },
+   { path: 'about', component: AboutBusinessComponent },
+   { path: 'about1', component: About1Component },
++  { path: 'about2', component: About2Component },
+ 
+ ];
+diff --git a/Angular/youtube-downloader/src/app/side-menu/side-menu.component.html b/Angular/youtube-downloader/src/app/side-menu/side-menu.component.html
+index bdc1a75645848751ff8d833a81976914c70e6c0b..d973f17592dfb07b4539f5fc694752272deab4c6 100644
+--- a/Angular/youtube-downloader/src/app/side-menu/side-menu.component.html
++++ b/Angular/youtube-downloader/src/app/side-menu/side-menu.component.html
+@@ -7,83 +7,91 @@
+     </a>
+     <a mat-list-item (click)="navigate('/tasks')">
+       <mat-icon matListItemIcon>subtitles</mat-icon>
+       <span matListItemTitle>Скрипториум</span>
+     </a>
+     <a mat-list-item (click)="navigate('/transcriptions')">
+       <mat-icon matListItemIcon>record_voice_over</mat-icon>
+       <span matListItemTitle>Протокол совещаний</span>
+     </a>
+     <a mat-list-item (click)="navigate('/down')">
+       <mat-icon matListItemIcon>download-icons</mat-icon>
+       <span matListItemTitle>Скачать ролик</span>
+     </a>
+     <a mat-list-item (click)="navigate('/markdown-converter')">
+       <mat-icon matListItemIcon>sync_alt</mat-icon>
+       <span matListItemTitle>Конвертер Markdown </span>
+     </a>
+     <a mat-list-item (click)="navigate('/about')">
+       <mat-icon matListItemIcon>info</mat-icon>
+       <span matListItemTitle>About</span>
+     </a>
+     <a mat-list-item (click)="navigate('/about1')">
+       <mat-icon matListItemIcon>info</mat-icon>
+       <span matListItemTitle>About1</span>
+     </a>
++    <a mat-list-item (click)="navigate('/about2')">
++      <mat-icon matListItemIcon>info</mat-icon>
++      <span matListItemTitle>About2</span>
++    </a>
+     <a mat-list-item (click)="navigate('/blog')">
+       <mat-icon matListItemIcon>article</mat-icon>
+       <span matListItemTitle>Блоги</span>
+     </a>
+     <a mat-list-item (click)="navigate('/profile')">
+       <mat-icon matListItemIcon>account_circle</mat-icon>
+       <span matListItemTitle>Профиль</span>
+     </a>
+     <a mat-list-item (click)="navigate('/billing')">
+       <mat-icon matListItemIcon>credit_card</mat-icon>
+       <span matListItemTitle>Подписки и баланс</span>
+     </a>
+     <a mat-list-item *ngIf="hasRole(user, 'Moderator')" (click)="navigate('/blog/new')">
+       <mat-icon matListItemIcon>post_add</mat-icon>
+       <span matListItemTitle>Новая тема</span>
+     </a>
+     <mat-divider></mat-divider>
+     <a mat-list-item (click)="onLogout()">
+       <mat-icon matListItemIcon>logout</mat-icon>
+       <span matListItemTitle>Выйти ({{ user.displayName || user.email }})</span>
+     </a>
+   </ng-container>
+   <ng-template #guestMenu>
+     <a mat-list-item (click)="navigate('/recognition')">
+       <mat-icon matListItemIcon>home</mat-icon>
+       <span matListItemTitle>Распознавание</span>
+     </a>
+     <a mat-list-item (click)="navigate('/tasks')">
+       <mat-icon matListItemIcon>subtitles</mat-icon>
+       <span matListItemTitle>Скрипториум</span>
+     </a>
+     <a mat-list-item (click)="navigate('/transcriptions')">
+       <mat-icon matListItemIcon>record_voice_over</mat-icon>
+       <span matListItemTitle>Протокол совещаний</span>
+     </a>
+     <a mat-list-item (click)="navigate('/markdown-converter')">
+       <mat-icon matListItemIcon>sync_alt</mat-icon>
+       <span matListItemTitle>Конвертер Markdown</span>
+     </a>
+     <a mat-list-item (click)="navigate('/about')">
+       <mat-icon matListItemIcon>info</mat-icon>
+       <span matListItemTitle>About</span>
+     </a>
+     <a mat-list-item (click)="navigate('/about1')">
+       <mat-icon matListItemIcon>info</mat-icon>
+       <span matListItemTitle>About1</span>
+     </a>
++    <a mat-list-item (click)="navigate('/about2')">
++      <mat-icon matListItemIcon>info</mat-icon>
++      <span matListItemTitle>About2</span>
++    </a>
+     <a mat-list-item (click)="navigate('/blog')">
+       <mat-icon matListItemIcon>article</mat-icon>
+       <span matListItemTitle>Блоги</span>
+     </a>
+     <mat-divider></mat-divider>
+     <a mat-list-item (click)="navigate('/login')">
+       <mat-icon matListItemIcon>login</mat-icon>
+       <span matListItemTitle>Войти</span>
+     </a>
+   </ng-template>
+ </mat-nav-list>
+ 
+EOF
+)

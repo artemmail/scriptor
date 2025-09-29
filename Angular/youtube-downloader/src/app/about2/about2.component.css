@@ -4,7 +4,7 @@
   background: linear-gradient(180deg, #f6f8fc 0%, #ffffff 30%);
 }
 
-.teamlogs-page {
+.YouScriptor-page {
   display: flex;
   flex-direction: column;
   gap: 6rem;
@@ -409,13 +409,13 @@ section {
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   }
 
-  .teamlogs-page {
+  .YouScriptor-page {
     padding-inline: clamp(1rem, 8vw, 3rem);
   }
 }
 
 @media (max-width: 600px) {
-  .teamlogs-page {
+  .YouScriptor-page {
     padding-block: 3rem 4rem;
     gap: 4rem;
   }

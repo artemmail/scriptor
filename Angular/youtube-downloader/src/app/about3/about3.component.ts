@@ -48,47 +48,47 @@ interface TrustedCompany {
 export class About3Component {
   readonly trustedCompanies: readonly TrustedCompany[] = [
     {
-      src: 'assets/about3/teamlogs/avito-seeklogocom_12.png',
+      src: 'assets/about3/YouScriptor/avito-seeklogocom_12.png',
       alt: 'Логотип Авито — клиент сервиса расшифровки аудио и видео в текст',
     },
     {
-      src: 'assets/about3/teamlogs/VK_Full_Logo_12x.png',
+      src: 'assets/about3/YouScriptor/VK_Full_Logo_12x.png',
       alt: 'Логотип ВКонтакте — клиент сервиса расшифровки аудио и видео в текст',
     },
     {
-      src: 'assets/about3/teamlogs/beeline_logo.png',
+      src: 'assets/about3/YouScriptor/beeline_logo.png',
       alt: 'Логотип Билайн — клиент сервиса расшифровки аудио и видео в текст',
     },
     {
-      src: 'assets/about3/teamlogs/Samok_12x.png',
+      src: 'assets/about3/YouScriptor/Samok_12x.png',
       alt: 'Логотип Самокат — клиент сервиса расшифровки аудио и видео в текст',
     },
     {
-      src: 'assets/about3/teamlogs/Lenta_New_Logo_22x.png',
+      src: 'assets/about3/YouScriptor/Lenta_New_Logo_22x.png',
       alt: 'Логотип Лента — клиент сервиса расшифровки аудио и видео в текст',
     },
     {
-      src: 'assets/about3/teamlogs/Skyeng_Base_12x.png',
+      src: 'assets/about3/YouScriptor/Skyeng_Base_12x.png',
       alt: 'Логотип Skyeng — клиент сервиса расшифровки аудио и видео в текст',
     },
     {
-      src: 'assets/about3/teamlogs/Skillbox_12x.png',
+      src: 'assets/about3/YouScriptor/Skillbox_12x.png',
       alt: 'Логотип Skillbox — клиент сервиса расшифровки аудио и видео в текст',
     },
     {
-      src: 'assets/about3/teamlogs/CIAN_BIG 1.png',
+      src: 'assets/about3/YouScriptor/CIAN_BIG 1.png',
       alt: 'Логотип Циан — клиент сервиса расшифровки аудио и видео в текст',
     },
     {
-      src: 'assets/about3/teamlogs/Skolkovo_Foundation_.png',
+      src: 'assets/about3/YouScriptor/Skolkovo_Foundation_.png',
       alt: 'Логотип Сколково — клиент сервиса расшифровки аудио и видео в текст',
     },
     {
-      src: 'assets/about3/teamlogs/logo-sber.png',
+      src: 'assets/about3/YouScriptor/logo-sber.png',
       alt: 'Логотип Сбер — клиент сервиса расшифровки аудио и видео в текст',
     },
     {
-      src: 'assets/about3/teamlogs/Untitled_12x.png',
+      src: 'assets/about3/YouScriptor/Untitled_12x.png',
       alt: 'Логотип РБК — клиент сервиса расшифровки аудио и видео в текст',
     },
   ];
@@ -98,25 +98,25 @@ export class About3Component {
       title: 'Загрузите файл',
       description:
         'Загрузите или перетащите файл в указанную область. Чем лучше качество аудио, тем понятнее будет итоговая расшифровка.',
-      image: 'assets/about3/teamlogs/upload_frame-600x.png',
+      image: 'assets/about3/YouScriptor/upload_frame-600x.png',
     },
     {
       title: 'Дождитесь окончания расшифровки',
       description:
         'Сервису нужно 3−5% времени от длительности записи, чтобы перевести ваше аудио в текст.',
-      image: 'assets/about3/teamlogs/files_frame-600x.png',
+      image: 'assets/about3/YouScriptor/files_frame-600x.png',
     },
     {
       title: 'Редактируйте прямо в браузере',
       description:
         'Проверьте расшифровку, прослушайте фрагменты и внесите правки через встроенный онлайн-редактор.',
-      image: 'assets/about3/teamlogs/transcript_frame-600x.png',
+      image: 'assets/about3/YouScriptor/transcript_frame-600x.png',
     },
     {
       title: 'Скачайте результат',
       description:
         'Сохраните результат на устройство в формате DOCX, XLSX или SRT и поделитесь с коллегами.',
-      image: 'assets/about3/teamlogs/export_frame-600x.png',
+      image: 'assets/about3/YouScriptor/export_frame-600x.png',
     },
   ];
 
@@ -133,17 +133,17 @@ export class About3Component {
   readonly editorBlocks: readonly GalleryItem[] = [
     {
       title: 'Прослушивайте материал',
-      image: 'assets/about3/teamlogs/transcript_player-600x.png',
+      image: 'assets/about3/YouScriptor/transcript_player-600x.png',
       alt: 'Онлайн-редактор с возможностью прослушивания аудио во время правки текста расшифровки',
     },
     {
       title: 'Выделяйте важные моменты',
-      image: 'assets/about3/teamlogs/transcript_formatter-600x.png',
+      image: 'assets/about3/YouScriptor/transcript_formatter-600x.png',
       alt: 'Инструменты форматирования и выделения текста цветным маркером в редакторе расшифровки',
     },
     {
       title: 'Подписывайте спикеров',
-      image: 'assets/about3/teamlogs/transcript_speakers-600x.png',
+      image: 'assets/about3/YouScriptor/transcript_speakers-600x.png',
       alt: 'Точная разметка диалога с удобной сменой и переименованием спикеров',
     },
   ];
@@ -155,7 +155,7 @@ export class About3Component {
     'Сделает контент на основе расшифровки — от статьи до постов в соцсетях',
   ];
 
-  readonly teamlogsFeatures: readonly AdvantageItem[] = [
+  readonly YouScriptorFeatures: readonly AdvantageItem[] = [
     {
       icon: '①',
       title: 'Пакетная загрузка',
@@ -176,41 +176,41 @@ export class About3Component {
   readonly businessFeatures: readonly BusinessFeature[] = [
     {
       title: 'Командная работа',
-      description: 'Создайте рабочее пространство в Teamlogs и пригласите коллег для совместной работы.',
-      image: 'assets/about3/teamlogs/workspace_card-471x.png',
+      description: 'Создайте рабочее пространство в YouScriptor и пригласите коллег для совместной работы.',
+      image: 'assets/about3/YouScriptor/workspace_card-471x.png',
     },
     {
       title: 'Общий доступ к файлам',
       description: 'Настройте уровни доступа и делитесь ссылками на расшифровки внутри команды.',
-      image: 'assets/about3/teamlogs/files_sharing-572x.png',
+      image: 'assets/about3/YouScriptor/files_sharing-572x.png',
     },
     {
       title: 'Детализация расходов',
       description: 'Отслеживайте баланс минут и количество загруженных файлов в реальном времени.',
-      image: 'assets/about3/teamlogs/workspace_analytics-572x.png',
+      image: 'assets/about3/YouScriptor/workspace_analytics-572x.png',
     },
     {
       title: 'Доступна интеграция по API',
       description: 'Интегрируйте распознавание речи в свои сервисы через простой REST API.',
-      image: 'assets/about3/teamlogs/api_integration-560x.png',
+      image: 'assets/about3/YouScriptor/api_integration-560x.png',
     },
   ];
 
   readonly pricingPlans: readonly PricingPlan[] = [
     {
-      title: 'Teamlogs Online',
+      title: 'YouScriptor Online',
       description:
-        'Попробуйте Teamlogs бесплатно и получите 15 тестовых минут. Оплачивайте с российских и зарубежных карт или со счета организации.',
+        'Попробуйте YouScriptor бесплатно и получите 15 тестовых минут. Оплачивайте с российских и зарубежных карт или со счета организации.',
       perks: ['15 тестовых минут на старте', 'Удобная оплата картой и по счету', 'Доступ из браузера и мобильных устройств'],
-      link: 'https://teamlogs.ru/pricing',
+      link: 'https://YouScriptor.ru/pricing',
       cta: 'Попробовать онлайн',
     },
     {
-      title: 'Teamlogs On-premise',
+      title: 'YouScriptor On-premise',
       description:
         'Полноценная версия сервиса разворачивается на ваших серверах. Данные обрабатываются внутри инфраструктуры компании.',
       perks: ['Развертывание в частной сети', 'Работа без доступа к интернету', 'Персональная поддержка и SLA'],
-      link: 'https://teamlogs.ru/business',
+      link: 'https://YouScriptor.ru/business',
       cta: 'Получить предложение',
     },
   ];
