@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
 
 interface WorkflowStep {
   readonly title: string;
@@ -25,11 +26,13 @@ interface BusinessFeature {
   readonly image: string;
 }
 
+type RouterCommand = string | string[];
+
 interface PricingPlan {
   readonly title: string;
   readonly description: string;
   readonly perks: readonly string[];
-  readonly link: string;
+  readonly link: RouterCommand;
   readonly cta: string;
 }
 
@@ -41,11 +44,14 @@ interface TrustedCompany {
 @Component({
   selector: 'app-about3',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterModule],
   templateUrl: './about3.component.html',
   styleUrls: ['./about3.component.css'],
 })
 export class About3Component {
+  readonly uploadRoute: RouterCommand = '/transcriptions';
+  readonly trialRoute: RouterCommand = '/billing';
+
   readonly trustedCompanies: readonly TrustedCompany[] = [
     {
       src: 'assets/about3/YouScriptor/avito-seeklogocom_12.png',
@@ -202,7 +208,7 @@ export class About3Component {
       description:
         'Попробуйте YouScriptor бесплатно и получите 15 тестовых минут. Оплачивайте с российских и зарубежных карт или со счета организации.',
       perks: ['15 тестовых минут на старте', 'Удобная оплата картой и по счету', 'Доступ из браузера и мобильных устройств'],
-      link: 'https://YouScriptor.ru/pricing',
+      link: this.trialRoute,
       cta: 'Попробовать онлайн',
     },
     {
@@ -210,7 +216,7 @@ export class About3Component {
       description:
         'Полноценная версия сервиса разворачивается на ваших серверах. Данные обрабатываются внутри инфраструктуры компании.',
       perks: ['Развертывание в частной сети', 'Работа без доступа к интернету', 'Персональная поддержка и SLA'],
-      link: 'https://YouScriptor.ru/business',
+      link: '/about',
       cta: 'Получить предложение',
     },
   ];
