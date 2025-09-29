@@ -33,7 +33,6 @@ import { MarkdownRendererService1 } from '../task-result/markdown-renderer.servi
 })
 export class BlogTopicCreateComponent implements OnInit {
   private readonly titleMaxLength = 256;
-  private readonly textMaxLength = 10000;
 
   readonly topicForm: FormGroup;
 
@@ -68,7 +67,7 @@ export class BlogTopicCreateComponent implements OnInit {
   ) {
     this.topicForm = this.fb.group({
       title: ['', [Validators.required, Validators.maxLength(this.titleMaxLength)]],
-      text: ['', [Validators.required, Validators.maxLength(this.textMaxLength)]]
+      text: ['', [Validators.required]]
     });
   }
 
