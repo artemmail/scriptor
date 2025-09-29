@@ -13,8 +13,8 @@
           <li>Удобный редактор с подсветкой важных фрагментов</li>
         </ul>
         <div class="hero-actions">
-          <a class="btn btn-primary" href="https://YouScriptor.ru/upload" target="_blank" rel="noopener">Загрузить файл</a>
-          <a class="btn btn-secondary" href="https://YouScriptor.ru/signup" target="_blank" rel="noopener">Получить 15 минут</a>
+          <a class="btn btn-primary" [routerLink]="uploadRoute">Загрузить файл</a>
+          <a class="btn btn-secondary" [routerLink]="trialRoute">Получить 15 минут</a>
         </div>
       </div>
       <div class="hero-card">
@@ -150,7 +150,7 @@
           <ul>
             <li *ngFor="let perk of plan.perks">{{ perk }}</li>
           </ul>
-          <a class="btn btn-primary" [href]="plan.link" target="_blank" rel="noopener">{{ plan.cta }}</a>
+          <a class="btn btn-primary" [routerLink]="plan.link">{{ plan.cta }}</a>
         </article>
       </div>
     </section>
@@ -163,7 +163,7 @@
             Получите 15 тестовых минут, чтобы протестировать скорость и точность сервиса. Перетащите файл или загрузите его с
             устройства — мы сразу начнём обработку.
           </p>
-          <a class="btn btn-primary" href="https://YouScriptor.ru/upload" target="_blank" rel="noopener">Загрузить файл</a>
+          <a class="btn btn-primary" [routerLink]="uploadRoute">Загрузить файл</a>
         </div>
         <div class="cta-preview">
           <h3>Перетащите файлы сюда</h3>
