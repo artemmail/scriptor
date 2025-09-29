@@ -359,8 +359,14 @@ section {
 
 .advantage-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 24px;
+}
+
+@media (min-width: 768px) {
+  .advantage-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .advantage-card {
