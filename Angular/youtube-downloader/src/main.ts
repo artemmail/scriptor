@@ -35,6 +35,8 @@ import { TranscriptionEditorComponent } from './app/transcription-editor/transcr
 import { BillingComponent } from './app/billing/billing.component';
 import { AboutBusinessComponent } from './app/about-business/about-business.component';
 import { About1Component } from './app/about1/about1.component';
+import { About2Component } from './app/about2/about2.component';
+import { About3Component } from './app/about3/about3.component';
 
 
 
@@ -76,6 +78,17 @@ const routes: Routes = [
     path: 'about1',
     component: About1Component,
   },
+
+  {
+    path: 'about2',
+    component: About2Component,
+  },
+
+    {
+    path: 'about3',
+    component: About3Component,
+  },
+
   {
     path: 'down',
     component: YoutubeDownloaderComponent, // главная страница
