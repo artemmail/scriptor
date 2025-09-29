@@ -34,6 +34,7 @@ import { OpenAiTranscriptionComponent } from './app/openai-transcription/openai-
 import { TranscriptionEditorComponent } from './app/transcription-editor/transcription-editor.component';
 import { BillingComponent } from './app/billing/billing.component';
 import { AboutBusinessComponent } from './app/about-business/about-business.component';
+import { About1Component } from './app/about1/about1.component';
 
 
 
@@ -71,7 +72,10 @@ const routes: Routes = [
     component: AboutBusinessComponent,
   },
 
-
+{
+    path: 'about1',
+    component: About1Component,
+  },
   {
     path: 'down',
     component: YoutubeDownloaderComponent, // главная страница
