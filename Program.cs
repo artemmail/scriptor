@@ -73,12 +73,13 @@ var jwtIssuer = jwtSection["Issuer"]!;
 var jwtAudience = jwtSection["Audience"]!;
 
 // 6. Аутентификация (JWT + Google + Yandex + VK)
-builder.Services.AddAuthentication(o =>
+var authBuilder = builder.Services.AddAuthentication(o =>
 {
     o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(o =>
+});
+
+authBuilder.AddJwtBearer(o =>
 {
     o.RequireHttpsMetadata = false; // Dev only
     o.SaveToken = true;
@@ -92,61 +93,79 @@ builder.Services.AddAuthentication(o =>
         ValidAudience = jwtAudience,
         ClockSkew = TimeSpan.Zero
     };
-})
-.AddGoogle(opts =>
-{
-    opts.ClientId = builder.Configuration["Authentication:Google:ClientId"];
-    opts.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+});
 
-    // Перехватываем ошибку silent-входа и возвращаем корректный HTML с postMessage
-    opts.Events.OnRemoteFailure = ctx =>
+var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
+var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
+{
+    authBuilder.AddGoogle(opts =>
     {
-        var silent = ctx.Request.Query.TryGetValue("silent", out var s) && s == "true";
-        if (silent)
+        opts.ClientId = googleClientId;
+        opts.ClientSecret = googleClientSecret;
+
+        // Перехватываем ошибку silent-входа и возвращаем корректный HTML с postMessage
+        opts.Events.OnRemoteFailure = ctx =>
         {
-            var origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
-            var html = $@"<!doctype html>
+            var silent = ctx.Request.Query.TryGetValue("silent", out var s) && s == "true";
+            if (silent)
+            {
+                var origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+                var html = $@"<!doctype html>
 <html><head><meta charset=""utf-8""></head><body>
 <script>
   window.parent.postMessage(JSON.stringify({{ type:'silent_login', status:'failed' }}), '{origin}');
 </script>
 </body></html>";
-            ctx.Response.ContentType = "text/html; charset=utf-8";
-            ctx.Response.Headers["Cache-Control"] = "no-store";
+                ctx.Response.ContentType = "text/html; charset=utf-8";
+                ctx.Response.Headers["Cache-Control"] = "no-store";
+                ctx.HandleResponse();
+                return ctx.Response.WriteAsync(html);
+            }
+
+            // Для обычного (не-silent) входа — редиректим на callback с ошибкой
+            var redirect = $"/api/account/externallogincallback?remoteError={Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error")}";
+            ctx.Response.Redirect(redirect);
             ctx.HandleResponse();
-            return ctx.Response.WriteAsync(html);
-        }
+            return Task.CompletedTask;
+        };
+    });
+}
 
-        // Для обычного (не-silent) входа — редиректим на callback с ошибкой
-        var redirect = $"/api/account/externallogincallback?remoteError={Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error")}";
-        ctx.Response.Redirect(redirect);
-        ctx.HandleResponse();
-        return Task.CompletedTask;
-    };
-})
-.AddYandex(opts =>
+var yandexClientId = builder.Configuration["Authentication:Yandex:ClientId"];
+var yandexClientSecret = builder.Configuration["Authentication:Yandex:ClientSecret"];
+if (!string.IsNullOrWhiteSpace(yandexClientId) && !string.IsNullOrWhiteSpace(yandexClientSecret))
 {
-    opts.ClientId = builder.Configuration["Authentication:Yandex:ClientId"];
-    opts.ClientSecret = builder.Configuration["Authentication:Yandex:ClientSecret"];
-    opts.Scope.Add("login:email");
-    opts.SaveTokens = true;
-
-    opts.Events.OnRemoteFailure = ctx =>
+    authBuilder.AddYandex(opts =>
     {
-        var redirect = $"/api/account/externallogincallback?remoteError={Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error")}";
-        ctx.Response.Redirect(redirect);
-        ctx.HandleResponse();
-        return Task.CompletedTask;
-    };
-})
-.AddVkontakte(opts =>
+        opts.ClientId = yandexClientId;
+        opts.ClientSecret = yandexClientSecret;
+        opts.Scope.Add("login:email");
+        opts.SaveTokens = true;
+
+        opts.Events.OnRemoteFailure = ctx =>
+        {
+            var redirect = $"/api/account/externallogincallback?remoteError={Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error")}";
+            ctx.Response.Redirect(redirect);
+            ctx.HandleResponse();
+            return Task.CompletedTask;
+        };
+    });
+}
+
+var vkClientId = builder.Configuration["Authentication:Vkontakte:ClientId"];
+var vkClientSecret = builder.Configuration["Authentication:Vkontakte:ClientSecret"];
+if (!string.IsNullOrWhiteSpace(vkClientId) && !string.IsNullOrWhiteSpace(vkClientSecret))
 {
-    opts.ClientId = builder.Configuration["Authentication:Vkontakte:ClientId"];
-    opts.ClientSecret = builder.Configuration["Authentication:Vkontakte:ClientSecret"];
-    opts.Scope.Add("email");
-    opts.Fields.Add("photo_100");
-    opts.SaveTokens = true;
-});
+    authBuilder.AddVkontakte(opts =>
+    {
+        opts.ClientId = vkClientId;
+        opts.ClientSecret = vkClientSecret;
+        opts.Scope.Add("email");
+        opts.Fields.Add("photo_100");
+        opts.SaveTokens = true;
+    });
+}
 
 
 
