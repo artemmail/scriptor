@@ -138,18 +138,43 @@ def _transcribe(payload: dict) -> Dict[str, object]:
     compute_type = payload.get("computeType") or "int8"
     language = payload.get("language")
     temperature_literal = payload.get("temperature") or "0.0"
-    compression_literal = payload.get("compressionRatioThreshold") or "2.4"
+    compression_literal = payload.get("compressionRatioThreshold") or "2.2"
     log_prob_literal = payload.get("logProbThreshold") or "-1.0"
-    no_speech_literal = payload.get("noSpeechThreshold") or "0.6"
-    condition_literal = payload.get("conditionOnPreviousText") or "True"
+    no_speech_literal = payload.get("noSpeechThreshold") or "0.35"
+    condition_literal = payload.get("conditionOnPreviousText")
+    repetition_penalty_literal = payload.get("repetitionPenalty") or "1.1"
+    no_repeat_ngram_literal = payload.get("noRepeatNgramSize") or "3"
+    length_penalty_literal = payload.get("lengthPenalty") or "1.0"
+    patience_literal = payload.get("patience") or "1.0"
+    hallucination_silence_literal = payload.get("hallucinationSilenceThreshold") or "0.5"
 
     model_instance = _ensure_model(model_name, device, compute_type)
 
     temperature = _parse_temperatures(temperature_literal)
-    compression_ratio_threshold = _parse_float(compression_literal, default=2.4)
+    compression_ratio_threshold = _parse_float(compression_literal, default=2.2)
     log_prob_threshold = _parse_float(log_prob_literal, default=-1.0)
-    no_speech_threshold = _parse_float(no_speech_literal, default=0.6)
+    no_speech_threshold = _parse_float(no_speech_literal, default=0.35)
     condition_on_previous_text = _parse_bool(condition_literal)
+    repetition_penalty = _parse_float(repetition_penalty_literal, default=1.1)
+    length_penalty = _parse_float(length_penalty_literal, default=1.0)
+    patience = _parse_float(patience_literal, default=1.0)
+    hallucination_silence_threshold = _parse_float(
+        hallucination_silence_literal, default=0.5
+    )
+    try:
+        no_repeat_ngram_size = int(float(no_repeat_ngram_literal))
+    except Exception:
+        no_repeat_ngram_size = 3
+    if no_repeat_ngram_size < 0:
+        no_repeat_ngram_size = 0
+
+    language_option = None
+    if language:
+        normalized_language = str(language).strip().lower()
+        if normalized_language not in {"auto", "automatic"}:
+            language_option = language
+    else:
+        language_option = "ru"
 
     LOGGER.info(
         "Starting transcription audio=%s model=%s device=%s compute_type=%s",
@@ -162,15 +187,26 @@ def _transcribe(payload: dict) -> Dict[str, object]:
     start_time = time.monotonic()
     segments, info = model_instance.transcribe(
         str(audio_path),
-        language=language if language and str(language).lower() != "auto" else None,
+        language=language_option,
         word_timestamps=True,
-        vad_filter=False,
+        vad_filter=True,
+        vad_parameters={
+            "threshold": 0.4,
+            "min_speech_duration_ms": 250,
+            "min_silence_duration_ms": 500,
+            "speech_pad_ms": 150,
+        },
         beam_size=5,
+        repetition_penalty=repetition_penalty,
+        no_repeat_ngram_size=no_repeat_ngram_size,
+        length_penalty=length_penalty,
+        patience=patience,
         temperature=temperature,
         compression_ratio_threshold=compression_ratio_threshold,
         log_prob_threshold=log_prob_threshold,
         no_speech_threshold=no_speech_threshold,
         condition_on_previous_text=condition_on_previous_text,
+        hallucination_silence_threshold=hallucination_silence_threshold,
         without_timestamps=False,
     )
 
