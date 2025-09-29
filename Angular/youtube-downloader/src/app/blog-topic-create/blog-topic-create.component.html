@@ -37,7 +37,7 @@
         <div class="editor-section" [class.invalid]="topicForm.controls['text'].invalid && topicForm.controls['text'].touched">
           <div class="editor-header">
             <label for="topic-text">Текст</label>
-            <span class="char-counter">{{ textLength }}/10000</span>
+            <span class="char-counter">{{ textLength }}</span>
           </div>
           <md-editor
             id="topic-text"
