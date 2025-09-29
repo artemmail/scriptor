@@ -8,6 +8,7 @@ import { AuthGuard } from './services/auth.guard';
 import { AboutBusinessComponent } from './about-business/about-business.component';
 import { About1Component } from './about1/about1.component';
 import { About2Component } from './about2/about2.component';
+import { About3Component } from './about3/about3.component';
 
 const routes: Routes = [
   { path: '', redirectTo: 'youtube-downloader', pathMatch: 'full' },
@@ -18,6 +19,7 @@ const routes: Routes = [
   { path: 'about', component: AboutBusinessComponent },
   { path: 'about1', component: About1Component },
   { path: 'about2', component: About2Component },
+  { path: 'about3', component: About3Component },
 ];
 
 @NgModule({
