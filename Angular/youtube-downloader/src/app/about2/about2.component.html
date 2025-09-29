@@ -1,0 +1,125 @@
+<div class="teamlogs-page">
+  <section class="hero">
+    <div class="hero__content">
+      <p class="hero__badge">Teamlogs</p>
+      <h1>Цифровой протокол для каждой командной встречи</h1>
+      <p class="hero__lead">
+        Teamlogs автоматически фиксирует разговоры, собирает решения и превращает договорённости в понятный план действий. Все
+        участники команды получают итоги сразу после созвона.
+      </p>
+      <div class="hero__actions">
+        <button class="btn btn--primary">Запросить демо</button>
+        <button class="btn btn--ghost">Смотреть пример отчёта</button>
+      </div>
+      <ul class="hero__metrics">
+        <li *ngFor="let metric of metrics">
+          <span class="metric__value">{{ metric.value }}</span>
+          <span class="metric__label">{{ metric.label }}</span>
+        </li>
+      </ul>
+    </div>
+    <div class="hero__preview">
+      <div class="preview-card">
+        <header class="preview-card__header">
+          <span class="preview-card__title">Созвон с командой продукта</span>
+          <span class="preview-card__tag">AI-протокол</span>
+        </header>
+        <div class="preview-card__body">
+          <article>
+            <h3>Результаты встречи</h3>
+            <ul>
+              <li>📝 Решения: перенос релиза на 18 марта, запуск доп. тестирования.</li>
+              <li>✅ Ответственные: продуктовый менеджер, тимлид разработки.</li>
+              <li>📌 Следующие шаги: обновить роадмап, подготовить коммуникацию для клиентов.</li>
+            </ul>
+          </article>
+          <article>
+            <h3>Контекст</h3>
+            <p>Таймкоды и тезисы собраны автоматически — достаточно перейти к нужному моменту и продолжить работу.</p>
+          </article>
+        </div>
+        <footer class="preview-card__footer">
+          Экспорт в PDF · Word · Notion
+        </footer>
+      </div>
+    </div>
+  </section>
+
+  <section class="features">
+    <div class="section-header">
+      <h2>Ключевые возможности Teamlogs</h2>
+      <p>Платформа сочетает в себе распознавание речи, структурирование контента и удобные сценарии совместной работы.</p>
+    </div>
+    <div class="features__grid">
+      <article class="feature" *ngFor="let feature of features">
+        <h3>{{ feature.title }}</h3>
+        <p>{{ feature.description }}</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="process">
+    <div class="section-header section-header--center">
+      <h2>Как Teamlogs помогает пройти путь от встречи к действиям</h2>
+      <p>Несколько шагов — и у вашей команды появляется готовый протокол с задачами, контекстом и ответственными.</p>
+    </div>
+    <ol class="process__steps">
+      <li *ngFor="let step of process; let index = index">
+        <div class="step__index">{{ index + 1 }}</div>
+        <div class="step__content">
+          <h3>{{ step.title }}</h3>
+          <p>{{ step.description }}</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="use-cases">
+    <div class="section-header">
+      <h2>Сценарии использования для разных подразделений</h2>
+      <p>Teamlogs одинаково полезен руководителям, клиентским командам и внутренним сервисам.</p>
+    </div>
+    <div class="use-cases__grid">
+      <article class="use-case" *ngFor="let useCase of useCases">
+        <h3>{{ useCase.title }}</h3>
+        <ul>
+          <li *ngFor="let bullet of useCase.bullets">{{ bullet }}</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="integrations">
+    <div class="section-header section-header--center">
+      <h2>Интеграции и автоматизация</h2>
+      <p>Подключайте Teamlogs к экосистеме компании и сокращайте время от договорённости до выполнения.</p>
+    </div>
+    <div class="integrations__list">
+      <article class="integration" *ngFor="let integration of integrations">
+        <h3>{{ integration.name }}</h3>
+        <p>{{ integration.description }}</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="cta__content">
+      <h2>Готовы подключить Teamlogs к своей команде?</h2>
+      <p>Оставьте заявку — мы подготовим пилот, настроим интеграции и покажем, как экономить часы рутинной работы.</p>
+    </div>
+    <button class="btn btn--primary btn--large">Получить консультацию</button>
+  </section>
+
+  <section class="faq">
+    <div class="section-header section-header--center">
+      <h2>Частые вопросы</h2>
+      <p>Ответы помогут понять, как Teamlogs впишется в процессы вашей компании.</p>
+    </div>
+    <div class="faq__list">
+      <article class="faq__item" *ngFor="let item of faq">
+        <h3>{{ item.question }}</h3>
+        <p>{{ item.answer }}</p>
+      </article>
+    </div>
+  </section>
+</div>
