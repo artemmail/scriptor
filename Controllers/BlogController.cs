@@ -343,7 +343,7 @@ namespace YandexSpeech.Controllers
             public string Title { get; set; } = string.Empty;
 
             [Required]
-            [StringLength(10000)]
+           // [StringLength(10000)]
             public string Text { get; set; } = string.Empty;
         }
 
@@ -354,7 +354,7 @@ namespace YandexSpeech.Controllers
             public string Title { get; set; } = string.Empty;
 
             [Required]
-            [StringLength(10000)]
+           // [StringLength(10000)]
             public string Text { get; set; } = string.Empty;
         }
 
