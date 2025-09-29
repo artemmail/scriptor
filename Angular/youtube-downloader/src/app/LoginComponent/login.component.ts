@@ -11,11 +11,19 @@ import { AuthService } from '../services/AuthService.service';
     <div class="login d-flex flex-column align-items-center mt-5">
       <h2>Login</h2>
 
-      <button
-        class="btn btn-primary mt-3"
-        (click)="loginInteractive()">
-        Login with a Google ID
-      </button>
+      <div class="d-flex flex-column gap-2 mt-3 w-100" style="max-width: 320px;">
+        <button
+          class="btn btn-primary"
+          (click)="loginWithGoogle()">
+          Login with a Google ID
+        </button>
+
+        <button
+          class="btn btn-outline-secondary"
+          (click)="loginWithYandex()">
+          Login with a Yandex ID
+        </button>
+      </div>
 
       <!-- Сообщение об ошибке из callback -->
       <p *ngIf="authError" class="text-danger mt-2 text-center w-75">
@@ -42,7 +50,7 @@ export class LoginComponent implements OnInit {
       if (error) {
         this.authError = true;
         if (error === 'interaction_required') {
-          this.authErrorMessage = 'Для входа требуется взаимодействие. Пожалуйста, войдите в аккаунт Google и попробуйте снова.';
+          this.authErrorMessage = 'Для входа требуется взаимодействие. Пожалуйста, войдите в аккаунт выбранного провайдера и попробуйте снова.';
         } else {
           this.authErrorMessage = `Ошибка авторизации: ${error}. Попробуйте войти вручную.`;
         }
@@ -51,8 +59,16 @@ export class LoginComponent implements OnInit {
   }
 
   /** интерактивный вход по кнопке */
-  loginInteractive(): void {
+  loginWithGoogle(): void {
+    this.redirectToProvider('google');
+  }
+
+  loginWithYandex(): void {
+    this.redirectToProvider('yandex');
+  }
+
+  private redirectToProvider(provider: 'google' | 'yandex'): void {
     const redirect = encodeURIComponent(`${window.location.origin}/auth/callback`);
-    window.location.href = `/api/account/signin-google?returnUrl=${redirect}`;
+    window.location.href = `/api/account/signin-${provider}?returnUrl=${redirect}`;
   }
 }
