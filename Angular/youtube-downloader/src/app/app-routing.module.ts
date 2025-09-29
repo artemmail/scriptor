@@ -5,6 +5,7 @@ import { RecognitionTasksComponent } from './recognition-tasks/recognition-tasks
 import { OpenAiTranscriptionComponent } from './openai-transcription/openai-transcription.component';
 import { BillingComponent } from './billing/billing.component';
 import { AuthGuard } from './services/auth.guard';
+import { AboutBusinessComponent } from './about-business/about-business.component';
 
 const routes: Routes = [
   { path: '', redirectTo: 'youtube-downloader', pathMatch: 'full' },
@@ -12,6 +13,7 @@ const routes: Routes = [
   { path: 'recognition-tasks', component: RecognitionTasksComponent },
   { path: 'transcriptions', component: OpenAiTranscriptionComponent },
   { path: 'billing', component: BillingComponent, canActivate: [AuthGuard] },
+  { path: 'about', component: AboutBusinessComponent },
 ];
 
 @NgModule({

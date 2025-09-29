@@ -1,0 +1,109 @@
+<div class="about-page">
+  <section class="hero">
+    <div class="hero__badge">Teamlogs для бизнеса</div>
+    <h1>Вся деловая коммуникация компании в одном дэшборде</h1>
+    <p class="hero__subtitle">
+      Мы превращаем часовые встречи в готовые протоколы, планы и отчёты. Команды<br />получают общий контекст без бесконечных переписок.
+    </p>
+    <div class="hero__cta">
+      <button class="btn btn--primary">Запросить демо</button>
+      <button class="btn btn--ghost">Посмотреть пример отчёта</button>
+    </div>
+    <div class="hero__highlights">
+      <div class="highlight" *ngFor="let highlight of highlights">
+        <div class="highlight__value">{{ highlight.value }}</div>
+        <div class="highlight__label">{{ highlight.label }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="features">
+    <h2>Почему команды выбирают Teamlogs</h2>
+    <div class="features__grid">
+      <article class="feature" *ngFor="let feature of features">
+        <h3>{{ feature.title }}</h3>
+        <p>{{ feature.description }}</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="workflow">
+    <div class="workflow__content">
+      <h2>Как работает бизнес-версия</h2>
+      <ol>
+        <li *ngFor="let step of steps">
+          <h3>{{ step.title }}</h3>
+          <p>{{ step.description }}</p>
+        </li>
+      </ol>
+    </div>
+    <div class="workflow__card">
+      <h3>Интеграции из коробки</h3>
+      <ul>
+        <li>Zoom, Google Meet, Microsoft Teams</li>
+        <li>Bitrix24, amoCRM, Notion, Confluence</li>
+        <li>Slack, Microsoft Teams, Telegram</li>
+        <li>Корпоративная почта и вебхуки</li>
+      </ul>
+      <p class="workflow__note">Поддерживаем единый вход (SSO), разграничение прав и аудит действий.</p>
+    </div>
+  </section>
+
+  <section class="cases">
+    <h2>Кейсы клиентов</h2>
+    <div class="cases__list">
+      <article class="case" *ngFor="let item of caseStudies">
+        <h3>{{ item.company }}</h3>
+        <p class="case__result">{{ item.result }}</p>
+        <p>{{ item.details }}</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="pricing">
+    <div class="pricing__header">
+      <h2>Тарифы для отделов и корпораций</h2>
+      <p>Стоимость рассчитывается по числу активных участников и объёму часов распознавания. Минимальная подписка — от 20 рабочих мест.</p>
+    </div>
+    <div class="pricing__cards">
+      <article class="pricing-card">
+        <h3>Командный</h3>
+        <p class="pricing-card__price">от 29 000 ₽ в месяц</p>
+        <ul>
+          <li>до 30 участников</li>
+          <li>500 часов распознавания</li>
+          <li>Совместное редактирование протоколов</li>
+          <li>Интеграции с мессенджерами и CRM</li>
+        </ul>
+      </article>
+      <article class="pricing-card">
+        <h3>Корпоративный</h3>
+        <p class="pricing-card__price">индивидуальный расчёт</p>
+        <ul>
+          <li>безлимитные участники</li>
+          <li>выделенная инфраструктура</li>
+          <li>SSO, аудит, кастомные политики хранения</li>
+          <li>Менеджер успеха и приоритетная поддержка</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="faq">
+    <h2>Частые вопросы</h2>
+    <div class="faq__list">
+      <article class="faq__item" *ngFor="let faq of faqs">
+        <h3>{{ faq.question }}</h3>
+        <p>{{ faq.answer }}</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="cta__content">
+      <h2>Готовы увидеть Teamlogs в действии?</h2>
+      <p>Оставьте заявку, и наш менеджер подберёт сценарий под задачи вашей команды.</p>
+    </div>
+    <button class="btn btn--primary btn--large">Получить консультацию</button>
+  </section>
+</div>
