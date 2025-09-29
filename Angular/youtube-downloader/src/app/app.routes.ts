@@ -7,6 +7,7 @@ import { OpenAiTranscriptionComponent } from './openai-transcription/openai-tran
 import { BillingComponent } from './billing/billing.component';
 import { AuthGuard } from './services/auth.guard';
 import { AboutBusinessComponent } from './about-business/about-business.component';
+import { About1Component } from './about1/about1.component';
 
 export const appRoutes: Routes = [
   { path: '', redirectTo: 'youtube-downloader', pathMatch: 'full' },
@@ -16,5 +17,6 @@ export const appRoutes: Routes = [
   { path: 'markdown-converter', component: MarkdownConverterComponent },
   { path: 'billing', component: BillingComponent, canActivate: [AuthGuard] },
   { path: 'about', component: AboutBusinessComponent },
+  { path: 'about1', component: About1Component },
 
 ];
