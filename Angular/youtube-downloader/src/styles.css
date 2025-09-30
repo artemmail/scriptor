@@ -6,7 +6,7 @@ body {
   margin: 0;
   font-family: Roboto, "Helvetica Neue", sans-serif;
   min-height: 100vh;
-  background: #E9E9E9;
+  background: #f5f4ef;
 }
 
 /* Если нужно, можно убрать или откорректировать стили для контейнеров Angular Material */
