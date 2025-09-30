@@ -4,63 +4,57 @@
   gap: 16px;
 }
 
-.filter-card {
-  padding: 16px;
+.table-card {
+  width: 100%;
+}
+
+.card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .filter-field {
   width: 100%;
 }
 
-.users-container {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: calc(100vh - 200px);
-  overflow-y: auto;
-  padding-right: 8px;
+.users-table {
+  width: 100%;
 }
 
-.user-card {
+.users-table th.mat-header-cell {
+  font-weight: 600;
+}
+
+.clickable-row {
   cursor: pointer;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
-.user-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
+.clickable-row:hover {
+  background-color: rgba(0, 0, 0, 0.04);
 }
 
-.user-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+.clickable-cell {
+  cursor: pointer;
 }
 
-.user-email {
+.email-wrapper {
   font-weight: 600;
-  word-break: break-all;
+  word-break: break-word;
 }
 
-.user-count {
-  display: flex;
+.videos-count {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   font-weight: 600;
 }
 
-.user-meta {
-  color: rgba(0, 0, 0, 0.6);
-  margin-bottom: 8px;
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
-}
-
-.user-roles mat-chip-set {
-  display: block;
+.roles-cell mat-chip-set {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .loader {

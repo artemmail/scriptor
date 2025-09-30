@@ -1,60 +1,87 @@
 <div class="admin-users">
-  <mat-card class="filter-card">
-    <mat-form-field appearance="outline" class="filter-field">
-      <mat-label>Поиск по email</mat-label>
-      <input
-        matInput
-        type="search"
-        placeholder="Введите email..."
-        (input)="applyFilter($event)"
-        [value]="filterValue"
-      />
-      <button
-        mat-icon-button
-        matSuffix
-        *ngIf="filterValue"
-        (click)="clearFilter()"
-        aria-label="Очистить фильтр"
-      >
-        <mat-icon>close</mat-icon>
-      </button>
-    </mat-form-field>
+  <mat-card class="table-card">
+    <mat-card-header>
+      <mat-card-title>Пользователи</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content
+      class="card-content"
+      infiniteScroll
+      [scrollWindow]="true"
+      [infiniteScrollDistance]="1"
+      [infiniteScrollThrottle]="200"
+      (scrolled)="onScrollDown()"
+    >
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Поиск по email</mat-label>
+        <input
+          matInput
+          type="search"
+          placeholder="Введите email..."
+          (input)="applyFilter($event)"
+          [value]="filterValue"
+        />
+        <button
+          mat-icon-button
+          matSuffix
+          *ngIf="filterValue"
+          (click)="clearFilter()"
+          aria-label="Очистить фильтр"
+        >
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
+
+      <table mat-table [dataSource]="users" class="users-table" *ngIf="users.length; else emptyState">
+        <ng-container matColumnDef="email">
+          <th mat-header-cell *matHeaderCellDef>Email</th>
+          <td mat-cell *matCellDef="let user" class="clickable-cell">
+            <div class="email-wrapper" [title]="user.email">{{ user.email }}</div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="registeredAt">
+          <th mat-header-cell *matHeaderCellDef>Дата регистрации</th>
+          <td mat-cell *matCellDef="let user" class="clickable-cell">
+            {{ user.registeredAt | date: 'medium' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="recognizedVideos">
+          <th mat-header-cell *matHeaderCellDef>Распознанные видео</th>
+          <td mat-cell *matCellDef="let user" class="clickable-cell">
+            <div class="videos-count">
+              <mat-icon color="primary">movie</mat-icon>
+              <span>{{ user.recognizedVideos }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="roles">
+          <th mat-header-cell *matHeaderCellDef>Роли</th>
+          <td mat-cell *matCellDef="let user" class="clickable-cell roles-cell">
+            <ng-container *ngIf="user.roles?.length; else noRoles">
+              <mat-chip-set>
+                <mat-chip *ngFor="let role of user.roles">{{ role }}</mat-chip>
+              </mat-chip-set>
+            </ng-container>
+            <ng-template #noRoles>—</ng-template>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns" class="clickable-row" (click)="openUserDialog(row)"></tr>
+      </table>
+
+      <div class="loader" *ngIf="loading">
+        <mat-progress-spinner diameter="36" mode="indeterminate"></mat-progress-spinner>
+      </div>
+    </mat-card-content>
   </mat-card>
-
-  <div
-    class="users-container"
-    infiniteScroll
-    [infiniteScrollDistance]="1"
-    [infiniteScrollThrottle]="200"
-    (scrolled)="onScrollDown()"
-  >
-    <ng-container *ngFor="let user of users; trackBy: trackByUserId">
-      <mat-card class="user-card" (click)="openUserDialog(user)" [attr.data-user-id]="user.id">
-        <div class="user-header">
-          <div class="user-email" title="{{ user.email }}">{{ user.email }}</div>
-          <div class="user-count" title="Распознанных видео">
-            <mat-icon color="primary">movie</mat-icon>
-            <span>{{ user.recognizedVideos }}</span>
-          </div>
-        </div>
-        <div class="user-meta">
-          <span>Дата регистрации:</span>
-          <strong>{{ user.registeredAt | date: 'medium' }}</strong>
-        </div>
-        <div class="user-roles" *ngIf="user.roles?.length">
-          <mat-chip-set>
-            <mat-chip *ngFor="let role of user.roles">{{ role }}</mat-chip>
-          </mat-chip-set>
-        </div>
-      </mat-card>
-    </ng-container>
-
-    <div class="loader" *ngIf="loading">
-      <mat-progress-spinner diameter="36" mode="indeterminate"></mat-progress-spinner>
-    </div>
-
-    <div class="empty-state" *ngIf="!loading && !users.length">
-      <p>Пользователи не найдены.</p>
-    </div>
-  </div>
 </div>
+
+<ng-template #emptyState>
+  <div class="empty-state" *ngIf="!loading">
+    <p>Пользователи не найдены.</p>
+  </div>
+</ng-template>
