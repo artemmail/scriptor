@@ -752,7 +752,7 @@ namespace YandexSpeech.Controllers
             }
 
             var fileName = $"{baseName}.{extension}";
-            var sanitized = SanitizeFileName(fileName);
+            var sanitized = OpenAiTranscriptionFileHelper.SanitizeFileName(fileName);
             if (!sanitized.EndsWith($".{extension}", StringComparison.OrdinalIgnoreCase))
             {
                 sanitized = $"{sanitized}.{extension}";
