@@ -5,6 +5,7 @@ export interface AdminUserListItem {
   recognizedVideos: number;
   registeredAt: string;
   roles: string[];
+  youtubeCaptionIps: string[];
 }
 
 export interface AdminUsersPage {
