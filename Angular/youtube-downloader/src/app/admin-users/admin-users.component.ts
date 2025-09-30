@@ -9,6 +9,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { InfiniteScrollModule } from 'ngx-infinite-scroll';
+import { MatTableModule } from '@angular/material/table';
 import { AdminUsersService } from '../services/admin-users.service';
 import { AdminUserListItem } from '../models/admin-user.model';
 import { AdminUserRoleDialogComponent } from './admin-user-role-dialog.component';
@@ -29,7 +30,8 @@ import { AdminUserRoleDialogComponent } from './admin-user-role-dialog.component
     MatChipsModule,
     MatButtonModule,
     MatDialogModule,
-    InfiniteScrollModule
+    InfiniteScrollModule,
+    MatTableModule
   ]
 })
 export class AdminUsersComponent implements OnInit {
@@ -40,6 +42,7 @@ export class AdminUsersComponent implements OnInit {
   filterValue = '';
   loading = false;
   availableRoles: string[] = [];
+  displayedColumns: string[] = ['email', 'registeredAt', 'recognizedVideos', 'roles'];
 
   constructor(
     private readonly adminUsersService: AdminUsersService,
@@ -104,10 +107,6 @@ export class AdminUsersComponent implements OnInit {
         }
       });
     });
-  }
-
-  trackByUserId(_: number, item: AdminUserListItem): string {
-    return item.id;
   }
 
   private loadUsers(append = false): void {
