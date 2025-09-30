@@ -167,6 +167,11 @@ namespace YandexSpeech.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
                     b.Property<Guid?>("CurrentSubscriptionId")
                         .HasColumnType("uniqueidentifier");
 
@@ -523,6 +528,9 @@ namespace YandexSpeech.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("Clarification")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("ConvertedFilePath")
                         .HasColumnType("nvarchar(max)");
 
@@ -540,9 +548,6 @@ namespace YandexSpeech.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("MarkdownText")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Clarification")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("ModifiedAt")
