@@ -12,6 +12,11 @@ namespace YandexSpeech.models.DB
         public string DisplayName { get; set; } = string.Empty;
 
         /// <summary>
+        /// Дата и время регистрации пользователя (UTC).
+        /// </summary>
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
         /// Текущая активная подписка пользователя (если есть).
         /// </summary>
         public Guid? CurrentSubscriptionId { get; set; }

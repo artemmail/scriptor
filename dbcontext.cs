@@ -160,6 +160,10 @@ namespace YandexSpeech
                 .WithMany()
                 .HasForeignKey(u => u.CurrentSubscriptionId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<ApplicationUser>()
+                .Property(u => u.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
         }
 
     }

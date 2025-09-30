@@ -10,6 +10,8 @@ import { AboutBusinessComponent } from './about-business/about-business.componen
 import { About1Component } from './about1/about1.component';
 import { About2Component } from './about2/about2.component';
 import { About3Component } from './about3/about3.component';
+import { RoleGuard } from './services/role.guard';
+import { AdminUsersComponent } from './admin-users/admin-users.component';
 
 export const appRoutes: Routes = [
   { path: '', redirectTo: 'youtube-downloader', pathMatch: 'full' },
@@ -18,6 +20,12 @@ export const appRoutes: Routes = [
   { path: 'transcriptions', component: OpenAiTranscriptionComponent },
   { path: 'markdown-converter', component: MarkdownConverterComponent },
   { path: 'billing', component: BillingComponent, canActivate: [AuthGuard] },
+  {
+    path: 'admin/users',
+    component: AdminUsersComponent,
+    canActivate: [RoleGuard],
+    data: { roles: ['Admin'] }
+  },
   { path: 'about', component: AboutBusinessComponent },
   { path: 'about1', component: About1Component },
   { path: 'about2', component: About2Component },
