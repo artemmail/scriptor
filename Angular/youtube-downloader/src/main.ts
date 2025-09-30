@@ -37,6 +37,7 @@ import { AboutBusinessComponent } from './app/about-business/about-business.comp
 import { About1Component } from './app/about1/about1.component';
 import { About2Component } from './app/about2/about2.component';
 import { About3Component } from './app/about3/about3.component';
+import { AdminUsersComponent } from './app/admin-users/admin-users.component';
 
 
 
@@ -149,6 +150,12 @@ const routes: Routes = [
     path: 'billing',
     component: BillingComponent,
     canActivate: [AuthGuard]
+  },
+  {
+    path: 'admin/users',
+    component: AdminUsersComponent,
+    canActivate: [RoleGuard],
+    data: { roles: ['Admin'] }
   },
   {
     path: 'profile',

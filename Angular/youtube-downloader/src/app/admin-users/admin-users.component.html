@@ -1,0 +1,60 @@
+<div class="admin-users">
+  <mat-card class="filter-card">
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Поиск по email</mat-label>
+      <input
+        matInput
+        type="search"
+        placeholder="Введите email..."
+        (input)="applyFilter($event)"
+        [value]="filterValue"
+      />
+      <button
+        mat-icon-button
+        matSuffix
+        *ngIf="filterValue"
+        (click)="clearFilter()"
+        aria-label="Очистить фильтр"
+      >
+        <mat-icon>close</mat-icon>
+      </button>
+    </mat-form-field>
+  </mat-card>
+
+  <div
+    class="users-container"
+    infiniteScroll
+    [infiniteScrollDistance]="1"
+    [infiniteScrollThrottle]="200"
+    (scrolled)="onScrollDown()"
+  >
+    <ng-container *ngFor="let user of users; trackBy: trackByUserId">
+      <mat-card class="user-card" (click)="openUserDialog(user)" [attr.data-user-id]="user.id">
+        <div class="user-header">
+          <div class="user-email" title="{{ user.email }}">{{ user.email }}</div>
+          <div class="user-count" title="Распознанных видео">
+            <mat-icon color="primary">movie</mat-icon>
+            <span>{{ user.recognizedVideos }}</span>
+          </div>
+        </div>
+        <div class="user-meta">
+          <span>Дата регистрации:</span>
+          <strong>{{ user.registeredAt | date: 'medium' }}</strong>
+        </div>
+        <div class="user-roles" *ngIf="user.roles?.length">
+          <mat-chip-set>
+            <mat-chip *ngFor="let role of user.roles">{{ role }}</mat-chip>
+          </mat-chip-set>
+        </div>
+      </mat-card>
+    </ng-container>
+
+    <div class="loader" *ngIf="loading">
+      <mat-progress-spinner diameter="36" mode="indeterminate"></mat-progress-spinner>
+    </div>
+
+    <div class="empty-state" *ngIf="!loading && !users.length">
+      <p>Пользователи не найдены.</p>
+    </div>
+  </div>
+</div>
