@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -28,18 +29,24 @@ namespace YandexSpeech.services
         private readonly IPunctuationService _punctuationService;
         private const int FormattingMaxAttempts = 5;
         private static readonly TimeSpan FormattingRetryDelay = TimeSpan.FromSeconds(5);
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IYandexDiskDownloadService _yandexDiskDownloadService;
 
         public OpenAiTranscriptionService(
             MyDbContext dbContext,
             IConfiguration configuration,
             ILogger<OpenAiTranscriptionService> logger,
             IPunctuationService punctuationService,
-            IWhisperTranscriptionService whisperTranscriptionService)
+            IWhisperTranscriptionService whisperTranscriptionService,
+            IHttpClientFactory httpClientFactory,
+            IYandexDiskDownloadService yandexDiskDownloadService)
         {
             _dbContext = dbContext;
             _logger = logger;
             _punctuationService = punctuationService;
             _whisperTranscriptionService = whisperTranscriptionService;
+            _httpClientFactory = httpClientFactory;
+            _yandexDiskDownloadService = yandexDiskDownloadService;
             _ffmpegPath = configuration.GetValue<string>("FfmpegExePath")
                            ?? throw new InvalidOperationException("FfmpegExePath is not configured.");
             _openAiApiKey = configuration["OpenAI:ApiKey"]
@@ -51,12 +58,13 @@ namespace YandexSpeech.services
         public async Task<OpenAiTranscriptionTask> StartTranscriptionAsync(
             string sourceFilePath,
             string createdBy,
-            string? clarification = null)
+            string? clarification = null,
+            string? sourceFileUrl = null)
         {
             if (string.IsNullOrWhiteSpace(sourceFilePath))
                 throw new ArgumentException("Source file path must be provided.", nameof(sourceFilePath));
 
-            if (!File.Exists(sourceFilePath))
+            if (string.IsNullOrWhiteSpace(sourceFileUrl) && !File.Exists(sourceFilePath))
                 throw new FileNotFoundException("Source file not found.", sourceFilePath);
 
             if (string.IsNullOrWhiteSpace(createdBy))
@@ -65,11 +73,14 @@ namespace YandexSpeech.services
             var task = new OpenAiTranscriptionTask
             {
                 SourceFilePath = sourceFilePath,
+                SourceFileUrl = sourceFileUrl,
                 CreatedBy = createdBy,
                 Clarification = string.IsNullOrWhiteSpace(clarification)
                     ? null
                     : clarification.Trim(),
-                Status = OpenAiTranscriptionStatus.Created,
+                Status = string.IsNullOrWhiteSpace(sourceFileUrl)
+                    ? OpenAiTranscriptionStatus.Created
+                    : OpenAiTranscriptionStatus.Downloading,
                 Done = false,
                 CreatedAt = DateTime.UtcNow,
                 ModifiedAt = DateTime.UtcNow
@@ -108,6 +119,7 @@ namespace YandexSpeech.services
 
             var activeStatuses = new HashSet<OpenAiTranscriptionStatus>
             {
+                OpenAiTranscriptionStatus.Downloading,
                 OpenAiTranscriptionStatus.Created,
                 OpenAiTranscriptionStatus.Converting,
                 OpenAiTranscriptionStatus.Transcribing,
@@ -129,6 +141,9 @@ namespace YandexSpeech.services
 
                     switch (task.Status)
                     {
+                        case OpenAiTranscriptionStatus.Downloading:
+                            await RunDownloadStepAsync(task);
+                            break;
                         case OpenAiTranscriptionStatus.Created:
                         case OpenAiTranscriptionStatus.Converting:
                             await RunConversionStepAsync(task);
@@ -171,6 +186,86 @@ namespace YandexSpeech.services
             }
 
             return task;
+        }
+
+        private async Task RunDownloadStepAsync(OpenAiTranscriptionTask task)
+        {
+            if (string.IsNullOrWhiteSpace(task.SourceFileUrl))
+                throw new InvalidOperationException("Source file URL is not specified for the download step.");
+
+            task.Status = OpenAiTranscriptionStatus.Downloading;
+            task.ModifiedAt = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
+
+            var step = await StartStepAsync(task, OpenAiTranscriptionStatus.Downloading);
+
+            try
+            {
+                await DownloadSourceFileAsync(task);
+
+                task.Status = OpenAiTranscriptionStatus.Created;
+                task.ModifiedAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync();
+
+                await CompleteStepAsync(step);
+            }
+            catch (Exception ex)
+            {
+                await FailStepAsync(step, ex.Message);
+                throw;
+            }
+        }
+
+        private async Task DownloadSourceFileAsync(OpenAiTranscriptionTask task)
+        {
+            if (string.IsNullOrWhiteSpace(task.SourceFileUrl))
+                throw new InvalidOperationException("Source file URL is missing.");
+
+            var targetPath = task.SourceFilePath;
+            if (string.IsNullOrWhiteSpace(targetPath))
+                throw new InvalidOperationException("Target file path is not specified.");
+
+            var directory = Path.GetDirectoryName(targetPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            if (File.Exists(targetPath))
+            {
+                return;
+            }
+
+            var uri = new Uri(task.SourceFileUrl);
+
+            if (_yandexDiskDownloadService.IsYandexDiskUrl(uri))
+            {
+                await using var downloadResult = await _yandexDiskDownloadService.DownloadAsync(uri);
+                if (!downloadResult.Success || downloadResult.Response == null)
+                {
+                    var error = string.IsNullOrWhiteSpace(downloadResult.ErrorMessage)
+                        ? "Unable to download file from the provided URL."
+                        : downloadResult.ErrorMessage;
+                    throw new InvalidOperationException(error);
+                }
+
+                await using var fileStream = File.Create(targetPath);
+                await downloadResult.Response.Content.CopyToAsync(fileStream);
+                return;
+            }
+
+            var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromMinutes(10);
+
+            using var response = await httpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
+            if (!response.IsSuccessStatusCode)
+            {
+                var status = (int)response.StatusCode;
+                throw new InvalidOperationException($"Unable to download file from the provided URL. Status code: {status}");
+            }
+
+            await using var targetStream = File.Create(targetPath);
+            await response.Content.CopyToAsync(targetStream);
         }
 
         private async Task RunConversionStepAsync(OpenAiTranscriptionTask task)
@@ -771,6 +866,12 @@ namespace YandexSpeech.services
             if (!segmentsCollection.IsLoaded)
             {
                 await segmentsCollection.LoadAsync();
+            }
+
+            if (!string.IsNullOrWhiteSpace(task.SourceFileUrl)
+                && (string.IsNullOrWhiteSpace(task.SourceFilePath) || !File.Exists(task.SourceFilePath)))
+            {
+                return OpenAiTranscriptionStatus.Downloading;
             }
 
             if (!string.IsNullOrWhiteSpace(task.MarkdownText))

@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -17,8 +18,17 @@ namespace YandexSpeech.services
             IConfiguration configuration,
             ILoggerFactory loggerFactory,
             IPunctuationService punctuationService,
-            IWhisperTranscriptionService whisperTranscriptionService)
-            : base(dbContext, configuration, loggerFactory.CreateLogger<OpenAiTranscriptionService>(), punctuationService, whisperTranscriptionService)
+            IWhisperTranscriptionService whisperTranscriptionService,
+            IHttpClientFactory httpClientFactory,
+            IYandexDiskDownloadService yandexDiskDownloadService)
+            : base(
+                dbContext,
+                configuration,
+                loggerFactory.CreateLogger<OpenAiTranscriptionService>(),
+                punctuationService,
+                whisperTranscriptionService,
+                httpClientFactory,
+                yandexDiskDownloadService)
         {
         }
 

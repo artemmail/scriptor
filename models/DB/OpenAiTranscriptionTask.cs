@@ -8,6 +8,7 @@ namespace YandexSpeech.models.DB
     public enum OpenAiTranscriptionStatus
     {
         Created = 0,
+        Downloading = 5,
         Converting = 10,
         Transcribing = 20,
         Segmenting = 25,
@@ -33,6 +34,8 @@ namespace YandexSpeech.models.DB
 
         [Required]
         public string SourceFilePath { get; set; } = null!;
+
+        public string? SourceFileUrl { get; set; }
 
         public string? ConvertedFilePath { get; set; }
 

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -100,13 +101,14 @@ namespace YandexSpeech.Controllers
             }
             else
             {
-                var downloadResult = await TryDownloadExternalFileAsync(normalizedUrl!, uploadsDirectory);
-                if (!downloadResult.Success)
+                var validationResult = await ValidateExternalFileUrlAsync(normalizedUrl!);
+                if (!validationResult.Success)
                 {
-                    return BadRequest(downloadResult.ErrorMessage ?? "Unable to download file from the provided URL.");
+                    return BadRequest(validationResult.ErrorMessage ?? "Unable to download file from the provided URL.");
                 }
 
-                storedFilePath = downloadResult.FilePath!;
+                var sanitizedName = OpenAiTranscriptionFileHelper.SanitizeFileName(validationResult.FileName);
+                storedFilePath = OpenAiTranscriptionFileHelper.GenerateStoredFilePath(uploadsDirectory, sanitizedName);
             }
 
             var sanitizedClarification = string.IsNullOrWhiteSpace(clarification)
@@ -116,7 +118,8 @@ namespace YandexSpeech.Controllers
             var task = await _transcriptionService.StartTranscriptionAsync(
                 storedFilePath,
                 userId,
-                sanitizedClarification);
+                sanitizedClarification,
+                hasUrl ? normalizedUrl : null);
 
             _ = Task.Run(async () =>
             {
@@ -467,8 +470,8 @@ namespace YandexSpeech.Controllers
 
         private static async Task<string> SaveUploadedFileAsync(IFormFile file, string uploadsDirectory)
         {
-            var sanitizedName = SanitizeFileName(file.FileName);
-            var storedFilePath = GenerateStoredFilePath(uploadsDirectory, sanitizedName);
+            var sanitizedName = OpenAiTranscriptionFileHelper.SanitizeFileName(file.FileName);
+            var storedFilePath = OpenAiTranscriptionFileHelper.GenerateStoredFilePath(uploadsDirectory, sanitizedName);
 
             await using var stream = System.IO.File.Create(storedFilePath);
             await file.CopyToAsync(stream);
@@ -476,9 +479,7 @@ namespace YandexSpeech.Controllers
             return storedFilePath;
         }
 
-        private async Task<(bool Success, string? FilePath, string? ErrorMessage)> TryDownloadExternalFileAsync(
-            string fileUrl,
-            string uploadsDirectory)
+        private async Task<(bool Success, string? FileName, string? ErrorMessage)> ValidateExternalFileUrlAsync(string fileUrl)
         {
             if (!Uri.TryCreate(fileUrl, UriKind.Absolute, out var uri))
             {
@@ -493,61 +494,48 @@ namespace YandexSpeech.Controllers
 
             if (_yandexDiskDownloadService.IsYandexDiskUrl(uri))
             {
-                await using var downloadResult = await _yandexDiskDownloadService.DownloadAsync(uri);
-                if (!downloadResult.Success || downloadResult.Response == null)
-                {
-                    var error = string.IsNullOrWhiteSpace(downloadResult.ErrorMessage)
-                        ? "Unable to download file from the provided URL."
-                        : downloadResult.ErrorMessage;
-                    return (false, null, error);
-                }
-
-                try
-                {
-                    var remoteFileName = downloadResult.FileName ?? "yandex-disk-file";
-                    var sanitizedName = SanitizeFileName(remoteFileName);
-                    var storedFilePath = GenerateStoredFilePath(uploadsDirectory, sanitizedName);
-
-                    await using var fileStream = System.IO.File.Create(storedFilePath);
-                    await downloadResult.Response.Content.CopyToAsync(fileStream);
-
-                    return (true, storedFilePath, null);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to save file downloaded from Yandex.Disk {Url}", fileUrl);
-                    return (false, null, "Unable to download file from the provided URL.");
-                }
+                var fileName = TryExtractFileNameFromQuery(uri) ?? Path.GetFileName(uri.LocalPath);
+                return (true, fileName, null);
             }
 
             try
             {
                 var httpClient = _httpClientFactory.CreateClient();
-                httpClient.Timeout = TimeSpan.FromMinutes(10);
+                using var headRequest = new HttpRequestMessage(HttpMethod.Head, uri);
+                using var headResponse = await httpClient.SendAsync(headRequest, HttpCompletionOption.ResponseHeadersRead);
+
+                if (headResponse.IsSuccessStatusCode)
+                {
+                    var fileName = ResolveRemoteFileName(headResponse, uri);
+                    return (true, fileName, null);
+                }
+
+                if (headResponse.StatusCode != HttpStatusCode.MethodNotAllowed)
+                {
+                    _logger.LogWarning(
+                        "Failed to validate transcription source file at {Url}. Status code: {StatusCode}",
+                        uri,
+                        headResponse.StatusCode);
+                    return (false, null, "Unable to access file at the provided URL.");
+                }
 
                 using var response = await httpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger.LogWarning(
-                        "Failed to download transcription source file from {Url}. Status code: {StatusCode}",
+                        "Failed to validate transcription source file at {Url}. Status code: {StatusCode}",
                         uri,
                         response.StatusCode);
-                    return (false, null, "Unable to download file from the provided URL.");
+                    return (false, null, "Unable to access file at the provided URL.");
                 }
 
                 var remoteFileName = ResolveRemoteFileName(response, uri);
-                var sanitizedName = SanitizeFileName(remoteFileName);
-                var storedFilePath = GenerateStoredFilePath(uploadsDirectory, sanitizedName);
-
-                await using var fileStream = System.IO.File.Create(storedFilePath);
-                await response.Content.CopyToAsync(fileStream);
-
-                return (true, storedFilePath, null);
+                return (true, remoteFileName, null);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to download transcription source file from {Url}", fileUrl);
-                return (false, null, "Unable to download file from the provided URL.");
+                _logger.LogError(ex, "Failed to validate transcription source file at {Url}", fileUrl);
+                return (false, null, "Unable to access file at the provided URL.");
             }
         }
 
@@ -626,34 +614,6 @@ namespace YandexSpeech.Controllers
                 "video/mpeg" => ".mpeg",
                 _ => null,
             };
-        }
-
-        private static string GenerateStoredFilePath(string uploadsDirectory, string sanitizedName)
-        {
-            var storedFileName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}__{sanitizedName}";
-            return Path.Combine(uploadsDirectory, storedFileName);
-        }
-
-        private static string SanitizeFileName(string fileName)
-        {
-            var invalidChars = Path.GetInvalidFileNameChars();
-            var cleaned = new string((fileName ?? string.Empty).Where(c => !invalidChars.Contains(c)).ToArray());
-            if (string.IsNullOrWhiteSpace(cleaned))
-            {
-                return "audio";
-            }
-
-            var extension = Path.GetExtension(cleaned);
-            var nameWithoutExtension = Path.GetFileNameWithoutExtension(cleaned);
-
-            if (nameWithoutExtension.Length > 80)
-            {
-                nameWithoutExtension = nameWithoutExtension[..80];
-            }
-
-            return string.IsNullOrEmpty(extension)
-                ? nameWithoutExtension
-                : $"{nameWithoutExtension}{extension}";
         }
 
         private static string ResolveDisplayName(string storedPath)

@@ -348,6 +348,10 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       return 'error';
     }
 
+    if (task.status === OpenAiTranscriptionStatus.Downloading) {
+      return 'cloud_download';
+    }
+
     if (task.done) {
       return 'check_circle';
     }
@@ -387,6 +391,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
         return 'status-done';
       case OpenAiTranscriptionStatus.Error:
         return 'status-error';
+      case OpenAiTranscriptionStatus.Downloading:
       case OpenAiTranscriptionStatus.Converting:
       case OpenAiTranscriptionStatus.Transcribing:
       case OpenAiTranscriptionStatus.Segmenting:
