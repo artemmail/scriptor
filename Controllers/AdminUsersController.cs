@@ -58,14 +58,16 @@ namespace YandexSpeech.Controllers
                     Count = g.Count()
                 });
 
-            var baseQuery = from user in usersQuery
-                            join count in captionCountsQuery on user.Id equals count.UserId into userCounts
-                            from count in userCounts.DefaultIfEmpty()
-                            select new
-                            {
-                                User = user,
-                                Recognized = count != null ? count.Count : 0
-                            };
+            var baseQuery = usersQuery
+                .GroupJoin(
+                    captionCountsQuery,
+                    user => user.Id,
+                    count => count.UserId,
+                    (user, counts) => new
+                    {
+                        User = user,
+                        Recognized = counts.Sum(c => (int?)c.Count) ?? 0
+                    });
 
             var totalCount = await baseQuery.CountAsync();
 
