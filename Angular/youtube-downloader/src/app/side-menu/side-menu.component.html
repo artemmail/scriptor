@@ -3,11 +3,11 @@
   <ng-container *ngIf="user$ | async as user; else guestMenu">
     <a mat-list-item (click)="navigate('/recognition')">
       <mat-icon matListItemIcon>home</mat-icon>
-      <span matListItemTitle>Распознавание</span>
+      <span matListItemTitle>Conspect YouTube</span>
     </a>
     <a mat-list-item (click)="navigate('/tasks')">
-      <mat-icon matListItemIcon>subtitles</mat-icon>
-      <span matListItemTitle>Скрипториум</span>
+      <mat-icon matListItemIcon>library_books</mat-icon>
+      <span matListItemTitle>Scriptorium</span>
     </a>
     <a mat-list-item (click)="navigate('/transcriptions')">
       <mat-icon matListItemIcon>record_voice_over</mat-icon>
@@ -15,27 +15,16 @@
     </a>
     <a mat-list-item (click)="navigate('/down')">
       <mat-icon matListItemIcon>download-icons</mat-icon>
-      <span matListItemTitle>Скачать ролик</span>
+      <span matListItemTitle>YouTube downloader</span>
     </a>
     <a mat-list-item (click)="navigate('/markdown-converter')">
       <mat-icon matListItemIcon>sync_alt</mat-icon>
       <span matListItemTitle>Конвертер Markdown </span>
     </a>
-    <a mat-list-item (click)="navigate('/about')">
-      <mat-icon matListItemIcon>info</mat-icon>
-      <span matListItemTitle>About</span>
-    </a>
-    <a mat-list-item (click)="navigate('/about1')">
-      <mat-icon matListItemIcon>info</mat-icon>
-      <span matListItemTitle>About1</span>
-    </a>
-    <a mat-list-item (click)="navigate('/about2')">
-      <mat-icon matListItemIcon>info</mat-icon>
-      <span matListItemTitle>About2</span>
-    </a>
+    
     <a mat-list-item (click)="navigate('/about3')">
       <mat-icon matListItemIcon>info</mat-icon>
-      <span matListItemTitle>About3</span>
+      <span matListItemTitle>Лендинг</span>
     </a>
     <a mat-list-item (click)="navigate('/blog')">
       <mat-icon matListItemIcon>article</mat-icon>
@@ -66,7 +55,7 @@
     </a>
     <a mat-list-item (click)="navigate('/tasks')">
       <mat-icon matListItemIcon>subtitles</mat-icon>
-      <span matListItemTitle>Скрипториум</span>
+      <span matListItemTitle>Scriptorium</span>
     </a>
     <a mat-list-item (click)="navigate('/transcriptions')">
       <mat-icon matListItemIcon>record_voice_over</mat-icon>

@@ -172,16 +172,23 @@
       </div>
     </section>
 
-    <section class="faq">
+    <section class="cta">
+      <div class="cta-card">
+        <div class="cta-text">
       <h2>Часто задаваемые вопросы</h2>
-      <mat-accordion class="faq-accordion" multi displayMode="flat">
+      
+       </div>
+       
+        <mat-accordion class="faq-accordion" multi displayMode="flat">
         <mat-expansion-panel *ngFor="let faq of faqs">
           <mat-expansion-panel-header>
             <span class="faq-question">{{ faq.question }}</span>
           </mat-expansion-panel-header>
           <p class="faq-answer">{{ faq.answer }}</p>
         </mat-expansion-panel>
-      </mat-accordion>
+      </mat-accordion>  
+      
+      </div>
     </section>
   </main>
 </div>
