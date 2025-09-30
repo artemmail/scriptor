@@ -541,27 +541,7 @@ section {
   padding: 32px;
 }
 
-:host ::ng-deep .faq-accordion .mat-expansion-panel {
-  border-radius: 22px;
-  border: 1px solid #dbe6ff;
-}
 
-:host ::ng-deep .faq-accordion .mat-expansion-indicator::after {
-  content: '+';
-  border: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #e3ecff;
-  color: #1d4ed8;
-  display: grid;
-  place-items: center;
-  transform: none;
-}
-
-:host ::ng-deep .faq-accordion .mat-expansion-panel.mat-expanded .mat-expansion-indicator::after {
-  content: '–';
-}
 
 @media (max-width: 1024px) {
   .page-content {
