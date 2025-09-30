@@ -11,6 +11,7 @@ namespace YandexSpeech.models.DTO
         public int RecognizedVideos { get; set; }
         public DateTime RegisteredAt { get; set; }
         public IReadOnlyCollection<string> Roles { get; set; } = Array.Empty<string>();
+        public IReadOnlyCollection<string> YoutubeCaptionIps { get; set; } = Array.Empty<string>();
     }
 
     public class AdminUsersPageDto

@@ -103,6 +103,26 @@ namespace YandexSpeech.Controllers
                         .Select(x => x.Name!)
                         .ToList());
 
+            var captionIps = await _dbContext.YoutubeCaptionTasks
+                .Where(task =>
+                    task.UserId != null &&
+                    userIds.Contains(task.UserId) &&
+                    task.IP != null &&
+                    task.IP != string.Empty)
+                .Select(task => new { task.UserId, task.IP })
+                .ToListAsync();
+
+            var ipLookup = captionIps
+                .GroupBy(x => x.UserId!)
+                .ToDictionary(
+                    g => g.Key!,
+                    g => (IReadOnlyCollection<string>)g
+                        .Select(x => x.IP!)
+                        .Where(ip => !string.IsNullOrWhiteSpace(ip))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(ip => ip)
+                        .ToList());
+
             var items = paged.Select(p => new AdminUserListItemDto
             {
                 Id = p.Id,
@@ -110,7 +130,8 @@ namespace YandexSpeech.Controllers
                 DisplayName = p.DisplayName ?? string.Empty,
                 RecognizedVideos = p.Recognized,
                 RegisteredAt = p.CreatedAt,
-                Roles = rolesLookup.TryGetValue(p.Id, out var r) ? r : Array.Empty<string>()
+                Roles = rolesLookup.TryGetValue(p.Id, out var r) ? r : Array.Empty<string>(),
+                YoutubeCaptionIps = ipLookup.TryGetValue(p.Id, out var ips) ? ips : Array.Empty<string>()
             }).ToList();
 
             return Ok(new AdminUsersPageDto

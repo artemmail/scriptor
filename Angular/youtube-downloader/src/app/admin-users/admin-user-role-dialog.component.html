@@ -1,23 +1,59 @@
-<h2 mat-dialog-title>Роли пользователя</h2>
-<mat-dialog-content>
-  <div class="user-info">
-    <strong>{{ data.user.email }}</strong>
-    <span>Распознанных видео: {{ data.user.recognizedVideos }}</span>
-    <span>Зарегистрирован: {{ data.user.registeredAt | date: 'medium' }}</span>
-  </div>
-  <div class="roles-list">
-    <label
-      class="role-item"
-      *ngFor="let role of data.availableRoles"
-    >
-      <mat-checkbox
-        [checked]="isChecked(role)"
-        (change)="toggleRole(role, $event.checked)"
-      >
-        {{ role }}
-      </mat-checkbox>
-    </label>
-  </div>
+<h2 mat-dialog-title>Пользователь: {{ data.user.email }}</h2>
+<mat-dialog-content class="dialog-content">
+  <mat-tab-group>
+    <mat-tab label="Роли">
+      <div class="tab-section roles-tab">
+        <div class="roles-list" *ngIf="data.availableRoles?.length; else noRoles">
+          <label
+            class="role-item"
+            *ngFor="let role of data.availableRoles"
+          >
+            <mat-checkbox
+              [checked]="isChecked(role)"
+              (change)="toggleRole(role, $event.checked)"
+            >
+              {{ role }}
+            </mat-checkbox>
+          </label>
+        </div>
+        <ng-template #noRoles>
+          <p class="empty-state">Нет доступных ролей.</p>
+        </ng-template>
+      </div>
+    </mat-tab>
+    <mat-tab label="Информация">
+      <div class="tab-section info-tab">
+        <div class="info-row">
+          <span class="info-label">Email:</span>
+          <span class="info-value">{{ data.user.email }}</span>
+        </div>
+        <div class="info-row" *ngIf="data.user.displayName">
+          <span class="info-label">Имя:</span>
+          <span class="info-value">{{ data.user.displayName }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Распознанных видео:</span>
+          <span class="info-value">{{ data.user.recognizedVideos }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Зарегистрирован:</span>
+          <span class="info-value">{{ data.user.registeredAt | date: 'medium' }}</span>
+        </div>
+      </div>
+    </mat-tab>
+    <mat-tab label="IP адреса">
+      <div class="tab-section ips-tab">
+        <ng-container *ngIf="ipAddresses.length; else noIps">
+          <ul class="ip-list">
+            <li class="ip-item" *ngFor="let ip of ipAddresses">{{ ip }}</li>
+          </ul>
+        </ng-container>
+        <ng-template #noIps>
+          <p class="empty-state">IP адреса из YoutubeCaptions отсутствуют.</p>
+        </ng-template>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
   <button mat-button type="button" (click)="close()">Отмена</button>
