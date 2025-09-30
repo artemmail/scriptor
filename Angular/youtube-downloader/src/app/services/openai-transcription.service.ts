@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 
 export enum OpenAiTranscriptionStatus {
   Created = 0,
+  Downloading = 5,
   Converting = 10,
   Transcribing = 20,
   Segmenting = 25,
@@ -123,6 +124,8 @@ export class OpenAiTranscriptionService {
     switch (status) {
       case OpenAiTranscriptionStatus.Created:
         return 'В очереди';
+      case OpenAiTranscriptionStatus.Downloading:
+        return 'Загрузка файла';
       case OpenAiTranscriptionStatus.Converting:
         return 'Преобразование аудио';
       case OpenAiTranscriptionStatus.Transcribing:

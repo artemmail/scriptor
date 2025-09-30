@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -64,12 +66,14 @@ public sealed class OpenAiTranscriptionServiceTests
         var punctuation = new StubPunctuationService();
         var whisper = new StubWhisperTranscriptionService();
 
-        var service = new TestOpenAiTranscriptionService(
-            dbContext,
-            configuration,
-            NullLogger<OpenAiTranscriptionService>.Instance,
-            punctuation,
-            whisper);
+            var service = new TestOpenAiTranscriptionService(
+                dbContext,
+                configuration,
+                NullLogger<OpenAiTranscriptionService>.Instance,
+                punctuation,
+                whisper,
+                new StubHttpClientFactory(),
+                new StubYandexDiskDownloadService());
 
         var result = await service.ContinueTranscriptionAsync(task.Id);
 
@@ -129,14 +133,34 @@ public sealed class OpenAiTranscriptionServiceTests
             IConfiguration configuration,
             Microsoft.Extensions.Logging.ILogger<OpenAiTranscriptionService> logger,
             IPunctuationService punctuationService,
-            IWhisperTranscriptionService whisperTranscriptionService)
-            : base(dbContext, configuration, logger, punctuationService, whisperTranscriptionService)
+            IWhisperTranscriptionService whisperTranscriptionService,
+            IHttpClientFactory httpClientFactory,
+            IYandexDiskDownloadService yandexDiskDownloadService)
+            : base(dbContext, configuration, logger, punctuationService, whisperTranscriptionService, httpClientFactory, yandexDiskDownloadService)
         {
         }
 
         protected override Task<string> CreateDialogueMarkdownAsync(string transcription, string? clarification)
         {
             return Task.FromResult($"markdown::{transcription}");
+        }
+    }
+
+    private sealed class StubHttpClientFactory : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name)
+        {
+            return new HttpClient(new HttpClientHandler());
+        }
+    }
+
+    private sealed class StubYandexDiskDownloadService : IYandexDiskDownloadService
+    {
+        public bool IsYandexDiskUrl(Uri uri) => false;
+
+        public Task<YandexDiskDownloadResult> DownloadAsync(Uri uri, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new YandexDiskDownloadResult(false, null, null, "Not supported"));
         }
     }
 }
