@@ -95,7 +95,7 @@ previously formatted segment that can be provided as assistant context. Do not a
 
             var requestBody = new
             {
-                model = "gpt-4.1-mini",
+                model = "gpt-5-mini",
                 messages,
                 temperature = 0.0,
             };
