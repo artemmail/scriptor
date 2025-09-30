@@ -198,6 +198,7 @@ builder.Services.AddScoped<ISpeechWorkflowService, SpeechWorkflowService>();
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<IUsageService, UsageService>();
+builder.Services.AddScoped<IYandexDiskDownloadService, YandexDiskDownloadService>();
 builder.Services.AddScoped<IPaymentGatewayService, PaymentGatewayService>();
 
 builder.Services.Configure<YooMoneyOptions>(builder.Configuration.GetSection("YooMoney"));
