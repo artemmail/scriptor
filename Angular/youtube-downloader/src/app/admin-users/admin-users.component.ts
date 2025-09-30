@@ -1,5 +1,6 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -46,7 +47,8 @@ export class AdminUsersComponent implements OnInit {
 
   constructor(
     private readonly adminUsersService: AdminUsersService,
-    private readonly dialog: MatDialog
+    private readonly dialog: MatDialog,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
@@ -126,6 +128,11 @@ export class AdminUsersComponent implements OnInit {
           this.loading = false;
         }
       });
+  }
+
+  goToUserTasks(user: AdminUserListItem, event: MouseEvent): void {
+    event.stopPropagation();
+    this.router.navigate(['/tasks'], { queryParams: { userId: user.id } });
   }
 
   private loadRoles(): void {

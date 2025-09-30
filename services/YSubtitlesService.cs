@@ -231,11 +231,17 @@ namespace YandexSpeech.services
             int pageSize,
             string sortField,
             string sortOrder,
-            string filter)
+            string filter,
+            string userId = null)
         {
             var query = _dbContext.YoutubeCaptionTasks
                 .AsQueryable()
-                .Where(x => x.ChannelId != "UCa0jIrHPmqCHopklH8ltmVw"); 
+                .Where(x => x.ChannelId != "UCa0jIrHPmqCHopklH8ltmVw");
+
+            if (!string.IsNullOrEmpty(userId))
+            {
+                query = query.Where(t => t.UserId == userId);
+            }
 
             // Фильтрация
             if (!string.IsNullOrEmpty(filter))

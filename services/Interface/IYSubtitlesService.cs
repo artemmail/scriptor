@@ -69,6 +69,7 @@ namespace YandexSpeech.services
             int pageSize,
             string sortField,
             string sortOrder,
-            string filter);
+            string filter,
+            string userId = null);
     }
 }

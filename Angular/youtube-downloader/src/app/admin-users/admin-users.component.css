@@ -49,6 +49,11 @@
   align-items: center;
   gap: 6px;
   font-weight: 600;
+  text-transform: none;
+}
+
+.videos-count.mat-mdc-button-base {
+  padding: 4px 12px;
 }
 
 .roles-cell mat-chip-set {

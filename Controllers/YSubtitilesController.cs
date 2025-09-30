@@ -97,10 +97,11 @@ namespace YandexSpeech.Controllers
             [FromQuery] int pageSize = 20,
             [FromQuery] string sortField = null,
             [FromQuery] string sortOrder = null,
-            [FromQuery] string filter = null)
+            [FromQuery] string filter = null,
+            [FromQuery] string userId = null)
         {
             var (items, totalCount) = await _ySubtitlesService.GetTasksPagedAsync(
-                page, pageSize, sortField, sortOrder, filter);
+                page, pageSize, sortField, sortOrder, filter, userId);
 
             var result = new
             {

@@ -1,7 +1,7 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { HttpClientModule } from '@angular/common/http';
-import { RouterModule } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
@@ -64,6 +64,7 @@ export class SubtitlesTasksComponent implements OnInit {
   sortField = '';
   sortOrder = '';
   filterValue = '';
+  userIdFilter: string | null = null;
 
   isMobile = false;
   loading = false;
@@ -75,7 +76,8 @@ export class SubtitlesTasksComponent implements OnInit {
     private subtitleService: SubtitleService,
     private titleService: Title,
     private dialog: MatDialog,
-    private breakpointObserver: BreakpointObserver
+    private breakpointObserver: BreakpointObserver,
+    private route: ActivatedRoute
   ) {
     this.titleService.setTitle('Transcription Queue');
 
@@ -85,16 +87,38 @@ export class SubtitlesTasksComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadTasks();
+    this.route.queryParamMap.subscribe(params => {
+      const newUserId = params.get('userId');
+      const hasChanged = this.userIdFilter !== newUserId;
+      this.userIdFilter = newUserId;
+
+      if (hasChanged) {
+        this.pageIndex = 0;
+        this.expandedTasks.clear();
+        this.loadTasks();
+      } else if (!this.dataSource.data.length) {
+        this.loadTasks();
+      }
+    });
   }
 
   private loadTasks(append = false): void {
     this.loading = true;
     const page = this.pageIndex + 1;
     this.subtitleService
-      .getTasks(page, this.pageSize, this.sortField, this.sortOrder, this.filterValue)
+      .getTasks(
+        page,
+        this.pageSize,
+        this.sortField,
+        this.sortOrder,
+        this.filterValue,
+        this.userIdFilter
+      )
       .subscribe({
         next: res => {
+          if (!append) {
+            this.expandedTasks.clear();
+          }
           this.dataSource.data = append
             ? this.dataSource.data.concat(res.items)
             : res.items;
