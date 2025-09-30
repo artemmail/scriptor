@@ -36,6 +36,7 @@ namespace YandexSpeech.Controllers
         private readonly ILogger<OpenAiTranscriptionController> _logger;
         private readonly IDocumentGeneratorService _documentGeneratorService;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IYandexDiskDownloadService _yandexDiskDownloadService;
 
         public OpenAiTranscriptionController(
             IOpenAiTranscriptionService transcriptionService,
@@ -44,7 +45,8 @@ namespace YandexSpeech.Controllers
             IServiceScopeFactory scopeFactory,
             ILogger<OpenAiTranscriptionController> logger,
             IDocumentGeneratorService documentGeneratorService,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            IYandexDiskDownloadService yandexDiskDownloadService)
         {
             _transcriptionService = transcriptionService;
             _dbContext = dbContext;
@@ -53,6 +55,7 @@ namespace YandexSpeech.Controllers
             _logger = logger;
             _documentGeneratorService = documentGeneratorService;
             _httpClientFactory = httpClientFactory;
+            _yandexDiskDownloadService = yandexDiskDownloadService;
         }
 
         [HttpPost]
@@ -486,6 +489,35 @@ namespace YandexSpeech.Controllers
                 && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
             {
                 return (false, null, "Only HTTP and HTTPS URLs are supported.");
+            }
+
+            if (_yandexDiskDownloadService.IsYandexDiskUrl(uri))
+            {
+                await using var downloadResult = await _yandexDiskDownloadService.DownloadAsync(uri);
+                if (!downloadResult.Success || downloadResult.Response == null)
+                {
+                    var error = string.IsNullOrWhiteSpace(downloadResult.ErrorMessage)
+                        ? "Unable to download file from the provided URL."
+                        : downloadResult.ErrorMessage;
+                    return (false, null, error);
+                }
+
+                try
+                {
+                    var remoteFileName = downloadResult.FileName ?? "yandex-disk-file";
+                    var sanitizedName = SanitizeFileName(remoteFileName);
+                    var storedFilePath = GenerateStoredFilePath(uploadsDirectory, sanitizedName);
+
+                    await using var fileStream = System.IO.File.Create(storedFilePath);
+                    await downloadResult.Response.Content.CopyToAsync(fileStream);
+
+                    return (true, storedFilePath, null);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to save file downloaded from Yandex.Disk {Url}", fileUrl);
+                    return (false, null, "Unable to download file from the provided URL.");
+                }
             }
 
             try
