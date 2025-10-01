@@ -29,7 +29,7 @@ namespace YandexSpeech.services
 
         public YoutubeCaptionService(
             MyDbContext dbContext,
-            IPunctuationService punctuationService,
+            PunctuationService punctuationService,
             CaptionService captionService,
             IYSubtitlesService slugService,
             ILogger<YoutubeCaptionService> logger)

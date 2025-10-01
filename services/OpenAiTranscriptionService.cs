@@ -24,7 +24,7 @@ namespace YandexSpeech.services
         private readonly string _ffmpegPath;
         private readonly string _openAiApiKey;
         private readonly string _workingDirectory;
-        private const string FormattingModel = "gpt-5-mini";
+        private const string FormattingModel = "gpt-4.1-mini";
         private readonly IWhisperTranscriptionService _whisperTranscriptionService;
         private readonly IPunctuationService _punctuationService;
         private const int FormattingMaxAttempts = 5;

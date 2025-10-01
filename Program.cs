@@ -194,6 +194,7 @@ builder.Services.AddSingleton<YoutubeClient>();
 builder.Services.AddSingleton<CaptionService>();
 builder.Services.AddScoped<IYSpeechService, YSpeechService>();
 builder.Services.AddSingleton<IPunctuationService, IntegratedFormattingPunctuationService>();
+builder.Services.AddSingleton<PunctuationService>();
 builder.Services.AddScoped<ISpeechWorkflowService, SpeechWorkflowService>();
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IWalletService, WalletService>();

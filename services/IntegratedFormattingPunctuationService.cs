@@ -95,10 +95,12 @@ previously formatted segment that can be provided as assistant context. Do not a
 
             var requestBody = new
             {
-                model = "gpt-5-mini",
+                model = "gpt-4.1-mini",
                 messages,
                 temperature = 0.0,
-            };
+                stream = false,
+                response_format = new { type = "text" }
+        };
 
             using var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
 
@@ -106,7 +108,7 @@ previously formatted segment that can be provided as assistant context. Do not a
             {
                 try
                 {
-                    var response = await client.PostAsync("https://api.openai.com/v1/chat/completions", content);
+                    var response = await client.PostAsync("https://api.openai.com/v1/responses", content);
                     if (response.IsSuccessStatusCode)
                     {
                         var json = await response.Content.ReadAsStringAsync();

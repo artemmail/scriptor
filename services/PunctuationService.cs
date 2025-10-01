@@ -87,7 +87,7 @@ Do not include any additional comments or explanations."
 
             var requestBody = new
             {
-                model = "gpt-5-mini",
+                model = "gpt-4.1-mini",
                 messages,
                 temperature = 0.0,
             };
