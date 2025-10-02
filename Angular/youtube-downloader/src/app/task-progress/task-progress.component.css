@@ -47,6 +47,11 @@
   color: #16a34a;
 }
 
+.status-icon.status-success mat-icon {
+  display: inline-block;
+  animation: slow-rotate 5s linear infinite;
+}
+
 .status-icon.status-error {
   background: rgba(239, 68, 68, 0.15);
   color: #dc2626;
@@ -126,6 +131,16 @@ mat-progress-bar {
   justify-content: center;
   align-items: center;
   min-height: 240px;
+}
+
+@keyframes slow-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(-360deg);
+  }
 }
 
 @media (max-width: 768px) {
