@@ -1,4 +1,4 @@
-<div class="recognized-card" *ngIf="youtubeTask as task">
+<div class="recognized-card" *ngIf="youtubeTask as task" [class.fullscreen]="isResultFullscreen">
   <div class="video-summary">
     <div class="video-summary-left">
       <button
@@ -59,6 +59,15 @@
         >
           <mat-icon>content_copy</mat-icon>
           <span>Копировать</span>
+        </button>
+        <button
+          class="btn btn-outline"
+          type="button"
+          (click)="toggleFullscreen()"
+          [attr.aria-pressed]="isResultFullscreen"
+        >
+          <mat-icon>{{ isResultFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
+          <span>{{ isResultFullscreen ? 'Свернуть' : 'На весь экран' }}</span>
         </button>
       </div>
     </div>

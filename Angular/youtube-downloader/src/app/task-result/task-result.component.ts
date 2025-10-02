@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, ViewChild } from '@angular/core';
+import { Component, ElementRef, Input, OnDestroy, ViewChild } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { MarkdownModule } from 'ngx-markdown';
@@ -30,11 +30,13 @@ import { RouterModule } from '@angular/router'; // ⬅️ Добавить
   templateUrl: './task-result.component.html',
   styleUrls: ['./task-result.component.css']
 })
-export class TaskResultComponent {
+export class TaskResultComponent implements OnDestroy {
   @Input() youtubeTask: YoutubeCaptionTaskDto | null = null;
   @ViewChild('markdownContent') private markdownContentRef?: ElementRef<HTMLElement>;
   isDownloading = false;
   isCopying = false;
+  isResultFullscreen = false;
+  private originalBodyOverflow: string | null = null;
 
   private englishPromo = 'YouScriptor: Accurate transcription from YouTube videos to PDF and MS Word with markup and formula display for free.';
   private russianPromo = 'YouScriptor: Точная транскрипция с YouTube видео в PDF и MS Word с разметкой и отображением формул бесплатно.';
@@ -160,9 +162,21 @@ export class TaskResultComponent {
       .finally(() => (this.isCopying = false));
   }
 
+  toggleFullscreen(): void {
+    this.isResultFullscreen = !this.isResultFullscreen;
+    this.updateBodyScrollLock();
+  }
+
   clearTaskHistory(): void {
     this.youtubeTask = null;
     this.snackBar.open('Task data cleared', '', { duration: 2000 });
+  }
+
+  ngOnDestroy(): void {
+    if (this.isResultFullscreen) {
+      this.isResultFullscreen = false;
+      this.updateBodyScrollLock();
+    }
   }
 
   private finishDownload(blob: Blob, filename: string) {
@@ -223,5 +237,25 @@ downloadAsSrt(lang?: string): void {
     }
 
     return 'task-result';
+  }
+
+  private updateBodyScrollLock(): void {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    if (this.isResultFullscreen) {
+      if (this.originalBodyOverflow === null) {
+        this.originalBodyOverflow = document.body.style.overflow || '';
+      }
+      document.body.style.overflow = 'hidden';
+    } else {
+      if (this.originalBodyOverflow !== null) {
+        document.body.style.overflow = this.originalBodyOverflow;
+        this.originalBodyOverflow = null;
+      } else {
+        document.body.style.removeProperty('overflow');
+      }
+    }
   }
 }
