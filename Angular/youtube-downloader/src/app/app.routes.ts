@@ -14,7 +14,7 @@ import { RoleGuard } from './services/role.guard';
 import { AdminUsersComponent } from './admin-users/admin-users.component';
 
 export const appRoutes: Routes = [
-  { path: '', redirectTo: 'youtube-downloader', pathMatch: 'full' },
+  { path: '', component: OpenAiTranscriptionComponent },
   { path: 'youtube-downloader', component: YoutubeDownloaderComponent },
   { path: 'recognition-tasks', component: SubtitlesTasksComponent },
   { path: 'transcriptions', component: OpenAiTranscriptionComponent },

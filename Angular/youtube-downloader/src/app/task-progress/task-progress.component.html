@@ -1,49 +1,59 @@
 <ng-container *ngIf="youtubeTask !== null; else loading">
-  <mat-card class="progress-card">
-    <mat-card-header>
-      <!-- Вращающаяся иконка для статуса (всегда default) -->
-      <mat-icon class="icon-status-pending">loop</mat-icon>
-      <mat-card-title>Задача в процессе...</mat-card-title>
-    </mat-card-header>
+  <div class="progress-card" [ngClass]="getCardClass(youtubeTask!.status)">
+    <div class="progress-header">
+      <span class="status-icon" [ngClass]="getIconClass(youtubeTask!.status)">
+        <mat-icon>{{ getStatusIcon(youtubeTask!.status) }}</mat-icon>
+      </span>
+      <div class="progress-title">
+        <h2>Задача обрабатывается</h2>
+        <p *ngIf="youtubeTask!.status !== null">
+          {{ getStatusText(youtubeTask!.status) }}
+        </p>
+      </div>
+    </div>
 
-    <mat-card-content>
+    <app-yandex-ad></app-yandex-ad>
 
-      <app-yandex-ad></app-yandex-ad>
-
-      <!-- Информация о начале и последнем обновлении (если нет ошибки и задача не завершена) -->
-      <div *ngIf="!youtubeTask?.done && youtubeTask?.status !== RecognizeStatus.Error">
-        <p>Время начала: {{ youtubeTask?.createdAt | localTime: 'yyyy-MM-dd HH:mm:ss' }}</p>
-        <p>Время последнего обновления: {{ youtubeTask?.modifiedAt | localTime: 'yyyy-MM-dd HH:mm:ss' }}</p>
+    <div class="progress-body">
+      <div class="progress-meta">
+        <div *ngIf="youtubeTask!.createdAt">
+          <span class="meta-label">Начало</span>
+          <span class="meta-value">{{ youtubeTask!.createdAt | localTime: 'yyyy-MM-dd HH:mm:ss' }}</span>
+        </div>
+        <div *ngIf="youtubeTask!.modifiedAt">
+          <span class="meta-label">Обновлено</span>
+          <span class="meta-value">{{ youtubeTask!.modifiedAt | localTime: 'yyyy-MM-dd HH:mm:ss' }}</span>
+        </div>
       </div>
 
-      <!-- Если статус = Error, показываем ошибку -->
-      <p *ngIf="youtubeTask?.status === RecognizeStatus.Error" style="color: red;">
-        Произошла ошибка: {{ youtubeTask?.error }}
-      </p>
+      <div class="progress-status" *ngIf="youtubeTask!.status === RecognizeStatus.Error">
+        <div class="error-message">Произошла ошибка: {{ youtubeTask!.error || 'Не удалось распознать задачу' }}</div>
+      </div>
 
-      <!-- Если нет ошибки и задача не завершена, показываем статус и прогресс -->
-      <ng-container *ngIf="youtubeTask && youtubeTask.status !== RecognizeStatus.Error && !youtubeTask.done">
-        <p>Статус: {{ getStatusText(youtubeTask?.status) }}</p>
+      <div
+        class="progress-status"
+        *ngIf="youtubeTask && youtubeTask.status !== RecognizeStatus.Error && !youtubeTask.done"
+      >
+        <span class="status-text">Текущий статус: {{ getStatusText(youtubeTask!.status) }}</span>
 
-        <!-- Полоса прогресса, если доступно -->
         <mat-progress-bar
-          *ngIf="youtubeTask?.status === RecognizeStatus.ApplyingPunctuationSegment &&
-                 youtubeTask?.segmentsTotal !== undefined &&
-                 youtubeTask?.segmentsProcessed !== undefined"
+          *ngIf="youtubeTask!.status === RecognizeStatus.ApplyingPunctuationSegment &&
+                  youtubeTask!.segmentsTotal !== undefined &&
+                  youtubeTask!.segmentsProcessed !== undefined"
           mode="determinate"
-          [value]="(youtubeTask.segmentsProcessed / youtubeTask.segmentsTotal) * 100"
+          [value]="(youtubeTask!.segmentsProcessed / youtubeTask!.segmentsTotal) * 100"
         ></mat-progress-bar>
 
-        <p *ngIf="youtubeTask?.status === RecognizeStatus.ApplyingPunctuationSegment">
-          Обработано: {{ youtubeTask?.segmentsProcessed }} из {{ youtubeTask?.segmentsTotal }}
+        <p *ngIf="youtubeTask!.status === RecognizeStatus.ApplyingPunctuationSegment">
+          Обработано: {{ youtubeTask!.segmentsProcessed }} из {{ youtubeTask!.segmentsTotal }}
         </p>
-      </ng-container>
-    </mat-card-content>
-  </mat-card>
+      </div>
+    </div>
+  </div>
 </ng-container>
 
 <ng-template #loading>
   <div class="spinner-container">
-    <mat-spinner></mat-spinner>
+    <mat-progress-spinner mode="indeterminate" diameter="48"></mat-progress-spinner>
   </div>
 </ng-template>

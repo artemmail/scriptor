@@ -8,6 +8,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatMenuModule } from '@angular/material/menu';
+import { Observable } from 'rxjs';
 import { LMarkdownEditorModule } from 'ngx-markdown-editor';
 import {
   OpenAiTranscriptionService,
@@ -26,7 +28,8 @@ import { MarkdownRendererService1 } from '../task-result/markdown-renderer.servi
     MatButtonModule,
     MatIconModule,
     MatSnackBarModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatMenuModule
   ],
   templateUrl: './transcription-editor.component.html',
   styleUrls: ['./transcription-editor.component.css']
@@ -95,80 +98,233 @@ export class TranscriptionEditorComponent implements OnInit {
     });
   }
 
-  onDownloadMd(): void {
-    if (!this.hasContent() || this.exporting) {
+  onDownload(format: 'md' | 'pdf' | 'docx' | 'srt'): void {
+    if (this.exporting || !this.isFormatAvailable(format)) {
       return;
     }
 
-    const blob = new Blob([this.markdownContent], { type: 'text/markdown' });
-    this.triggerDownload(blob, `${this.getFileBaseName()}.md`);
-  }
-
-  onDownloadPdf(): void {
-    if (!this.hasContent() || this.exporting) {
+    if (format === 'md') {
+      const blob = new Blob([this.markdownContent], { type: 'text/markdown' });
+      this.triggerDownload(blob, `${this.getFileBaseName()}.md`);
       return;
     }
 
     this.exporting = true;
-    this.transcriptionService.exportPdf(this.taskId).subscribe({
-      next: blob => {
-        this.triggerDownload(blob, `${this.getFileBaseName()}.pdf`);
+
+    let exportRequest$: Observable<Blob> | null = null;
+    let extension = '';
+    let errorMessage = '';
+
+    switch (format) {
+      case 'pdf':
+        exportRequest$ = this.transcriptionService.exportPdf(this.taskId);
+        extension = 'pdf';
+        errorMessage = 'Не удалось сформировать PDF файл.';
+        break;
+      case 'docx':
+        exportRequest$ = this.transcriptionService.exportDocx(this.taskId);
+        extension = 'docx';
+        errorMessage = 'Не удалось сформировать DOCX файл.';
+        break;
+      case 'srt':
+        exportRequest$ = this.transcriptionService.exportSrt(this.taskId);
+        extension = 'srt';
+        errorMessage = 'Не удалось сформировать SRT файл.';
+        break;
+      default:
+        this.exporting = false;
+        return;
+    }
+
+    if (!exportRequest$) {
+      this.exporting = false;
+      return;
+    }
+
+    exportRequest$.subscribe({
+      next: (blob: Blob) => {
+        this.triggerDownload(blob, `${this.getFileBaseName()}.${extension}`);
         this.exporting = false;
       },
       error: error => {
         this.exporting = false;
-        this.handleActionError(error, 'Не удалось сформировать PDF файл.');
+        this.handleActionError(error, errorMessage);
       }
     });
   }
 
-  onDownloadDocx(): void {
-    if (!this.hasContent() || this.exporting) {
-      return;
+  isFormatAvailable(format: 'md' | 'pdf' | 'docx' | 'srt'): boolean {
+    switch (format) {
+      case 'md':
+      case 'pdf':
+      case 'docx':
+        return this.hasContent();
+      case 'srt':
+        return !!this.task?.hasSegments;
+      default:
+        return false;
     }
-
-    this.exporting = true;
-    this.transcriptionService.exportDocx(this.taskId).subscribe({
-      next: blob => {
-        this.triggerDownload(blob, `${this.getFileBaseName()}.docx`);
-        this.exporting = false;
-      },
-      error: error => {
-        this.exporting = false;
-        this.handleActionError(error, 'Не удалось сформировать DOCX файл.');
-      }
-    });
   }
 
-  onCopyBbcode(): void {
-    if (!this.hasContent() || this.exporting) {
+  hasAnyDownloadOption(): boolean {
+    return (
+      this.isFormatAvailable('md') ||
+      this.isFormatAvailable('pdf') ||
+      this.isFormatAvailable('docx') ||
+      this.isFormatAvailable('srt')
+    );
+  }
+
+  onCopy(format: 'txt' | 'bbcode' | 'html' | 'markdown' | 'srt'): void {
+    if (this.exporting || !this.isCopyFormatAvailable(format)) {
       return;
     }
 
     this.exporting = true;
-    this.transcriptionService.exportBbcode(this.taskId).subscribe({
-      next: text => {
-        if (!navigator.clipboard || !navigator.clipboard.writeText) {
-          console.error('Clipboard API is not available');
-          this.snackBar.open('Буфер обмена недоступен в этом браузере', 'OK', { duration: 3000 });
-          this.exporting = false;
+    const finalize = () => {
+      this.exporting = false;
+    };
+
+    const copy = (text: string, successMessage: string, errorMessage?: string) => {
+      this.copyTextToClipboard(text, successMessage, errorMessage, finalize);
+    };
+
+    switch (format) {
+      case 'txt': {
+        const plainText = this.getPlainTextContent();
+        if (!plainText) {
+          finalize();
           return;
         }
-
-        navigator.clipboard.writeText(text).then(() => {
-          this.snackBar.open('BBCode скопирован в буфер обмена', '', { duration: 2000 });
-          this.exporting = false;
-        }).catch(err => {
-          console.error('Clipboard error', err);
-          this.snackBar.open('Не удалось скопировать в буфер обмена', 'OK', { duration: 3000 });
-          this.exporting = false;
-        });
-      },
-      error: error => {
-        this.exporting = false;
-        this.handleActionError(error, 'Не удалось подготовить BBCode.');
+        copy(plainText, 'Текст скопирован в буфер обмена');
+        return;
       }
-    });
+      case 'markdown':
+        copy(this.markdownContent, 'Markdown скопирован в буфер обмена');
+        return;
+      case 'html': {
+        const htmlContent = this.getRenderedHtmlContent();
+        if (!htmlContent) {
+          finalize();
+          return;
+        }
+        copy(htmlContent, 'HTML скопирован в буфер обмена');
+        return;
+      }
+      case 'bbcode':
+        this.transcriptionService.exportBbcode(this.taskId).subscribe({
+          next: text => copy(text, 'BBCode скопирован в буфер обмена'),
+          error: error => {
+            finalize();
+            this.handleActionError(error, 'Не удалось подготовить BBCode.');
+          }
+        });
+        return;
+      case 'srt':
+        this.transcriptionService.exportSrt(this.taskId).subscribe({
+          next: blob => {
+            blob
+              .text()
+              .then(text => {
+                copy(text, 'SRT скопирован в буфер обмена');
+              })
+              .catch(err => {
+                console.error('Blob read error', err);
+                this.snackBar.open('Не удалось подготовить SRT.', 'OK', { duration: 3000 });
+                finalize();
+              });
+          },
+          error: error => {
+            finalize();
+            this.handleActionError(error, 'Не удалось подготовить SRT.');
+          }
+        });
+        return;
+      default:
+        finalize();
+        return;
+    }
+  }
+
+  isCopyFormatAvailable(format: 'txt' | 'bbcode' | 'html' | 'markdown' | 'srt'): boolean {
+    switch (format) {
+      case 'txt':
+        return !!this.getPlainTextContent();
+      case 'bbcode':
+      case 'html':
+      case 'markdown':
+        return this.hasContent();
+      case 'srt':
+        return !!this.task?.hasSegments;
+      default:
+        return false;
+    }
+  }
+
+  hasAnyCopyOption(): boolean {
+    return (
+      this.isCopyFormatAvailable('txt') ||
+      this.isCopyFormatAvailable('bbcode') ||
+      this.isCopyFormatAvailable('html') ||
+      this.isCopyFormatAvailable('markdown') ||
+      this.isCopyFormatAvailable('srt')
+    );
+  }
+
+  private copyTextToClipboard(
+    text: string,
+    successMessage: string,
+    errorMessage = 'Не удалось скопировать в буфер обмена',
+    finalize?: () => void
+  ): void {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      console.error('Clipboard API is not available');
+      this.snackBar.open('Буфер обмена недоступен в этом браузере', 'OK', { duration: 3000 });
+      finalize?.();
+      return;
+    }
+
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        this.snackBar.open(successMessage, '', { duration: 2000 });
+        finalize?.();
+      })
+      .catch(err => {
+        console.error('Clipboard error', err);
+        this.snackBar.open(errorMessage, 'OK', { duration: 3000 });
+        finalize?.();
+      });
+  }
+
+  private getPlainTextContent(): string | null {
+    const processed = this.task?.processedText?.trim();
+    if (processed) {
+      return processed;
+    }
+
+    const recognized = this.task?.recognizedText?.trim();
+    if (recognized) {
+      return recognized;
+    }
+
+    const html = this.getRenderedHtmlContent();
+    if (!html) {
+      return null;
+    }
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    const plain = (tempDiv.textContent || tempDiv.innerText || '').trim();
+    return plain.length > 0 ? plain : null;
+  }
+
+  private getRenderedHtmlContent(): string | null {
+    if (!this.hasContent()) {
+      return null;
+    }
+
+    return this.markdownRenderer.renderMath(this.markdownContent);
   }
 
   onSave(): void {
