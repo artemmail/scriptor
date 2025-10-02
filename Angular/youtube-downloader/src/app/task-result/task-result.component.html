@@ -1,4 +1,4 @@
-<div class="recognized-card" *ngIf="youtubeTask as task" [class.fullscreen]="isResultFullscreen">
+<div class="recognized-card" *ngIf="youtubeTask as task">
   <div class="video-summary">
     <div class="video-summary-left">
       <button
@@ -30,7 +30,7 @@
     </div>
   </div>
 
-  <section class="result-block">
+  <section class="result-block" [class.fullscreen]="isResultFullscreen">
     <div class="result-header">
       <h2>Результат</h2>
       <div class="result-actions">
