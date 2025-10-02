@@ -1,8 +1,6 @@
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Extensions.Configuration;
 
 namespace YandexSpeech.services
 {
@@ -97,10 +95,10 @@ previously formatted segment that can be provided as assistant context. Do not a
             {
                 model = "gpt-4.1-mini",
                 messages,
-                temperature = 0.0,
-                stream = false,
-                response_format = new { type = "text" }
-        };
+                temperature = 0.0
+                //   stream = false,
+                //  response_format = new { type = "text" }
+            };
 
             using var content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
 
@@ -108,7 +106,7 @@ previously formatted segment that can be provided as assistant context. Do not a
             {
                 try
                 {
-                    var response = await client.PostAsync("https://api.openai.com/v1/responses", content);
+                    var response = await client.PostAsync("https://api.openai.com/v1/chat/completions", content);
                     if (response.IsSuccessStatusCode)
                     {
                         var json = await response.Content.ReadAsStringAsync();
