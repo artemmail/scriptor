@@ -1,7 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -27,8 +25,6 @@ import { OpenAiTranscriptionUploadDialogComponent } from './openai-transcription
   standalone: true,
   imports: [
     CommonModule,
-    MatCardModule,
-    MatButtonModule,
     MatIconModule,
     MatListModule,
     MatProgressSpinnerModule,
@@ -58,6 +54,11 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
 
   readonly OpenAiTranscriptionStatus = OpenAiTranscriptionStatus;
   readonly OpenAiTranscriptionStepStatus = OpenAiTranscriptionStepStatus;
+  readonly heroHighlights = [
+    'Скорость обработки — 1 час записи за 3 минуты',
+    'Поддержка 78 языков и автоматические тайм-коды',
+    'Удобный редактор с командной работой и AI-помощником',
+  ];
 
   private pollSubscription?: Subscription;
 
