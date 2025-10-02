@@ -47,7 +47,7 @@
   color: #16a34a;
 }
 
-.status-icon.status-success mat-icon {
+.status-icon.status-progress mat-icon {
   display: inline-block;
   animation: slow-rotate 5s linear infinite;
 }
