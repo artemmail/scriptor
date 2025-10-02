@@ -193,4 +193,16 @@ export class SubtitlesTasksComponent implements OnInit {
     };
     this.dialog.open(VideoDialogComponent, { width: '800px', data });
   }
+
+  get completedTasksCount(): number {
+    return this.dataSource.data.filter(task => !!task.done).length;
+  }
+
+  get inProgressTasksCount(): number {
+    return this.dataSource.data.filter(task => !task.done && task.status !== RecognizeStatus.Error).length;
+  }
+
+  get failedTasksCount(): number {
+    return this.dataSource.data.filter(task => task.status === RecognizeStatus.Error).length;
+  }
 }
