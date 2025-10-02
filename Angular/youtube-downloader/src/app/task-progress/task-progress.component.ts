@@ -8,7 +8,6 @@ import {
 } from '../services/subtitle.service';
 
 // Angular Material
-import { MatCardModule } from '@angular/material/card';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner'; // Импорт спиннера
 import { MatIconModule } from '@angular/material/icon';
@@ -23,12 +22,10 @@ import { YandexAdComponent } from "../ydx-ad/yandex-ad.component";
   standalone: true,
   imports: [
     CommonModule,
-    MatCardModule,
     MatIconModule,
     LocalTimePipe,
     MatProgressBarModule,
-    MatProgressSpinnerModule // Добавлен сюда
-    ,
+    MatProgressSpinnerModule,
     YandexAdComponent
 ],
   templateUrl: './task-progress.component.html',
@@ -87,6 +84,41 @@ export class TaskProgressComponent implements OnInit, OnDestroy {
 
   getStatusText(status: RecognizeStatus | null | undefined): string {
     return this.subtitleService.getStatusText(status);
+  }
+
+  getStatusIcon(status: RecognizeStatus | null | undefined): string {
+    switch (status) {
+      case RecognizeStatus.Error:
+        return 'error';
+      case RecognizeStatus.Done:
+        return 'check_circle';
+      default:
+        return 'loop';
+    }
+  }
+
+  getIconClass(status: RecognizeStatus | null | undefined): string {
+    if (status === RecognizeStatus.Error) {
+      return 'status-error';
+    }
+
+    if (status === RecognizeStatus.Done) {
+      return 'status-success';
+    }
+
+    return 'status-progress';
+  }
+
+  getCardClass(status: RecognizeStatus | null | undefined): string {
+    if (status === RecognizeStatus.Error) {
+      return 'status-error';
+    }
+
+    if (status === RecognizeStatus.Done) {
+      return 'status-success';
+    }
+
+    return '';
   }
 
   private processTask(task: YoutubeCaptionTaskDto) {

@@ -1,192 +1,115 @@
-<div class="container">
-  <!-- Десктопная версия (с mat-card) -->
-  <div class="desktop-only">
-    <mat-card class="blogblock youtube-result-card">
-      <mat-card-header>
-        <div class="header-flex">
-          <button
-            class="yt-logo-button"
-            matRipple
-            [matRippleColor]="'rgba(0,0,0,0.15)'"
-            (click)="openVideoDialog(youtubeTask)"
-            aria-label="Open video in dialog">
-            <img src="assets/yt.webp" alt="YouTube" class="youtube-logo" />
-          </button>
-          <div class="title-wrapper">
-            <mat-card-title class="video-title">
-              {{ promoText }}
-              <br>
-              {{ youtubeTask?.title }}
-            </mat-card-title>
-            <mat-card-subtitle *ngIf="youtubeTask?.channelName">
-              Channel: {{ youtubeTask?.channelName }}
-              /
-              {{ youtubeTask?.createdAt | localTime: 'yyyy-MM-dd HH:mm' }}
-            </mat-card-subtitle>
-          </div>
-        </div>
-      </mat-card-header>
-
-      <mat-card-content>
-        <div class="download-section">
-          <span class="download-text">Download</span>
-          <div class="download-icons">
-            <!-- PDF -->
-            <button
-              mat-icon-button
-              matTooltip="Download PDF"
-              (click)="downloadAsPdf()"
-              [disabled]="isDownloading">
-              <mat-icon class="icon-pdf">picture_as_pdf</mat-icon>
-            </button>
-
-            <!-- Word -->
-            <button
-              mat-icon-button
-              matTooltip="Download Word"
-              (click)="downloadAsWord()"
-              [disabled]="isDownloading">
-              <mat-icon svgIcon="icon-msword">description</mat-icon>
-            </button>
-
-            <!-- Markdown -->
-            <button
-              mat-icon-button
-              matTooltip="Download Markdown"
-              (click)="downloadAsMd()"
-              [disabled]="isDownloading">
-              <mat-icon svgIcon="icon-markdown">description</mat-icon>
-            </button>
-
-            <!-- HTML -->
-            <button
-              mat-icon-button
-              matTooltip="Download HTML"
-              (click)="downloadAsHtml()"
-              [disabled]="isDownloading">
-              <mat-icon svgIcon="icon-html">code</mat-icon>
-            </button>
-
-            <!-- Copy to clipboard -->
-            <button
-              mat-icon-button
-              matTooltip="Copy to clipboard"
-              (click)="copyToClipboard()"
-              [disabled]="isCopying">
-              <mat-icon>content_copy</mat-icon>
-            </button>
-
-          
-             
-<button
-  mat-icon-button
-  matTooltip="Download Subtitles (SRT)"
-  (click)="downloadAsSrt()"
-  [disabled]="isDownloading || !youtubeTask?.id">
-  <mat-icon>subtitles</mat-icon>
-</button>
-
-<button
-  mat-icon-button
-  [routerLink]="['/markdown-converter', youtubeTask?.id]"
-  matTooltip="Edit in Markdown editor"
-  [disabled]="!youtubeTask?.id">
-  <mat-icon>edit</mat-icon>
-</button>
-
-
-
-
-
-          </div>
-        </div>
-
-        <hr />
-        <app-yandex-ad></app-yandex-ad>
-        <div [innerHTML]="processedMarkdown" class="markdown-content"></div>
-      </mat-card-content>
-    </mat-card>
-  </div>
-
-  <!-- Мобильная версия (без mat-card) -->
-  <div class="mobile-only">
-    <app-yandex-ad></app-yandex-ad>
-
-    <div class="blogblock">
-      <div class="header-flex">
-        <button
-          class="yt-logo-button"
-          matRipple
-          [matRippleColor]="'rgba(0,0,0,0.15)'"
-          (click)="openVideoDialog(youtubeTask)"
-          aria-label="Open video in dialog">
-          <img src="assets/yt.webp" alt="YouTube" class="youtube-logo" />
-        </button>
-        <div class="title-wrapper">
-          <h2>{{ youtubeTask?.title }}</h2>
-          <h3 *ngIf="youtubeTask?.channelName">
-            Channel: {{ youtubeTask?.channelName }}
-          </h3>
-          <h4 *ngIf="youtubeTask?.createdAt">
-            {{ youtubeTask?.createdAt | localTime: 'yyyy-MM-dd HH:mm' }}
-          </h4>
+<div class="recognized-card" *ngIf="youtubeTask as task">
+  <div class="video-summary">
+    <div class="video-summary-left">
+      <button
+        class="yt-logo-button"
+        type="button"
+        (click)="openVideoDialog(task)"
+        aria-label="Открыть видео"
+      >
+        <img src="assets/yt.webp" alt="YouTube" class="youtube-logo" />
+      </button>
+      <div class="video-text">
+        <span class="promo-tagline">{{ promoText }}</span>
+        <h1 class="video-title" *ngIf="task.title; else defaultTitle">{{ task.title }}</h1>
+        <ng-template #defaultTitle>
+          <h1 class="video-title">Результат распознавания</h1>
+        </ng-template>
+        <div class="video-meta">
+          <span *ngIf="task.channelName">Канал: {{ task.channelName }}</span>
+          <span *ngIf="task.uploadDate">· Видео от {{ task.uploadDate | localTime: 'yyyy-MM-dd' }}</span>
+          <span *ngIf="task.createdAt">· Обновлено {{ task.createdAt | localTime: 'yyyy-MM-dd HH:mm' }}</span>
         </div>
       </div>
-
-      <div class="download-section">
-        <span class="download-text">Download</span>
-        <div class="download-icons">
-          <!-- PDF -->
-          <button
-            mat-icon-button
-            matTooltip="Download PDF"
-            (click)="downloadAsPdf()"
-            [disabled]="isDownloading">
-            <mat-icon class="icon-pdf">picture_as_pdf</mat-icon>
-          </button>
-
-          <!-- Word -->
-          <button
-            mat-icon-button
-            matTooltip="Download Word"
-            (click)="downloadAsWord()"
-            [disabled]="isDownloading">
-            <mat-icon class="icon-word">description</mat-icon>
-          </button>
-
-          <!-- Markdown -->
-          <button
-            mat-icon-button
-            matTooltip="Download Markdown"
-            (click)="downloadAsMd()"
-            [disabled]="isDownloading">
-            <mat-icon class="icon-md">description</mat-icon>
-          </button>
-
-          <!-- HTML -->
-          <button
-            mat-icon-button
-            matTooltip="Download HTML"
-            (click)="downloadAsHtml()"
-            [disabled]="isDownloading">
-            <mat-icon class="icon-html">code</mat-icon>
-          </button>
-
-          <!-- Copy to clipboard -->
-          <button
-            mat-icon-button
-            matTooltip="Copy to clipboard"
-            (click)="copyHtmlToClipboard()"
-            [disabled]="isCopying">
-            <mat-icon>content_copy</mat-icon>
-          </button>
-        </div>
-      </div>
-
-      <hr />
-      <div [innerHTML]="processedMarkdown" class="markdown-content"></div>
+    </div>
+    <div class="video-summary-actions">
+      <button class="btn btn-outline" type="button" (click)="openVideoDialog(task)">
+        <mat-icon>play_circle</mat-icon>
+        <span>Смотреть видео</span>
+      </button>
     </div>
   </div>
+
+  <section class="result-block">
+    <div class="result-header">
+      <h2>Результат</h2>
+      <div class="result-actions">
+        <a
+          class="btn btn-outline"
+          *ngIf="task.id"
+          [routerLink]="['/markdown-converter', task.id]"
+        >
+          <mat-icon>edit</mat-icon>
+          <span>Редактировать</span>
+        </a>
+        <button
+          class="btn btn-outline"
+          type="button"
+          [matMenuTriggerFor]="downloadMenu"
+          [disabled]="isDownloading || !hasAnyDownloadOption"
+        >
+          <mat-icon>download</mat-icon>
+          <span>Скачать</span>
+        </button>
+        <button
+          class="btn btn-outline"
+          type="button"
+          [matMenuTriggerFor]="copyMenu"
+          [disabled]="isCopying || !hasAnyCopyOption"
+        >
+          <mat-icon>content_copy</mat-icon>
+          <span>Копировать</span>
+        </button>
+      </div>
+    </div>
+
+    <mat-menu #downloadMenu="matMenu">
+      <button mat-menu-item (click)="downloadAsPdf()" [disabled]="isDownloading || !canDownloadFromServer">
+        <mat-icon>picture_as_pdf</mat-icon>
+        <span>PDF</span>
+      </button>
+      <button mat-menu-item (click)="downloadAsWord()" [disabled]="isDownloading || !canDownloadFromServer">
+        <mat-icon>description</mat-icon>
+        <span>Word (.docx)</span>
+      </button>
+      <button mat-menu-item (click)="downloadAsSrt()" [disabled]="isDownloading || !canDownloadFromServer">
+        <mat-icon>subtitles</mat-icon>
+        <span>SRT субтитры</span>
+      </button>
+      <button mat-menu-item (click)="downloadAsMd()" [disabled]="isDownloading || !hasResultText">
+        <mat-icon>article</mat-icon>
+        <span>Markdown (.md)</span>
+      </button>
+      <button mat-menu-item (click)="downloadAsHtml()" [disabled]="isDownloading || !hasResultText">
+        <mat-icon>language</mat-icon>
+        <span>HTML</span>
+      </button>
+    </mat-menu>
+
+    <mat-menu #copyMenu="matMenu">
+      <button mat-menu-item (click)="copyToClipboard()" [disabled]="isCopying || !hasResultText">
+        <mat-icon>notes</mat-icon>
+        <span>Текст (plain)</span>
+      </button>
+      <button mat-menu-item (click)="copyHtmlToClipboard()" [disabled]="isCopying || !hasResultText">
+        <mat-icon>code</mat-icon>
+        <span>HTML</span>
+      </button>
+    </mat-menu>
+
+    <div class="result-alert" *ngIf="task.error">{{ task.error }}</div>
+
+    <app-yandex-ad></app-yandex-ad>
+
+    <div
+      class="markdown-content"
+      #markdownContent
+      [innerHTML]="processedMarkdown"
+      *ngIf="hasResultText; else emptyState"
+    ></div>
+
+    <ng-template #emptyState>
+      <div class="empty-state">Расшифровка пока недоступна.</div>
+    </ng-template>
+  </section>
 </div>
-
-
