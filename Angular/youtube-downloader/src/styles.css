@@ -6,7 +6,7 @@ body {
   margin: 0;
   font-family: Roboto, "Helvetica Neue", sans-serif;
   min-height: 100vh;
-  background: #f5f4ef;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef2ff 100%);
 }
 
 /* Если нужно, можно убрать или откорректировать стили для контейнеров Angular Material */
@@ -196,7 +196,7 @@ blockquote {
 
 @media (max-width: 600px) {
   html, body {
-    background: #fff !important;
+    background: linear-gradient(180deg, #f8fbff 0%, #eef2ff 100%) !important;
   }
   .blogblock,
   .wblogblock,
