@@ -1,7 +1,5 @@
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, OnInit } from '@angular/core';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs/operators';
@@ -24,8 +22,6 @@ interface BlogTopicViewModel extends BlogTopic {
   standalone: true,
   imports: [
     CommonModule,
-    MatCardModule,
-    MatButtonModule,
     MatProgressSpinnerModule,
     InfiniteScrollModule,
     RouterModule
@@ -46,6 +42,18 @@ export class BlogFeedComponent implements OnInit {
 
   canCreateTopics = false;
   isModerator = false;
+
+  readonly heroHighlights = [
+    'Новости продукта и команды YouScriptor',
+    'Гайды по работе с расшифровками и контентом',
+    'Истории клиентов и лучшие практики'
+  ];
+
+  readonly cardHighlights = [
+    'Интервью и обзоры функций',
+    'Инструкции по автоматизации процессов',
+    'Советы экспертов и сообществ'
+  ];
 
   constructor(
     private readonly blogService: BlogService,
