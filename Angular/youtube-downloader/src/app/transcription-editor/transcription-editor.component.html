@@ -15,32 +15,47 @@
     <button
       mat-raised-button
       color="primary"
-      (click)="onDownloadMd()"
-      [disabled]="!hasContent() || exporting"
+      [matMenuTriggerFor]="downloadMenu"
+      [disabled]="exporting || !hasAnyDownloadOption()"
     >
       <mat-icon>download</mat-icon>
-      Скачать .md
+      Скачать
     </button>
 
-    <button
-      mat-raised-button
-      color="primary"
-      (click)="onDownloadPdf()"
-      [disabled]="!hasContent() || exporting"
-    >
-      <mat-icon>picture_as_pdf</mat-icon>
-      PDF
-    </button>
-
-    <button
-      mat-raised-button
-      color="primary"
-      (click)="onDownloadDocx()"
-      [disabled]="!hasContent() || exporting"
-    >
-      <mat-icon>description</mat-icon>
-      DOCX
-    </button>
+    <mat-menu #downloadMenu="matMenu">
+      <button
+        mat-menu-item
+        (click)="onDownload('md')"
+        [disabled]="exporting || !isFormatAvailable('md')"
+      >
+        <mat-icon>article</mat-icon>
+        Markdown (.md)
+      </button>
+      <button
+        mat-menu-item
+        (click)="onDownload('pdf')"
+        [disabled]="exporting || !isFormatAvailable('pdf')"
+      >
+        <mat-icon>picture_as_pdf</mat-icon>
+        PDF
+      </button>
+      <button
+        mat-menu-item
+        (click)="onDownload('docx')"
+        [disabled]="exporting || !isFormatAvailable('docx')"
+      >
+        <mat-icon>description</mat-icon>
+        Word (.docx)
+      </button>
+      <button
+        mat-menu-item
+        (click)="onDownload('srt')"
+        [disabled]="exporting || !isFormatAvailable('srt')"
+      >
+        <mat-icon>subtitles</mat-icon>
+        SRT субтитры
+      </button>
+    </mat-menu>
 
     <button
       mat-stroked-button
