@@ -1,24 +1,27 @@
-<div class="task-page-container">
+<div class="recognized-page transcription-page">
+  <main class="page-content">
+    <section class="recognized-section">
+      <ng-container *ngIf="taskDone && task; else showProgressOrError">
+        <app-task-result [youtubeTask]="task"></app-task-result>
+      </ng-container>
 
-  <!-- Отображаем TaskResultComponent, если задача завершена -->
-  <ng-container *ngIf="taskDone && task; else showProgressOrError">
-    <app-task-result [youtubeTask]="task"></app-task-result>
-  </ng-container>
+      <ng-template #showProgressOrError>
+        <ng-container *ngIf="taskErrorMessage; else showProgress">
+          <div class="info-panel error-state">
+            <h2>Возникла ошибка</h2>
+            <p class="error-message">{{ taskErrorMessage }}</p>
+          </div>
+        </ng-container>
 
-  <!-- Иначе, отображаем TaskProgressComponent или сообщение об ошибке -->
-  <ng-template #showProgressOrError>
-    <ng-container *ngIf="taskErrorMessage; else showProgress">
-      <p class="error-message">Error: {{ taskErrorMessage }}</p>
-    </ng-container>
-
-    <ng-template #showProgress>
-      <app-task-progress
-        [taskId]="taskId"
-        (taskLoaded)="onTaskLoaded($event)"
-        (taskDone)="onTaskDone($event)"
-        (taskError)="onTaskError($event)"
-      ></app-task-progress>
-    </ng-template>
-  </ng-template>
-
+        <ng-template #showProgress>
+          <app-task-progress
+            [taskId]="taskId"
+            (taskLoaded)="onTaskLoaded($event)"
+            (taskDone)="onTaskDone($event)"
+            (taskError)="onTaskError($event)"
+          ></app-task-progress>
+        </ng-template>
+      </ng-template>
+    </section>
+  </main>
 </div>
