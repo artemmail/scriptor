@@ -122,41 +122,99 @@
                         <button
                           class="btn btn-outline"
                           type="button"
-                          (click)="exportDocx()"
-                          [disabled]="exportingDocx"
+                          [matMenuTriggerFor]="downloadMenu"
+                          [disabled]="downloadInProgress || !hasAnyDownloadOption()"
                         >
-                          <mat-icon>description</mat-icon>
-                          <span>Word</span>
+                          <mat-icon>download</mat-icon>
+                          <span>Скачать</span>
                         </button>
                         <button
                           class="btn btn-outline"
                           type="button"
-                          (click)="exportPdf()"
-                          [disabled]="exportingPdf"
+                          [matMenuTriggerFor]="copyMenu"
+                          [disabled]="copying || !hasAnyCopyOption()"
                         >
-                          <mat-icon>picture_as_pdf</mat-icon>
-                          <span>PDF</span>
-                        </button>
-                        <button
-                          class="btn btn-outline"
-                          type="button"
-                          (click)="downloadMarkdown()"
-                          [disabled]="!hasMarkdown()"
-                        >
-                          <mat-icon>code</mat-icon>
-                          <span>Markdown</span>
-                        </button>
-                        <button
-                          class="btn btn-outline"
-                          type="button"
-                          (click)="downloadSrt()"
-                          [disabled]="!canDownloadSrt() || downloadingSrt"
-                        >
-                          <mat-icon>subtitles</mat-icon>
-                          <span>SRT</span>
+                          <mat-icon>content_copy</mat-icon>
+                          <span>Копировать</span>
                         </button>
                       </div>
                     </div>
+                    <mat-menu #downloadMenu="matMenu">
+                      <button
+                        mat-menu-item
+                        (click)="onDownload('md')"
+                        [disabled]="!isDownloadFormatAvailable('md') || downloadInProgress"
+                      >
+                        <mat-icon>article</mat-icon>
+                        <span>Markdown (.md)</span>
+                      </button>
+                      <button
+                        mat-menu-item
+                        (click)="onDownload('pdf')"
+                        [disabled]="!isDownloadFormatAvailable('pdf') || downloadInProgress"
+                      >
+                        <mat-icon>picture_as_pdf</mat-icon>
+                        <span>PDF</span>
+                      </button>
+                      <button
+                        mat-menu-item
+                        (click)="onDownload('docx')"
+                        [disabled]="!isDownloadFormatAvailable('docx') || downloadInProgress"
+                      >
+                        <mat-icon>description</mat-icon>
+                        <span>Word (.docx)</span>
+                      </button>
+                      <button
+                        mat-menu-item
+                        (click)="onDownload('srt')"
+                        [disabled]="!isDownloadFormatAvailable('srt') || downloadInProgress"
+                      >
+                        <mat-icon>subtitles</mat-icon>
+                        <span>SRT субтитры</span>
+                      </button>
+                    </mat-menu>
+                    <mat-menu #copyMenu="matMenu">
+                      <button
+                        mat-menu-item
+                        (click)="onCopy('txt')"
+                        [disabled]="!isCopyFormatAvailable('txt') || copying"
+                      >
+                        <mat-icon>notes</mat-icon>
+                        <span>Текст (plain)</span>
+                      </button>
+                      <button
+                        mat-menu-item
+                        (click)="onCopy('markdown')"
+                        [disabled]="!isCopyFormatAvailable('markdown') || copying"
+                      >
+                        <mat-icon>code</mat-icon>
+                        <span>Markdown</span>
+                      </button>
+                      <button
+                        mat-menu-item
+                        (click)="onCopy('html')"
+                        [disabled]="!isCopyFormatAvailable('html') || copying"
+                      >
+                        <mat-icon>language</mat-icon>
+                        <span>HTML</span>
+                      </button>
+                      <button
+                        mat-menu-item
+                        (click)="onCopy('bbcode')"
+                        [disabled]="!isCopyFormatAvailable('bbcode') || copying"
+                      >
+                        <mat-icon>format_quote</mat-icon>
+                        <span>BBCode</span>
+                      </button>
+                      <button
+                        mat-menu-item
+                        (click)="onCopy('srt')"
+                        [disabled]="!isCopyFormatAvailable('srt') || copying"
+                      >
+                        <mat-icon>subtitles</mat-icon>
+                        <span>SRT субтитры</span>
+                      </button>
+                    </mat-menu>
                     <div class="error" *ngIf="exportError">{{ exportError }}</div>
                     <div
                       class="markdown-content"

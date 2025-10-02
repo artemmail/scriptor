@@ -3,10 +3,13 @@ import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatButtonModule } from '@angular/material/button';
 import { RouterModule } from '@angular/router';
 import { Subscription, timer } from 'rxjs';
 import { exhaustMap } from 'rxjs/operators';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import {
   OpenAiTranscriptionService,
   OpenAiTranscriptionStatus,
@@ -28,6 +31,9 @@ import { OpenAiTranscriptionUploadDialogComponent } from './openai-transcription
     MatIconModule,
     MatListModule,
     MatProgressSpinnerModule,
+    MatMenuModule,
+    MatButtonModule,
+    MatSnackBarModule,
     LocalTimePipe,
     RouterModule,
   ],
@@ -49,6 +55,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   exportingPdf = false;
   exportingDocx = false;
   downloadingSrt = false;
+  copying = false;
   renderedMarkdown: SafeHtml | null = null;
   private markdownSource = '';
 
@@ -62,11 +69,16 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
 
   private pollSubscription?: Subscription;
 
+  get downloadInProgress(): boolean {
+    return this.exportingPdf || this.exportingDocx || this.downloadingSrt;
+  }
+
   constructor(
     private readonly transcriptionService: OpenAiTranscriptionService,
     private readonly markdownRenderer: MarkdownRendererService1,
     private readonly sanitizer: DomSanitizer,
-    private readonly dialog: MatDialog
+    private readonly dialog: MatDialog,
+    private readonly snackBar: MatSnackBar
   ) {}
 
   ngOnInit(): void {
@@ -248,11 +260,60 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     return !!this.selectedTask?.hasSegments;
   }
 
+  hasAnyDownloadOption(): boolean {
+    return (
+      this.isDownloadFormatAvailable('md') ||
+      this.isDownloadFormatAvailable('pdf') ||
+      this.isDownloadFormatAvailable('docx') ||
+      this.isDownloadFormatAvailable('srt')
+    );
+  }
+
+  isDownloadFormatAvailable(format: 'md' | 'pdf' | 'docx' | 'srt'): boolean {
+    switch (format) {
+      case 'md':
+        return this.hasMarkdown();
+      case 'pdf':
+      case 'docx':
+        return !!this.selectedTaskId && this.hasMarkdown();
+      case 'srt':
+        return this.canDownloadSrt();
+      default:
+        return false;
+    }
+  }
+
+  onDownload(format: 'md' | 'pdf' | 'docx' | 'srt'): void {
+    if (this.downloadInProgress || !this.isDownloadFormatAvailable(format)) {
+      return;
+    }
+
+    this.exportError = null;
+
+    switch (format) {
+      case 'md':
+        this.downloadMarkdown();
+        return;
+      case 'pdf':
+        this.exportPdf();
+        return;
+      case 'docx':
+        this.exportDocx();
+        return;
+      case 'srt':
+        this.downloadSrt();
+        return;
+      default:
+        return;
+    }
+  }
+
   downloadMarkdown(): void {
     if (!this.selectedTask || !this.hasMarkdown()) {
       return;
     }
 
+    this.exportError = null;
     const blob = new Blob([this.markdownSource], { type: 'text/markdown' });
     this.saveBlob(blob, this.buildFileName('md'));
   }
@@ -276,6 +337,114 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
           this.extractError(error) ?? 'Не удалось экспортировать SRT.';
       },
     });
+  }
+
+  hasAnyCopyOption(): boolean {
+    return (
+      this.isCopyFormatAvailable('txt') ||
+      this.isCopyFormatAvailable('markdown') ||
+      this.isCopyFormatAvailable('html') ||
+      this.isCopyFormatAvailable('bbcode') ||
+      this.isCopyFormatAvailable('srt')
+    );
+  }
+
+  isCopyFormatAvailable(format: 'txt' | 'markdown' | 'html' | 'bbcode' | 'srt'): boolean {
+    switch (format) {
+      case 'txt':
+        return !!this.getPlainTextContent();
+      case 'markdown':
+        return this.hasMarkdown();
+      case 'html':
+        return !!this.getRenderedHtmlContent();
+      case 'bbcode':
+        return !!this.selectedTaskId && this.hasMarkdown();
+      case 'srt':
+        return this.canDownloadSrt();
+      default:
+        return false;
+    }
+  }
+
+  onCopy(format: 'txt' | 'markdown' | 'html' | 'bbcode' | 'srt'): void {
+    if (this.copying || !this.isCopyFormatAvailable(format)) {
+      return;
+    }
+
+    this.copying = true;
+    const finalize = () => {
+      this.copying = false;
+    };
+
+    const copy = (text: string, successMessage: string, errorMessage?: string) => {
+      this.copyTextToClipboard(text, successMessage, errorMessage, finalize);
+    };
+
+    switch (format) {
+      case 'txt': {
+        const plainText = this.getPlainTextContent();
+        if (!plainText) {
+          finalize();
+          return;
+        }
+        copy(plainText, 'Текст скопирован в буфер обмена');
+        return;
+      }
+      case 'markdown':
+        copy(this.markdownSource, 'Markdown скопирован в буфер обмена');
+        return;
+      case 'html': {
+        const htmlContent = this.getRenderedHtmlContent();
+        if (!htmlContent) {
+          finalize();
+          return;
+        }
+        copy(htmlContent, 'HTML скопирован в буфер обмена');
+        return;
+      }
+      case 'bbcode': {
+        if (!this.selectedTaskId) {
+          finalize();
+          return;
+        }
+        this.transcriptionService.exportBbcode(this.selectedTaskId).subscribe({
+          next: (text) => copy(text, 'BBCode скопирован в буфер обмена'),
+          error: (error) => {
+            finalize();
+            this.handleActionError(error, 'Не удалось подготовить BBCode.');
+          },
+        });
+        return;
+      }
+      case 'srt': {
+        if (!this.selectedTaskId) {
+          finalize();
+          return;
+        }
+        this.transcriptionService.exportSrt(this.selectedTaskId).subscribe({
+          next: (blob) => {
+            blob
+              .text()
+              .then((text) => {
+                copy(text, 'SRT скопирован в буфер обмена');
+              })
+              .catch((error) => {
+                console.error('Blob read error', error);
+                finalize();
+                this.snackBar.open('Не удалось подготовить SRT.', 'OK', { duration: 3000 });
+              });
+          },
+          error: (error) => {
+            finalize();
+            this.handleActionError(error, 'Не удалось подготовить SRT.');
+          },
+        });
+        return;
+      }
+      default:
+        finalize();
+        return;
+    }
   }
 
   exportPdf(): void {
@@ -316,6 +485,67 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
         this.exportError = this.extractError(error) ?? 'Не удалось экспортировать DOCX.';
       },
     });
+  }
+
+  private copyTextToClipboard(
+    text: string,
+    successMessage: string,
+    errorMessage = 'Не удалось скопировать в буфер обмена',
+    finalize?: () => void
+  ): void {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      console.error('Clipboard API is not available');
+      this.snackBar.open('Буфер обмена недоступен в этом браузере', 'OK', { duration: 3000 });
+      finalize?.();
+      return;
+    }
+
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        this.snackBar.open(successMessage, '', { duration: 2000 });
+        finalize?.();
+      })
+      .catch((error) => {
+        console.error('Clipboard error', error);
+        this.snackBar.open(errorMessage, 'OK', { duration: 3000 });
+        finalize?.();
+      });
+  }
+
+  private getPlainTextContent(): string | null {
+    const processed = this.selectedTask?.processedText?.trim();
+    if (processed) {
+      return processed;
+    }
+
+    const recognized = this.selectedTask?.recognizedText?.trim();
+    if (recognized) {
+      return recognized;
+    }
+
+    const html = this.getRenderedHtmlContent();
+    if (!html) {
+      return null;
+    }
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    const plain = (tempDiv.textContent || tempDiv.innerText || '').trim();
+    return plain.length > 0 ? plain : null;
+  }
+
+  private getRenderedHtmlContent(): string | null {
+    if (!this.hasMarkdown()) {
+      return null;
+    }
+
+    return this.markdownRenderer.renderMath(this.markdownSource);
+  }
+
+  private handleActionError(error: unknown, fallback: string): void {
+    const message = this.extractError(error) ?? fallback;
+    this.snackBar.open(message, 'OK', { duration: 3000 });
   }
 
   private saveBlob(blob: Blob, filename: string): void {
