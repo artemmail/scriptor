@@ -1,127 +1,378 @@
-/* ===== Фон и базовый flex-контейнер ================================ */
 :host {
+  display: block;
+  color: #102a43;
+  font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef3ff 100%);
+}
+
+.subtitles-page {
+  min-height: 100vh;
+}
+
+.page-content {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
-  background: #eef3f8;   /* тот же фон, что и у recognition */
+  gap: 96px;
+  padding: 72px 32px 120px;
 }
 
-/* ---------- Layout & flex ---------- */
+section {
+  max-width: 1200px;
+  margin: 0 auto;
+}
 
-.table-card.h-100 {
-  height: 100%;
+.hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 48px;
+  align-items: center;
+}
+
+.hero-text h1 {
+  font-size: 3rem;
+  line-height: 1.15;
+  margin-bottom: 24px;
+  color: #0f172a;
+}
+
+.hero-lead {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin-bottom: 24px;
+  max-width: 560px;
+  color: #334155;
+}
+
+.hero-highlights {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.hero-highlights li {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 16px;
+  padding: 12px 18px;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.hero-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 32px;
+  padding: 32px;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
+  display: grid;
+  gap: 24px;
+}
+
+.card-header {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #0b1f33;
+}
+
+.queue-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.metric {
+  background: #f8fbff;
+  border-radius: 20px;
+  padding: 16px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.metric-label {
+  font-size: 0.85rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.metric-value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.card-hint {
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.tasks-card {
+  border-radius: 32px !important;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.tasks-card mat-card-header {
+  padding: 32px 32px 0;
+}
+
+.tasks-card mat-card-title {
+  font-size: 2rem;
+  margin-bottom: 8px;
+  color: #0b1f33;
+}
+
+.tasks-card mat-card-subtitle {
+  font-size: 1rem;
+  color: #475569;
+}
+
+.tasks-card mat-card-content {
+  padding: 0 32px 32px;
+}
+
+.table-scroll {
   display: flex;
   flex-direction: column;
+  gap: 24px;
 }
 
-.card-content-flex {
+.filter-toolbar {
   display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
+  justify-content: flex-start;
 }
 
-.desktop-scroll-container {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  min-height: 0;
+.filter-field {
+  width: min(100%, 420px);
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: 16px;
 }
-
-/* мобильный: теперь тоже flex-item с прокруткой */
-.mobile-container {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-/* ---------- Table & misc ---------- */
-
-.custom-table { width: 100%; }
-
-.error-text { color: #f44336; }
-
-.filter-field { width: 100%; max-width: 400px; margin-bottom: 20px; }
-
-.markdown-container { max-height: 100px; overflow: hidden; transition: max-height .3s; }
-.markdown-container.collapsed { max-height: 100px; }
-.markdown-container:not(.collapsed) { max-height: none; }
-
-.actions { margin-top: 8px; display: flex; align-items: center; }
-
-.recognized-link { margin-left: 8px; color: #3f51b5; text-decoration: underline; }
-.recognized-link:hover { color: #303f9f; }
-
-/* Icons */
-.icon-status-done   { color: #4caf50; }
-.icon-status-error  { color: #f44336; }
-@keyframes slow-rotate { from {transform:rotate(0)} to {transform:rotate(-360deg)} }
-.icon-status-pending { color:#2196f3; display:inline-block; animation:slow-rotate 5s linear infinite; }
-
-/* YouTube logo */
-.youtube-logo-button { width:40px; height:40px; padding:0; background:transparent!important; border:none!important; }
-.youtube-logo { width:100%; height:100%; object-fit:contain; }
-.youtube-logo-button:hover .youtube-logo { filter:brightness(1.2); }
-
-/* ---------- Mobile layout tweaks ---------- */
-
-@media (max-width: 600px) {
-  .mobile-cell { display:flex; flex-direction:column; gap:8px; padding:8px; }
-  .mobile-header { display:flex; justify-content:space-between; align-items:center; }
-  .mobile-title { flex:1; }
-}
-
-
-:host {
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-  background: #eef3f8;       /* свой фон */
-}
-
-/* ТОТ ЖЕ контейнер, что и раньше: прокрутка внутри */
-.table-card.h-100 {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.card-content-flex {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.desktop-scroll-container {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-/* мобильная прокрутка */
-.mobile-container {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-/* …остальные стили без изменений… */
-
-
-/* отменяем все внутренние скроллы */
-.table-card {
-  /* убираем фиксированную высоту — пусть страница скроллится целиком */
-  height: auto; /* was 100% :contentReference[oaicite:2]{index=2} */
-}
-.card-content {
-  display: block; /* was flex… */
-}
-
-/* Старые локальные контейнеры с overflow убираем entirely */
-/* .desktop-scroll-container, .mobile-container { overflow-y: auto; } */
 
 .custom-table {
   width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #ffffff;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.08);
 }
 
-/* остальные стили без изменений */
+.custom-table thead tr {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.custom-table th {
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #475569;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.custom-table td {
+  padding: 18px 20px;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  color: #0f172a;
+}
+
+.custom-table tr:last-child td {
+  border-bottom: none;
+}
+
+.custom-table a {
+  color: #1d4ed8;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.custom-table a:hover {
+  text-decoration: underline;
+}
+
+.status-text {
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+.status-progress {
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.error-text {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.markdown-container {
+  max-height: 140px;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+  border-radius: 16px;
+  background: rgba(241, 245, 249, 0.6);
+  padding: 12px 16px;
+}
+
+.markdown-container.collapsed {
+  max-height: 140px;
+}
+
+.markdown-container:not(.collapsed) {
+  max-height: none;
+}
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.recognized-link {
+  font-weight: 600;
+  color: #1d4ed8;
+}
+
+.recognized-link:hover {
+  text-decoration: underline;
+}
+
+.icon-status-done {
+  color: #22c55e;
+}
+
+.icon-status-error {
+  color: #ef4444;
+}
+
+.icon-status-pending {
+  color: #2563eb;
+  display: inline-block;
+  animation: slow-rotate 5s linear infinite;
+}
+
+@keyframes slow-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+.youtube-logo-button {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.youtube-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.youtube-logo-button:hover .youtube-logo {
+  filter: brightness(1.15);
+}
+
+.youtube-logo-button:hover {
+  transform: translateY(-2px);
+}
+
+.mobile-container {
+  display: grid;
+  gap: 16px;
+  padding: 24px 0 0;
+}
+
+.mobile-table {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.mobile-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.08);
+  display: grid;
+  gap: 16px;
+}
+
+.mobile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mobile-title h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+
+.mobile-title p {
+  margin: 4px 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.mobile-body {
+  display: grid;
+  gap: 12px;
+}
+
+.mat-mdc-progress-bar {
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .page-content {
+    gap: 72px;
+    padding: 48px 20px 96px;
+  }
+
+  .hero-text h1 {
+    font-size: 2.4rem;
+  }
+
+  .tasks-card mat-card-header,
+  .tasks-card mat-card-content {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+@media (max-width: 600px) {
+  .hero {
+    gap: 32px;
+  }
+
+  .hero-text h1 {
+    font-size: 2rem;
+  }
+
+  .page-content {
+    padding: 40px 16px 80px;
+  }
+
+  .filter-field {
+    width: 100%;
+  }
+}
