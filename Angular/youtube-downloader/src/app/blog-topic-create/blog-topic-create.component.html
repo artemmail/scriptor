@@ -1,67 +1,83 @@
-<div class="create-topic-container">
-  <mat-card>
-    <mat-card-header>
-      <mat-card-title>
-        {{ isEditMode ? 'Редактирование темы' : 'Новая тема' }}
-      </mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
-      <div class="load-state" *ngIf="loadingTopic">
-        <mat-spinner diameter="40"></mat-spinner>
-      </div>
-      <div class="load-state error" *ngIf="loadError">
-        <span>{{ loadError }}</span>
-        <button
-          mat-stroked-button
-          type="button"
-          (click)="retryLoad()"
-          *ngIf="isEditMode"
+<div class="blog-page">
+  <main class="page-content">
+    <section class="editor-shell">
+      <a class="back-link" [routerLink]="['/blog']">← Вернуться к блогу</a>
+
+      <div class="editor-card">
+        <header class="editor-header">
+          <span class="editor-eyebrow">{{ isEditMode ? 'Редактирование' : 'Новая публикация' }}</span>
+          <h1>{{ isEditMode ? 'Обновите материал' : 'Поделитесь своей историей' }}</h1>
+          <p>
+            Заполните форму ниже, чтобы {{ isEditMode ? 'обновить тему' : 'создать новую тему' }} сообщества. Опубликуйте
+            практики, кейсы и рекомендации.
+          </p>
+        </header>
+
+        <div class="load-state" *ngIf="loadingTopic">
+          <mat-spinner diameter="44"></mat-spinner>
+        </div>
+
+        <div class="load-state error" *ngIf="loadError">
+          <span>{{ loadError }}</span>
+          <button class="btn btn-outline" type="button" (click)="retryLoad()" *ngIf="isEditMode">
+            Повторить
+          </button>
+        </div>
+
+        <form
+          class="editor-form"
+          *ngIf="!loadingTopic && (!isEditMode || !loadError)"
+          [formGroup]="topicForm"
+          (ngSubmit)="onSubmit()"
         >
-          Повторить
-        </button>
+          <div class="form-field" [class.invalid]="topicForm.controls['title'].invalid && topicForm.controls['title'].touched">
+            <div class="field-header">
+              <label for="topic-title">Заголовок</label>
+              <span class="char-counter">{{ titleLength }}/256</span>
+            </div>
+            <input
+              id="topic-title"
+              type="text"
+              maxlength="256"
+              formControlName="title"
+              class="text-input"
+              placeholder="Например, Как мы ускорили разметку подкастов"
+            />
+            <div class="field-error" *ngIf="topicForm.controls['title'].hasError('required') && topicForm.controls['title'].touched">
+              Укажите заголовок
+            </div>
+          </div>
+
+          <div class="editor-section" [class.invalid]="topicForm.controls['text'].invalid && topicForm.controls['text'].touched">
+            <div class="field-header">
+              <label for="topic-text">Текст</label>
+              <span class="char-counter">{{ textLength }}</span>
+            </div>
+            <md-editor
+              id="topic-text"
+              formControlName="text"
+              preview="vertical"
+              height="'420px'"
+              [options]="editorOptions"
+              [preRender]="preRender"
+            ></md-editor>
+            <div class="field-hint">Используйте Markdown, чтобы структурировать материал.</div>
+            <div class="field-error" *ngIf="topicForm.controls['text'].hasError('required') && topicForm.controls['text'].touched">
+              Укажите текст темы
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="text-button" type="button" (click)="onCancel()" [disabled]="submitting">
+              Отмена
+            </button>
+            <span class="error" *ngIf="submitError">{{ submitError }}</span>
+            <button class="btn btn-primary" type="submit" [disabled]="submitting">
+              {{ isEditMode ? 'Сохранить' : 'Опубликовать' }}
+            </button>
+          </div>
+        </form>
       </div>
-      <form
-        *ngIf="!loadingTopic && (!isEditMode || !loadError)"
-        [formGroup]="topicForm"
-        (ngSubmit)="onSubmit()"
-      >
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Заголовок</mat-label>
-          <input matInput formControlName="title" maxlength="256" />
-          <mat-hint align="end">{{ titleLength }}/256</mat-hint>
-          <mat-error *ngIf="topicForm.controls['title'].hasError('required')">
-            Укажите заголовок
-          </mat-error>
-        </mat-form-field>
-
-        <div class="editor-section" [class.invalid]="topicForm.controls['text'].invalid && topicForm.controls['text'].touched">
-          <div class="editor-header">
-            <label for="topic-text">Текст</label>
-            <span class="char-counter">{{ textLength }}</span>
-          </div>
-          <md-editor
-            id="topic-text"
-            formControlName="text"
-            preview="vertical"
-            height="'420px'"
-            [options]="editorOptions"
-            [preRender]="preRender"
-          ></md-editor>
-          <div class="editor-error" *ngIf="topicForm.controls['text'].hasError('required') && topicForm.controls['text'].touched">
-            Укажите текст темы
-          </div>
-        </div>
-
-        <div class="form-actions">
-          <button mat-stroked-button type="button" (click)="onCancel()" [disabled]="submitting">
-            Отмена
-          </button>
-          <span class="error" *ngIf="submitError">{{ submitError }}</span>
-          <button mat-flat-button color="primary" type="submit" [disabled]="submitting">
-            {{ isEditMode ? 'Сохранить' : 'Опубликовать' }}
-          </button>
-        </div>
-      </form>
-    </mat-card-content>
-  </mat-card>
+    </section>
+  </main>
 </div>
