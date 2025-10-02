@@ -15,42 +15,100 @@
     <button
       mat-raised-button
       color="primary"
-      (click)="onDownloadMd()"
-      [disabled]="!hasContent() || exporting"
+      [matMenuTriggerFor]="downloadMenu"
+      [disabled]="exporting || !hasAnyDownloadOption()"
     >
       <mat-icon>download</mat-icon>
-      Скачать .md
+      Скачать
     </button>
 
-    <button
-      mat-raised-button
-      color="primary"
-      (click)="onDownloadPdf()"
-      [disabled]="!hasContent() || exporting"
-    >
-      <mat-icon>picture_as_pdf</mat-icon>
-      PDF
-    </button>
-
-    <button
-      mat-raised-button
-      color="primary"
-      (click)="onDownloadDocx()"
-      [disabled]="!hasContent() || exporting"
-    >
-      <mat-icon>description</mat-icon>
-      DOCX
-    </button>
+    <mat-menu #downloadMenu="matMenu">
+      <button
+        mat-menu-item
+        (click)="onDownload('md')"
+        [disabled]="exporting || !isFormatAvailable('md')"
+      >
+        <mat-icon>article</mat-icon>
+        Markdown (.md)
+      </button>
+      <button
+        mat-menu-item
+        (click)="onDownload('pdf')"
+        [disabled]="exporting || !isFormatAvailable('pdf')"
+      >
+        <mat-icon>picture_as_pdf</mat-icon>
+        PDF
+      </button>
+      <button
+        mat-menu-item
+        (click)="onDownload('docx')"
+        [disabled]="exporting || !isFormatAvailable('docx')"
+      >
+        <mat-icon>description</mat-icon>
+        Word (.docx)
+      </button>
+      <button
+        mat-menu-item
+        (click)="onDownload('srt')"
+        [disabled]="exporting || !isFormatAvailable('srt')"
+      >
+        <mat-icon>subtitles</mat-icon>
+        SRT субтитры
+      </button>
+    </mat-menu>
 
     <button
       mat-stroked-button
       color="primary"
-      (click)="onCopyBbcode()"
-      [disabled]="!hasContent() || exporting"
+      [matMenuTriggerFor]="copyMenu"
+      [disabled]="exporting || !hasAnyCopyOption()"
     >
       <mat-icon>content_copy</mat-icon>
-      BBCode
+      Копировать
     </button>
+
+    <mat-menu #copyMenu="matMenu">
+      <button
+        mat-menu-item
+        (click)="onCopy('txt')"
+        [disabled]="exporting || !isCopyFormatAvailable('txt')"
+      >
+        <mat-icon>text_snippet</mat-icon>
+        Текст (.txt)
+      </button>
+      <button
+        mat-menu-item
+        (click)="onCopy('bbcode')"
+        [disabled]="exporting || !isCopyFormatAvailable('bbcode')"
+      >
+        <mat-icon>code</mat-icon>
+        BBCode
+      </button>
+      <button
+        mat-menu-item
+        (click)="onCopy('html')"
+        [disabled]="exporting || !isCopyFormatAvailable('html')"
+      >
+        <mat-icon>html</mat-icon>
+        HTML
+      </button>
+      <button
+        mat-menu-item
+        (click)="onCopy('markdown')"
+        [disabled]="exporting || !isCopyFormatAvailable('markdown')"
+      >
+        <mat-icon>article</mat-icon>
+        Markdown (.md)
+      </button>
+      <button
+        mat-menu-item
+        (click)="onCopy('srt')"
+        [disabled]="exporting || !isCopyFormatAvailable('srt')"
+      >
+        <mat-icon>subtitles</mat-icon>
+        SRT субтитры
+      </button>
+    </mat-menu>
 
     <span class="spacer"></span>
 
