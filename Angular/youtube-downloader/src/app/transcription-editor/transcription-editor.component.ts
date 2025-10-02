@@ -8,6 +8,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatMenuModule } from '@angular/material/menu';
+import { Observable } from 'rxjs';
 import { LMarkdownEditorModule } from 'ngx-markdown-editor';
 import {
   OpenAiTranscriptionService,
@@ -26,7 +28,8 @@ import { MarkdownRendererService1 } from '../task-result/markdown-renderer.servi
     MatButtonModule,
     MatIconModule,
     MatSnackBarModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatMenuModule
   ],
   templateUrl: './transcription-editor.component.html',
   styleUrls: ['./transcription-editor.component.css']
@@ -95,49 +98,81 @@ export class TranscriptionEditorComponent implements OnInit {
     });
   }
 
-  onDownloadMd(): void {
-    if (!this.hasContent() || this.exporting) {
+  onDownload(format: 'md' | 'pdf' | 'docx' | 'srt'): void {
+    if (this.exporting || !this.isFormatAvailable(format)) {
       return;
     }
 
-    const blob = new Blob([this.markdownContent], { type: 'text/markdown' });
-    this.triggerDownload(blob, `${this.getFileBaseName()}.md`);
-  }
-
-  onDownloadPdf(): void {
-    if (!this.hasContent() || this.exporting) {
-      return;
-    }
-
-    this.exporting = true;
-    this.transcriptionService.exportPdf(this.taskId).subscribe({
-      next: blob => {
-        this.triggerDownload(blob, `${this.getFileBaseName()}.pdf`);
-        this.exporting = false;
-      },
-      error: error => {
-        this.exporting = false;
-        this.handleActionError(error, 'Не удалось сформировать PDF файл.');
-      }
-    });
-  }
-
-  onDownloadDocx(): void {
-    if (!this.hasContent() || this.exporting) {
+    if (format === 'md') {
+      const blob = new Blob([this.markdownContent], { type: 'text/markdown' });
+      this.triggerDownload(blob, `${this.getFileBaseName()}.md`);
       return;
     }
 
     this.exporting = true;
-    this.transcriptionService.exportDocx(this.taskId).subscribe({
-      next: blob => {
-        this.triggerDownload(blob, `${this.getFileBaseName()}.docx`);
+
+    let exportRequest$: Observable<Blob> | null = null;
+    let extension = '';
+    let errorMessage = '';
+
+    switch (format) {
+      case 'pdf':
+        exportRequest$ = this.transcriptionService.exportPdf(this.taskId);
+        extension = 'pdf';
+        errorMessage = 'Не удалось сформировать PDF файл.';
+        break;
+      case 'docx':
+        exportRequest$ = this.transcriptionService.exportDocx(this.taskId);
+        extension = 'docx';
+        errorMessage = 'Не удалось сформировать DOCX файл.';
+        break;
+      case 'srt':
+        exportRequest$ = this.transcriptionService.exportSrt(this.taskId);
+        extension = 'srt';
+        errorMessage = 'Не удалось сформировать SRT файл.';
+        break;
+      default:
+        this.exporting = false;
+        return;
+    }
+
+    if (!exportRequest$) {
+      this.exporting = false;
+      return;
+    }
+
+    exportRequest$.subscribe({
+      next: (blob: Blob) => {
+        this.triggerDownload(blob, `${this.getFileBaseName()}.${extension}`);
         this.exporting = false;
       },
       error: error => {
         this.exporting = false;
-        this.handleActionError(error, 'Не удалось сформировать DOCX файл.');
+        this.handleActionError(error, errorMessage);
       }
     });
+  }
+
+  isFormatAvailable(format: 'md' | 'pdf' | 'docx' | 'srt'): boolean {
+    switch (format) {
+      case 'md':
+      case 'pdf':
+      case 'docx':
+        return this.hasContent();
+      case 'srt':
+        return !!this.task?.hasSegments;
+      default:
+        return false;
+    }
+  }
+
+  hasAnyDownloadOption(): boolean {
+    return (
+      this.isFormatAvailable('md') ||
+      this.isFormatAvailable('pdf') ||
+      this.isFormatAvailable('docx') ||
+      this.isFormatAvailable('srt')
+    );
   }
 
   onCopyBbcode(): void {
