@@ -156,14 +156,14 @@ section {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  background: #ffffff;
+  background: #00000000;
   border-radius: 24px;
   overflow: hidden;
   box-shadow: 0 18px 32px rgba(15, 23, 42, 0.08);
 }
 
 .custom-table thead tr {
-  background: rgba(15, 23, 42, 0.04);
+  background:  #00000000;
 }
 
 .custom-table th {
