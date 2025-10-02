@@ -1,70 +1,104 @@
-<!-- recognition-tasks.component.html -->
-<div class="tasks-table">
-  <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
-
-    <!-- Status Column -->
-    <ng-container matColumnDef="status">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header> Status </th>
-      <td mat-cell *matCellDef="let task">{{ task.status }}</td>
-    </ng-container>
-
-    <!-- Done Column -->
-    <ng-container matColumnDef="done">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header> Done </th>
-      <td mat-cell *matCellDef="let task">{{ task.done ? 'Yes' : 'No' }}</td>
-    </ng-container>
-
-    <!-- Created At Column -->
-    <ng-container matColumnDef="createdAt">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header> Created At </th>
-      <td mat-cell *matCellDef="let task">{{ task.createdAt | date }}  {{ task.uploadDate  |  localTime: 'yyyy-MM-dd HH:mm:ss' }}</td>
-    </ng-container>
-
-    <!-- Language Column -->
-    <ng-container matColumnDef="language">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header> Language </th>
-      <td mat-cell *matCellDef="let task">
-        {{ task.language }}
-      </td>
-    </ng-container>
-
-    <!-- Result Column (Markdown, с toggling) -->
-    <ng-container matColumnDef="result">
-      <th mat-header-cell *matHeaderCellDef mat-sort-header> Result </th>
-      <td mat-cell *matCellDef="let task">
-        <div
-        class="markdown-container"
-        [ngClass]="{ collapsed: !isExpanded(task.id) }"
-      >
-        <markdown [data]="task.result"></markdown>
-      </div>
-      
-
-        <!-- Кнопки управления -->
-        <div style="margin-top: 8px;">
-          <button mat-button color="primary" (click)="toggleExpand(task.id)">
-            <!-- Меняем подпись в зависимости от состояния -->
-            {{ isExpanded(task.id) ? 'Свернуть' : 'Развернуть' }}
-          </button>
-
-          <!-- Ссылка для открытия полной страницы -->
-          <a
-            [routerLink]="['/recognized', task.id]"
-            style="margin-left: 8px; text-decoration: underline; cursor: pointer;"
-          >
-            Перейти к полной версии
-          </a>
+<div class="tasks-page">
+  <main class="page-content">
+    <section class="hero hero--compact">
+      <div class="hero-text">
+        <h1>История расшифровок</h1>
+        <p class="hero-lead">
+          Все ваши задачи из YouScriptor в одном месте. Отслеживайте прогресс, возвращайтесь к готовым результатам и
+          продолжайте работу там, где остановились.
+        </p>
+        <ul class="hero-highlights" *ngIf="totalTasks">
+          <li><strong>{{ completedTasks }}</strong> готовых задач</li>
+          <li><strong>{{ totalTasks - completedTasks }}</strong> в обработке</li>
+        </ul>
+        <div class="hero-actions">
+          <a class="btn btn-primary" [routerLink]="['/upload']">Загрузить новую запись</a>
+          <a class="btn btn-secondary" [routerLink]="['/about3']">О сервисе</a>
         </div>
-      </td>
-    </ng-container>
+      </div>
 
-    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-  </table>
+      <div class="hero-card tasks-hero-card" *ngIf="totalTasks; else emptyState">
+        <div class="stats-grid">
+          <div class="stat">
+            <span class="stat-label">Всего задач</span>
+            <span class="stat-value">{{ totalTasks }}</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Завершено</span>
+            <span class="stat-value">{{ completedTasks }}</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Последнее обновление</span>
+            <span class="stat-value">{{ latestUpdate ? (latestUpdate | date: 'd MMM, HH:mm') : '—' }}</span>
+          </div>
+        </div>
+        <p class="hero-hint">
+          Результаты автоматически сохраняются и доступны в любое время. Нажмите на задачу, чтобы посмотреть расшифровку.
+        </p>
+      </div>
+    </section>
 
-  <mat-paginator
-    [pageSize]="15"
-    [pageSizeOptions]="[5, 10, 15]"
-    showFirstLastButtons
-  ></mat-paginator>
+    <ng-template #emptyState>
+      <div class="hero-card tasks-hero-card empty">
+        <h2>Здесь появятся ваши задачи</h2>
+        <p>Как только вы отправите первый файл, мы покажем прогресс и готовые результаты.</p>
+        <a class="btn btn-primary" [routerLink]="['/upload']">Загрузить файл</a>
+      </div>
+    </ng-template>
+
+    <section class="tasks-section">
+      <div class="section-header">
+        <h2>Ваши файлы и задачи</h2>
+        <p>
+          Управляйте расшифровками: проверяйте статус обработки, редактируйте готовый текст и скачивайте результат в пару
+          кликов.
+        </p>
+      </div>
+
+      <div class="tasks-grid" *ngIf="tasks.length; else noTasks">
+        <article class="task-card" *ngFor="let task of tasks" [ngClass]="{ done: task.done }">
+          <header class="task-header">
+            <span class="status-pill" [attr.data-status]="task.status || 'unknown'">{{ task.status || '—' }}</span>
+            <span class="task-language" *ngIf="task.language">{{ task.language }}</span>
+          </header>
+
+          <div class="task-meta">
+            <span *ngIf="task.createdAt">Создана {{ formatLocal(task.createdAt, { day: '2-digit', month: 'long' }) }}</span>
+            <span *ngIf="task.uploadDate">Загружено {{ formatLocal(task.uploadDate) }}</span>
+            <span *ngIf="task.createdBy">Автор: {{ task.createdBy }}</span>
+          </div>
+
+          <div class="task-body" *ngIf="task.result || task.error; else awaiting">
+            <div
+              class="task-result"
+              [ngClass]="{ collapsed: !isExpanded(task.id) }"
+              *ngIf="task.result"
+            >
+              <markdown [data]="task.result"></markdown>
+            </div>
+            <p class="task-error" *ngIf="task.error">{{ task.error }}</p>
+          </div>
+
+          <ng-template #awaiting>
+            <p class="task-awaiting">Результат будет готов после завершения обработки.</p>
+          </ng-template>
+
+          <footer class="task-actions">
+            <button class="btn btn-secondary" type="button" (click)="toggleExpand(task.id)" *ngIf="task.result">
+              {{ isExpanded(task.id) ? 'Свернуть' : 'Развернуть' }}
+            </button>
+            <a class="btn btn-primary" [routerLink]="['/recognized', task.id]">Открыть задачу</a>
+          </footer>
+        </article>
+      </div>
+    </section>
+
+    <ng-template #noTasks>
+      <div class="empty-state">
+        <h3>Пока нет задач</h3>
+        <p>Загрузите аудио или видео, чтобы начать расшифровку и увидеть прогресс здесь.</p>
+        <a class="btn btn-primary" [routerLink]="['/upload']">Создать задачу</a>
+      </div>
+    </ng-template>
+  </main>
 </div>
