@@ -13,7 +13,7 @@ import { About2Component } from './about2/about2.component';
 import { About3Component } from './about3/about3.component';
 
 const routes: Routes = [
-  { path: '', redirectTo: 'youtube-downloader', pathMatch: 'full' },
+  { path: '', component: OpenAiTranscriptionComponent },
   { path: 'youtube-downloader', component: YoutubeDownloaderComponent },
   { path: 'recognition-tasks', component: RecognitionTasksComponent },
   { path: 'transcriptions', component: OpenAiTranscriptionComponent },
