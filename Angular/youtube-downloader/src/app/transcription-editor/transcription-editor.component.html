@@ -60,12 +60,55 @@
     <button
       mat-stroked-button
       color="primary"
-      (click)="onCopyBbcode()"
-      [disabled]="!hasContent() || exporting"
+      [matMenuTriggerFor]="copyMenu"
+      [disabled]="exporting || !hasAnyCopyOption()"
     >
       <mat-icon>content_copy</mat-icon>
-      BBCode
+      Копировать
     </button>
+
+    <mat-menu #copyMenu="matMenu">
+      <button
+        mat-menu-item
+        (click)="onCopy('txt')"
+        [disabled]="exporting || !isCopyFormatAvailable('txt')"
+      >
+        <mat-icon>notes</mat-icon>
+        Текст (plain)
+      </button>
+      <button
+        mat-menu-item
+        (click)="onCopy('markdown')"
+        [disabled]="exporting || !isCopyFormatAvailable('markdown')"
+      >
+        <mat-icon>code</mat-icon>
+        Markdown
+      </button>
+      <button
+        mat-menu-item
+        (click)="onCopy('html')"
+        [disabled]="exporting || !isCopyFormatAvailable('html')"
+      >
+        <mat-icon>language</mat-icon>
+        HTML
+      </button>
+      <button
+        mat-menu-item
+        (click)="onCopy('bbcode')"
+        [disabled]="exporting || !isCopyFormatAvailable('bbcode')"
+      >
+        <mat-icon>format_quote</mat-icon>
+        BBCode
+      </button>
+      <button
+        mat-menu-item
+        (click)="onCopy('srt')"
+        [disabled]="exporting || !isCopyFormatAvailable('srt')"
+      >
+        <mat-icon>subtitles</mat-icon>
+        SRT субтитры
+      </button>
+    </mat-menu>
 
     <span class="spacer"></span>
 
