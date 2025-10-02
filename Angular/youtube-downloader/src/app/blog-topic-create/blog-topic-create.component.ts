@@ -1,11 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatButtonModule } from '@angular/material/button';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { LMarkdownEditorModule } from 'ngx-markdown-editor';
@@ -20,10 +16,7 @@ import { MarkdownRendererService1 } from '../task-result/markdown-renderer.servi
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatButtonModule,
+    RouterModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
     LMarkdownEditorModule

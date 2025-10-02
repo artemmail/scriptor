@@ -1,142 +1,144 @@
-<div class="topic-shell">
-  <a mat-button color="primary" class="back-link" [routerLink]="['/blog']">
-    ← Вернуться к блогу
-  </a>
+<div class="blog-page">
+  <main class="page-content">
+    <section class="detail-section">
+      <a class="back-link" [routerLink]="['/blog']">← Вернуться к блогу</a>
 
-  <div class="state" *ngIf="loadError">{{ loadError }}</div>
+      <div class="state-card error" *ngIf="loadError">{{ loadError }}</div>
 
-  <div class="state" *ngIf="loading">
-    <mat-spinner diameter="48"></mat-spinner>
-  </div>
-
-  <mat-card class="topic-card" *ngIf="!loading && topic">
-    <mat-card-header>
-      <mat-card-title>{{ topic.header }}</mat-card-title>
-      <mat-card-subtitle>
-        <div class="topic-meta">
-          <span class="topic-author">{{ topic.user }}</span>
-          <span>{{ topic.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
-          <span *ngIf="topic.commentCount > 0">Комментариев: {{ topic.commentCount }}</span>
-        </div>
-      </mat-card-subtitle>
-    </mat-card-header>
-
-    <mat-card-content>
-      <div class="topic-content" [innerHTML]="topic.renderedText"></div>
-
-      <div class="topic-actions" *ngIf="isModerator">
-        <span class="error" *ngIf="topic.topicActionError">{{ topic.topicActionError }}</span>
-        <span class="actions-spacer"></span>
-        <button mat-stroked-button color="primary" (click)="editTopic(topic)">
-          Редактировать тему
-        </button>
-        <button
-          mat-stroked-button
-          color="warn"
-          (click)="deleteTopic(topic)"
-          [disabled]="topic.deletingTopic"
-        >
-          {{ topic.deletingTopic ? 'Удаление…' : 'Удалить тему' }}
-        </button>
+      <div class="state-card loading" *ngIf="loading">
+        <mat-spinner diameter="48"></mat-spinner>
       </div>
 
-      <mat-divider></mat-divider>
-
-      <section class="comments">
-        <h3>Комментарии</h3>
-        <div class="comment" *ngFor="let comment of topic.comments; trackBy: trackByCommentId">
-          <div class="comment-header">
-            <b>{{ comment.user }}</b>
-            <span>{{ comment.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
+      <article class="topic-card" *ngIf="!loading && topic">
+        <header class="topic-header">
+          <span class="topic-eyebrow">Публикация сообщества</span>
+          <h1>{{ topic.header }}</h1>
+          <div class="topic-meta">
+            <span class="topic-author">{{ topic.user }}</span>
+            <span>{{ topic.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
+            <span class="topic-comments" *ngIf="topic.commentCount > 0">
+              Комментариев: {{ topic.commentCount }}
+            </span>
           </div>
-          <ng-container *ngIf="comment.editing; else viewComment">
-            <div class="comment-edit-section">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Текст комментария</mat-label>
+        </header>
+
+        <div class="topic-content" [innerHTML]="topic.renderedText"></div>
+
+        <div class="topic-actions" *ngIf="isModerator">
+          <span class="error" *ngIf="topic.topicActionError">{{ topic.topicActionError }}</span>
+          <span class="actions-spacer"></span>
+          <button class="btn btn-outline" type="button" (click)="editTopic(topic)">
+            Редактировать тему
+          </button>
+          <button
+            class="btn btn-danger"
+            type="button"
+            (click)="deleteTopic(topic)"
+            [disabled]="topic.deletingTopic"
+          >
+            {{ topic.deletingTopic ? 'Удаление…' : 'Удалить тему' }}
+          </button>
+        </div>
+
+        <div class="divider"></div>
+
+        <section class="comments">
+          <div class="section-header">
+            <h2>Комментарии</h2>
+            <p>Присоединяйтесь к обсуждению и делитесь своим опытом.</p>
+          </div>
+          <div class="comment" *ngFor="let comment of topic.comments; trackBy: trackByCommentId">
+            <div class="comment-header">
+              <div class="comment-author">{{ comment.user }}</div>
+              <span class="comment-date">{{ comment.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
+            </div>
+            <ng-container *ngIf="comment.editing; else viewComment">
+              <div class="comment-edit-section">
+                <label class="field-label" for="comment-{{ comment.id }}">Текст комментария</label>
                 <textarea
-                  matInput
+                  id="comment-{{ comment.id }}"
+                  class="text-field"
                   rows="4"
                   maxlength="2000"
                   [(ngModel)]="comment.editText"
                   [ngModelOptions]="{ standalone: true }"
                 ></textarea>
-              </mat-form-field>
-              <div class="comment-edit-actions">
+                <div class="comment-edit-actions">
+                  <span class="error" *ngIf="comment.actionError">{{ comment.actionError }}</span>
+                  <span class="controls-spacer"></span>
+                  <button
+                    class="btn btn-primary"
+                    type="button"
+                    (click)="saveComment(topic, comment)"
+                    [disabled]="comment.submittingEdit"
+                  >
+                    Сохранить
+                  </button>
+                  <button
+                    class="text-button"
+                    type="button"
+                    (click)="cancelEditComment(comment)"
+                    [disabled]="comment.submittingEdit"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            </ng-container>
+            <ng-template #viewComment>
+              <div class="comment-text">{{ comment.text }}</div>
+              <div class="comment-controls" *ngIf="canEditComment(comment) || canDeleteComment(comment)">
                 <span class="error" *ngIf="comment.actionError">{{ comment.actionError }}</span>
                 <span class="controls-spacer"></span>
                 <button
-                  mat-flat-button
-                  color="primary"
-                  (click)="saveComment(topic, comment)"
-                  [disabled]="comment.submittingEdit"
+                  class="text-button"
+                  type="button"
+                  *ngIf="canEditComment(comment)"
+                  (click)="startEditComment(comment)"
+                  [disabled]="comment.editing"
                 >
-                  Сохранить
+                  Редактировать
                 </button>
                 <button
-                  mat-button
+                  class="text-button danger"
                   type="button"
-                  (click)="cancelEditComment(comment)"
-                  [disabled]="comment.submittingEdit"
+                  *ngIf="canDeleteComment(comment)"
+                  (click)="deleteComment(topic, comment)"
+                  [disabled]="comment.deleting"
                 >
-                  Отмена
+                  {{ comment.deleting ? 'Удаление…' : 'Удалить' }}
                 </button>
               </div>
-            </div>
-          </ng-container>
-          <ng-template #viewComment>
-            <div class="comment-text">{{ comment.text }}</div>
-            <div class="comment-controls" *ngIf="canEditComment(comment) || canDeleteComment(comment)">
-              <span class="error" *ngIf="comment.actionError">{{ comment.actionError }}</span>
-              <span class="controls-spacer"></span>
-              <button
-                mat-button
-                color="primary"
-                *ngIf="canEditComment(comment)"
-                (click)="startEditComment(comment)"
-                [disabled]="comment.editing"
-              >
-                Редактировать
-              </button>
-              <button
-                mat-button
-                color="warn"
-                *ngIf="canDeleteComment(comment)"
-                (click)="deleteComment(topic, comment)"
-                [disabled]="comment.deleting"
-              >
-                {{ comment.deleting ? 'Удаление…' : 'Удалить' }}
-              </button>
-            </div>
-          </ng-template>
-        </div>
-        <div class="empty" *ngIf="topic.comments.length === 0">
-          Пока нет комментариев
-        </div>
-      </section>
+            </ng-template>
+          </div>
+          <div class="empty" *ngIf="topic.comments.length === 0">
+            Пока нет комментариев
+          </div>
+        </section>
 
-      <mat-divider></mat-divider>
+        <div class="divider"></div>
 
-      <section class="comment-form" *ngIf="currentUser; else loginHint">
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Комментарий</mat-label>
+        <section class="comment-form" *ngIf="currentUser; else loginHint">
+          <label class="field-label" for="new-comment">Комментарий</label>
           <textarea
-            matInput
+            id="new-comment"
+            class="text-field"
             rows="4"
             maxlength="2000"
             [(ngModel)]="topic.newComment"
             [ngModelOptions]="{ standalone: true }"
           ></textarea>
-        </mat-form-field>
-        <div class="comment-actions">
-          <span class="error" *ngIf="topic.commentError">{{ topic.commentError }}</span>
-          <button mat-raised-button color="primary" (click)="submitComment(topic)" [disabled]="topic.submittingComment">
-            Отправить
-          </button>
-        </div>
-      </section>
-      <ng-template #loginHint>
-        <div class="login-hint">Чтобы оставить комментарий, войдите в систему.</div>
-      </ng-template>
-    </mat-card-content>
-  </mat-card>
+          <div class="comment-actions">
+            <span class="error" *ngIf="topic.commentError">{{ topic.commentError }}</span>
+            <button class="btn btn-primary" type="button" (click)="submitComment(topic)" [disabled]="topic.submittingComment">
+              Отправить
+            </button>
+          </div>
+        </section>
+        <ng-template #loginHint>
+          <div class="login-hint">Чтобы оставить комментарий, войдите в систему.</div>
+        </ng-template>
+      </article>
+    </section>
+  </main>
 </div>

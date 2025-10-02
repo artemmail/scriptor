@@ -5,11 +5,6 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs/operators';
 
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatDividerModule } from '@angular/material/divider';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { BlogService, BlogTopic, BlogComment } from '../services/blog.service';
@@ -41,11 +36,6 @@ interface BlogTopicDetailViewModel extends BlogTopic {
     CommonModule,
     FormsModule,
     RouterModule,
-    MatCardModule,
-    MatButtonModule,
-    MatDividerModule,
-    MatFormFieldModule,
-    MatInputModule,
     MatProgressSpinnerModule
   ],
   templateUrl: './blog-topic-detail.component.html',
