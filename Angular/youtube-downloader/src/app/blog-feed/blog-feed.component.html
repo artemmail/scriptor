@@ -1,86 +1,111 @@
-<div class="page-shell">
-  <section class="topic-creation" *ngIf="canCreateTopics">
-    <mat-card>
-      <mat-card-title>Новая тема</mat-card-title>
-      <mat-card-content>
-        <p>Используйте редактор с поддержкой Markdown и LaTeX, чтобы оформить новую публикацию.</p>
-        <button mat-flat-button color="primary" [routerLink]="['/blog/new']">
-          Открыть редактор
-        </button>
-      </mat-card-content>
-    </mat-card>
-  </section>
-
-  <div class="feed-state" *ngIf="feedError">{{ feedError }}</div>
-  <div class="feed-state" *ngIf="!loading && initialLoad && topics.length === 0 && !feedError">
-    Пока нет тем. Создайте первую!
-  </div>
-
-  <div
-    class="blog-container"
-    infiniteScroll
-    [scrollWindow]="true"
-    [infiniteScrollDistance]="2"
-    [infiniteScrollThrottle]="200"
-    [infiniteScrollDisabled]="loading || allLoaded"
-    (scrolled)="onScrollDown()"
-  >
-    <mat-card class="blog-card" *ngFor="let topic of topics; trackBy: trackByTopicId">
-      <mat-card-header>
-        <mat-card-title>{{ topic.header }}</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <div class="topic-meta">
-          <b class="topic-author">{{ topic.user }}</b>
-          <span>{{ topic.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
-          <span class="topic-comments-count" *ngIf="topic.commentCount > 0">
-            Комментариев: {{ topic.commentCount }}
-          </span>
+<div class="blog-page">
+  <main class="page-content">
+    <section class="hero">
+      <div class="hero-text">
+        <span class="hero-eyebrow">сообщество youtscriptor</span>
+        <h1>Блог о создании и использовании расшифровок</h1>
+        <p class="hero-lead">
+          Делимся практиками, новыми функциями и историями команд, которые ускоряют работу с аудио и видео при помощи
+          YouScriptor.
+        </p>
+        <ul class="hero-highlights">
+          <li *ngFor="let highlight of heroHighlights">{{ highlight }}</li>
+        </ul>
+        <div class="hero-actions">
+          <ng-container *ngIf="canCreateTopics; else exploreLink">
+            <a class="btn btn-primary" [routerLink]="['/blog/new']">Новая публикация</a>
+          </ng-container>
+          <ng-template #exploreLink>
+            <a class="btn btn-primary" href="#topics">Читать статьи</a>
+          </ng-template>
+          <a class="btn btn-secondary" [routerLink]="['/transcriptions']">К расшифровкам</a>
         </div>
+      </div>
 
-        <div class="content" [class.collapsed]="topic.collapsed" [innerHTML]="topic.renderedText"></div>
+      <div class="hero-card">
+        <div class="card-badge">Комьюнити</div>
+        <h3>Обменивайтесь опытом и идеями</h3>
+        <p>
+          Создавайте публикации, рассказывайте о кейсах внедрения и находите ответы на вопросы о работе с сервисом.
+        </p>
+        <ul class="card-list">
+          <li *ngFor="let point of cardHighlights">{{ point }}</li>
+        </ul>
+        <div class="card-actions" *ngIf="canCreateTopics">
+          <a class="btn btn-outline" [routerLink]="['/blog/new']">Опубликовать статью</a>
+        </div>
+      </div>
+    </section>
 
-        <div class="card-actions">
-          <button
-            mat-button
-            color="primary"
-            class="toggle"
-            *ngIf="topic.textIsTooLong"
-            (click)="toggleCollapse(topic)"
-          >
-            {{ topic.collapsed ? 'Развернуть' : 'Свернуть' }}
-          </button>
-          <a mat-stroked-button color="primary" [routerLink]="['/blog', topic.slug]">
-            Читать полностью
-          </a>
-          <div class="moderation-actions" *ngIf="isModerator">
-            <span class="action-error" *ngIf="topic.actionError">{{ topic.actionError }}</span>
-            <button mat-stroked-button color="primary" (click)="editTopic(topic)">
-              Редактировать
-            </button>
-            <button
-              mat-stroked-button
-              color="warn"
-              (click)="deleteTopic(topic)"
-              [disabled]="topic.deleting"
-            >
-              {{ topic.deleting ? 'Удаление…' : 'Удалить' }}
-            </button>
+    <section class="feed-section" id="topics">
+      <div class="section-header">
+        <h2>Последние публикации</h2>
+        <p>Читайте новости продукта, рекомендации экспертов и инструкции по работе с расшифровками.</p>
+      </div>
+
+      <div class="feed-state" *ngIf="feedError">{{ feedError }}</div>
+      <div class="feed-state" *ngIf="!loading && initialLoad && topics.length === 0 && !feedError">
+        Пока нет тем. Создайте первую!
+      </div>
+
+      <div
+        class="topics-list"
+        infiniteScroll
+        [scrollWindow]="true"
+        [infiniteScrollDistance]="2"
+        [infiniteScrollThrottle]="200"
+        [infiniteScrollDisabled]="loading || allLoaded"
+        (scrolled)="onScrollDown()"
+      >
+        <article class="topic-card" *ngFor="let topic of topics; trackBy: trackByTopicId">
+          <div class="topic-header">
+            <h3>{{ topic.header }}</h3>
+            <div class="topic-meta">
+              <span class="topic-author">{{ topic.user }}</span>
+              <span>{{ topic.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
+              <span class="topic-comments-count" *ngIf="topic.commentCount > 0">
+                Комментариев: {{ topic.commentCount }}
+              </span>
+            </div>
           </div>
+
+          <div class="topic-content" [class.collapsed]="topic.collapsed" [innerHTML]="topic.renderedText"></div>
+
+          <div class="topic-actions">
+            <button
+              class="text-button toggle"
+              type="button"
+              *ngIf="topic.textIsTooLong"
+              (click)="toggleCollapse(topic)"
+            >
+              {{ topic.collapsed ? 'Развернуть' : 'Свернуть' }}
+            </button>
+            <a class="btn btn-outline" [routerLink]="['/blog', topic.slug]">Читать полностью</a>
+            <div class="moderation-actions" *ngIf="isModerator">
+              <span class="action-error" *ngIf="topic.actionError">{{ topic.actionError }}</span>
+              <button class="btn btn-outline" type="button" (click)="editTopic(topic)">Редактировать</button>
+              <button
+                class="btn btn-danger"
+                type="button"
+                (click)="deleteTopic(topic)"
+                [disabled]="topic.deleting"
+              >
+                {{ topic.deleting ? 'Удаление…' : 'Удалить' }}
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <div class="feed-loader" *ngIf="loading && topics.length > 0">
+          <mat-spinner diameter="36"></mat-spinner>
         </div>
-      </mat-card-content>
-    </mat-card>
 
-    <div class="feed-loader" *ngIf="loading && topics.length > 0">
-      <mat-spinner diameter="36"></mat-spinner>
-    </div>
+        <div class="feed-end" *ngIf="allLoaded && topics.length > 0">Больше нет записей</div>
+      </div>
 
-    <div class="feed-end" *ngIf="allLoaded && topics.length > 0">
-      Больше нет записей
-    </div>
-  </div>
-
-  <div class="initial-loader" *ngIf="loading && topics.length === 0">
-    <mat-spinner diameter="40"></mat-spinner>
-  </div>
+      <div class="initial-loader" *ngIf="loading && topics.length === 0">
+        <mat-spinner diameter="40"></mat-spinner>
+      </div>
+    </section>
+  </main>
 </div>
