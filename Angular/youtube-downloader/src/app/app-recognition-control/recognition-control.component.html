@@ -5,7 +5,8 @@
         <img class="hero-logo" src="assets/logo.webp" alt="Логотип YouScriptor" />
         <h1>YouScriptor - Ваш личный учёный писарь</h1>
         <p class="hero-lead">Создавайте профессиональные конспекты и отчёты из видео автоматически</p>
-        <div class="hero-ad">
+        
+        <div >
           <app-yandex-ad></app-yandex-ad>
         </div>
       </div>
@@ -21,7 +22,7 @@
               name="youtubeQuery"
               type="text"
               [(ngModel)]="inputValue"
-              placeholder="youtubeId или URL"
+              placeholder="https://youtube.com/..."
               autocomplete="off"
             />
             <button class="btn btn-primary" type="submit" [disabled]="!inputValue.trim()">Запустить</button>
