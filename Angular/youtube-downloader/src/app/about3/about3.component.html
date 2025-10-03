@@ -31,6 +31,49 @@
       </div>
     </section>
 
+    <section class="landing-search">
+      <div class="landing-search-inner">
+        <div class="landing-search-text">
+          <h2>Расшифровывайте YouTube за пару минут</h2>
+          <p>
+            Запустите задачу прямо со страницы «О сервисе»: укажите ссылку или идентификатор ролика, а мы подготовим
+            аккуратно оформленный документ с тайм-кодами, списками и цитатами.
+          </p>
+          <ul class="landing-search-list">
+            <li *ngFor="let item of recognitionGuide">{{ item }}</li>
+          </ul>
+        </div>
+
+        <div class="landing-search-panel">
+          <form class="landing-search-form" (ngSubmit)="startRecognition()">
+            <label class="landing-search-label" for="landing-search-input">Ссылка или идентификатор YouTube</label>
+            <div class="landing-search-field">
+              <input
+                id="landing-search-input"
+                name="youtubeQuery"
+                type="text"
+                [(ngModel)]="searchValue"
+                placeholder="https://youtube.com/..."
+                autocomplete="off"
+                [disabled]="isStarting"
+              />
+              <button class="btn btn-primary" type="submit" [disabled]="isStarting || !searchValue.trim()">
+                <span *ngIf="!isStarting">Начать транскрибацию</span>
+                <span *ngIf="isStarting">Запускаем…</span>
+              </button>
+            </div>
+          </form>
+
+          <p class="landing-search-hint">
+            Результат появится в разделе <a [routerLink]="['/recognition-tasks']">Scriptorium</a>, а прогресс можно будет
+            отслеживать позднее.
+          </p>
+
+          <p class="landing-search-error" *ngIf="startError">{{ startError }}</p>
+        </div>
+      </div>
+    </section>
+
     <section class="trusted">
       <h2>Нам доверяют команды из топовых компаний</h2>
       <div class="logo-grid">

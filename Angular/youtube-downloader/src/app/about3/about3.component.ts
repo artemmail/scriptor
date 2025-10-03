@@ -1,7 +1,10 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterModule } from '@angular/router';
 import { MatExpansionModule } from '@angular/material/expansion';
+import { SubtitleService } from '../services/subtitle.service';
 
 interface WorkflowStep {
   readonly title: string;
@@ -50,13 +53,29 @@ interface FaqItem {
 @Component({
   selector: 'app-about3',
   standalone: true,
-  imports: [CommonModule, RouterModule, MatExpansionModule],
+  imports: [CommonModule, FormsModule, RouterModule, MatExpansionModule],
   templateUrl: './about3.component.html',
   styleUrls: ['./about3.component.css'],
 })
 export class About3Component {
+  constructor(
+    private readonly subtitleService: SubtitleService,
+    private readonly router: Router,
+  ) {}
+
   readonly uploadRoute: RouterCommand = '/transcriptions';
   readonly trialRoute: RouterCommand = '/billing';
+
+  searchValue = '';
+  isStarting = false;
+  startError: string | null = null;
+
+  readonly recognitionGuide: readonly string[] = [
+    'Укажите ссылку или идентификатор YouTube-видео с доступными субтитрами.',
+    'Мы создадим задачу и автоматически сохраним прогресс — вы сможете вернуться к ней позже.',
+    'Готовую расшифровку найдёте в разделе «Scriptorium» или повторите тот же запрос.',
+    'Экспортируйте результат в DOCX, PDF, HTML или Markdown и загрузите субтитры в формате .srt.',
+  ];
 
   readonly trustedCompanies: readonly TrustedCompany[] = [
     {
@@ -268,4 +287,32 @@ export class About3Component {
         'Зарегистрируйтесь на платформе и создайте рабочее пространство. Пригласите коллег по email, настройте роли и уровни доступа, а затем распределите минуты между участниками.',
     },
   ];
+
+  startRecognition(): void {
+    const query = this.searchValue.trim();
+    if (!query || this.isStarting) {
+      return;
+    }
+
+    this.isStarting = true;
+    this.startError = null;
+
+    this.subtitleService.startSubtitleRecognition(query, 'user').subscribe({
+      next: (taskId: string) => {
+        this.isStarting = false;
+        this.router.navigate(['/recognized', taskId]);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.isStarting = false;
+
+        if (err.status === 401) {
+          this.router.navigate(['/login']);
+          return;
+        }
+
+        console.error('Не удалось запустить распознавание', err);
+        this.startError = 'Не удалось запустить распознавание. Попробуйте ещё раз позже.';
+      },
+    });
+  }
 }
