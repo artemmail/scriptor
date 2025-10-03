@@ -416,6 +416,34 @@ section {
   border: 1px solid rgba(148, 163, 184, 0.3);
 }
 
+.result-block.fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  margin: 0;
+  padding: 32px clamp(16px, 4vw, 48px);
+  box-shadow: none;
+  border: none;
+  background: rgba(248, 250, 255, 0.98);
+  z-index: 1100;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.result-block.fullscreen .markdown-content {
+  flex: 1;
+  max-height: none;
+}
+
+.result-block.fullscreen pre {
+  flex: 1;
+  max-height: none;
+}
+
 .result-header {
   display: flex;
   align-items: center;

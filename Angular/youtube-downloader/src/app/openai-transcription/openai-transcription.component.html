@@ -107,7 +107,7 @@
                 <div class="error" *ngIf="selectedTask.error && !isTaskCompleted(selectedTask)">{{ selectedTask.error }}</div>
 
                 <ng-container *ngIf="isTaskCompleted(selectedTask); else processingView">
-                  <section class="result-block">
+                  <section class="result-block" [class.fullscreen]="isResultFullscreen">
                     <div class="result-header">
                       <h4>Результат</h4>
                       <div class="result-actions">
@@ -136,6 +136,15 @@
                         >
                           <mat-icon>content_copy</mat-icon>
                           <span>Копировать</span>
+                        </button>
+                        <button
+                          class="btn btn-outline"
+                          type="button"
+                          (click)="toggleResultFullscreen()"
+                          [attr.aria-pressed]="isResultFullscreen"
+                        >
+                          <mat-icon>{{ isResultFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
+                          <span>{{ isResultFullscreen ? 'Свернуть' : 'На весь экран' }}</span>
                         </button>
                       </div>
                     </div>
