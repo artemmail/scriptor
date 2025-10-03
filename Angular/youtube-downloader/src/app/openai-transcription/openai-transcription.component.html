@@ -102,58 +102,56 @@
 
 
                   <section class="result-block" [class.fullscreen]="isResultFullscreen">
-
-                    <div class="details-header">
-                  <div class="details-title">
-                    <h3>{{ selectedTask.displayName }}    </h3>
-                    <div class="clarification-display" *ngIf="selectedTask.clarification">
-                      <strong>Уточнение:</strong>
-                      <span>{{ selectedTask.clarification }}</span>
-                    </div>
-                  </div>
-                  <span class="status-chip" [ngClass]="getStatusClass(selectedTask.status)">
-                    {{ getStatusText(selectedTask.status) }}
-                  </span>
-                </div>
-
-                    
-                      <div class="result-actions">
-                        <button
-                          class="btn btn-outline"
-                          type="button"
-                          [routerLink]="['/transcriptions', selectedTask.id, 'edit']"
-                        >
-                          <mat-icon>edit</mat-icon>
-                          <span>Редактировать</span>
-                        </button>
-                        <button
-                          class="btn btn-outline"
-                          type="button"
-                          [matMenuTriggerFor]="downloadMenu"
-                          [disabled]="downloadInProgress || !hasAnyDownloadOption()"
-                        >
-                          <mat-icon>download</mat-icon>
-                          <span>Скачать</span>
-                        </button>
-                        <button
-                          class="btn btn-outline"
-                          type="button"
-                          [matMenuTriggerFor]="copyMenu"
-                          [disabled]="copying || !hasAnyCopyOption()"
-                        >
-                          <mat-icon>content_copy</mat-icon>
-                          <span>Копировать</span>
-                        </button>
-                        <button
-                          class="btn btn-outline"
-                          type="button"
-                          (click)="toggleResultFullscreen()"
-                          [attr.aria-pressed]="isResultFullscreen"
-                        >
-                          <mat-icon>{{ isResultFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
-                          <span>{{ isResultFullscreen ? 'Свернуть' : 'На весь экран' }}</span>
-                        </button>
+                    <div class="result-header">
+                      <div class="details-title">
+                        <h4>{{ selectedTask.displayName }}</h4>
+                        <div class="clarification-display" *ngIf="selectedTask.clarification">
+                          <strong>Уточнение:</strong>
+                          <span>{{ selectedTask.clarification }}</span>
+                        </div>
                       </div>
+                      <span class="status-chip" [ngClass]="getStatusClass(selectedTask.status)">
+                        {{ getStatusText(selectedTask.status) }}
+                      </span>
+                    </div>
+
+                    <div class="result-actions">
+                      <button
+                        class="btn btn-outline"
+                        type="button"
+                        [routerLink]="['/transcriptions', selectedTask.id, 'edit']"
+                      >
+                        <mat-icon>edit</mat-icon>
+                        <span>Редактировать</span>
+                      </button>
+                      <button
+                        class="btn btn-outline"
+                        type="button"
+                        [matMenuTriggerFor]="downloadMenu"
+                        [disabled]="downloadInProgress || !hasAnyDownloadOption()"
+                      >
+                        <mat-icon>download</mat-icon>
+                        <span>Скачать</span>
+                      </button>
+                      <button
+                        class="btn btn-outline"
+                        type="button"
+                        [matMenuTriggerFor]="copyMenu"
+                        [disabled]="copying || !hasAnyCopyOption()"
+                      >
+                        <mat-icon>content_copy</mat-icon>
+                        <span>Копировать</span>
+                      </button>
+                      <button
+                        class="btn btn-outline"
+                        type="button"
+                        (click)="toggleResultFullscreen()"
+                        [attr.aria-pressed]="isResultFullscreen"
+                      >
+                        <mat-icon>{{ isResultFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
+                        <span>{{ isResultFullscreen ? 'Свернуть' : 'На весь экран' }}</span>
+                      </button>
+                    </div>
                  
                     <mat-menu #downloadMenu="matMenu">
                       <button
