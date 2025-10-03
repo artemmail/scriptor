@@ -91,9 +91,21 @@
 
             <ng-template #taskDetails>
               <ng-container *ngIf="selectedTask; else detailsErrorBlock">
-                <div class="details-header">
+               
+
+                <div class="error" *ngIf="selectedTask.error && !isTaskCompleted(selectedTask)">{{ selectedTask.error }}</div>
+
+                
+                <ng-container *ngIf="isTaskCompleted(selectedTask); else processingView">
+
+ 
+
+
+                  <section class="result-block" [class.fullscreen]="isResultFullscreen">
+
+                    <div class="details-header">
                   <div class="details-title">
-                    <h3>{{ selectedTask.displayName }}</h3>
+                    <h3>{{ selectedTask.displayName }}    </h3>
                     <div class="clarification-display" *ngIf="selectedTask.clarification">
                       <strong>Уточнение:</strong>
                       <span>{{ selectedTask.clarification }}</span>
@@ -104,12 +116,7 @@
                   </span>
                 </div>
 
-                <div class="error" *ngIf="selectedTask.error && !isTaskCompleted(selectedTask)">{{ selectedTask.error }}</div>
-
-                <ng-container *ngIf="isTaskCompleted(selectedTask); else processingView">
-                  <section class="result-block" [class.fullscreen]="isResultFullscreen">
-                    <div class="result-header">
-                      <h4>Результат</h4>
+                    
                       <div class="result-actions">
                         <button
                           class="btn btn-outline"
@@ -147,7 +154,7 @@
                           <span>{{ isResultFullscreen ? 'Свернуть' : 'На весь экран' }}</span>
                         </button>
                       </div>
-                    </div>
+                 
                     <mat-menu #downloadMenu="matMenu">
                       <button
                         mat-menu-item

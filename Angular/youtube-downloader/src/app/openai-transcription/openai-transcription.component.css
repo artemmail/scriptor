@@ -23,9 +23,6 @@ section {
   width: 100%;
 }
 
-.workspace {
-  max-width: 1400px;
-}
 
 .hero {
   display: grid;
@@ -288,7 +285,7 @@ section {
   background: rgba(248, 250, 255, 0.9);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease, background 0.2s ease;
   padding-inline: 18px;
-  padding-inline-start: 3px;
+  padding-inline-start: 0px;
 }
 
 .tasks-list .mat-mdc-list-item:hover {
