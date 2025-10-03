@@ -45,21 +45,21 @@
 		<AngularDistDir>$(AngularProjectDir)dist/youtube-downloader/</AngularDistDir>
 	</PropertyGroup>
 
-	<Target Name="BuildAngularApp" Condition="'$(DesignTimeBuild)' != 'true'" BeforeTargets="Build">
-		<Message Importance="high" Text="Building Angular client application..." />
-		<Exec WorkingDirectory="$(AngularProjectDir)" Command="npm install" Condition="!Exists('$(AngularProjectDir)node_modules')" />
-		<Exec WorkingDirectory="$(AngularProjectDir)" Command="npm run build -- --configuration production --progress false" />
-	</Target>
+        <Target Name="BuildAngularApp" Condition="'$(DesignTimeBuild)' != 'true' and '$(Configuration)' != 'Debug'" BeforeTargets="Build">
+                <Message Importance="high" Text="Building Angular client application..." />
+                <Exec WorkingDirectory="$(AngularProjectDir)" Command="npm install" Condition="!Exists('$(AngularProjectDir)node_modules')" />
+                <Exec WorkingDirectory="$(AngularProjectDir)" Command="npm run build -- --configuration production --progress false" />
+        </Target>
 
-	<Target Name="CopyAngularDistToProject" Condition="'$(DesignTimeBuild)' != 'true'" DependsOnTargets="BuildAngularApp" AfterTargets="Build" BeforeTargets="Publish">
-		<ItemGroup>
-			<AngularDistFiles Include="$(AngularDistDir)**/*.*" />
-		</ItemGroup>
-		<RemoveDir Directories="$(ProjectDir)wwwroot" />
-		<Copy SourceFiles="@(AngularDistFiles)" DestinationFiles="@(AngularDistFiles->'$(ProjectDir)wwwroot\\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
-	</Target>
+        <Target Name="CopyAngularDistToProject" Condition="'$(DesignTimeBuild)' != 'true' and '$(Configuration)' != 'Debug'" DependsOnTargets="BuildAngularApp" AfterTargets="Build" BeforeTargets="Publish">
+                <ItemGroup>
+                        <AngularDistFiles Include="$(AngularDistDir)**/*.*" />
+                </ItemGroup>
+                <RemoveDir Directories="$(ProjectDir)wwwroot" />
+                <Copy SourceFiles="@(AngularDistFiles)" DestinationFiles="@(AngularDistFiles->'$(ProjectDir)wwwroot\\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+        </Target>
 
-        <Target Name="CopyAngularDistToPublish" Condition="'$(DesignTimeBuild)' != 'true'" DependsOnTargets="BuildAngularApp" AfterTargets="Publish">
+        <Target Name="CopyAngularDistToPublish" Condition="'$(DesignTimeBuild)' != 'true' and '$(Configuration)' != 'Debug'" DependsOnTargets="BuildAngularApp" AfterTargets="Publish">
                 <ItemGroup>
                         <AngularDistFiles Include="$(AngularDistDir)**/*.*" />
                 </ItemGroup>
