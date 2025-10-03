@@ -81,7 +81,7 @@
         </div>
 
         <ng-container *ngIf="selectedTaskId; else selectPrompt">
-          <div class="panel details-panel">
+          <div class="panel details-panel" [class.has-result]="selectedTask && isTaskCompleted(selectedTask)">
             <ng-container *ngIf="detailsLoading; else taskDetails">
               <div class="loading-state">
                 <mat-progress-spinner mode="indeterminate" diameter="40"></mat-progress-spinner>

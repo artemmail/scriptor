@@ -423,6 +423,13 @@ section {
   border: 1px solid rgba(148, 163, 184, 0.3);
 }
 
+.details-panel.has-result {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
 .result-block.fullscreen {
   position: fixed;
   inset: 32px;
@@ -437,6 +444,8 @@ section {
   gap: 24px;
   padding: 32px;
   border-radius: 28px;
+  background: rgba(248, 250, 255, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.35);
   box-shadow: 0 32px 80px rgba(15, 23, 42, 0.35);
   overflow: hidden;
 }
@@ -458,6 +467,8 @@ section {
     inset: 16px;
     padding: 24px;
     max-height: calc(100vh - 32px);
+    background: rgba(248, 250, 255, 0.96);
+    border: 1px solid rgba(148, 163, 184, 0.35);
   }
 }
 
