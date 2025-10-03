@@ -1,11 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { RouterLink } from '@angular/router';
 
 import { AccountService } from '../services/account.service';
 import { AuthService } from '../services/AuthService.service';
@@ -16,11 +17,12 @@ import { AuthService } from '../services/AuthService.service';
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
     MatButtonModule,
-    MatProgressSpinnerModule
+    MatFormFieldModule,
+    MatIconModule,
+    MatInputModule,
+    MatProgressSpinnerModule,
+    RouterLink
   ],
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.css']
@@ -46,7 +48,15 @@ export class ProfileComponent implements OnInit {
     this.fetchProfile();
   }
 
+  get displayNameValue(): string {
+    return this.form.controls.displayName.value.trim();
+  }
+
   fetchProfile(): void {
+    if (this.loading) {
+      return;
+    }
+
     this.loading = true;
     this.loadError = '';
     this.accountService.getProfile().subscribe({
