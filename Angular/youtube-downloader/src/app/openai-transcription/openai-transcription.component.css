@@ -433,8 +433,8 @@ section {
 .details-panel.has-result .result-block:not(.fullscreen) {
   margin: 0;
   padding: 24px 32px;
-  background: rgba(226, 240, 255, 0.95);
-  border: 1px solid rgba(59, 130, 246, 0.22);
+  background: rgba(248, 250, 255, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 28px;
 }
 
@@ -507,7 +507,7 @@ section {
 .markdown-content {
   border-radius: 18px;
   padding: 24px;
-  background: rgba(255, 255, 255, 0.85);
+  background: #ffffff;
   border: 1px solid rgba(226, 232, 240, 0.8);
   max-height: 600px;
   overflow-y: auto;
