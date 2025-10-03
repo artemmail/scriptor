@@ -97,7 +97,7 @@ const routes: Routes = [
 
   {
     path: '',
-    component: RecognitionControlComponent, // главная страница
+    component: About3Component// RecognitionControlComponent, // главная страница
   },
   {
     path: 'y',
