@@ -95,10 +95,21 @@ const routes: Routes = [
     component: YoutubeDownloaderComponent, // главная страница
   },
 
+  
   {
     path: '',
     component: About3Component// RecognitionControlComponent, // главная страница
   },
+
+
+  {
+    path: 'recognition',
+    component: RecognitionControlComponent, // главная страница
+  },
+
+
+
+
   {
     path: 'y',
     component: YoutubeDownloaderComponent,
@@ -122,6 +133,14 @@ const routes: Routes = [
     path: 'tasks',
     component: SubtitlesTasksComponent, // страница со списком задач
   },
+
+{
+    path: 'Scriptorium',
+    component: SubtitlesTasksComponent, // страница со списком задач
+  },
+
+
+
   {
     path: 'blog/new',
     component: BlogTopicCreateComponent,
