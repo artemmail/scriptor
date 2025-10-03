@@ -1,38 +1,6 @@
 <div class="profile-page">
   <main class="page-content">
-    <section class="hero">
-      <div class="hero-text">
-        <h1>Управляйте профилем в едином рабочем пространстве</h1>
-        <p class="hero-lead">
-          Обновляйте отображаемое имя, чтобы коллеги видели актуальные данные в расшифровках и комментариях. Все
-          изменения синхронизируются моментально.
-        </p>
-        <ul class="hero-highlights">
-          <li>Единый профиль для всех сервисов YouScriptor</li>
-          <li>Автоматическое обновление данных в задачах по расшифровке</li>
-          <li>Защищённое хранение и обработка персональной информации</li>
-        </ul>
-        <div class="hero-actions">
-          <a class="btn btn-primary" [routerLink]="['/transcriptions']">
-            <mat-icon>arrow_back</mat-icon>
-            <span>К расшифровкам</span>
-          </a>
-          <button class="btn btn-secondary" type="button" (click)="fetchProfile()" [disabled]="loading">
-            <mat-icon>refresh</mat-icon>
-            <span>Обновить данные</span>
-          </button>
-        </div>
-      </div>
-      <div class="hero-card">
-        <div class="card-header">Текущее отображаемое имя</div>
-        <div class="card-value">{{ displayNameValue || '—' }}</div>
-        <div class="card-description">
-          Оно используется в расшифровках, комментариях и уведомлениях команды. Изменяйте его, если хотите поменять,
-          как вас видят коллеги.
-        </div>
-        <div class="card-footnote">Последнее обновление подтянется автоматически после сохранения.</div>
-      </div>
-    </section>
+ 
 
     <section class="profile-settings">
       <div class="section-header">
@@ -78,14 +46,7 @@
           </form>
         </div>
 
-        <div class="tips-card">
-          <h3>Советы по оформлению</h3>
-          <ul>
-            <li>Используйте реальное имя или псевдоним, который узнают коллеги.</li>
-            <li>Не добавляйте контактные данные — для них есть профиль организации.</li>
-            <li>Обновляйте имя перед публикацией расшифровок или отчётов.</li>
-          </ul>
-        </div>
+        
       </div>
     </section>
   </main>
