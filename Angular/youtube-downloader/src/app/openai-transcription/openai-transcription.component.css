@@ -423,6 +423,13 @@ section {
   border: none;
 }
 
+.details-panel.has-result {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
 .result-block.fullscreen {
   position: fixed;
   inset: 32px;
