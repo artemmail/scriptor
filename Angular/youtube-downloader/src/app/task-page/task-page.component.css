@@ -70,4 +70,15 @@
     border-radius: 24px;
   }
 }
+
+@media (max-width: 600px) {
+  .page-content {
+    padding: 48px 12px 72px;
+    gap: 24px;
+  }
+
+  .recognized-section {
+    gap: 20px;
+  }
+}
   

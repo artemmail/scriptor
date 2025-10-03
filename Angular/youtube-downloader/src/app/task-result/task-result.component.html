@@ -23,7 +23,12 @@
       </div>
     </div>
     <div class="video-summary-actions">
-      <button class="btn btn-outline" type="button" (click)="openVideoDialog(task)">
+      <button
+        class="btn btn-outline"
+        type="button"
+        (click)="openVideoDialog(task)"
+        aria-label="Смотреть видео"
+      >
         <mat-icon>play_circle</mat-icon>
         <span>Смотреть видео</span>
       </button>
@@ -38,6 +43,7 @@
           class="btn btn-outline"
           *ngIf="task.id"
           [routerLink]="['/markdown-converter', task.id]"
+          aria-label="Редактировать"
         >
           <mat-icon>edit</mat-icon>
           <span>Редактировать</span>
@@ -47,6 +53,7 @@
           type="button"
           [matMenuTriggerFor]="downloadMenu"
           [disabled]="isDownloading || !hasAnyDownloadOption"
+          aria-label="Скачать"
         >
           <mat-icon>download</mat-icon>
           <span>Скачать</span>
@@ -56,6 +63,7 @@
           type="button"
           [matMenuTriggerFor]="copyMenu"
           [disabled]="isCopying || !hasAnyCopyOption"
+          aria-label="Копировать"
         >
           <mat-icon>content_copy</mat-icon>
           <span>Копировать</span>
@@ -65,6 +73,7 @@
           type="button"
           (click)="toggleFullscreen()"
           [attr.aria-pressed]="isResultFullscreen"
+          [attr.aria-label]="isResultFullscreen ? 'Свернуть результат' : 'Открыть результат на весь экран'"
         >
           <mat-icon>{{ isResultFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
           <span>{{ isResultFullscreen ? 'Свернуть' : 'На весь экран' }}</span>
