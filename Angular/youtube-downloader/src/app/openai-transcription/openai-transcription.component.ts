@@ -58,6 +58,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   copying = false;
   renderedMarkdown: SafeHtml | null = null;
   private markdownSource = '';
+  isResultFullscreen = false;
+  private originalBodyOverflow: string | null = null;
 
   readonly OpenAiTranscriptionStatus = OpenAiTranscriptionStatus;
   readonly OpenAiTranscriptionStepStatus = OpenAiTranscriptionStepStatus;
@@ -87,6 +89,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopPolling();
+    this.resetFullscreenState();
   }
 
   openUploadDialog(): void {
@@ -156,6 +159,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.selectedTask = null;
     this.detailsError = null;
     this.updateRenderedMarkdown(null);
+    this.resetFullscreenState();
     this.startPolling();
   }
 
@@ -444,6 +448,38 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       default:
         finalize();
         return;
+    }
+  }
+
+  toggleResultFullscreen(): void {
+    this.isResultFullscreen = !this.isResultFullscreen;
+    this.updateBodyScrollLock();
+  }
+
+  private resetFullscreenState(): void {
+    if (this.isResultFullscreen) {
+      this.isResultFullscreen = false;
+      this.updateBodyScrollLock();
+    }
+  }
+
+  private updateBodyScrollLock(): void {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    if (this.isResultFullscreen) {
+      if (this.originalBodyOverflow === null) {
+        this.originalBodyOverflow = document.body.style.overflow || '';
+      }
+      document.body.style.overflow = 'hidden';
+    } else {
+      if (this.originalBodyOverflow !== null) {
+        document.body.style.overflow = this.originalBodyOverflow;
+        this.originalBodyOverflow = null;
+      } else {
+        document.body.style.removeProperty('overflow');
+      }
     }
   }
 
