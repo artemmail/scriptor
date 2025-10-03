@@ -1,137 +1,256 @@
 :host {
+  display: block;
+  color: #102a43;
+  font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+  background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 45%),
+    radial-gradient(circle at bottom left, rgba(14, 116, 144, 0.08), transparent 40%),
+    #f8fafc;
+}
+
+.recognition-page {
+  min-height: 100vh;
+}
+
+.page-content {
   display: flex;
   flex-direction: column;
+  gap: 96px;
+  padding: 80px 32px 140px;
+}
+
+section {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 48px;
+  align-items: center;
+}
+
+.hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.hero-logo {
+  max-width: 320px;
+  width: 100%;
+  filter: drop-shadow(0 12px 24px rgba(15, 23, 42, 0.18));
+}
+
+.hero-text h1 {
+  font-size: 3rem;
+  line-height: 1.15;
+  color: #0f172a;
+  margin: 0;
+}
+
+.hero-lead {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: #334155;
+  margin: 0;
+}
+
+.hero-ad {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
+}
+
+.hero-card {
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 32px;
+  padding: 36px;
+  display: grid;
+  gap: 20px;
+  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.12);
+}
+
+.hero-card h2 {
+  font-size: 2rem;
+  color: #0b1f33;
+  margin: 0;
+}
+
+.card-lead {
+  font-size: 1rem;
+  color: #475569;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: calc(100vh - 64px); /* вычитаем высоту toolbar, если нужно */
-
-  padding: 16px;
-  box-sizing: border-box;
+  padding: 10px 22px;
+  border-radius: 999px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  cursor: pointer;
 }
 
-/* ===== Внутренние элементы =========================================== */
-
-.logo {
-  max-width: 600px;
-  width: 100%;
-  margin-bottom: 4px;
+.btn-primary {
+  background: linear-gradient(135deg, #3ec7ff, #2a6bff);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(46, 130, 255, 0.35);
 }
 
-.service-description {
-  text-align: center;
-  font-size: 26px;
-  color: #555;
-  max-width: 600px;
-  margin-bottom: 14px;
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 22px rgba(46, 130, 255, 0.45);
 }
 
-.search-card {
-  padding: 0;
-  border-radius: 24px;
-  box-shadow: none;
-  background: transparent;
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.landing-search-form {
+  display: grid;
+  gap: 12px;
+}
+
+.landing-search-label {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.landing-search-field {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: #f8fafc;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  padding: 10px 12px 10px 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.landing-search-field input {
+  flex: 1;
   border: none;
-  max-width: 600px;
-  width: 100%;
+  background: transparent;
+  font-size: 1rem;
+  color: #0f172a;
+  outline: none;
 }
 
-.search-form   { display: flex; flex-direction: column; }
-.search-field  { width: 100%; }
-
-.search-field .mat-form-field-infix {
-  background: #fff;
-  border-radius: 24px;
-  height: 56px;
+.landing-search-field input::placeholder {
+  color: #94a3b8;
 }
 
-.mat-form-field-appearance-outline .mat-form-field-outline {
-  border-radius: 24px;
+.landing-search-field:focus-within {
+  border-color: rgba(59, 130, 246, 0.65);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
 }
 
-button[mat-icon-button] { margin-right: 8px; }
-
-.instructions {
-  max-width: 600px;
-  width: 100%;
-  margin-top: 20px;
-  padding: 0 16px;
-  text-align: left;
-  font-size: 16px;
-  line-height: 1.5;
-  color: #555;
+.landing-search-hint {
+  font-size: 0.95rem;
+  color: #334155;
+  line-height: 1.6;
 }
 
-.instructions ol { padding-left: 20px; }
-.instructions li { margin-bottom: 10px; }
-
-
-:host {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  /* теперь точно на всю высоту контейнера scroll-host */
-  height: 100%;
- 
-  padding: 16px;
-  box-sizing: border-box;
+.landing-search-hint a {
+  color: #1d4ed8;
+  text-decoration: none;
+  font-weight: 600;
 }
 
-/* …остальные стили без изменений… */
-.search-container {
-  .service-description {
-    .headline { font-weight: 700; line-height: 1.2; margin-bottom: 4px; }
-    .subline { font-size: 0.95em; color: #5f6368; }
+.landing-search-hint a:hover {
+  text-decoration: underline;
+}
+
+.instructions-section {
+  display: grid;
+}
+
+.instruction-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(14, 116, 144, 0.12));
+  border-radius: 40px;
+  padding: 56px 64px;
+  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.12);
+  display: grid;
+  gap: 32px;
+}
+
+.instruction-card h2 {
+  font-size: 2.2rem;
+  color: #0b1f33;
+  margin: 0;
+}
+
+.instruction-intro {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: #1f2937;
+  margin: 0;
+}
+
+.instruction-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 18px;
+}
+
+.instruction-list li {
+  background: rgba(255, 255, 255, 0.88);
+  border-radius: 20px;
+  padding: 18px 22px;
+  font-weight: 500;
+  color: #0f172a;
+  line-height: 1.6;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+}
+
+.instruction-list a {
+  color: #1d4ed8;
+  text-decoration: none;
+}
+
+.instruction-list a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 1024px) {
+  .hero {
+    grid-template-columns: 1fr;
   }
 
-  .features-card { margin-top: 12px; }
+  .hero-card,
+  .instruction-card {
+    padding: 40px 28px;
+  }
+}
 
-  .features-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
+@media (max-width: 640px) {
+  .page-content {
+    padding: 48px 20px 96px;
+    gap: 64px;
   }
 
-  .features-label {
-    font-weight: 600;
-    margin-right: 8px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+  .hero-text h1 {
+    font-size: 2.4rem;
   }
 
-  /* Чипы Material */
-  .feature-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-
-    .mat-mdc-chip {
-      line-height: 1.4;
-      white-space: nowrap;
-    }
-
-    .icon-inline {
-      vertical-align: middle;
-      margin-right: 6px;
-    }
+  .landing-search-field {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px;
   }
 
-  .instructions {
-    margin-top: 12px;
-
-    .section-title {
-      font-weight: 700;
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-    }
-
-    .divider { margin: 12px 0; }
-    .no-margin { margin: 0; }
+  .landing-search-field .btn {
+    width: 100%;
   }
-
-  .icon-inline { vertical-align: middle; }
-  .mr-6 { margin-right: 6px; }
 }

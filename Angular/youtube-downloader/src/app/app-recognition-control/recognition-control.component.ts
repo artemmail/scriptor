@@ -1,19 +1,12 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatInputModule } from '@angular/material/input';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { SubtitleService } from '../services/subtitle.service';
 import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
-
-import { MatChipsModule } from '@angular/material/chips';
-import { MatDividerModule } from '@angular/material/divider';
 
 @Component({
   selector: 'app-recognition-control',
@@ -21,12 +14,7 @@ import { MatDividerModule } from '@angular/material/divider';
   imports: [
     CommonModule,
     FormsModule,
-    MatInputModule,
-    MatButtonModule,
-    MatCardModule,
-    MatIconModule,
-    MatChipsModule,
-    MatDividerModule,
+    RouterModule,
     YandexAdComponent
   ],
   templateUrl: './recognition-control.component.html',
