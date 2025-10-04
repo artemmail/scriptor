@@ -465,11 +465,42 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
       if (crop) {
         const handleType = this.getCropHandleType(point, crop);
         if (handleType) {
+          const corners = this.getCropCorners(crop);
+          const handlePointImage = (() => {
+            const [tl, tr, br, bl] = corners;
+            const mid = (a: { x: number; y: number }, b: { x: number; y: number }) => ({
+              x: (a.x + b.x) / 2,
+              y: (a.y + b.y) / 2,
+            });
+            switch (handleType) {
+              case 'top-left':
+                return tl;
+              case 'top-right':
+                return tr;
+              case 'bottom-right':
+                return br;
+              case 'bottom-left':
+                return bl;
+              case 'top':
+                return mid(tl, tr);
+              case 'right':
+                return mid(tr, br);
+              case 'bottom':
+                return mid(bl, br);
+              case 'left':
+                return mid(tl, bl);
+              case 'move':
+                return point;
+              default:
+                return point;
+            }
+          })();
+
           this.cropStart = null;
           this.activeCropHandle = {
             type: handleType,
             startRect: { ...crop },
-            startPointer: point,
+            startPointer: handlePointImage,
           };
           return;
         }
@@ -661,9 +692,12 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     let rect: CropRect = { ...startRect };
 
     switch (type) {
-      case 'move':
-        rect = this.translateCrop(startRect, dx, dy);
-        break;
+      case 'move': {
+        const translated = this.translateCrop(startRect, dx, dy);
+        this.cropRect.set(this.normalizeCrop(translated));
+        this.scheduleRender();
+        return;
+      }
       case 'top-left':
         rect = { x: startRect.x + dx, y: startRect.y + dy, width: startRect.width - dx, height: startRect.height - dy };
         break;
@@ -690,21 +724,30 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
         break;
     }
 
-    rect = this.enforceMinimumCropSize(rect, type, startRect);
-    this.cropRect.set(this.normalizeCrop(rect));
+    rect = this.normalizeCrop(rect);
+    const normalizedStart = this.normalizeCrop(startRect);
+    rect = this.enforceMinimumCropSizeNormalized(rect, type, normalizedStart);
+    this.cropRect.set(rect);
     this.scheduleRender();
   }
 
-  private enforceMinimumCropSize(rect: CropRect, type: CropHandleType, startRect: CropRect): CropRect {
+  private enforceMinimumCropSizeNormalized(
+    rect: CropRect,
+    type: CropHandleType,
+    startRect: CropRect,
+  ): CropRect {
     if (type === 'move') {
       return rect;
     }
 
     const min = ImageEditorDialogComponent.MIN_CROP_SIZE;
-    const anchorLeft = startRect.x;
-    const anchorRight = startRect.x + startRect.width;
-    const anchorTop = startRect.y;
-    const anchorBottom = startRect.y + startRect.height;
+
+    const anchor = {
+      left: startRect.x,
+      right: startRect.x + startRect.width,
+      top: startRect.y,
+      bottom: startRect.y + startRect.height,
+    };
 
     let left = rect.x;
     let top = rect.y;
@@ -713,56 +756,52 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
 
     switch (type) {
       case 'top-left':
-        right = anchorRight;
-        bottom = anchorBottom;
+        right = anchor.right;
+        bottom = anchor.bottom;
         left = Math.min(left, right - min);
         top = Math.min(top, bottom - min);
         break;
       case 'top-right':
-        left = anchorLeft;
-        bottom = anchorBottom;
+        left = anchor.left;
+        bottom = anchor.bottom;
         right = Math.max(right, left + min);
         top = Math.min(top, bottom - min);
         break;
       case 'bottom-left':
-        right = anchorRight;
-        top = anchorTop;
+        right = anchor.right;
+        top = anchor.top;
         left = Math.min(left, right - min);
         bottom = Math.max(bottom, top + min);
         break;
       case 'bottom-right':
-        left = anchorLeft;
-        top = anchorTop;
+        left = anchor.left;
+        top = anchor.top;
         right = Math.max(right, left + min);
         bottom = Math.max(bottom, top + min);
         break;
       case 'top':
-        left = anchorLeft;
-        right = anchorRight;
-        bottom = anchorBottom;
+        left = anchor.left;
+        right = anchor.right;
         top = Math.min(top, bottom - min);
         break;
       case 'bottom':
-        left = anchorLeft;
-        right = anchorRight;
-        top = anchorTop;
+        left = anchor.left;
+        right = anchor.right;
         bottom = Math.max(bottom, top + min);
         break;
       case 'left':
-        right = anchorRight;
-        top = anchorTop;
-        bottom = anchorBottom;
+        top = anchor.top;
+        bottom = anchor.bottom;
         left = Math.min(left, right - min);
         break;
       case 'right':
-        left = anchorLeft;
-        top = anchorTop;
-        bottom = anchorBottom;
+        top = anchor.top;
+        bottom = anchor.bottom;
         right = Math.max(right, left + min);
         break;
     }
 
-    return { x: left, y: top, width: right - left, height: bottom - top };
+    return this.normalizeCrop({ x: left, y: top, width: right - left, height: bottom - top });
   }
 
   private finalizeCrop(): void {
