@@ -71,7 +71,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   @ViewChild('canvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('canvasContainer', { static: true }) canvasContainerRef!: ElementRef<HTMLDivElement>;
 
-  readonly zoomOptions = [1, 0.5, 0.25] as const;
+  readonly zoomOptions = [1, 2, 4] as const;
 
   readonly zoom: WritableSignal<number> = signal(1);
   readonly rotation: WritableSignal<number> = signal(0);
@@ -140,6 +140,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     canvas.removeEventListener('pointerdown', this.onPointerDown);
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
+    canvas.removeEventListener('wheel', this.onWheel);
 
     if (this.image && 'close' in this.image) {
       try {
@@ -261,6 +262,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     canvas.addEventListener('pointerdown', this.onPointerDown);
     window.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('pointerup', this.onPointerUp);
+    canvas.addEventListener('wheel', this.onWheel, { passive: false });
     canvas.style.touchAction = 'none';
   }
 
@@ -496,6 +498,39 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
 
     if (this.isCropping()) {
       this.finalizeCrop();
+    }
+  };
+
+  private onWheel = (event: WheelEvent): void => {
+    if (!this.image) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const currentZoom = this.zoom();
+    let nextZoom = currentZoom;
+
+    if (event.deltaY < 0) {
+      for (const option of this.zoomOptions) {
+        if (option > currentZoom) {
+          nextZoom = option;
+          break;
+        }
+      }
+    } else if (event.deltaY > 0) {
+      for (let i = this.zoomOptions.length - 1; i >= 0; i--) {
+        const option = this.zoomOptions[i];
+        if (option < currentZoom) {
+          nextZoom = option;
+          break;
+        }
+      }
+    }
+
+    if (nextZoom !== currentZoom) {
+      this.zoom.set(nextZoom);
+      this.scheduleRender();
     }
   };
 
