@@ -35,9 +35,9 @@ section {
 }
 
 .hero-logo {
-  max-width: 320px;
+  max-width: 120px;
   width: 100%;
-  filter: drop-shadow(0 12px 24px rgba(15, 23, 42, 0.18));
+  filter: drop-shadow(0 12px 24px #eef2ff93);
 }
 
 .hero-text h1 {
