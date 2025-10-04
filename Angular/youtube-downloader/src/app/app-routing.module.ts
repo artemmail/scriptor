@@ -11,12 +11,14 @@ import { AboutBusinessComponent } from './about-business/about-business.componen
 import { About1Component } from './about1/about1.component';
 import { About2Component } from './about2/about2.component';
 import { About3Component } from './about3/about3.component';
+import { PngToWebpComponent } from './png-to-webp/png-to-webp.component';
 
 const routes: Routes = [
   { path: '', component: YoutubeDownloaderComponent },
   { path: 'youtube-downloader', component: YoutubeDownloaderComponent },
   { path: 'recognition-tasks', component: RecognitionTasksComponent },
   { path: 'transcriptions', component: OpenAiTranscriptionComponent },
+  { path: 'png-to-webp', component: PngToWebpComponent },
   { path: 'billing', component: BillingComponent, canActivate: [AuthGuard] },
   {
     path: 'admin/users',

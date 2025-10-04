@@ -3,6 +3,7 @@ import { YoutubeDownloaderComponent } from './youtube-downloader/youtube-downloa
 import { RecognitionTasksComponent } from './recognition-tasks/recognition-tasks.component';
 import { SubtitlesTasksComponent } from './subtitles-task/subtitles-tasks.component';
 import { MarkdownConverterComponent } from './Markdown-converter/markdown-converter.component';
+import { PngToWebpComponent } from './png-to-webp/png-to-webp.component';
 import { OpenAiTranscriptionComponent } from './openai-transcription/openai-transcription.component';
 import { BillingComponent } from './billing/billing.component';
 import { AuthGuard } from './services/auth.guard';
@@ -19,6 +20,7 @@ export const appRoutes: Routes = [
   { path: 'recognition-tasks', component: SubtitlesTasksComponent },
   { path: 'transcriptions', component: OpenAiTranscriptionComponent },
   { path: 'markdown-converter', component: MarkdownConverterComponent },
+  { path: 'png-to-webp', component: PngToWebpComponent },
   { path: 'billing', component: BillingComponent, canActivate: [AuthGuard] },
   {
     path: 'admin/users',

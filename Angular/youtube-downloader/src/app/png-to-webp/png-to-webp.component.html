@@ -1,0 +1,100 @@
+<div class="page">
+  <h1>PNG → WebP конвертер</h1>
+  <p class="description">
+    Преобразуйте PNG изображение в WebP прямо в браузере. Загрузите файл, вставьте из буфера обмена или перетащите его в область ниже.
+    Прозрачность сохраняется, а вы сразу увидите результат и размер полученного файла.
+  </p>
+
+  <div class="upload-area"
+       (drop)="onDrop($event)"
+       (dragover)="onDragOver($event)">
+    <div class="upload-content">
+      <button mat-stroked-button color="primary" (click)="fileInput.click()">
+        <mat-icon>upload_file</mat-icon>
+        Выбрать PNG
+      </button>
+      <p class="hint">или перетащите изображение сюда, или нажмите <strong>Ctrl/⌘ + V</strong> для вставки</p>
+      <input #fileInput type="file" accept="image/png" (change)="onFileInput($event)" hidden>
+    </div>
+  </div>
+
+  <div class="controls" *ngIf="originalFile()">
+    <div class="slider">
+      <label for="quality">Качество WebP: {{ quality() | number:'1.0-2' }}</label>
+      <mat-slider
+        id="quality"
+        min="0.1"
+        max="1"
+        step="0.01"
+        [discrete]="true">
+        <input matSliderThumb [value]="quality()" (input)="onSliderInput($event)">
+      </mat-slider>
+    </div>
+
+    <div class="actions">
+      <button mat-flat-button color="primary" (click)="downloadResult()" [disabled]="!result()">
+        <mat-icon>download</mat-icon>
+        Скачать WebP
+      </button>
+      <button mat-button color="warn" (click)="clear()">
+        <mat-icon>delete</mat-icon>
+        Очистить
+      </button>
+    </div>
+  </div>
+
+  <mat-card class="previews" *ngIf="originalFile()">
+    <div class="preview">
+      <h2>Оригинал</h2>
+      <div class="image-frame">
+        <div class="checkerboard"></div>
+        <img *ngIf="originalUrl()" [src]="originalUrl()" alt="Оригинал">
+      </div>
+      <dl>
+        <div>
+          <dt>Размер</dt>
+          <dd>{{ originalSizeLabel() }}</dd>
+        </div>
+        <div *ngIf="originalDimensions() as dims">
+          <dt>Разрешение</dt>
+          <dd>{{ dims.width }} × {{ dims.height }} px</dd>
+        </div>
+      </dl>
+    </div>
+
+    <mat-divider vertical></mat-divider>
+
+    <div class="preview">
+      <h2>WebP</h2>
+      <div class="image-frame">
+        <div class="checkerboard"></div>
+        <img *ngIf="result() as res" [src]="res.previewUrl" alt="WebP результат">
+        <div class="spinner" *ngIf="processing()">
+          <mat-progress-spinner mode="indeterminate" diameter="48"></mat-progress-spinner>
+        </div>
+      </div>
+      <dl>
+        <div>
+          <dt>Размер</dt>
+          <dd>{{ resultSizeLabel() }}</dd>
+        </div>
+        <div>
+          <dt>Сжатие</dt>
+          <dd>{{ compressionRatio() }}</dd>
+        </div>
+        <div *ngIf="result() as res">
+          <dt>Время конверсии</dt>
+          <dd>{{ res.durationMs | number:'1.0-0' }} мс</dd>
+        </div>
+      </dl>
+      <p class="note" *ngIf="!result() && !processing()">
+        Выберите качество, чтобы получить WebP файл.
+      </p>
+    </div>
+  </mat-card>
+
+  <div class="error" *ngIf="error()">
+    <mat-icon>error_outline</mat-icon>
+    {{ error() }}
+  </div>
+</div>
