@@ -74,6 +74,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   private static readonly MAX_ZOOM = 8;
   private static readonly ZOOM_EPSILON = 1e-3;
   private static readonly PAN_EPSILON = 1e-2;
+  private static readonly MIN_CROP_SIZE = 5;
 
   private readonly baseZoomOptions: number[] = [1, 2, 4, ImageEditorDialogComponent.MAX_ZOOM];
 
@@ -689,8 +690,79 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
         break;
     }
 
+    rect = this.enforceMinimumCropSize(rect, type, startRect);
     this.cropRect.set(this.normalizeCrop(rect));
     this.scheduleRender();
+  }
+
+  private enforceMinimumCropSize(rect: CropRect, type: CropHandleType, startRect: CropRect): CropRect {
+    if (type === 'move') {
+      return rect;
+    }
+
+    const min = ImageEditorDialogComponent.MIN_CROP_SIZE;
+    const anchorLeft = startRect.x;
+    const anchorRight = startRect.x + startRect.width;
+    const anchorTop = startRect.y;
+    const anchorBottom = startRect.y + startRect.height;
+
+    let left = rect.x;
+    let top = rect.y;
+    let right = rect.x + rect.width;
+    let bottom = rect.y + rect.height;
+
+    switch (type) {
+      case 'top-left':
+        right = anchorRight;
+        bottom = anchorBottom;
+        left = Math.min(left, right - min);
+        top = Math.min(top, bottom - min);
+        break;
+      case 'top-right':
+        left = anchorLeft;
+        bottom = anchorBottom;
+        right = Math.max(right, left + min);
+        top = Math.min(top, bottom - min);
+        break;
+      case 'bottom-left':
+        right = anchorRight;
+        top = anchorTop;
+        left = Math.min(left, right - min);
+        bottom = Math.max(bottom, top + min);
+        break;
+      case 'bottom-right':
+        left = anchorLeft;
+        top = anchorTop;
+        right = Math.max(right, left + min);
+        bottom = Math.max(bottom, top + min);
+        break;
+      case 'top':
+        left = anchorLeft;
+        right = anchorRight;
+        bottom = anchorBottom;
+        top = Math.min(top, bottom - min);
+        break;
+      case 'bottom':
+        left = anchorLeft;
+        right = anchorRight;
+        top = anchorTop;
+        bottom = Math.max(bottom, top + min);
+        break;
+      case 'left':
+        right = anchorRight;
+        top = anchorTop;
+        bottom = anchorBottom;
+        left = Math.min(left, right - min);
+        break;
+      case 'right':
+        left = anchorLeft;
+        top = anchorTop;
+        bottom = anchorBottom;
+        right = Math.max(right, left + min);
+        break;
+    }
+
+    return { x: left, y: top, width: right - left, height: bottom - top };
   }
 
   private finalizeCrop(): void {
