@@ -53,6 +53,16 @@
           <mat-icon>crop</mat-icon>
           {{ isCropping() ? 'Выделите область' : 'Выбрать область' }}
         </button>
+        <button
+          *ngIf="isCropping()"
+          mat-stroked-button
+          color="primary"
+          type="button"
+          (click)="applyCropSelection()"
+        >
+          <mat-icon>done</mat-icon>
+          Завершить обрезку
+        </button>
         <div class="crop-info">{{ cropInfo() }}</div>
       </div>
     </section>

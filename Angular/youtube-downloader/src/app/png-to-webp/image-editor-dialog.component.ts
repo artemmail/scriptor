@@ -43,6 +43,23 @@ export interface ImageEditorDialogResult {
   state: EditorState;
 }
 
+type CropHandleType =
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right'
+  | 'top'
+  | 'right'
+  | 'bottom'
+  | 'left'
+  | 'move';
+
+interface ActiveCropHandle {
+  type: CropHandleType;
+  startRect: CropRect;
+  startPointer: { x: number; y: number };
+}
+
 @Component({
   selector: 'app-image-editor-dialog',
   standalone: true,
@@ -77,6 +94,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   private activePointerId: number | null = null;
   private lastPointerPosition: { x: number; y: number } | null = null;
   private cropStart: { x: number; y: number } | null = null;
+  private activeCropHandle: ActiveCropHandle | null = null;
   private pan: { x: number; y: number } = { x: 0, y: 0 };
   private rafHandle: number | null = null;
 
@@ -133,11 +151,27 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   }
 
   toggleCrop(): void {
-    this.isCropping.update(value => !value);
-    if (this.isCropping()) {
-      this.pointerActive = false;
-      this.pan = { x: 0, y: 0 };
+    const shouldEnable = !this.isCropping();
+    this.isCropping.set(shouldEnable);
+    this.pointerActive = false;
+    this.activePointerId = null;
+    this.lastPointerPosition = null;
+    if (!shouldEnable) {
+      this.cropStart = null;
+      this.activeCropHandle = null;
     }
+    this.scheduleRender();
+  }
+
+  applyCropSelection(): void {
+    if (!this.cropRect()) {
+      this.isCropping.set(false);
+      return;
+    }
+    this.isCropping.set(false);
+    this.cropStart = null;
+    this.activeCropHandle = null;
+    this.scheduleRender();
   }
 
   onZoomChange(event: MatButtonToggleChange): void {
@@ -343,7 +377,39 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     }
     ctx.closePath();
     ctx.stroke();
+
+    this.drawCropHandles(ctx, corners);
     ctx.restore();
+  }
+
+  private drawCropHandles(
+    ctx: CanvasRenderingContext2D,
+    corners: Array<{ x: number; y: number }>,
+  ): void {
+    const [topLeft, topRight, bottomRight, bottomLeft] = corners;
+    const midTop = { x: (topLeft.x + topRight.x) / 2, y: (topLeft.y + topRight.y) / 2 };
+    const midRight = {
+      x: (topRight.x + bottomRight.x) / 2,
+      y: (topRight.y + bottomRight.y) / 2,
+    };
+    const midBottom = {
+      x: (bottomLeft.x + bottomRight.x) / 2,
+      y: (bottomLeft.y + bottomRight.y) / 2,
+    };
+    const midLeft = { x: (topLeft.x + bottomLeft.x) / 2, y: (topLeft.y + bottomLeft.y) / 2 };
+
+    const handles = [topLeft, topRight, bottomRight, bottomLeft, midTop, midRight, midBottom, midLeft];
+    const size = 10;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#3f51b5';
+    ctx.setLineDash([]);
+    handles.forEach(point => {
+      ctx.beginPath();
+      ctx.rect(point.x - size / 2, point.y - size / 2, size, size);
+      ctx.fill();
+      ctx.stroke();
+    });
   }
 
   private getCropCorners(crop: CropRect): Array<{ x: number; y: number }> {
@@ -367,10 +433,28 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
 
     if (this.isCropping()) {
       const point = this.screenToImage(event);
-      if (point) {
-        this.cropStart = point;
-        this.cropRect.set({ x: point.x, y: point.y, width: 0, height: 0 });
+      if (!point) {
+        return;
       }
+
+      const crop = this.cropRect();
+      if (crop) {
+        const handleType = this.getCropHandleType(point, crop);
+        if (handleType) {
+          this.cropStart = null;
+          this.activeCropHandle = {
+            type: handleType,
+            startRect: { ...crop },
+            startPointer: point,
+          };
+          return;
+        }
+      }
+
+      this.activeCropHandle = null;
+      this.cropStart = point;
+      this.cropRect.set({ x: point.x, y: point.y, width: 0, height: 0 });
+      this.scheduleRender();
     }
   };
 
@@ -381,6 +465,10 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     event.preventDefault();
 
     if (this.isCropping()) {
+      if (this.activeCropHandle) {
+        this.resizeCrop(event);
+        return;
+      }
       this.updateCrop(event);
       return;
     }
@@ -428,6 +516,54 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     this.scheduleRender();
   }
 
+  private resizeCrop(event: PointerEvent): void {
+    if (!this.activeCropHandle) {
+      return;
+    }
+    const point = this.screenToImage(event);
+    if (!point) {
+      return;
+    }
+
+    const { startRect, startPointer, type } = this.activeCropHandle;
+    const dx = point.x - startPointer.x;
+    const dy = point.y - startPointer.y;
+    let rect: CropRect = { ...startRect };
+
+    switch (type) {
+      case 'move':
+        rect = this.translateCrop(startRect, dx, dy);
+        break;
+      case 'top-left':
+        rect = { x: startRect.x + dx, y: startRect.y + dy, width: startRect.width - dx, height: startRect.height - dy };
+        break;
+      case 'top-right':
+        rect = { x: startRect.x, y: startRect.y + dy, width: startRect.width + dx, height: startRect.height - dy };
+        break;
+      case 'bottom-left':
+        rect = { x: startRect.x + dx, y: startRect.y, width: startRect.width - dx, height: startRect.height + dy };
+        break;
+      case 'bottom-right':
+        rect = { x: startRect.x, y: startRect.y, width: startRect.width + dx, height: startRect.height + dy };
+        break;
+      case 'top':
+        rect = { x: startRect.x, y: startRect.y + dy, width: startRect.width, height: startRect.height - dy };
+        break;
+      case 'bottom':
+        rect = { x: startRect.x, y: startRect.y, width: startRect.width, height: startRect.height + dy };
+        break;
+      case 'left':
+        rect = { x: startRect.x + dx, y: startRect.y, width: startRect.width - dx, height: startRect.height };
+        break;
+      case 'right':
+        rect = { x: startRect.x, y: startRect.y, width: startRect.width + dx, height: startRect.height };
+        break;
+    }
+
+    this.cropRect.set(this.normalizeCrop(rect));
+    this.scheduleRender();
+  }
+
   private finalizeCrop(): void {
     const crop = this.cropRect();
     if (!crop) {
@@ -437,22 +573,39 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
       this.cropRect.set(null);
     }
     this.cropStart = null;
+    this.activeCropHandle = null;
     this.scheduleRender();
   }
 
   private normalizeCrop(crop: CropRect): CropRect {
-    const width = this.imageWidth;
-    const height = this.imageHeight;
-    const x = Math.max(0, Math.min(crop.x, width));
-    const y = Math.max(0, Math.min(crop.y, height));
-    const maxWidth = width - x;
-    const maxHeight = height - y;
-    return {
-      x,
-      y,
-      width: Math.min(crop.width, maxWidth),
-      height: Math.min(crop.height, maxHeight),
-    };
+    let { x, y, width, height } = crop;
+
+    if (width < 0) {
+      x += width;
+      width = Math.abs(width);
+    }
+    if (height < 0) {
+      y += height;
+      height = Math.abs(height);
+    }
+
+    const maxWidth = this.imageWidth;
+    const maxHeight = this.imageHeight;
+
+    width = Math.min(width, maxWidth);
+    height = Math.min(height, maxHeight);
+
+    x = Math.min(Math.max(0, x), Math.max(0, maxWidth - width));
+    y = Math.min(Math.max(0, y), Math.max(0, maxHeight - height));
+
+    if (x + width > maxWidth) {
+      x = Math.max(0, maxWidth - width);
+    }
+    if (y + height > maxHeight) {
+      y = Math.max(0, maxHeight - height);
+    }
+
+    return { x, y, width, height };
   }
 
   private screenToImage(event: PointerEvent): { x: number; y: number } | null {
@@ -472,6 +625,53 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     const matrix = this.getTransformMatrix();
     const result = matrix.transformPoint(new DOMPoint(point.x, point.y));
     return { x: result.x, y: result.y };
+  }
+
+  private getCropHandleType(point: { x: number; y: number }, crop: CropRect): CropHandleType | null {
+    const tolerance = 12 / Math.max(this.zoom(), 0.0001);
+    const left = crop.x;
+    const right = crop.x + crop.width;
+    const top = crop.y;
+    const bottom = crop.y + crop.height;
+
+    const near = (value: number, target: number) => Math.abs(value - target) <= tolerance;
+
+    if (near(point.x, left) && near(point.y, top)) {
+      return 'top-left';
+    }
+    if (near(point.x, right) && near(point.y, top)) {
+      return 'top-right';
+    }
+    if (near(point.x, right) && near(point.y, bottom)) {
+      return 'bottom-right';
+    }
+    if (near(point.x, left) && near(point.y, bottom)) {
+      return 'bottom-left';
+    }
+    if (point.x > left + tolerance && point.x < right - tolerance && near(point.y, top)) {
+      return 'top';
+    }
+    if (point.x > left + tolerance && point.x < right - tolerance && near(point.y, bottom)) {
+      return 'bottom';
+    }
+    if (point.y > top + tolerance && point.y < bottom - tolerance && near(point.x, right)) {
+      return 'right';
+    }
+    if (point.y > top + tolerance && point.y < bottom - tolerance && near(point.x, left)) {
+      return 'left';
+    }
+    if (point.x > left && point.x < right && point.y > top && point.y < bottom) {
+      return 'move';
+    }
+    return null;
+  }
+
+  private translateCrop(startRect: CropRect, dx: number, dy: number): CropRect {
+    const maxWidth = this.imageWidth;
+    const maxHeight = this.imageHeight;
+    const newX = Math.min(Math.max(0, startRect.x + dx), Math.max(0, maxWidth - startRect.width));
+    const newY = Math.min(Math.max(0, startRect.y + dy), Math.max(0, maxHeight - startRect.height));
+    return { x: newX, y: newY, width: startRect.width, height: startRect.height };
   }
 
   private getTransformMatrix(): DOMMatrix {
