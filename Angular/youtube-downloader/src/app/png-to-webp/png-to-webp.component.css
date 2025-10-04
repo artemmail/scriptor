@@ -73,6 +73,11 @@ h1 {
   flex-direction: row;
   gap: 24px;
   padding: 24px;
+  align-items: stretch;
+}
+
+.previews mat-divider[vertical] {
+  align-self: stretch;
 }
 
 .preview {
@@ -80,6 +85,7 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
 
 .image-frame {
@@ -165,5 +171,9 @@ dd {
 
   .image-frame {
     min-height: 200px;
+  }
+
+  .previews mat-divider[vertical] {
+    display: none;
   }
 }
