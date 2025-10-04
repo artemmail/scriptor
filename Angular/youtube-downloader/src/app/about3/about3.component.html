@@ -31,25 +31,34 @@
       </div>
     </section>
 
-    <section class="landing-search">
-      <div class="landing-search-inner">
-        <div class="landing-search-text">
-          <h2>Расшифровывайте YouTube за пару минут</h2>
-          <p>
-            Запустите задачу прямо со страницы «О сервисе»: укажите ссылку или идентификатор ролика, а мы подготовим
-            аккуратно оформленный документ с тайм-кодами, списками и цитатами.
+    <section class="recognition-block">
+      <div class="recognition-grid">
+        <div class="recognition-text">
+          <div class="recognition-brand">
+            <img class="recognition-logo" src="assets/logo.webp" alt="Логотип YouScriptor" />
+            <span class="recognition-title">YouScriptor</span>
+          </div>
+          <p class="recognition-tagline">Конспектируем за вас — как личный учёный писарь.</p>
+          <p class="recognition-lead">
+            Автоматически создавайте профессиональные конспекты и отчёты из YouTube-видео: с расшифровкой,
+            форматированием, разметкой, формулами и подсветкой кода.
           </p>
-          <ul class="landing-search-list">
-            <li *ngFor="let item of recognitionGuide">{{ item }}</li>
-          </ul>
+
+          <div class="recognition-ad">
+            <app-yandex-ad></app-yandex-ad>
+          </div>
         </div>
 
-        <div class="landing-search-panel">
-          <form class="landing-search-form" (ngSubmit)="startRecognition()">
-            <label class="landing-search-label" for="landing-search-input">Ссылка или идентификатор YouTube</label>
-            <div class="landing-search-field">
+        <div class="recognition-card">
+          <h2>Запустите новую расшифровку</h2>
+          <p class="recognition-card-lead">
+            Введите идентификатор или ссылку на YouTube, чтобы получить готовый документ.
+          </p>
+          <form class="recognition-form" (ngSubmit)="startRecognition()">
+            <label class="recognition-label" for="recognition-input">Введите идентификатор или ссылку YouTube</label>
+            <div class="recognition-field">
               <input
-                id="landing-search-input"
+                id="recognition-input"
                 name="youtubeQuery"
                 type="text"
                 [(ngModel)]="searchValue"
@@ -58,19 +67,41 @@
                 [disabled]="isStarting"
               />
               <button class="btn btn-primary" type="submit" [disabled]="isStarting || !searchValue.trim()">
-                <span *ngIf="!isStarting">Начать транскрибацию</span>
+                <span *ngIf="!isStarting">Запустить</span>
                 <span *ngIf="isStarting">Запускаем…</span>
               </button>
             </div>
           </form>
-
-          <p class="landing-search-hint">
-            Результат появится в разделе <a [routerLink]="['/Scriptorium']">Scriptorium</a>, а прогресс можно будет
-            отслеживать позднее.
+          <p class="recognition-hint">
+            Готовый результат ищите в <b><a [routerLink]="['/Scriptorium']">Scriptorium</a></b>, либо повторите тот же
+            запрос — результат сохраняется.
           </p>
-
-          <p class="landing-search-error" *ngIf="startError">{{ startError }}</p>
+          <p class="recognition-error" *ngIf="startError">{{ startError }}</p>
         </div>
+      </div>
+    </section>
+
+    <section class="recognition-instructions">
+      <div class="instruction-card">
+        <h2>Как это работает</h2>
+        <p class="instruction-intro">Создавайте профессиональные конспекты и отчёты из видео автоматически.</p>
+        <ol class="instruction-list">
+          <li>Укажите ссылку на YouTube-видео с субтитрами.</li>
+          <li>
+            Готовый результат ищите в <b><a [routerLink]="['/Scriptorium']">Scriptorium</a></b>, либо повторите тот же
+            запрос — результат сохраняется.
+          </li>
+          <li>
+            Получите транскрипцию в виде аккуратно отформатированного документа. Готовое решение для учёбы, работы и
+            технической документации.
+          </li>
+          <li>Сохраняется структура: заголовки, списки, цитаты, формулы (LaTeX), программный код с подсветкой.</li>
+          <li>Экспортируйте в PDF, Word, HTML или Markdown; при необходимости сохраните субтитры в формате <strong>.srt</strong>.</li>
+          <li>
+            Можно также <b><a [routerLink]="['/down']">скачать YouTube-видео</a></b> с нужными дорожками (качество/контейнер/кодек/аудио и
+            субтитры).
+          </li>
+        </ol>
       </div>
     </section>
 

@@ -5,6 +5,7 @@ declare var Ya: any;
 
 @Component({
   selector: 'app-yandex-ad',
+  standalone: true,
   template: `
     <!-- Yandex.RTB R-A-14227572-1 -->
     <div id="yandex_rtb_R-A-14227572-1"></div>

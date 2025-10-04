@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { SubtitleService } from '../services/subtitle.service';
+import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
 
 interface WorkflowStep {
   readonly title: string;
@@ -53,7 +54,7 @@ interface FaqItem {
 @Component({
   selector: 'app-about3',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, MatExpansionModule],
+  imports: [CommonModule, FormsModule, RouterModule, MatExpansionModule, YandexAdComponent],
   templateUrl: './about3.component.html',
   styleUrls: ['./about3.component.css'],
 })
@@ -69,13 +70,6 @@ export class About3Component {
   searchValue = '';
   isStarting = false;
   startError: string | null = null;
-
-  readonly recognitionGuide: readonly string[] = [
-    'Укажите ссылку или идентификатор YouTube-видео с доступными субтитрами.',
-    'Мы создадим задачу и автоматически сохраним прогресс — вы сможете вернуться к ней позже.',
-    'Готовую расшифровку найдёте в разделе «Scriptorium» или повторите тот же запрос.',
-    'Экспортируйте результат в DOCX, PDF, HTML или Markdown и загрузите субтитры в формате .srt.',
-  ];
 
   readonly trustedCompanies: readonly TrustedCompany[] = [
     {
