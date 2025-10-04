@@ -47,10 +47,10 @@ section {
 }
 
 .hero-title {
-  font-size: 3rem;
+  font-size: 4rem;
   line-height: 1.15;
   color: #0f172a;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .hero-tagline {
