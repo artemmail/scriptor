@@ -423,7 +423,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     const midLeft = { x: (topLeft.x + bottomLeft.x) / 2, y: (topLeft.y + bottomLeft.y) / 2 };
 
     const handles = [topLeft, topRight, bottomRight, bottomLeft, midTop, midRight, midBottom, midLeft];
-    const size = 10;
+    const size = 12;
 
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#3f51b5';
@@ -897,40 +897,82 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     return { x: result.x, y: result.y };
   }
 
-  private getCropHandleType(point: { x: number; y: number }, crop: CropRect): CropHandleType | null {
-    const tolerance = 12 / Math.max(this.zoom(), 0.0001);
+  private getCropHandleType(pointImage: { x: number; y: number }, crop: CropRect): CropHandleType | null {
+    const matrix = this.getTransformMatrix();
+    const pScreen = matrix.transformPoint(new DOMPoint(pointImage.x, pointImage.y));
+
+    const cornersImg = this.getCropCorners(crop);
+    const [tl, tr, br, bl] = cornersImg.map(pt => {
+      const s = matrix.transformPoint(new DOMPoint(pt.x, pt.y));
+      return { x: s.x, y: s.y };
+    });
+
+    const mid = (a: { x: number; y: number }, b: { x: number; y: number }) => ({
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2,
+    });
+    const midTop = mid(tl, tr);
+    const midRight = mid(tr, br);
+    const midBottom = mid(bl, br);
+    const midLeft = mid(tl, bl);
+
+    const HANDLE_HALF = 6;
+
+    const hitBox = (h: { x: number; y: number }) =>
+      Math.abs(pScreen.x - h.x) <= HANDLE_HALF && Math.abs(pScreen.y - h.y) <= HANDLE_HALF;
+
+    if (hitBox(tl)) {
+      return 'top-left';
+    }
+    if (hitBox(tr)) {
+      return 'top-right';
+    }
+    if (hitBox(br)) {
+      return 'bottom-right';
+    }
+    if (hitBox(bl)) {
+      return 'bottom-left';
+    }
+
+    const EDGE_HALF = 8;
+
+    const hitEdge = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+      const vx = b.x - a.x;
+      const vy = b.y - a.y;
+      const wx = pScreen.x - a.x;
+      const wy = pScreen.y - a.y;
+      const len2 = vx * vx + vy * vy || 1;
+      const t = Math.max(0, Math.min(1, (wx * vx + wy * vy) / len2));
+      const px = a.x + t * vx;
+      const py = a.y + t * vy;
+      const dx = pScreen.x - px;
+      const dy = pScreen.y - py;
+      return Math.hypot(dx, dy) <= EDGE_HALF;
+    };
+
+    if (hitEdge(tl, tr)) {
+      return 'top';
+    }
+    if (hitEdge(tr, br)) {
+      return 'right';
+    }
+    if (hitEdge(bl, br)) {
+      return 'bottom';
+    }
+    if (hitEdge(tl, bl)) {
+      return 'left';
+    }
+
     const left = crop.x;
     const right = crop.x + crop.width;
     const top = crop.y;
     const bottom = crop.y + crop.height;
-
-    const near = (value: number, target: number) => Math.abs(value - target) <= tolerance;
-
-    if (near(point.x, left) && near(point.y, top)) {
-      return 'top-left';
-    }
-    if (near(point.x, right) && near(point.y, top)) {
-      return 'top-right';
-    }
-    if (near(point.x, right) && near(point.y, bottom)) {
-      return 'bottom-right';
-    }
-    if (near(point.x, left) && near(point.y, bottom)) {
-      return 'bottom-left';
-    }
-    if (point.x > left + tolerance && point.x < right - tolerance && near(point.y, top)) {
-      return 'top';
-    }
-    if (point.x > left + tolerance && point.x < right - tolerance && near(point.y, bottom)) {
-      return 'bottom';
-    }
-    if (point.y > top + tolerance && point.y < bottom - tolerance && near(point.x, right)) {
-      return 'right';
-    }
-    if (point.y > top + tolerance && point.y < bottom - tolerance && near(point.x, left)) {
-      return 'left';
-    }
-    if (point.x > left && point.x < right && point.y > top && point.y < bottom) {
+    if (
+      pointImage.x > left &&
+      pointImage.x < right &&
+      pointImage.y > top &&
+      pointImage.y < bottom
+    ) {
       return 'move';
     }
     return null;
