@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, OnDestroy, ViewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Input, OnDestroy, ViewChild } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { MarkdownModule } from 'ngx-markdown';
@@ -13,6 +13,8 @@ import { VideoDialogComponent, VideoDialogData } from '../video-dialog/video-dia
 import { LocalTimePipe } from '../pipe/local-time.pipe';
 import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
 import { RouterModule } from '@angular/router'; // ⬅️ Добавить
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { AuthService } from '../services/AuthService.service';
 
 @Component({
   selector: 'app-task-result',
@@ -37,6 +39,7 @@ export class TaskResultComponent implements OnDestroy {
   isCopying = false;
   isResultFullscreen = false;
   private originalBodyOverflow: string | null = null;
+  isAuthenticated = false;
 
   private englishPromo = 'YouScriptor: Accurate transcription from YouTube videos to PDF and MS Word with markup and formula display for free.';
   private russianPromo = 'YouScriptor: Точная транскрипция с YouTube видео в PDF и MS Word с разметкой и отображением формул бесплатно.';
@@ -46,8 +49,16 @@ export class TaskResultComponent implements OnDestroy {
     private sanitizer: DomSanitizer,
     private subtitleService: SubtitleService,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar
-  ) {}
+    private snackBar: MatSnackBar,
+    private readonly authService: AuthService,
+    private readonly destroyRef: DestroyRef
+  ) {
+    this.authService.user$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(user => {
+        this.isAuthenticated = !!user;
+      });
+  }
 
   get promoText(): string {
     if (!this.youtubeTask?.result) {
@@ -90,7 +101,7 @@ export class TaskResultComponent implements OnDestroy {
   }
 
   openVideoDialog(task: YoutubeCaptionTaskDto | null): void {
-    if (!task) return;
+    if (!task || !this.isAuthenticated) return;
     const data: VideoDialogData = {
       videoId: task.id,
       title: task.title,
