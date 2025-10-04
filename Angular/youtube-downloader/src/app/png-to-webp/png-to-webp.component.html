@@ -72,30 +72,7 @@
 
     <mat-divider vertical></mat-divider>
 
-    <div class="preview">
-      <div class="image-frame">
-        <div class="checkerboard"></div>
-        <img *ngIf="workingPreviewUrl() as currentUrl" [src]="currentUrl" alt="Текущее изображение">
-      </div>
-      <dl>
-        <div>
-          <dt>Размер</dt>
-          <dd>{{ workingSizeLabel() }}</dd>
-        </div>
-        <div *ngIf="workingDimensions()">
-          <dt>Разрешение</dt>
-          <dd>{{ workingDimensionsLabel() }}</dd>
-        </div>
-        <div *ngIf="!hasEdits()">
-          <dt>Статус</dt>
-          <dd>Без изменений</dd>
-        </div>
-      </dl>
-      <p class="note" *ngIf="hasEdits()">Превью учитывает все применённые трансформации.</p>
-    </div>
-
-    <mat-divider vertical></mat-divider>
-
+    
     <div class="preview">
       <h2>WebP</h2>
       <div class="image-frame">
