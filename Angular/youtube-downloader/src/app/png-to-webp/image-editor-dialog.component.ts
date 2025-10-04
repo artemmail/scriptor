@@ -71,9 +71,21 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   @ViewChild('canvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('canvasContainer', { static: true }) canvasContainerRef!: ElementRef<HTMLDivElement>;
 
-  readonly zoomOptions = [1, 2, 4] as const;
+  private static readonly MAX_ZOOM = 8;
+  private static readonly ZOOM_EPSILON = 1e-3;
+
+  private readonly baseZoomOptions: number[] = [1, 2, 4, ImageEditorDialogComponent.MAX_ZOOM];
 
   readonly zoom: WritableSignal<number> = signal(1);
+  readonly zoomOptions: Signal<readonly number[]> = computed(() => {
+    const options = [...this.baseZoomOptions];
+    const current = this.zoom();
+    if (!options.some(option => this.areZoomValuesEqual(option, current))) {
+      options.push(current);
+      options.sort((a, b) => a - b);
+    }
+    return options;
+  });
   readonly rotation: WritableSignal<number> = signal(0);
   readonly flipHorizontal: WritableSignal<boolean> = signal(false);
   readonly flipVertical: WritableSignal<boolean> = signal(false);
@@ -88,6 +100,8 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
 
   readonly isCropping: WritableSignal<boolean> = signal(false);
 
+  protected readonly trackZoomOption = (_: number, option: number): number => option;
+
   private image: ImageBitmap | HTMLImageElement | null = null;
   private resizeObserver?: ResizeObserver;
   private pointerActive = false;
@@ -97,6 +111,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   private activeCropHandle: ActiveCropHandle | null = null;
   private pan: { x: number; y: number } = { x: 0, y: 0 };
   private rafHandle: number | null = null;
+  private readonly minZoom: WritableSignal<number> = signal(1);
 
   private get canvas(): HTMLCanvasElement {
     return this.canvasRef.nativeElement;
@@ -180,9 +195,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     if (typeof value !== 'number') {
       return;
     }
-    this.zoom.set(value);
-    this.pan = { x: 0, y: 0 };
-    this.scheduleRender();
+    this.updateZoom(value, { resetPan: true });
   }
 
   rotateRight(): void {
@@ -211,13 +224,12 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   }
 
   reset(): void {
-    this.zoom.set(1);
+    this.updateZoom(1, { resetPan: true, schedule: false });
     this.rotation.set(0);
     this.flipHorizontal.set(false);
     this.flipVertical.set(false);
     this.cropRect.set(null);
     this.isCropping.set(false);
-    this.pan = { x: 0, y: 0 };
     this.scheduleRender();
   }
 
@@ -250,6 +262,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
       this.image = await this.loadImage(this.data.blob);
       this.attachEventListeners();
       this.observeResize();
+      this.updateZoomLimits();
       this.scheduleRender();
     } catch (error) {
       console.error('Image editor initialization error', error);
@@ -269,6 +282,11 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   private observeResize(): void {
     this.resizeObserver = new ResizeObserver(() => {
       this.resizeCanvas();
+      const zoomAdjusted = this.updateZoomLimits();
+      if (zoomAdjusted) {
+        this.scheduleRender();
+        return;
+      }
       this.scheduleRender();
     });
     this.resizeObserver.observe(this.canvasContainerRef.nativeElement);
@@ -285,6 +303,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
       canvas.width = width;
       canvas.height = height;
     }
+    this.updateZoomLimits();
   }
 
   private loadImage(blob: Blob): Promise<ImageBitmap | HTMLImageElement> {
@@ -509,28 +528,11 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     event.preventDefault();
 
     const currentZoom = this.zoom();
-    let nextZoom = currentZoom;
+    const factor = Math.exp(-event.deltaY / 300);
+    const nextZoom = this.clampZoom(currentZoom * factor);
 
-    if (event.deltaY < 0) {
-      for (const option of this.zoomOptions) {
-        if (option > currentZoom) {
-          nextZoom = option;
-          break;
-        }
-      }
-    } else if (event.deltaY > 0) {
-      for (let i = this.zoomOptions.length - 1; i >= 0; i--) {
-        const option = this.zoomOptions[i];
-        if (option < currentZoom) {
-          nextZoom = option;
-          break;
-        }
-      }
-    }
-
-    if (nextZoom !== currentZoom) {
-      this.zoom.set(nextZoom);
-      this.scheduleRender();
+    if (!this.areZoomValuesEqual(nextZoom, currentZoom)) {
+      this.updateZoom(nextZoom);
     }
   };
 
@@ -549,6 +551,96 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     const normalized = this.normalizeCrop({ x, y, width, height });
     this.cropRect.set(normalized);
     this.scheduleRender();
+  }
+
+  formatZoomLabel(option: number): string {
+    const format = (value: number): string => {
+      if (this.areZoomValuesEqual(value, Math.round(value))) {
+        return Math.round(value).toString();
+      }
+      return value >= 10 ? value.toFixed(0) : value.toFixed(2);
+    };
+
+    if (option >= 1) {
+      return `1:${format(option)}`;
+    }
+    return `${format(1 / option)}:1`;
+  }
+
+  private updateZoom(value: number, options: { resetPan?: boolean; schedule?: boolean } = {}): boolean {
+    const { resetPan = false, schedule = true } = options;
+    const clamped = this.clampZoom(value);
+
+    let panChanged = false;
+    if (resetPan && (this.pan.x !== 0 || this.pan.y !== 0)) {
+      this.pan = { x: 0, y: 0 };
+      panChanged = true;
+    } else if (resetPan) {
+      this.pan = { x: 0, y: 0 };
+    }
+
+    const zoomChanged = !this.areZoomValuesEqual(this.zoom(), clamped);
+    if (zoomChanged) {
+      this.zoom.set(clamped);
+    }
+
+    if ((zoomChanged || panChanged) && schedule) {
+      this.scheduleRender();
+    }
+
+    return zoomChanged || panChanged;
+  }
+
+  private updateZoomLimits(): boolean {
+    const minZoom = this.calculateMinZoom();
+    if (!Number.isFinite(minZoom) || minZoom <= 0) {
+      return false;
+    }
+
+    if (!this.areZoomValuesEqual(this.minZoom(), minZoom)) {
+      this.minZoom.set(minZoom);
+    }
+
+    return this.updateZoom(this.zoom(), { schedule: false });
+  }
+
+  private calculateMinZoom(): number {
+    if (!this.image) {
+      return 1;
+    }
+    const canvas = this.canvas;
+    if (canvas.width === 0 || canvas.height === 0) {
+      return 1;
+    }
+
+    const widthRatio = canvas.width / this.imageWidth;
+    const heightRatio = canvas.height / this.imageHeight;
+    const fitScale = Math.min(widthRatio, heightRatio);
+    const minZoom = Math.min(1, fitScale);
+    return Math.max(minZoom, 0.01);
+  }
+
+  private clampZoom(value: number): number {
+    if (!Number.isFinite(value)) {
+      return this.minZoom();
+    }
+    const min = this.minZoom();
+    const max = ImageEditorDialogComponent.MAX_ZOOM;
+    const clamped = Math.min(max, Math.max(min, value));
+    return this.snapToBaseZoom(clamped);
+  }
+
+  private snapToBaseZoom(value: number): number {
+    for (const option of this.baseZoomOptions) {
+      if (this.areZoomValuesEqual(option, value)) {
+        return option;
+      }
+    }
+    return value;
+  }
+
+  private areZoomValuesEqual(a: number, b: number): boolean {
+    return Math.abs(a - b) <= ImageEditorDialogComponent.ZOOM_EPSILON;
   }
 
   private resizeCrop(event: PointerEvent): void {
