@@ -1,3 +1,7 @@
+:root {
+  --app-header-height: 64px;
+}
+
 html, body {
   height: 100%;
 }
@@ -7,6 +11,12 @@ body {
   font-family: Roboto, "Helvetica Neue", sans-serif;
   min-height: 100vh;
   background: linear-gradient(180deg, #f8fbff 0%, #eef2ff 100%);
+}
+
+@media (max-width: 600px) {
+  :root {
+    --app-header-height: 56px;
+  }
 }
 
 /* Если нужно, можно убрать или откорректировать стили для контейнеров Angular Material */
