@@ -3,11 +3,11 @@
   color: #102a43;
   font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
   background: linear-gradient(180deg, #f8fbff 0%, #eef2ff 100%);
-  min-height: 100vh;
+  min-height: calc(100vh - var(--app-header-height));
 }
 
 .transcription-page {
-  min-height: 100vh;
+  min-height: 100%;
 }
 
 .page-content {
