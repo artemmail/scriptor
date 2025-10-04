@@ -6,8 +6,6 @@ import { Title } from '@angular/platform-browser';
 
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
@@ -36,8 +34,6 @@ import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
     /* Material & CDK */
     MatTableModule,
     MatSortModule,
-    MatFormFieldModule,
-    MatInputModule,
     MatButtonModule,
     MatIconModule,
     MatCardModule,
@@ -105,13 +101,14 @@ export class SubtitlesTasksComponent implements OnInit {
   private loadTasks(append = false): void {
     this.loading = true;
     const page = this.pageIndex + 1;
+    const filter = this.filterValue.trim().toLowerCase();
     this.subtitleService
       .getTasks(
         page,
         this.pageSize,
         this.sortField,
         this.sortOrder,
-        this.filterValue,
+        filter,
         this.userIdFilter
       )
       .subscribe({
@@ -133,9 +130,16 @@ export class SubtitlesTasksComponent implements OnInit {
   }
 
   applyFilter(evt: Event): void {
-    this.filterValue = (evt.target as HTMLInputElement).value.trim().toLowerCase();
+    this.filterValue = (evt.target as HTMLInputElement).value;
     this.pageIndex = 0;
     this.loadTasks();
+  }
+
+  clearFilter(input: HTMLInputElement): void {
+    this.filterValue = '';
+    this.pageIndex = 0;
+    this.loadTasks();
+    input.focus();
   }
 
   onSortChange(sort: Sort): void {

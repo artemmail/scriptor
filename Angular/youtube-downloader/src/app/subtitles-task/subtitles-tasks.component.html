@@ -53,10 +53,26 @@
             (scrolled)="onScrollDown()"
           >
             <div class="filter-toolbar">
-              <mat-form-field appearance="outline" class="filter-field">
-                <mat-label>Фильтр по названию или каналу</mat-label>
-                <input matInput placeholder="Начните печатать..." (keyup)="applyFilter($event)">
-              </mat-form-field>
+              <label class="filter-label" for="tasks-filter-input">Фильтр по названию или каналу</label>
+              <div class="filter-field">
+                <input
+                  #filterInput
+                  id="tasks-filter-input"
+                  type="text"
+                  [value]="filterValue"
+                  (input)="applyFilter($event)"
+                  placeholder="Начните печатать..."
+                  autocomplete="off"
+                />
+                <button
+                  *ngIf="filterValue"
+                  type="button"
+                  class="filter-reset-btn"
+                  (click)="clearFilter(filterInput)"
+                >
+                  Очистить
+                </button>
+              </div>
             </div>
 
             <app-yandex-ad></app-yandex-ad>

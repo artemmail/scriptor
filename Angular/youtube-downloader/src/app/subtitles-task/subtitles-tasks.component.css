@@ -142,14 +142,66 @@ section {
 }
 
 .filter-toolbar {
-  display: flex;
-  justify-content: flex-start;
+  display: grid;
+  gap: 12px;
+  justify-items: flex-start;
+}
+
+.filter-label {
+  font-weight: 600;
+  color: #0f172a;
 }
 
 .filter-field {
-  width: min(100%, 420px);
-  background: rgba(59, 130, 246, 0.08);
-  border-radius: 16px;
+  width: min(100%, 540px);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: #f8fafc;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  padding: 10px 12px 10px 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.filter-field:focus-within {
+  border-color: rgba(59, 130, 246, 0.65);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+}
+
+.filter-field input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  color: #0f172a;
+  outline: none;
+}
+
+.filter-field input::placeholder {
+  color: #94a3b8;
+}
+
+.filter-reset-btn {
+  border: none;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-weight: 600;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(14, 165, 233, 0.18));
+  color: #1d4ed8;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.filter-reset-btn:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(14, 165, 233, 0.26));
+  color: #1e3a8a;
+}
+
+.filter-reset-btn:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.55);
+  outline-offset: 2px;
 }
 
 .custom-table {
