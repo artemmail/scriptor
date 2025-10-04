@@ -8,8 +8,11 @@
     <section>
       <h3>Масштаб</h3>
       <mat-button-toggle-group [value]="zoom()" (change)="onZoomChange($event)" name="zoom" [multiple]="false">
-        <mat-button-toggle *ngFor="let option of zoomOptions" [value]="option">
-          {{ option === 1 ? '1:1' : option === 2 ? '1:2' : '1:4' }}
+        <mat-button-toggle
+          *ngFor="let option of zoomOptions(); trackBy: trackZoomOption"
+          [value]="option"
+        >
+          {{ formatZoomLabel(option) }}
         </mat-button-toggle>
       </mat-button-toggle-group>
     </section>
