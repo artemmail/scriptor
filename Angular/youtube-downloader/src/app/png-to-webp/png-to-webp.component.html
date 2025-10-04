@@ -73,7 +73,6 @@
     <mat-divider vertical></mat-divider>
 
     <div class="preview">
-      <h2>{{ hasEdits() ? 'После редактирования' : 'Текущее изображение' }}</h2>
       <div class="image-frame">
         <div class="checkerboard"></div>
         <img *ngIf="workingPreviewUrl() as currentUrl" [src]="currentUrl" alt="Текущее изображение">
