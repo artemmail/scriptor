@@ -73,6 +73,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
 
   private static readonly MAX_ZOOM = 8;
   private static readonly ZOOM_EPSILON = 1e-3;
+  private static readonly PAN_EPSILON = 1e-2;
 
   private readonly baseZoomOptions: number[] = [1, 2, 4, ImageEditorDialogComponent.MAX_ZOOM];
 
@@ -180,14 +181,15 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   }
 
   applyCropSelection(): void {
-    if (!this.cropRect()) {
-      this.isCropping.set(false);
-      return;
-    }
+    const crop = this.cropRect();
     this.isCropping.set(false);
     this.cropStart = null;
     this.activeCropHandle = null;
-    this.scheduleRender();
+    if (!crop) {
+      this.scheduleRender();
+      return;
+    }
+    this.focusOnCropArea(crop);
   }
 
   onZoomChange(event: MatButtonToggleChange): void {
@@ -704,6 +706,75 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     this.scheduleRender();
   }
 
+  private focusOnCropArea(crop: CropRect): void {
+    if (!this.image) {
+      this.scheduleRender();
+      return;
+    }
+
+    const zoomForCrop = this.calculateZoomForCrop(crop);
+    this.updateZoom(zoomForCrop, { schedule: false });
+    const appliedZoom = this.zoom();
+    const targetPan = this.calculatePanForCrop(crop, appliedZoom);
+    const safePan = {
+      x: Number.isFinite(targetPan.x) ? targetPan.x : this.pan.x,
+      y: Number.isFinite(targetPan.y) ? targetPan.y : this.pan.y,
+    };
+    const panChanged = !this.arePanValuesEqual(this.pan, safePan);
+    if (panChanged) {
+      this.pan = safePan;
+    }
+
+    this.scheduleRender();
+  }
+
+  private calculateZoomForCrop(crop: CropRect): number {
+    const canvas = this.canvas;
+    if (canvas.width === 0 || canvas.height === 0) {
+      return this.zoom();
+    }
+
+    const angle = ((this.rotation() % 360) + 360) % 360;
+    const radians = (angle * Math.PI) / 180;
+    const cropWidth = crop.width;
+    const cropHeight = crop.height;
+
+    const rotatedWidth = Math.abs(cropWidth * Math.cos(radians)) + Math.abs(cropHeight * Math.sin(radians));
+    const rotatedHeight = Math.abs(cropWidth * Math.sin(radians)) + Math.abs(cropHeight * Math.cos(radians));
+
+    if (rotatedWidth <= 0 || rotatedHeight <= 0) {
+      return this.zoom();
+    }
+
+    const widthRatio = canvas.width / rotatedWidth;
+    const heightRatio = canvas.height / rotatedHeight;
+    const zoomToFit = Math.min(widthRatio, heightRatio);
+
+    if (!Number.isFinite(zoomToFit) || zoomToFit <= 0) {
+      return this.zoom();
+    }
+
+    return zoomToFit;
+  }
+
+  private calculatePanForCrop(crop: CropRect, zoom: number): { x: number; y: number } {
+    const matrix = this.buildTransformMatrix(zoom, { x: 0, y: 0 });
+    const centerPoint = new DOMPoint(crop.x + crop.width / 2, crop.y + crop.height / 2);
+    const transformed = matrix.transformPoint(centerPoint);
+    const canvas = this.canvas;
+    return {
+      x: canvas.width / 2 - transformed.x,
+      y: canvas.height / 2 - transformed.y,
+    };
+  }
+
+  private arePanValuesEqual(a: { x: number; y: number }, b: { x: number; y: number }): boolean {
+    return (
+      Math.abs(a.x - b.x) <= ImageEditorDialogComponent.PAN_EPSILON &&
+      Math.abs(a.y - b.y) <= ImageEditorDialogComponent.PAN_EPSILON
+    );
+  }
+
   private normalizeCrop(crop: CropRect): CropRect {
     let { x, y, width, height } = crop;
 
@@ -802,13 +873,16 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   }
 
   private getTransformMatrix(): DOMMatrix {
+    return this.buildTransformMatrix(this.zoom(), this.pan);
+  }
+
+  private buildTransformMatrix(zoom: number, pan: { x: number; y: number }): DOMMatrix {
     const canvas = this.canvas;
-    const zoom = this.zoom();
     const rotation = this.rotation();
     const flipH = this.flipHorizontal() ? -1 : 1;
     const flipV = this.flipVertical() ? -1 : 1;
-    const cx = canvas.width / 2 + this.pan.x;
-    const cy = canvas.height / 2 + this.pan.y;
+    const cx = canvas.width / 2 + pan.x;
+    const cy = canvas.height / 2 + pan.y;
 
     let matrix = new DOMMatrix();
     matrix = matrix.translate(cx, cy);
