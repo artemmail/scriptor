@@ -57,7 +57,10 @@ type CropHandleType =
 interface ActiveCropHandle {
   type: CropHandleType;
   startRect: CropRect;
+  // для ручек — координата САМОЙ ручки (угла/середины ребра), а не точки клика
   startPointer: { x: number; y: number };
+  // смещение клика от центра ручки, чтобы не было «скачка»
+  pointerOffset?: { ox: number; oy: number };
 }
 
 @Component({
@@ -75,6 +78,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   private static readonly ZOOM_EPSILON = 1e-3;
   private static readonly PAN_EPSILON = 1e-2;
   private static readonly MIN_CROP_SIZE = 5;
+  private static readonly NEW_CROP_DRAG_THRESHOLD = 3; // px, чтобы новый кроп не ставился по одиночному клику
 
   private readonly baseZoomOptions: number[] = [1, 2, 4, ImageEditorDialogComponent.MAX_ZOOM];
 
@@ -94,14 +98,11 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   readonly cropRect: WritableSignal<CropRect | null> = signal(null);
   readonly cropInfo: Signal<string> = computed(() => {
     const crop = this.cropRect();
-    if (!crop) {
-      return 'Полный размер';
-    }
+    if (!crop) return 'Полный размер';
     return `${Math.round(crop.width)} × ${Math.round(crop.height)} px`;
   });
 
   readonly isCropping: WritableSignal<boolean> = signal(false);
-
   protected readonly trackZoomOption = (_: number, option: number): number => option;
 
   private image: ImageBitmap | HTMLImageElement | null = null;
@@ -114,6 +115,22 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   private pan: { x: number; y: number } = { x: 0, y: 0 };
   private rafHandle: number | null = null;
   private readonly minZoom: WritableSignal<number> = signal(1);
+
+  // новый кроп
+  private newCropStartImage: { x: number; y: number } | null = null;
+  private pointerDownScreen: { x: number; y: number } | null = null;
+  private dragStarted = false;
+
+  // подсветка/курсор
+  private hoverHandle: CropHandleType | null = null;
+
+  // HiDPI support
+  private devicePixelRatio = 1;
+  private canvasCssWidth = 0;
+  private canvasCssHeight = 0;
+
+  // DEBUG: отрисовывать центры ручек и рамки их хит-боксов
+  private readonly DEBUG_HIT = true;
 
   private get canvas(): HTMLCanvasElement {
     return this.canvasRef.nativeElement;
@@ -155,6 +172,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
 
     const canvas = this.canvas;
     canvas.removeEventListener('pointerdown', this.onPointerDown);
+    canvas.removeEventListener('pointerleave', this.onPointerLeave);
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
     canvas.removeEventListener('wheel', this.onWheel);
@@ -177,6 +195,13 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     if (!shouldEnable) {
       this.cropStart = null;
       this.activeCropHandle = null;
+      this.newCropStartImage = null;
+      this.pointerDownScreen = null;
+      this.dragStarted = false;
+      this.hoverHandle = null;
+      this.updateCursorForHandle(null);
+    } else {
+      this.updateCursorForHandle('move');
     }
     this.scheduleRender();
   }
@@ -186,6 +211,12 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     this.isCropping.set(false);
     this.cropStart = null;
     this.activeCropHandle = null;
+    this.newCropStartImage = null;
+    this.pointerDownScreen = null;
+    this.dragStarted = false;
+    this.hoverHandle = null;
+    this.updateCursorForHandle(null);
+
     if (!crop) {
       this.scheduleRender();
       return;
@@ -195,9 +226,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
 
   onZoomChange(event: MatButtonToggleChange): void {
     const value = event.value as number;
-    if (typeof value !== 'number') {
-      return;
-    }
+    if (typeof value !== 'number') return;
     this.updateZoom(value, { resetPan: true });
   }
 
@@ -233,13 +262,16 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     this.flipVertical.set(false);
     this.cropRect.set(null);
     this.isCropping.set(false);
+    this.newCropStartImage = null;
+    this.pointerDownScreen = null;
+    this.dragStarted = false;
+    this.hoverHandle = null;
+    this.updateCursorForHandle(null);
     this.scheduleRender();
   }
 
   async apply(): Promise<void> {
-    if (!this.image) {
-      return;
-    }
+    if (!this.image) return;
 
     try {
       const { blob, width, height } = await this.exportTransformedImage();
@@ -276,6 +308,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   private attachEventListeners(): void {
     const canvas = this.canvas;
     canvas.addEventListener('pointerdown', this.onPointerDown);
+    canvas.addEventListener('pointerleave', this.onPointerLeave);
     window.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('pointerup', this.onPointerUp);
     canvas.addEventListener('wheel', this.onWheel, { passive: false });
@@ -300,12 +333,18 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     const canvas = this.canvas;
     const container = this.canvasContainerRef.nativeElement;
     const rect = container.getBoundingClientRect();
-    const width = Math.max(200, Math.floor(rect.width));
-    const height = Math.max(200, Math.floor(rect.height));
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
-    }
+
+    // CSS размер
+    this.canvasCssWidth = Math.max(200, Math.floor(rect.width));
+    this.canvasCssHeight = Math.max(200, Math.floor(rect.height));
+
+    // HiDPI backing store
+    this.devicePixelRatio = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(this.canvasCssWidth * this.devicePixelRatio);
+    canvas.height = Math.floor(this.canvasCssHeight * this.devicePixelRatio);
+    canvas.style.width = `${this.canvasCssWidth}px`;
+    canvas.style.height = `${this.canvasCssHeight}px`;
+
     this.updateZoomLimits();
   }
 
@@ -346,64 +385,84 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   }
 
   private render(): void {
-    if (!this.image) {
-      return;
-    }
+    if (!this.image) return;
 
     const canvas = this.canvas;
     const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      return;
-    }
+    if (!ctx) return;
 
+    // очистка в device px
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    const matrix = this.getTransformMatrix();
+    // масштаб до CSS пикселей (вся дальнейшая математика — в CSS px)
     ctx.save();
-    ctx.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f);
+    ctx.setTransform(this.devicePixelRatio, 0, 0, this.devicePixelRatio, 0, 0);
+
+    const matrix = this.getTransformMatrix(); // уже в CSS px
+    ctx.setTransform(
+      matrix.a * this.devicePixelRatio,
+      matrix.b * this.devicePixelRatio,
+      matrix.c * this.devicePixelRatio,
+      matrix.d * this.devicePixelRatio,
+      matrix.e * this.devicePixelRatio,
+      matrix.f * this.devicePixelRatio,
+    );
+
     ctx.drawImage(this.image, 0, 0);
     ctx.restore();
 
     const crop = this.cropRect();
     if (crop) {
-      this.drawCropOverlay(ctx, crop);
+      // оверлеи рисуем в CSS px
+      const overlayCtx = canvas.getContext('2d')!;
+      overlayCtx.save();
+      overlayCtx.setTransform(this.devicePixelRatio, 0, 0, this.devicePixelRatio, 0, 0);
+      this.drawCropOverlay(overlayCtx, crop);
+      overlayCtx.restore();
     }
   }
 
   private drawCropOverlay(ctx: CanvasRenderingContext2D, crop: CropRect): void {
-    const canvas = this.canvas;
-    const corners = this.getCropCorners(crop).map(point => this.transformPoint(point));
-    if (corners.length !== 4) {
-      return;
-    }
+    const corners = this.getCropCorners(crop).map(point => this.transformPoint(point)); // экранные (CSS px)
 
     ctx.save();
+    // затемнение фона
     ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
     ctx.beginPath();
-    ctx.rect(0, 0, canvas.width, canvas.height);
+    ctx.rect(0, 0, this.canvasCssWidth, this.canvasCssHeight);
     ctx.moveTo(corners[0].x, corners[0].y);
-    for (let i = 1; i < corners.length; i++) {
-      ctx.lineTo(corners[i].x, corners[i].y);
-    }
+    for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
     ctx.closePath();
     ctx.fill('evenodd');
 
+    // штриховая рамка кропа
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 4]);
     ctx.beginPath();
     ctx.moveTo(corners[0].x, corners[0].y);
-    for (let i = 1; i < corners.length; i++) {
-      ctx.lineTo(corners[i].x, corners[i].y);
-    }
+    for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
     ctx.closePath();
     ctx.stroke();
 
     this.drawCropHandles(ctx, corners);
     ctx.restore();
+
+    // DEBUG: хит-боксы поверх
+    if (this.DEBUG_HIT) {
+      const boxes = this.getHandleHitBoxesScreen(crop);
+      ctx.save();
+      ctx.setLineDash([3, 3]);
+      ctx.lineWidth = 1;
+      for (const b of boxes) {
+        ctx.strokeStyle = this.hoverHandle === b.type ? '#ff3d71' : 'rgba(255,255,255,0.5)';
+        ctx.strokeRect(b.x - b.hw, b.y - b.hh, b.hw * 2, b.hh * 2);
+      }
+      ctx.restore();
+    }
   }
 
   private drawCropHandles(
@@ -412,28 +471,66 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   ): void {
     const [topLeft, topRight, bottomRight, bottomLeft] = corners;
     const midTop = { x: (topLeft.x + topRight.x) / 2, y: (topLeft.y + topRight.y) / 2 };
-    const midRight = {
-      x: (topRight.x + bottomRight.x) / 2,
-      y: (topRight.y + bottomRight.y) / 2,
-    };
-    const midBottom = {
-      x: (bottomLeft.x + bottomRight.x) / 2,
-      y: (bottomLeft.y + bottomRight.y) / 2,
-    };
+    const midRight = { x: (topRight.x + bottomRight.x) / 2, y: (topRight.y + bottomRight.y) / 2 };
+    const midBottom = { x: (bottomLeft.x + bottomRight.x) / 2, y: (bottomLeft.y + bottomRight.y) / 2 };
     const midLeft = { x: (topLeft.x + bottomLeft.x) / 2, y: (topLeft.y + bottomLeft.y) / 2 };
 
-    const handles = [topLeft, topRight, bottomRight, bottomLeft, midTop, midRight, midBottom, midLeft];
-    const size = 12;
+    const typedHandles: Array<{ x: number; y: number; type: CropHandleType }> = [
+      { ...topLeft, type: 'top-left' },
+      { ...topRight, type: 'top-right' },
+      { ...bottomRight, type: 'bottom-right' },
+      { ...bottomLeft, type: 'bottom-left' },
+      { ...midTop, type: 'top' },
+      { ...midRight, type: 'right' },
+      { ...midBottom, type: 'bottom' },
+      { ...midLeft, type: 'left' },
+    ];
 
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#3f51b5';
+    const size = 16;
     ctx.setLineDash([]);
-    handles.forEach(point => {
+
+    for (const h of typedHandles) {
+      const isActive = this.activeCropHandle?.type === h.type;
+      const isHover = this.hoverHandle === h.type;
+
+      let fill = '#ffffff';
+      let stroke = '#3f51b5';
+      let lineW = 2;
+
+      if (isActive) {
+        fill = '#e8f0ff';
+        stroke = '#2962ff';
+        lineW = 3;
+      } else if (isHover) {
+        fill = '#fff3f8';
+        stroke = '#ff3d71';
+        lineW = 3;
+      }
+
+      ctx.save();
+      if (isHover) {
+        ctx.shadowColor = '#ff3d71';
+        ctx.shadowBlur = 12;
+      }
+      ctx.lineWidth = lineW;
+      ctx.strokeStyle = stroke;
+      ctx.fillStyle = fill;
       ctx.beginPath();
-      ctx.rect(point.x - size / 2, point.y - size / 2, size, size);
+      ctx.rect(h.x - size / 2, h.y - size / 2, size, size);
       ctx.fill();
       ctx.stroke();
-    });
+      ctx.restore();
+
+      if (this.DEBUG_HIT) {
+        // центр ручки
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff3d71';
+        ctx.fill();
+        ctx.restore();
+      }
+    }
   }
 
   private getCropCorners(crop: CropRect): Array<{ x: number; y: number }> {
@@ -445,93 +542,129 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     ];
   }
 
+  // ——— События указателя ———
+
   private onPointerDown = (event: PointerEvent): void => {
-    if (!this.image) {
-      return;
-    }
+    if (!this.image) return;
+
     event.preventDefault();
     this.canvas.setPointerCapture?.(event.pointerId);
     this.pointerActive = true;
     this.activePointerId = event.pointerId;
     this.lastPointerPosition = { x: event.clientX, y: event.clientY };
 
-    if (this.isCropping()) {
-      const point = this.screenToImage(event);
-      if (!point) {
+    if (!this.isCropping()) return;
+
+    const pointImg = this.screenToImage(event);
+    if (!pointImg) return;
+
+    const crop = this.cropRect();
+    if (crop) {
+      // Хит-тест строго в экранных координатах
+      const screenPt = this.getScreenPoint(event);
+      const handleType = this.getCropHandleTypeScreen(screenPt, crop);
+      if (handleType) {
+        const corners = this.getCropCorners(crop);
+        const [tl, tr, br, bl] = corners;
+        const mid = (a: { x: number; y: number }, b: { x: number; y: number }) => ({
+          x: (a.x + b.x) / 2,
+          y: (a.y + b.y) / 2,
+        });
+
+        // точная координата ручки (в координатах изображения)
+        const handlePointImage =
+          handleType === 'top-left' ? tl :
+          handleType === 'top-right' ? tr :
+          handleType === 'bottom-right' ? br :
+          handleType === 'bottom-left' ? bl :
+          handleType === 'top' ? mid(tl, tr) :
+          handleType === 'right' ? mid(tr, br) :
+          handleType === 'bottom' ? mid(bl, br) :
+          /* left */           mid(tl, bl);
+
+        const pointerOffset = { ox: pointImg.x - handlePointImage.x, oy: pointImg.y - handlePointImage.y };
+
+        this.cropStart = null;
+        this.activeCropHandle = {
+          type: handleType,
+          startRect: { ...crop },
+          startPointer: handlePointImage,
+          pointerOffset,
+        };
+        this.hoverHandle = handleType;
+        this.updateCursorForHandle(handleType);
         return;
       }
 
-      const crop = this.cropRect();
-      if (crop) {
-        const handleType = this.getCropHandleType(point, crop);
-        if (handleType) {
-          const corners = this.getCropCorners(crop);
-          const handlePointImage = (() => {
-            const [tl, tr, br, bl] = corners;
-            const mid = (a: { x: number; y: number }, b: { x: number; y: number }) => ({
-              x: (a.x + b.x) / 2,
-              y: (a.y + b.y) / 2,
-            });
-            switch (handleType) {
-              case 'top-left':
-                return tl;
-              case 'top-right':
-                return tr;
-              case 'bottom-right':
-                return br;
-              case 'bottom-left':
-                return bl;
-              case 'top':
-                return mid(tl, tr);
-              case 'right':
-                return mid(tr, br);
-              case 'bottom':
-                return mid(bl, br);
-              case 'left':
-                return mid(tl, bl);
-              case 'move':
-                return point;
-              default:
-                return point;
-            }
-          })();
-
-          this.cropStart = null;
-          this.activeCropHandle = {
-            type: handleType,
-            startRect: { ...crop },
-            startPointer: handlePointImage,
-          };
-          return;
-        }
+      // внутри прямоугольника — перенос
+      if (pointImg.x > crop.x && pointImg.x < crop.x + crop.width && pointImg.y > crop.y && pointImg.y < crop.y + crop.height) {
+        this.cropStart = null;
+        this.activeCropHandle = { type: 'move', startRect: { ...crop }, startPointer: pointImg };
+        this.hoverHandle = 'move';
+        this.updateCursorForHandle('move');
+        return;
       }
-
-      this.activeCropHandle = null;
-      this.cropStart = point;
-      this.cropRect.set({ x: point.x, y: point.y, width: 0, height: 0 });
-      this.scheduleRender();
     }
+
+    // вне области — новый прямоугольник
+    this.activeCropHandle = null;
+    this.cropStart = null;
+    this.newCropStartImage = pointImg;
+    this.pointerDownScreen = this.getScreenPoint(event);
+    this.dragStarted = false;
+    this.hoverHandle = null;
+    this.updateCursorForHandle(null);
   };
 
   private onPointerMove = (event: PointerEvent): void => {
-    if (!this.pointerActive || this.activePointerId !== event.pointerId) {
-      return;
-    }
     event.preventDefault();
+
+    // ХОВЕР — всегда (даже без нажатия)
+    if (this.isCropping()) {
+      const crop = this.cropRect();
+      if (crop) {
+        const sp = this.getScreenPoint(event);
+        const ht = this.getCropHandleTypeScreen(sp, crop);
+        if (ht !== this.hoverHandle) {
+          this.hoverHandle = ht;
+          this.updateCursorForHandle(ht);
+          this.scheduleRender();
+        }
+      }
+    }
+
+    // drag / панорамирование
+    if (!this.pointerActive || this.activePointerId !== event.pointerId) return;
 
     if (this.isCropping()) {
       if (this.activeCropHandle) {
+        this.updateCursorForHandle(this.activeCropHandle.type);
         this.resizeCrop(event);
         return;
       }
-      this.updateCrop(event);
+
+      if (this.newCropStartImage && this.pointerDownScreen) {
+        const p = this.getScreenPoint(event);
+        const moved = Math.hypot(p.x - this.pointerDownScreen.x, p.y - this.pointerDownScreen.y);
+        if (moved >= ImageEditorDialogComponent.NEW_CROP_DRAG_THRESHOLD) {
+          this.dragStarted = true;
+          this.cropStart = this.newCropStartImage;
+          this.newCropStartImage = null;
+          this.pointerDownScreen = null;
+          this.cropRect.set({ x: this.cropStart.x, y: this.cropStart.y, width: 0, height: 0 });
+          this.updateCrop(event);
+        }
+        return;
+      }
+
+      if (this.cropStart) {
+        this.updateCrop(event);
+      }
       return;
     }
 
-    if (!this.lastPointerPosition) {
-      return;
-    }
-
+    // панорамирование изображения, когда кроп выключен
+    if (!this.lastPointerPosition) return;
     const deltaX = event.clientX - this.lastPointerPosition.x;
     const deltaY = event.clientY - this.lastPointerPosition.y;
     this.pan.x += deltaX;
@@ -540,25 +673,51 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     this.scheduleRender();
   };
 
+  private onPointerLeave = (): void => {
+    if (!this.isCropping()) return;
+    if (this.activeCropHandle) return; // во время драга не трогаем
+    this.hoverHandle = null;
+    this.updateCursorForHandle(null);
+    this.scheduleRender();
+  };
+
   private onPointerUp = (event: PointerEvent): void => {
-    if (this.activePointerId !== event.pointerId) {
-      return;
-    }
+    if (this.activePointerId !== event.pointerId) return;
+
     this.canvas.releasePointerCapture?.(event.pointerId);
     this.pointerActive = false;
     this.activePointerId = null;
     this.lastPointerPosition = null;
 
     if (this.isCropping()) {
-      this.finalizeCrop();
+      if (this.activeCropHandle) {
+        this.finalizeCrop();
+        return;
+      }
+
+      if (!this.dragStarted && this.newCropStartImage) {
+        this.newCropStartImage = null;
+        this.pointerDownScreen = null;
+        this.hoverHandle = null;
+        this.updateCursorForHandle(null);
+        this.scheduleRender();
+        return;
+      }
+
+      if (this.cropStart) {
+        this.finalizeCrop();
+      }
+
+      if (!this.activeCropHandle) {
+        this.hoverHandle = null;
+        this.updateCursorForHandle(null);
+        this.scheduleRender();
+      }
     }
   };
 
   private onWheel = (event: WheelEvent): void => {
-    if (!this.image) {
-      return;
-    }
-
+    if (!this.image) return;
     event.preventDefault();
 
     const currentZoom = this.zoom();
@@ -570,14 +729,12 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     }
   };
 
+  // ——— Обновление кропа во время рисования нового прямоугольника ———
   private updateCrop(event: PointerEvent): void {
-    if (!this.cropStart) {
-      return;
-    }
+    if (!this.cropStart) return;
     const current = this.screenToImage(event);
-    if (!current) {
-      return;
-    }
+    if (!current) return;
+
     const x = Math.min(this.cropStart.x, current.x);
     const y = Math.min(this.cropStart.y, current.y);
     const width = Math.abs(current.x - this.cropStart.x);
@@ -587,17 +744,14 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     this.scheduleRender();
   }
 
+  // ——— Zoom helpers ———
+
   formatZoomLabel(option: number): string {
     const format = (value: number): string => {
-      if (this.areZoomValuesEqual(value, Math.round(value))) {
-        return Math.round(value).toString();
-      }
+      if (this.areZoomValuesEqual(value, Math.round(value))) return Math.round(value).toString();
       return value >= 10 ? value.toFixed(0) : value.toFixed(2);
     };
-
-    if (option >= 1) {
-      return `1:${format(option)}`;
-    }
+    if (option >= 1) return `1:${format(option)}`;
     return `${format(1 / option)}:1`;
   }
 
@@ -614,50 +768,36 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     }
 
     const zoomChanged = !this.areZoomValuesEqual(this.zoom(), clamped);
-    if (zoomChanged) {
-      this.zoom.set(clamped);
-    }
+    if (zoomChanged) this.zoom.set(clamped);
 
-    if ((zoomChanged || panChanged) && schedule) {
-      this.scheduleRender();
-    }
+    if ((zoomChanged || panChanged) && schedule) this.scheduleRender();
 
     return zoomChanged || panChanged;
   }
 
   private updateZoomLimits(): boolean {
     const minZoom = this.calculateMinZoom();
-    if (!Number.isFinite(minZoom) || minZoom <= 0) {
-      return false;
-    }
+    if (!Number.isFinite(minZoom) || minZoom <= 0) return false;
 
     if (!this.areZoomValuesEqual(this.minZoom(), minZoom)) {
       this.minZoom.set(minZoom);
     }
-
     return this.updateZoom(this.zoom(), { schedule: false });
   }
 
   private calculateMinZoom(): number {
-    if (!this.image) {
-      return 1;
-    }
-    const canvas = this.canvas;
-    if (canvas.width === 0 || canvas.height === 0) {
-      return 1;
-    }
+    if (!this.image) return 1;
+    if (this.canvasCssWidth === 0 || this.canvasCssHeight === 0) return 1;
 
-    const widthRatio = canvas.width / this.imageWidth;
-    const heightRatio = canvas.height / this.imageHeight;
+    const widthRatio = this.canvasCssWidth / this.imageWidth;
+    const heightRatio = this.canvasCssHeight / this.imageHeight;
     const fitScale = Math.min(widthRatio, heightRatio);
     const minZoom = Math.min(1, fitScale);
     return Math.max(minZoom, 0.01);
   }
 
   private clampZoom(value: number): number {
-    if (!Number.isFinite(value)) {
-      return this.minZoom();
-    }
+    if (!Number.isFinite(value)) return this.minZoom();
     const min = this.minZoom();
     const max = ImageEditorDialogComponent.MAX_ZOOM;
     const clamped = Math.min(max, Math.max(min, value));
@@ -666,9 +806,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
 
   private snapToBaseZoom(value: number): number {
     for (const option of this.baseZoomOptions) {
-      if (this.areZoomValuesEqual(option, value)) {
-        return option;
-      }
+      if (this.areZoomValuesEqual(option, value)) return option;
     }
     return value;
   }
@@ -677,54 +815,52 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     return Math.abs(a - b) <= ImageEditorDialogComponent.ZOOM_EPSILON;
   }
 
-  private resizeCrop(event: PointerEvent): void {
-    if (!this.activeCropHandle) {
-      return;
-    }
-    const point = this.screenToImage(event);
-    if (!point) {
-      return;
-    }
+  // ——— Resize/move ———
 
-    const { startRect, startPointer, type } = this.activeCropHandle;
-    const dx = point.x - startPointer.x;
-    const dy = point.y - startPointer.y;
-    let rect: CropRect = { ...startRect };
+  private resizeCrop(event: PointerEvent): void {
+    if (!this.activeCropHandle) return;
+
+    const point = this.screenToImage(event);
+    if (!point) return;
+
+    const { startRect, startPointer, type, pointerOffset } = this.activeCropHandle;
+
+    // эффективная позиция ручки с учётом offset
+    const effX = point.x - (pointerOffset?.ox ?? 0);
+    const effY = point.y - (pointerOffset?.oy ?? 0);
+
+    const left0   = startRect.x;
+    const top0    = startRect.y;
+    const right0  = startRect.x + startRect.width;
+    const bottom0 = startRect.y + startRect.height;
+
+    let left = left0, top = top0, right = right0, bottom = bottom0;
 
     switch (type) {
       case 'move': {
+        // dx/dy от позиции клика (offset учтён)
+        const refX = startPointer.x + (pointerOffset?.ox ?? 0);
+        const refY = startPointer.y + (pointerOffset?.oy ?? 0);
+        const dx = point.x - refX;
+        const dy = point.y - refY;
         const translated = this.translateCrop(startRect, dx, dy);
         this.cropRect.set(this.normalizeCrop(translated));
         this.scheduleRender();
         return;
       }
-      case 'top-left':
-        rect = { x: startRect.x + dx, y: startRect.y + dy, width: startRect.width - dx, height: startRect.height - dy };
-        break;
-      case 'top-right':
-        rect = { x: startRect.x, y: startRect.y + dy, width: startRect.width + dx, height: startRect.height - dy };
-        break;
-      case 'bottom-left':
-        rect = { x: startRect.x + dx, y: startRect.y, width: startRect.width - dx, height: startRect.height + dy };
-        break;
-      case 'bottom-right':
-        rect = { x: startRect.x, y: startRect.y, width: startRect.width + dx, height: startRect.height + dy };
-        break;
-      case 'top':
-        rect = { x: startRect.x, y: startRect.y + dy, width: startRect.width, height: startRect.height - dy };
-        break;
-      case 'bottom':
-        rect = { x: startRect.x, y: startRect.y, width: startRect.width, height: startRect.height + dy };
-        break;
-      case 'left':
-        rect = { x: startRect.x + dx, y: startRect.y, width: startRect.width - dx, height: startRect.height };
-        break;
-      case 'right':
-        rect = { x: startRect.x, y: startRect.y, width: startRect.width + dx, height: startRect.height };
-        break;
+      // УГЛЫ
+      case 'top-left':     left = effX; top = effY; break;
+      case 'top-right':    right = effX; top = effY; break;
+      case 'bottom-left':  left = effX; bottom = effY; break;
+      case 'bottom-right': right = effX; bottom = effY; break;
+      // РЁБРА
+      case 'top':    top = effY; break;
+      case 'bottom': bottom = effY; break;
+      case 'left':   left = effX; break;
+      case 'right':  right = effX; break;
     }
 
-    rect = this.normalizeCrop(rect);
+    let rect = this.normalizeCrop({ x: left, y: top, width: right - left, height: bottom - top });
     const normalizedStart = this.normalizeCrop(startRect);
     rect = this.enforceMinimumCropSizeNormalized(rect, type, normalizedStart);
     this.cropRect.set(rect);
@@ -736,9 +872,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     type: CropHandleType,
     startRect: CropRect,
   ): CropRect {
-    if (type === 'move') {
-      return rect;
-    }
+    if (type === 'move') return rect;
 
     const min = ImageEditorDialogComponent.MIN_CROP_SIZE;
 
@@ -807,6 +941,14 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   private finalizeCrop(): void {
     const crop = this.cropRect();
     if (!crop) {
+      this.cropStart = null;
+      this.activeCropHandle = null;
+      this.newCropStartImage = null;
+      this.pointerDownScreen = null;
+      this.dragStarted = false;
+      this.hoverHandle = null;
+      this.updateCursorForHandle(null);
+      this.scheduleRender();
       return;
     }
     if (crop.width < 2 || crop.height < 2) {
@@ -814,6 +956,11 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     }
     this.cropStart = null;
     this.activeCropHandle = null;
+    this.newCropStartImage = null;
+    this.pointerDownScreen = null;
+    this.dragStarted = false;
+    this.hoverHandle = null;
+    this.updateCursorForHandle(null);
     this.scheduleRender();
   }
 
@@ -832,18 +979,13 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
       y: Number.isFinite(targetPan.y) ? targetPan.y : this.pan.y,
     };
     const panChanged = !this.arePanValuesEqual(this.pan, safePan);
-    if (panChanged) {
-      this.pan = safePan;
-    }
+    if (panChanged) this.pan = safePan;
 
     this.scheduleRender();
   }
 
   private calculateZoomForCrop(crop: CropRect): number {
-    const canvas = this.canvas;
-    if (canvas.width === 0 || canvas.height === 0) {
-      return this.zoom();
-    }
+    if (this.canvasCssWidth === 0 || this.canvasCssHeight === 0) return this.zoom();
 
     const angle = ((this.rotation() % 360) + 360) % 360;
     const radians = (angle * Math.PI) / 180;
@@ -853,18 +995,13 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     const rotatedWidth = Math.abs(cropWidth * Math.cos(radians)) + Math.abs(cropHeight * Math.sin(radians));
     const rotatedHeight = Math.abs(cropWidth * Math.sin(radians)) + Math.abs(cropHeight * Math.cos(radians));
 
-    if (rotatedWidth <= 0 || rotatedHeight <= 0) {
-      return this.zoom();
-    }
+    if (rotatedWidth <= 0 || rotatedHeight <= 0) return this.zoom();
 
-    const widthRatio = canvas.width / rotatedWidth;
-    const heightRatio = canvas.height / rotatedHeight;
+    const widthRatio = this.canvasCssWidth / rotatedWidth;
+    const heightRatio = this.canvasCssHeight / rotatedHeight;
     const zoomToFit = Math.min(widthRatio, heightRatio);
 
-    if (!Number.isFinite(zoomToFit) || zoomToFit <= 0) {
-      return this.zoom();
-    }
-
+    if (!Number.isFinite(zoomToFit) || zoomToFit <= 0) return this.zoom();
     return zoomToFit;
   }
 
@@ -872,10 +1009,9 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     const matrix = this.buildTransformMatrix(zoom, { x: 0, y: 0 });
     const centerPoint = new DOMPoint(crop.x + crop.width / 2, crop.y + crop.height / 2);
     const transformed = matrix.transformPoint(centerPoint);
-    const canvas = this.canvas;
     return {
-      x: canvas.width / 2 - transformed.x,
-      y: canvas.height / 2 - transformed.y,
+      x: this.canvasCssWidth / 2 - transformed.x,
+      y: this.canvasCssHeight / 2 - transformed.y,
     };
   }
 
@@ -885,6 +1021,8 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
       Math.abs(a.y - b.y) <= ImageEditorDialogComponent.PAN_EPSILON
     );
   }
+
+  // ——— Геометрия/матрицы ———
 
   private normalizeCrop(crop: CropRect): CropRect {
     let { x, y, width, height } = crop;
@@ -907,27 +1045,27 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     x = Math.min(Math.max(0, x), Math.max(0, maxWidth - width));
     y = Math.min(Math.max(0, y), Math.max(0, maxHeight - height));
 
-    if (x + width > maxWidth) {
-      x = Math.max(0, maxWidth - width);
-    }
-    if (y + height > maxHeight) {
-      y = Math.max(0, maxHeight - height);
-    }
+    if (x + width > maxWidth) x = Math.max(0, maxWidth - width);
+    if (y + height > maxHeight) y = Math.max(0, maxHeight - height);
 
     return { x, y, width, height };
   }
 
-  private screenToImage(event: PointerEvent): { x: number; y: number } | null {
-    const rect = this.canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const matrix = this.getTransformMatrix();
-    const inverse = matrix.inverse();
-    const point = inverse.transformPoint(new DOMPoint(x, y));
-    if (Number.isFinite(point.x) && Number.isFinite(point.y)) {
-      return { x: point.x, y: point.y };
-    }
+  private getScreenPoint(event: PointerEvent) {
+    const rect = this.canvas.getBoundingClientRect(); // CSS px
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  private screenPointToImage(pt: { x: number; y: number }): { x: number; y: number } | null {
+    const M = this.getTransformMatrix(); // CSS px
+    const inv = M.inverse();
+    const p = inv.transformPoint(new DOMPoint(pt.x, pt.y));
+    if (Number.isFinite(p.x) && Number.isFinite(p.y)) return { x: p.x, y: p.y };
     return null;
+  }
+
+  private screenToImage(event: PointerEvent): { x: number; y: number } | null {
+    return this.screenPointToImage(this.getScreenPoint(event));
   }
 
   private transformPoint(point: { x: number; y: number }): { x: number; y: number } {
@@ -936,83 +1074,88 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     return { x: result.x, y: result.y };
   }
 
-  private getCropHandleType(pointImage: { x: number; y: number }, crop: CropRect): CropHandleType | null {
-    const matrix = this.getTransformMatrix();
-    const pScreen = matrix.transformPoint(new DOMPoint(pointImage.x, pointImage.y));
+  private getTransformMatrix(): DOMMatrix {
+    return this.buildTransformMatrix(this.zoom(), this.pan); // все в CSS px
+  }
 
-    const cornersImg = this.getCropCorners(crop);
-    const [tl, tr, br, bl] = cornersImg.map(pt => {
-      const s = matrix.transformPoint(new DOMPoint(pt.x, pt.y));
+  private buildTransformMatrix(zoom: number, pan: { x: number; y: number }): DOMMatrix {
+    const rotation = this.rotation();
+    const flipH = this.flipHorizontal() ? -1 : 1;
+    const flipV = this.flipVertical() ? -1 : 1;
+
+    const cx = this.canvasCssWidth / 2 + pan.x;
+    const cy = this.canvasCssHeight / 2 + pan.y;
+
+    let matrix = new DOMMatrix();
+    matrix = matrix.translate(cx, cy);
+    matrix = matrix.rotate(rotation);
+    matrix = matrix.scale(zoom * flipH, zoom * flipV);
+    matrix = matrix.translate(-this.imageWidth / 2, -this.imageHeight / 2);
+    return matrix;
+  }
+
+  // ——— Хит-тест в экранных координатах ———
+
+  private getHandleCentersScreen(crop: CropRect): Array<{ x: number; y: number; type: CropHandleType }> {
+    const M = this.getTransformMatrix();
+    const [p1, p2, p3, p4] = this.getCropCorners(crop).map(pt => {
+      const s = M.transformPoint(new DOMPoint(pt.x, pt.y));
       return { x: s.x, y: s.y };
     });
+    const mid = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    return [
+      { ...p1, type: 'top-left' },
+      { ...p2, type: 'top-right' },
+      { ...p3, type: 'bottom-right' },
+      { ...p4, type: 'bottom-left' },
+      { ...mid(p1, p2), type: 'top' },
+      { ...mid(p2, p3), type: 'right' },
+      { ...mid(p4, p3), type: 'bottom' },
+      { ...mid(p1, p4), type: 'left' },
+    ];
+  }
 
-    const mid = (a: { x: number; y: number }, b: { x: number; y: number }) => ({
-      x: (a.x + b.x) / 2,
-      y: (a.y + b.y) / 2,
+  private getHandleHitBoxesScreen(crop: CropRect): Array<{ x: number; y: number; hw: number; hh: number; type: CropHandleType }> {
+    const centers = this.getHandleCentersScreen(crop);
+    const HANDLE_HALF = 10; // 20×20 px
+    return centers.map(c => ({ x: c.x, y: c.y, hw: HANDLE_HALF, hh: HANDLE_HALF, type: c.type }));
+  }
+
+  private getCropHandleTypeScreen(Ps: { x: number; y: number }, crop: CropRect): CropHandleType | null {
+    // 1) квадраты — углы, затем середины
+    const boxes = this.getHandleHitBoxesScreen(crop);
+    const order: CropHandleType[] = ['top-left', 'top-right', 'bottom-right', 'bottom-left', 'top', 'right', 'bottom', 'left'];
+    const byType = new Map(boxes.map(b => [b.type, b]));
+    for (const t of order) {
+      const b = byType.get(t)!;
+      if (Math.abs(Ps.x - b.x) <= b.hw && Math.abs(Ps.y - b.y) <= b.hh) return t;
+    }
+
+    // 2) рёбра как полоса шириной 10 px
+    const EDGE_HALF = 10;
+    const M = this.getTransformMatrix();
+    const [p1, p2, p3, p4] = this.getCropCorners(crop).map(pt => {
+      const s = M.transformPoint(new DOMPoint(pt.x, pt.y));
+      return { x: s.x, y: s.y };
     });
-    const midTop = mid(tl, tr);
-    const midRight = mid(tr, br);
-    const midBottom = mid(bl, br);
-    const midLeft = mid(tl, bl);
-
-    const HANDLE_HALF = 6;
-
-    const hitBox = (h: { x: number; y: number }) =>
-      Math.abs(pScreen.x - h.x) <= HANDLE_HALF && Math.abs(pScreen.y - h.y) <= HANDLE_HALF;
-
-    if (hitBox(tl)) {
-      return 'top-left';
-    }
-    if (hitBox(tr)) {
-      return 'top-right';
-    }
-    if (hitBox(br)) {
-      return 'bottom-right';
-    }
-    if (hitBox(bl)) {
-      return 'bottom-left';
-    }
-
-    const EDGE_HALF = 8;
-
     const hitEdge = (a: { x: number; y: number }, b: { x: number; y: number }) => {
-      const vx = b.x - a.x;
-      const vy = b.y - a.y;
-      const wx = pScreen.x - a.x;
-      const wy = pScreen.y - a.y;
+      const vx = b.x - a.x, vy = b.y - a.y;
+      const wx = Ps.x - a.x, wy = Ps.y - a.y;
       const len2 = vx * vx + vy * vy || 1;
       const t = Math.max(0, Math.min(1, (wx * vx + wy * vy) / len2));
-      const px = a.x + t * vx;
-      const py = a.y + t * vy;
-      const dx = pScreen.x - px;
-      const dy = pScreen.y - py;
-      return Math.hypot(dx, dy) <= EDGE_HALF;
+      const px = a.x + t * vx, py = a.y + t * vy;
+      return Math.hypot(Ps.x - px, Ps.y - py) <= EDGE_HALF;
     };
+    if (hitEdge(p1, p2)) return 'top';
+    if (hitEdge(p2, p3)) return 'right';
+    if (hitEdge(p4, p3)) return 'bottom';
+    if (hitEdge(p1, p4)) return 'left';
 
-    if (hitEdge(tl, tr)) {
-      return 'top';
-    }
-    if (hitEdge(tr, br)) {
-      return 'right';
-    }
-    if (hitEdge(bl, br)) {
-      return 'bottom';
-    }
-    if (hitEdge(tl, bl)) {
-      return 'left';
-    }
-
-    const left = crop.x;
-    const right = crop.x + crop.width;
-    const top = crop.y;
-    const bottom = crop.y + crop.height;
-    if (
-      pointImage.x > left &&
-      pointImage.x < right &&
-      pointImage.y > top &&
-      pointImage.y < bottom
-    ) {
-      return 'move';
+    // 3) внутри прямоугольника — move (нужно проверить в координатах изображения)
+    const ptImg = this.screenPointToImage(Ps);
+    if (ptImg) {
+      const left = crop.x, right = crop.x + crop.width, top = crop.y, bottom = crop.y + crop.height;
+      if (ptImg.x > left && ptImg.x < right && ptImg.y > top && ptImg.y < bottom) return 'move';
     }
     return null;
   }
@@ -1025,30 +1168,17 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     return { x: newX, y: newY, width: startRect.width, height: startRect.height };
   }
 
-  private getTransformMatrix(): DOMMatrix {
-    return this.buildTransformMatrix(this.zoom(), this.pan);
-  }
-
-  private buildTransformMatrix(zoom: number, pan: { x: number; y: number }): DOMMatrix {
-    const canvas = this.canvas;
-    const rotation = this.rotation();
-    const flipH = this.flipHorizontal() ? -1 : 1;
-    const flipV = this.flipVertical() ? -1 : 1;
-    const cx = canvas.width / 2 + pan.x;
-    const cy = canvas.height / 2 + pan.y;
-
-    let matrix = new DOMMatrix();
-    matrix = matrix.translate(cx, cy);
-    matrix = matrix.rotate(rotation);
-    matrix = matrix.scale(zoom * flipH, zoom * flipV);
-    matrix = matrix.translate(-this.imageWidth / 2, -this.imageHeight / 2);
-    return matrix;
+  private getTransformMatrixForExport(rotation: number, flipH: boolean, flipV: boolean, sourceRect: CropRect): { width: number; height: number; radians: number } {
+    const angle = ((rotation % 360) + 360) % 360;
+    const radians = (angle * Math.PI) / 180;
+    const needsSwap = angle === 90 || angle === 270;
+    const outputWidth = needsSwap ? sourceRect.height : sourceRect.width;
+    const outputHeight = needsSwap ? sourceRect.width : sourceRect.height;
+    return { width: Math.max(1, Math.round(outputWidth)), height: Math.max(1, Math.round(outputHeight)), radians };
   }
 
   private async exportTransformedImage(): Promise<{ blob: Blob; width: number; height: number }> {
-    if (!this.image) {
-      throw new Error('Изображение не загружено');
-    }
+    if (!this.image) throw new Error('Изображение не загружено');
 
     const crop = this.cropRect();
     const rotation = this.rotation();
@@ -1056,20 +1186,13 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     const flipV = this.flipVertical();
 
     const sourceRect: CropRect = crop ?? { x: 0, y: 0, width: this.imageWidth, height: this.imageHeight };
-    const angle = ((rotation % 360) + 360) % 360;
-    const radians = (angle * Math.PI) / 180;
-
-    const needsSwap = angle === 90 || angle === 270;
-    const outputWidth = needsSwap ? sourceRect.height : sourceRect.width;
-    const outputHeight = needsSwap ? sourceRect.width : sourceRect.height;
+    const { width, height, radians } = this.getTransformMatrixForExport(rotation, flipH, flipV, sourceRect);
 
     const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(outputWidth));
-    canvas.height = Math.max(1, Math.round(outputHeight));
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      throw new Error('Canvas недоступен');
-    }
+    if (!ctx) throw new Error('Canvas недоступен');
 
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -1090,10 +1213,27 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     ctx.restore();
 
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
-    if (!blob) {
-      throw new Error('Не удалось получить PNG изображение');
-    }
+    if (!blob) throw new Error('Не удалось получить PNG изображение');
 
     return { blob, width: canvas.width, height: canvas.height };
+  }
+
+  // курсоры
+  private updateCursorForHandle(type: CropHandleType | null): void {
+    const el = this.canvas;
+    let cursor = 'default';
+    switch (type) {
+      case 'move': cursor = 'move'; break;
+      case 'top':
+      case 'bottom': cursor = 'ns-resize'; break;
+      case 'left':
+      case 'right': cursor = 'ew-resize'; break;
+      case 'top-left':
+      case 'bottom-right': cursor = 'nwse-resize'; break;
+      case 'top-right':
+      case 'bottom-left': cursor = 'nesw-resize'; break;
+      default: cursor = this.isCropping() ? 'crosshair' : 'default';
+    }
+    el.style.cursor = cursor;
   }
 }
