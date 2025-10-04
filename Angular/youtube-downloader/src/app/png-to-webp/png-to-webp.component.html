@@ -36,6 +36,14 @@
         <mat-icon>download</mat-icon>
         Скачать WebP
       </button>
+      <button mat-stroked-button (click)="openEditor()" [disabled]="processing()">
+        <mat-icon>edit</mat-icon>
+        Редактировать
+      </button>
+      <button mat-button color="accent" (click)="resetEdits()" *ngIf="hasEdits()" [disabled]="processing()">
+        <mat-icon>undo</mat-icon>
+        Сбросить правки
+      </button>
       <button mat-button color="warn" (click)="clear()">
         <mat-icon>delete</mat-icon>
         Очистить
@@ -60,6 +68,31 @@
           <dd>{{ dims.width }} × {{ dims.height }} px</dd>
         </div>
       </dl>
+    </div>
+
+    <mat-divider vertical></mat-divider>
+
+    <div class="preview">
+      <h2>{{ hasEdits() ? 'После редактирования' : 'Текущее изображение' }}</h2>
+      <div class="image-frame">
+        <div class="checkerboard"></div>
+        <img *ngIf="workingPreviewUrl() as currentUrl" [src]="currentUrl" alt="Текущее изображение">
+      </div>
+      <dl>
+        <div>
+          <dt>Размер</dt>
+          <dd>{{ workingSizeLabel() }}</dd>
+        </div>
+        <div *ngIf="workingDimensions()">
+          <dt>Разрешение</dt>
+          <dd>{{ workingDimensionsLabel() }}</dd>
+        </div>
+        <div *ngIf="!hasEdits()">
+          <dt>Статус</dt>
+          <dd>Без изменений</dd>
+        </div>
+      </dl>
+      <p class="note" *ngIf="hasEdits()">Превью учитывает все применённые трансформации.</p>
     </div>
 
     <mat-divider vertical></mat-divider>

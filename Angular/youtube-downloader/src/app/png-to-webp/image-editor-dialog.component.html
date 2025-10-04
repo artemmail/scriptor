@@ -1,0 +1,73 @@
+<h2 mat-dialog-title>Редактирование изображения</h2>
+<div mat-dialog-content class="content">
+  <div class="canvas-area" #canvasContainer>
+    <div class="checkerboard"></div>
+    <canvas #canvas></canvas>
+  </div>
+  <div class="toolbar">
+    <section>
+      <h3>Масштаб</h3>
+      <mat-button-toggle-group [value]="zoom()" (change)="onZoomChange($event)" name="zoom" [multiple]="false">
+        <mat-button-toggle *ngFor="let option of zoomOptions" [value]="option">
+          {{ option === 1 ? '1:1' : option === 0.5 ? '1:2' : '1:4' }}
+        </mat-button-toggle>
+      </mat-button-toggle-group>
+    </section>
+
+    <section>
+      <h3>Поворот</h3>
+      <div class="button-row">
+        <button mat-stroked-button type="button" (click)="rotateRight()">
+          <mat-icon>rotate_90_degrees_ccw</mat-icon>
+          90°
+        </button>
+        <button mat-stroked-button type="button" (click)="rotate180()">
+          <mat-icon>rotate_left</mat-icon>
+          180°
+        </button>
+        <button mat-stroked-button type="button" (click)="rotate270()">
+          <mat-icon>rotate_90_degrees_cw</mat-icon>
+          270°
+        </button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Отражение</h3>
+      <div class="button-row">
+        <button mat-stroked-button type="button" (click)="flipHorizontally()">
+          <mat-icon>flip</mat-icon>
+          Слева-направо
+        </button>
+        <button mat-stroked-button type="button" (click)="flipVertically()">
+          <mat-icon>swap_vert</mat-icon>
+          Сверху-вниз
+        </button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Обрезка</h3>
+      <div class="button-row">
+        <button mat-stroked-button type="button" [color]="isCropping() ? 'primary' : undefined" (click)="toggleCrop()">
+          <mat-icon>crop</mat-icon>
+          {{ isCropping() ? 'Выделите область' : 'Выбрать область' }}
+        </button>
+        <div class="crop-info">{{ cropInfo() }}</div>
+      </div>
+    </section>
+
+    <section>
+      <h3>Прочее</h3>
+      <button mat-button color="warn" type="button" (click)="reset()">
+        <mat-icon>refresh</mat-icon>
+        Сбросить
+      </button>
+      <p class="hint">Перемещайте изображение мышью для панорамирования. Обрезка работает при активной кнопке.</p>
+    </section>
+  </div>
+</div>
+<div mat-dialog-actions align="end" class="actions">
+  <button mat-button type="button" (click)="cancel()">Отмена</button>
+  <button mat-flat-button color="primary" type="button" (click)="apply()">Применить</button>
+</div>
