@@ -21,6 +21,10 @@
       <mat-icon matListItemIcon>sync_alt</mat-icon>
       <span matListItemTitle>Конвертер Markdown </span>
     </a>
+    <a mat-list-item (click)="navigate('/png-to-webp')">
+      <mat-icon matListItemIcon>image</mat-icon>
+      <span matListItemTitle>PNG → WebP</span>
+    </a>
     
     <a mat-list-item (click)="navigate('/')">
       <mat-icon matListItemIcon>info</mat-icon>
@@ -68,7 +72,11 @@
     <a mat-list-item (click)="navigate('/markdown-converter')">
       <mat-icon matListItemIcon>sync_alt</mat-icon>
       <span matListItemTitle>Конвертер Markdown</span>
-    </a>  
+    </a>
+    <a mat-list-item (click)="navigate('/png-to-webp')">
+      <mat-icon matListItemIcon>image</mat-icon>
+      <span matListItemTitle>PNG → WebP</span>
+    </a>
     <a mat-list-item (click)="navigate('/blog')">
       <mat-icon matListItemIcon>article</mat-icon>
       <span matListItemTitle>Блоги</span>

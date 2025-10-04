@@ -38,6 +38,7 @@ import { About1Component } from './app/about1/about1.component';
 import { About2Component } from './app/about2/about2.component';
 import { About3Component } from './app/about3/about3.component';
 import { AdminUsersComponent } from './app/admin-users/admin-users.component';
+import { PngToWebpComponent } from './app/png-to-webp/png-to-webp.component';
 
 
 
@@ -120,6 +121,7 @@ const routes: Routes = [
   },
   { path: 'markdown-converter/:id', component: MarkdownConverterComponent },
   { path: 'markdown-converter', component: MarkdownConverterComponent },
+  { path: 'png-to-webp', component: PngToWebpComponent },
   {
     path: 'edit/:id',
     component: EditorPageComponent,
