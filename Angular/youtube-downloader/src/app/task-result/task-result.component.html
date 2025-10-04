@@ -2,6 +2,7 @@
   <div class="video-summary">
     <div class="video-summary-left">
       <button
+        *ngIf="isAuthenticated"
         class="yt-logo-button"
         type="button"
         (click)="openVideoDialog(task)"
@@ -21,17 +22,6 @@
           <span *ngIf="task.createdAt">· Обновлено {{ task.createdAt | localTime: 'yyyy-MM-dd HH:mm' }}</span>
         </div>
       </div>
-    </div>
-    <div class="video-summary-actions">
-      <button
-        class="btn btn-outline"
-        type="button"
-        (click)="openVideoDialog(task)"
-        aria-label="Смотреть видео"
-      >
-        <mat-icon>play_circle</mat-icon>
-        <span>Смотреть видео</span>
-      </button>
     </div>
   </div>
 

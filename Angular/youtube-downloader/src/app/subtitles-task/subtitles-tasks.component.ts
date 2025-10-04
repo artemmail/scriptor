@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, DestroyRef, OnInit, ViewChild } from '@angular/core';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { HttpClientModule } from '@angular/common/http';
 import { ActivatedRoute, RouterModule } from '@angular/router';
@@ -21,6 +21,8 @@ import { LocalTimePipe } from '../pipe/local-time.pipe';
 import { SubtitleService, YoutubeCaptionTaskDto2, RecognizeStatus } from '../services/subtitle.service';
 import { VideoDialogComponent, VideoDialogData } from '../video-dialog/video-dialog.component';
 import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { AuthService } from '../services/AuthService.service';
 
 @Component({
   selector: 'app-subtitles-tasks',
@@ -50,7 +52,7 @@ import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
   ],
 })
 export class SubtitlesTasksComponent implements OnInit {
-  displayedColumns: string[] = ['status', 'createdAt', 'youtube', 'title', 'channelName', 'result'];
+  displayedColumns: string[] = [];
   dataSource = new MatTableDataSource<YoutubeCaptionTaskDto2>();
   RecognizeStatus = RecognizeStatus;
 
@@ -65,6 +67,7 @@ export class SubtitlesTasksComponent implements OnInit {
   isMobile = false;
   loading = false;
   expandedTasks = new Set<string>();
+  isAuthenticated = false;
 
   @ViewChild(MatSort) sort!: MatSort;
 
@@ -73,13 +76,24 @@ export class SubtitlesTasksComponent implements OnInit {
     private titleService: Title,
     private dialog: MatDialog,
     private breakpointObserver: BreakpointObserver,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private authService: AuthService,
+    private destroyRef: DestroyRef
   ) {
     this.titleService.setTitle('Transcription Queue');
 
     this.breakpointObserver
       .observe([Breakpoints.Handset])
       .subscribe(r => (this.isMobile = r.matches));
+
+    this.updateDisplayedColumns(false);
+
+    this.authService.user$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(user => {
+        this.isAuthenticated = !!user;
+        this.updateDisplayedColumns(this.isAuthenticated);
+      });
   }
 
   ngOnInit(): void {
@@ -188,6 +202,9 @@ export class SubtitlesTasksComponent implements OnInit {
   }
 
   openVideoDialog(t: YoutubeCaptionTaskDto2): void {
+    if (!this.isAuthenticated) {
+      return;
+    }
     const data: VideoDialogData = {
       videoId: t.id,
       title: t.title,
@@ -196,6 +213,12 @@ export class SubtitlesTasksComponent implements OnInit {
       uploadDate: t.uploadDate,
     };
     this.dialog.open(VideoDialogComponent, { width: '800px', data });
+  }
+
+  private updateDisplayedColumns(includeYoutube: boolean): void {
+    this.displayedColumns = includeYoutube
+      ? ['status', 'createdAt', 'youtube', 'title', 'channelName', 'result']
+      : ['status', 'createdAt', 'title', 'channelName', 'result'];
   }
 
   get completedTasksCount(): number {

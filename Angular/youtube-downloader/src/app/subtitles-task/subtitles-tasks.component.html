@@ -99,7 +99,7 @@
                   </td>
                 </ng-container>
 
-                <ng-container matColumnDef="youtube">
+                <ng-container *ngIf="isAuthenticated" matColumnDef="youtube">
                   <th mat-header-cell *matHeaderCellDef>Видео</th>
                   <td mat-cell *matCellDef="let task">
                     <button class="youtube-logo-button" matRipple (click)="openVideoDialog(task)">
@@ -191,7 +191,12 @@
                     <p>Канал: {{ task.channelName }}</p>
                     <p>{{ task.createdAt | localTime:'yyyy-MM-dd HH:mm' }}</p>
                   </div>
-                  <button class="youtube-logo-button" matRipple (click)="openVideoDialog(task)">
+                  <button
+                    *ngIf="isAuthenticated"
+                    class="youtube-logo-button"
+                    matRipple
+                    (click)="openVideoDialog(task)"
+                  >
                     <img src="assets/yt.webp" alt="YouTube" class="youtube-logo">
                   </button>
                 </div>
