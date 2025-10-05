@@ -206,7 +206,9 @@ namespace YandexSpeech.services.Telegram
                 return;
             }
 
-            var command = text.Split(' ', '\t', '\n')[0];
+            var rawCommand = text.Split(new[] { ' ', '\t', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()
+                              ?? text;
+            var command = rawCommand.Split('@')[0];
             switch (command)
             {
                 case "/start":
