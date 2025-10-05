@@ -96,7 +96,8 @@ namespace YandexSpeech.services.Telegram
             _noSpeechLiteral = FormatDouble(noSpeech);
             _conditionLiteral = condition ? "True" : "False";
             _ffmpegExecutable = section.GetValue<string?>("FfmpegExecutable")
-                ?? configuration.GetValue<string?>("Whisper:FfmpegExecutable");
+                ?? configuration.GetValue<string?>("Whisper:FfmpegExecutable")
+                ?? configuration.GetValue<string?>("FfmpegExecutable");
 
             _logJsonOptions = new JsonSerializerOptions
             {
@@ -126,13 +127,6 @@ namespace YandexSpeech.services.Telegram
                 return;
             }
 
-            if (!useLongPolling && string.IsNullOrWhiteSpace(options.WebhookUrl))
-            {
-                _logger.LogWarning("Telegram webhook URL is not configured. Set Telegram:WebhookUrl in appsettings or enable long polling.");
-                await WaitForCancellationAsync(stoppingToken);
-                return;
-            }
-
             var botOptions = string.IsNullOrWhiteSpace(options.ApiBaseUrl)
                 ? new TelegramBotClientOptions(options.BotToken)
                 : new TelegramBotClientOptions(options.BotToken, options.ApiBaseUrl);
@@ -145,22 +139,40 @@ namespace YandexSpeech.services.Telegram
                 var me = await _botClient.GetMeAsync(cancellationToken: stoppingToken).ConfigureAwait(false);
                 _logger.LogInformation("Telegram bot connected as @{Username} (id {Id}).", me.Username, me.Id);
 
-                await _botClient.DeleteWebhookAsync(true, cancellationToken: stoppingToken).ConfigureAwait(false);
+                var webhookUrl = options.WebhookUrl;
+                var dropPendingUpdates = useLongPolling || string.IsNullOrWhiteSpace(webhookUrl);
+                await _botClient.DeleteWebhookAsync(dropPendingUpdates, cancellationToken: stoppingToken)
+                    .ConfigureAwait(false);
 
-                if (useLongPolling)
+                if (useLongPolling || string.IsNullOrWhiteSpace(webhookUrl))
                 {
+                    if (!useLongPolling)
+                    {
+                        _logger.LogWarning("Telegram webhook URL is not configured. Falling back to long polling mode.");
+                    }
+
                     _logger.LogInformation("Telegram long polling mode enabled.");
                     await RunLongPollingAsync(stoppingToken).ConfigureAwait(false);
                     return;
                 }
 
-                await _botClient.SetWebhookAsync(
-                    url: options.WebhookUrl!,
-                    allowedUpdates: new[] { UpdateType.Message },
-                    secretToken: string.IsNullOrWhiteSpace(options.WebhookSecretToken) ? null : options.WebhookSecretToken,
-                    cancellationToken: stoppingToken).ConfigureAwait(false);
+                try
+                {
+                    await _botClient.SetWebhookAsync(
+                        url: webhookUrl!,
+                        allowedUpdates: new[] { UpdateType.Message },
+                        secretToken: string.IsNullOrWhiteSpace(options.WebhookSecretToken) ? null : options.WebhookSecretToken,
+                        cancellationToken: stoppingToken).ConfigureAwait(false);
 
-                _logger.LogInformation("Telegram webhook configured at {WebhookUrl}.", options.WebhookUrl);
+                    _logger.LogInformation("Telegram webhook configured at {WebhookUrl}.", webhookUrl);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to configure Telegram webhook. Falling back to long polling mode.");
+                    _logger.LogInformation("Telegram long polling mode enabled.");
+                    await RunLongPollingAsync(stoppingToken).ConfigureAwait(false);
+                    return;
+                }
             }
             catch (Exception ex)
             {
