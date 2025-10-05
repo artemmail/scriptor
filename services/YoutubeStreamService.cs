@@ -12,6 +12,7 @@ using Xabe.FFmpeg;
 using YoutubeDownload.Models;    // StreamDto, YoutubeStreamCache
 using YandexSpeech;
 using YandexSpeech.models.DB;             // MyDbContext
+using YandexSpeech.services.Interface;
 
 namespace YandexSpeech.services
 {
@@ -36,19 +37,19 @@ namespace YandexSpeech.services
     {
         private readonly YoutubeClient _youtubeClient;
         private readonly MyDbContext _dbContext;
-        private readonly string _ffmpegPath;
+        private readonly IFfmpegService _ffmpegService;
         private readonly string _defaultSaveDir;
 
         public YoutubeStreamService(
             IConfiguration configuration,
-            MyDbContext dbContext)
+            MyDbContext dbContext,
+            IFfmpegService ffmpegService)
         {
-            _ffmpegPath = configuration.GetValue<string>("FfmpegExePath")
-                                ?? throw new ArgumentNullException("FfmpegExePath");
             _defaultSaveDir = configuration.GetValue<string>("SaveDirectory")
                                 ?? @"C:\Temp";
             _youtubeClient = new YoutubeClient();
             _dbContext = dbContext;
+            _ffmpegService = ffmpegService;
         }
 
         /// <summary>
@@ -200,7 +201,11 @@ namespace YandexSpeech.services
             if (!Directory.Exists(outDir))
                 Directory.CreateDirectory(outDir);
 
-            FFmpeg.SetExecutablesPath(_ffmpegPath);
+            var ffmpegDirectory = _ffmpegService.ResolveFfmpegDirectory();
+            if (!string.IsNullOrWhiteSpace(ffmpegDirectory))
+            {
+                FFmpeg.SetExecutablesPath(ffmpegDirectory);
+            }
             var conversion = FFmpeg.Conversions.New();
 
             // видео
