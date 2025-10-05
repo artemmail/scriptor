@@ -14,6 +14,8 @@ namespace YandexSpeech.services.Options
 
         public string? WebhookSecretToken { get; set; }
 
+        public bool UseLongPolling { get; set; }
+
         public string? LogFilePath { get; set; }
 
         public int MessageChunkLimit { get; set; } = 3900;
