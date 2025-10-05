@@ -85,6 +85,7 @@ namespace YandexSpeech.services.Telegram
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             var options = _optionsMonitor.CurrentValue;
+            var useLongPolling = options.UseLongPolling;
             if (!options.Enabled)
             {
                 _logger.LogInformation("Telegram bot is disabled via configuration.");
@@ -99,9 +100,9 @@ namespace YandexSpeech.services.Telegram
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(options.WebhookUrl))
+            if (!useLongPolling && string.IsNullOrWhiteSpace(options.WebhookUrl))
             {
-                _logger.LogWarning("Telegram webhook URL is not configured. Set Telegram:WebhookUrl in appsettings.");
+                _logger.LogWarning("Telegram webhook URL is not configured. Set Telegram:WebhookUrl in appsettings or enable long polling.");
                 await WaitForCancellationAsync(stoppingToken);
                 return;
             }
@@ -119,6 +120,14 @@ namespace YandexSpeech.services.Telegram
                 _logger.LogInformation("Telegram bot connected as @{Username} (id {Id}).", me.Username, me.Id);
 
                 await _botClient.DeleteWebhookAsync(true, cancellationToken: stoppingToken).ConfigureAwait(false);
+
+                if (useLongPolling)
+                {
+                    _logger.LogInformation("Telegram long polling mode enabled.");
+                    await RunLongPollingAsync(stoppingToken).ConfigureAwait(false);
+                    return;
+                }
+
                 await _botClient.SetWebhookAsync(
                     url: options.WebhookUrl!,
                     allowedUpdates: new[] { UpdateType.Message },
@@ -129,7 +138,7 @@ namespace YandexSpeech.services.Telegram
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to initialize Telegram bot webhook.");
+                _logger.LogError(ex, "Failed to initialize Telegram bot.");
                 await WaitForCancellationAsync(stoppingToken);
                 return;
             }
@@ -199,6 +208,50 @@ namespace YandexSpeech.services.Telegram
             }
         }
 
+        private async Task RunLongPollingAsync(CancellationToken stoppingToken)
+        {
+            if (_botClient is null)
+            {
+                return;
+            }
+
+            var offset = 0;
+            var allowedUpdates = new[] { UpdateType.Message };
+
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    var updates = await _botClient
+                        .GetUpdatesAsync(offset, timeout: 30, allowedUpdates: allowedUpdates, cancellationToken: stoppingToken)
+                        .ConfigureAwait(false);
+
+                    foreach (var update in updates)
+                    {
+                        offset = update.Id + 1;
+                        await ProcessUpdateAsync(update, stoppingToken).ConfigureAwait(false);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error while polling Telegram updates.");
+
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+
         private async Task HandleCommandAsync(Message message, string text, CancellationToken cancellationToken)
         {
             if (_botClient is null)
@@ -209,6 +262,8 @@ namespace YandexSpeech.services.Telegram
             var rawCommand = text.Split(new[] { ' ', '\t', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()
                               ?? text;
             var command = rawCommand.Split('@')[0];
+
+            LogEvent("command", message, rawCommand, new { command });
             switch (command)
             {
                 case "/start":
@@ -593,8 +648,10 @@ namespace YandexSpeech.services.Telegram
         private void LogEvent(string kind, Message message, string text, object? extra)
         {
             var options = _optionsMonitor.CurrentValue;
+            var defaultDirectory = Path.Combine("c:", "log");
+            var defaultPath = Path.Combine(defaultDirectory, "telegram_messages.log");
             var path = string.IsNullOrWhiteSpace(options.LogFilePath)
-                ? Path.Combine(AppContext.BaseDirectory, "telegram_messages.log")
+                ? defaultPath
                 : Path.GetFullPath(options.LogFilePath);
 
             try
