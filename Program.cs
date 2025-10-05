@@ -12,6 +12,7 @@ using YandexSpeech.models.DB;
 using YandexSpeech.services;
 using YandexSpeech.services.Interface;
 using YandexSpeech.services.Options;
+using YandexSpeech.services.Telegram;
 using YandexSpeech.services.Whisper;
 using YandexSpeech.Services;
 using YoutubeDownload.Managers;
@@ -54,6 +55,7 @@ builder.Services.AddControllers();
 
 // Общий HttpClient для внешних запросов
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient(nameof(TelegramTranscriptionBot));
 
 // 3. DbContext
 var conn = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -173,6 +175,7 @@ builder.Services.AddScoped<IAudioFileService, AudioFileService>();
 builder.Services.AddScoped<ISpeechWorkflowService, SpeechWorkflowService>();
 
 builder.Services.Configure<EventBusOptions>(builder.Configuration.GetSection("EventBus"));
+builder.Services.Configure<TelegramBotOptions>(builder.Configuration.GetSection("Telegram"));
 builder.Services.AddSingleton<FasterWhisperQueueClient>();
 
 var whisperProvider = builder.Configuration.GetValue<string>("Whisper:Provider");
@@ -218,6 +221,8 @@ builder.Services.AddSingleton<IYoutubeDownloadTaskManager, YoutubeDownloadTaskMa
 builder.Services.AddScoped<IYSubtitlesService, YSubtitlesService>();
 builder.Services.AddHostedService<RecognitionBackgroundService>();
 builder.Services.AddHostedService<AudioRecognitionBackgroundService>();
+builder.Services.AddSingleton<TelegramTranscriptionBot>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<TelegramTranscriptionBot>());
 
 
 

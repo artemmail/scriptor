@@ -32,8 +32,9 @@
                 <PackageReference Include="NAudio" Version="2.2.1" />
                 <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
                 <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-		<PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
-		<PackageReference Include="Xabe.FFmpeg" Version="5.2.6" />
+                <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+                <PackageReference Include="Telegram.Bot" Version="20.0.0" />
+                <PackageReference Include="Xabe.FFmpeg" Version="5.2.6" />
 		<PackageReference Include="xunit" Version="2.9.3" />
 	</ItemGroup>
 
