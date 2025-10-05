@@ -1,27 +1,17 @@
-using System;
-using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Linq;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using System.Net.Http;
-using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using YandexSpeech.services.Options;
 using YandexSpeech.services.Whisper;
-using System.Text.RegularExpressions;
 using IOFile = System.IO.File;
 
 namespace YandexSpeech.services.Telegram
@@ -95,9 +85,7 @@ namespace YandexSpeech.services.Telegram
             _logProbLiteral = FormatDouble(logProb);
             _noSpeechLiteral = FormatDouble(noSpeech);
             _conditionLiteral = condition ? "True" : "False";
-            _ffmpegExecutable = section.GetValue<string?>("FfmpegExecutable")
-                ?? configuration.GetValue<string?>("Whisper:FfmpegExecutable")
-                ?? configuration.GetValue<string?>("FfmpegExecutable");
+            _ffmpegExecutable = configuration.GetValue<string?>("FfmpegExecutable");
 
             _logJsonOptions = new JsonSerializerOptions
             {
