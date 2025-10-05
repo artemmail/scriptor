@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -11,6 +12,7 @@ using Xunit;
 using YandexSpeech;
 using YandexSpeech.models.DB;
 using YandexSpeech.services;
+using YandexSpeech.services.Interface;
 using YandexSpeech.services.Whisper;
 
 namespace YandexSpeech.Tests;
@@ -65,15 +67,17 @@ public sealed class OpenAiTranscriptionServiceTests
 
         var punctuation = new StubPunctuationService();
         var whisper = new StubWhisperTranscriptionService();
+        var ffmpeg = new StubFfmpegService();
 
-            var service = new TestOpenAiTranscriptionService(
-                dbContext,
-                configuration,
-                NullLogger<OpenAiTranscriptionService>.Instance,
-                punctuation,
-                whisper,
-                new StubHttpClientFactory(),
-                new StubYandexDiskDownloadService());
+        var service = new TestOpenAiTranscriptionService(
+            dbContext,
+            configuration,
+            NullLogger<OpenAiTranscriptionService>.Instance,
+            punctuation,
+            whisper,
+            new StubHttpClientFactory(),
+            new StubYandexDiskDownloadService(),
+            ffmpeg);
 
         var result = await service.ContinueTranscriptionAsync(task.Id);
 
@@ -135,8 +139,9 @@ public sealed class OpenAiTranscriptionServiceTests
             IPunctuationService punctuationService,
             IWhisperTranscriptionService whisperTranscriptionService,
             IHttpClientFactory httpClientFactory,
-            IYandexDiskDownloadService yandexDiskDownloadService)
-            : base(dbContext, configuration, logger, punctuationService, whisperTranscriptionService, httpClientFactory, yandexDiskDownloadService)
+            IYandexDiskDownloadService yandexDiskDownloadService,
+            IFfmpegService ffmpegService)
+            : base(dbContext, configuration, logger, punctuationService, whisperTranscriptionService, httpClientFactory, yandexDiskDownloadService, ffmpegService)
         {
         }
 
@@ -144,6 +149,33 @@ public sealed class OpenAiTranscriptionServiceTests
         {
             return Task.FromResult($"markdown::{transcription}");
         }
+    }
+
+    private sealed class StubFfmpegService : IFfmpegService
+    {
+        public Task ConvertToWav16kMonoAsync(
+            string sourcePath,
+            string outputPath,
+            CancellationToken cancellationToken = default,
+            string? overrideExecutable = null)
+        {
+            if (!File.Exists(outputPath))
+            {
+                var directory = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.WriteAllText(outputPath, string.Empty);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public string ResolveFfmpegExecutable(string? overrideExecutable = null) => "/usr/bin/ffmpeg";
+
+        public string? ResolveFfmpegDirectory(string? overrideExecutable = null) => "/usr/bin";
     }
 
     private sealed class StubHttpClientFactory : IHttpClientFactory

@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using YandexSpeech.models.DB;
+using YandexSpeech.services.Interface;
 
 namespace YandexSpeech.services
 {
@@ -20,7 +21,8 @@ namespace YandexSpeech.services
             IPunctuationService punctuationService,
             IWhisperTranscriptionService whisperTranscriptionService,
             IHttpClientFactory httpClientFactory,
-            IYandexDiskDownloadService yandexDiskDownloadService)
+            IYandexDiskDownloadService yandexDiskDownloadService,
+            IFfmpegService ffmpegService)
             : base(
                 dbContext,
                 configuration,
@@ -28,7 +30,8 @@ namespace YandexSpeech.services
                 punctuationService,
                 whisperTranscriptionService,
                 httpClientFactory,
-                yandexDiskDownloadService)
+                yandexDiskDownloadService,
+                ffmpegService)
         {
         }
 

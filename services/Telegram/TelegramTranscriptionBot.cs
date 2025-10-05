@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -19,6 +18,7 @@ using System.Net.Http.Headers;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using YandexSpeech.services.Interface;
 using YandexSpeech.services.Options;
 using YandexSpeech.services.Whisper;
 using System.Text.RegularExpressions;
@@ -42,6 +42,7 @@ namespace YandexSpeech.services.Telegram
         private readonly string _noSpeechLiteral;
         private readonly string _conditionLiteral;
         private readonly string? _ffmpegExecutable;
+        private readonly IFfmpegService _ffmpegService;
         private readonly JsonSerializerOptions _logJsonOptions;
         private readonly object _logLock = new();
         private readonly string? _globalOpenAiApiKey;
@@ -73,12 +74,14 @@ namespace YandexSpeech.services.Telegram
             IConfiguration configuration,
             IHttpClientFactory httpClientFactory,
             FasterWhisperQueueClient queueClient,
-            ILogger<TelegramTranscriptionBot> logger)
+            ILogger<TelegramTranscriptionBot> logger,
+            IFfmpegService ffmpegService)
         {
             _optionsMonitor = optionsMonitor;
             _httpClientFactory = httpClientFactory;
             _queueClient = queueClient;
             _logger = logger;
+            _ffmpegService = ffmpegService;
 
             var section = configuration.GetSection("FasterWhisper");
             _model = section.GetValue<string>("Model") ?? configuration.GetValue<string>("Whisper:Model") ?? "medium";
@@ -508,60 +511,22 @@ namespace YandexSpeech.services.Telegram
 
         private async Task<string> ConvertToWav16kMonoAsync(string sourcePath, string directory, CancellationToken cancellationToken)
         {
-            var ffmpeg = _optionsMonitor.CurrentValue.FfmpegExecutable;
-            if (string.IsNullOrWhiteSpace(ffmpeg))
+            var overrideExecutable = _optionsMonitor.CurrentValue.FfmpegExecutable;
+            if (string.IsNullOrWhiteSpace(overrideExecutable))
             {
-                ffmpeg = _ffmpegExecutable;
-            }
-            if (string.IsNullOrWhiteSpace(ffmpeg))
-            {
-                ffmpeg = "ffmpeg";
+                overrideExecutable = _ffmpegExecutable;
             }
 
             var outputPath = Path.Combine(directory, Path.GetFileNameWithoutExtension(sourcePath) + "_16k.wav");
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = ffmpeg,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            startInfo.ArgumentList.Add("-y");
-            startInfo.ArgumentList.Add("-i");
-            startInfo.ArgumentList.Add(sourcePath);
-            startInfo.ArgumentList.Add("-ac");
-            startInfo.ArgumentList.Add("1");
-            startInfo.ArgumentList.Add("-ar");
-            startInfo.ArgumentList.Add("16000");
-            startInfo.ArgumentList.Add("-c:a");
-            startInfo.ArgumentList.Add("pcm_s16le");
-            startInfo.ArgumentList.Add(outputPath);
-
-            using var process = new Process { StartInfo = startInfo };
-            try
-            {
-                process.Start();
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"Не удалось запустить ffmpeg: {ex.Message}", ex);
-            }
-
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            if (process.ExitCode != 0)
-            {
-                var error = await process.StandardError.ReadToEndAsync().ConfigureAwait(false);
-                throw new InvalidOperationException(string.IsNullOrWhiteSpace(error)
-                    ? "ffmpeg завершился с ошибкой"
-                    : error.Trim());
-            }
-
+            await _ffmpegService.ConvertToWav16kMonoAsync(sourcePath, outputPath, cancellationToken, overrideExecutable);
             return outputPath;
         }
 
         private async Task<(string Text, string? Language, double? LanguageProbability)> TranscribeAsync(string audioPath, CancellationToken cancellationToken)
         {
+            var overrideExecutable = _optionsMonitor.CurrentValue.FfmpegExecutable ?? _ffmpegExecutable;
+            var resolvedFfmpeg = _ffmpegService.ResolveFfmpegExecutable(overrideExecutable);
+
             var request = new FasterWhisperQueueRequest
             {
                 Audio = audioPath,
@@ -574,7 +539,7 @@ namespace YandexSpeech.services.Telegram
                 LogProbThreshold = _logProbLiteral,
                 NoSpeechThreshold = _noSpeechLiteral,
                 ConditionOnPreviousText = _conditionLiteral,
-                FfmpegExecutable = _optionsMonitor.CurrentValue.FfmpegExecutable ?? _ffmpegExecutable
+                FfmpegExecutable = resolvedFfmpeg
             };
 
             var response = await _queueClient.TranscribeAsync(request, cancellationToken).ConfigureAwait(false);

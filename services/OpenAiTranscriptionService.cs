@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -13,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using YandexSpeech.models.DB;
+using YandexSpeech.services.Interface;
 using YandexSpeech.services.Whisper;
 
 namespace YandexSpeech.services
@@ -21,7 +21,6 @@ namespace YandexSpeech.services
     {
         private readonly MyDbContext _dbContext;
         private readonly ILogger<OpenAiTranscriptionService> _logger;
-        private readonly string _ffmpegPath;
         private readonly string _openAiApiKey;
         private readonly string _workingDirectory;
         private const string FormattingModel = "gpt-4.1-mini";
@@ -31,6 +30,7 @@ namespace YandexSpeech.services
         private static readonly TimeSpan FormattingRetryDelay = TimeSpan.FromSeconds(5);
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IYandexDiskDownloadService _yandexDiskDownloadService;
+        private readonly IFfmpegService _ffmpegService;
 
         public OpenAiTranscriptionService(
             MyDbContext dbContext,
@@ -39,7 +39,8 @@ namespace YandexSpeech.services
             IPunctuationService punctuationService,
             IWhisperTranscriptionService whisperTranscriptionService,
             IHttpClientFactory httpClientFactory,
-            IYandexDiskDownloadService yandexDiskDownloadService)
+            IYandexDiskDownloadService yandexDiskDownloadService,
+            IFfmpegService ffmpegService)
         {
             _dbContext = dbContext;
             _logger = logger;
@@ -47,8 +48,7 @@ namespace YandexSpeech.services
             _whisperTranscriptionService = whisperTranscriptionService;
             _httpClientFactory = httpClientFactory;
             _yandexDiskDownloadService = yandexDiskDownloadService;
-            _ffmpegPath = configuration.GetValue<string>("FfmpegExePath")
-                           ?? throw new InvalidOperationException("FfmpegExePath is not configured.");
+            _ffmpegService = ffmpegService;
             _openAiApiKey = configuration["OpenAI:ApiKey"]
                              ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured.");
             _workingDirectory = Path.Combine(Path.GetTempPath(), "openai-transcriptions");
@@ -280,50 +280,7 @@ namespace YandexSpeech.services
             {
                 var sourcePath = Path.GetFullPath(task.SourceFilePath);
                 var outputPath = Path.GetFullPath(Path.Combine(_workingDirectory, $"{task.Id}.wav"));
-                var ffmpegExecutable = ResolveFfmpegExecutable();
-
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = ffmpegExecutable,
-                    UseShellExecute = false,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow = true
-                };
-
-                startInfo.ArgumentList.Add("-y");
-                startInfo.ArgumentList.Add("-i");
-                startInfo.ArgumentList.Add(sourcePath);
-                startInfo.ArgumentList.Add("-vn");
-                startInfo.ArgumentList.Add("-ac");
-                startInfo.ArgumentList.Add("1");
-                startInfo.ArgumentList.Add("-ar");
-                startInfo.ArgumentList.Add("16000");
-                startInfo.ArgumentList.Add("-acodec");
-                startInfo.ArgumentList.Add("pcm_s16le");
-                startInfo.ArgumentList.Add(outputPath);
-
-                using var process = new Process { StartInfo = startInfo };
-
-                process.Start();
-
-                var waitForExitTask = process.WaitForExitAsync();
-                var standardErrorTask = process.StandardError.ReadToEndAsync();
-                var standardOutputTask = process.StandardOutput.ReadToEndAsync();
-                await Task.WhenAll(waitForExitTask, standardErrorTask, standardOutputTask);
-
-                var standardError = await standardErrorTask;
-                var standardOutput = await standardOutputTask;
-
-                if (process.ExitCode != 0)
-                {
-                    throw new InvalidOperationException($"FFmpeg conversion failed (exit code {process.ExitCode}): {standardError}\n{standardOutput}");
-                }
-
-                if (!File.Exists(outputPath))
-                {
-                    throw new InvalidOperationException($"FFmpeg conversion did not produce an output file at '{outputPath}'. Output: {standardOutput} Error: {standardError}");
-                }
+                await _ffmpegService.ConvertToWav16kMonoAsync(sourcePath, outputPath);
 
                 task.ConvertedFilePath = outputPath;
                 task.Status = OpenAiTranscriptionStatus.Transcribing;
@@ -352,7 +309,7 @@ namespace YandexSpeech.services
 
             try
             {
-                var ffmpegExecutable = ResolveFfmpegExecutable();
+                var ffmpegExecutable = _ffmpegService.ResolveFfmpegExecutable();
                 var transcription = await _whisperTranscriptionService.TranscribeAsync(
                     task.ConvertedFilePath!,
                     _workingDirectory,
@@ -625,23 +582,6 @@ namespace YandexSpeech.services
             task.Status = OpenAiTranscriptionStatus.Formatting;
             task.ModifiedAt = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
-        }
-
-        private string ResolveFfmpegExecutable()
-        {
-            var executableName = OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg";
-
-            if (File.Exists(_ffmpegPath))
-                return _ffmpegPath;
-
-            if (Directory.Exists(_ffmpegPath))
-            {
-                var candidate = Path.Combine(_ffmpegPath, executableName);
-                if (File.Exists(candidate))
-                    return candidate;
-            }
-
-            return executableName;
         }
 
         private static int ClampIndex(int value, int length)
