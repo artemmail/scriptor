@@ -42,6 +42,7 @@ namespace YandexSpeech.services.Telegram
         private readonly string? _ffmpegExecutable;
         private readonly JsonSerializerOptions _logJsonOptions;
         private readonly object _logLock = new();
+        private CancellationToken _stoppingToken = CancellationToken.None;
 
         private ITelegramBotClient? _botClient;
 
@@ -84,6 +85,7 @@ namespace YandexSpeech.services.Telegram
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            _stoppingToken = stoppingToken;
             var options = _optionsMonitor.CurrentValue;
             var useLongPolling = options.UseLongPolling;
             if (!options.Enabled)
@@ -172,6 +174,17 @@ namespace YandexSpeech.services.Telegram
         }
 
         public bool IsReady => _botClient is not null;
+
+        public void EnqueueWebhookUpdate(Update update)
+        {
+            if (_botClient is null)
+            {
+                _logger.LogWarning("Cannot process Telegram webhook update because the bot client is not initialized yet.");
+                return;
+            }
+
+            _ = ProcessUpdateAsync(update, _stoppingToken);
+        }
 
         public async Task ProcessUpdateAsync(Update update, CancellationToken cancellationToken)
         {
