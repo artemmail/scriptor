@@ -15,11 +15,13 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using YandexSpeech.services.Options;
 using YandexSpeech.services.Whisper;
+using System.Text.RegularExpressions;
 using IOFile = System.IO.File;
 
 namespace YandexSpeech.services.Telegram
@@ -42,8 +44,27 @@ namespace YandexSpeech.services.Telegram
         private readonly string? _ffmpegExecutable;
         private readonly JsonSerializerOptions _logJsonOptions;
         private readonly object _logLock = new();
+        private readonly string? _globalOpenAiApiKey;
+
+        private const string DefaultOpenAiModel = "gpt-4.1";
+        private const int DefaultSummaryThreshold = 70;
+        private const string OpenAiEndpoint = "https://api.openai.com/v1/chat/completions";
+        private const string OpenAiSystemPrompt =
+            """You are a meticulous editor for Telegram voice transcriptions. Fix punctuation, casing, and obvious ASR mistakes without adding content. Keep the input language. Output JSON with fields: polished, summary.""";
+
+        private static readonly JsonSerializerOptions OpenAiRequestJsonOptions = new()
+        {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
 
         private ITelegramBotClient? _botClient;
+
+        private readonly record struct OpenAiPostProcessingResult(
+            string Text,
+            string? Summary,
+            string? Model,
+            string? Error,
+            bool Attempted);
 
         public TelegramTranscriptionBot(
             IOptionsMonitor<TelegramBotOptions> optionsMonitor,
@@ -80,6 +101,8 @@ namespace YandexSpeech.services.Telegram
                 Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             };
+
+            _globalOpenAiApiKey = configuration["OpenAI:ApiKey"];
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -347,13 +370,37 @@ namespace YandexSpeech.services.Telegram
                     text: header,
                     cancellationToken: cancellationToken).ConfigureAwait(false);
 
-                await SendTranscriptAsync(message, transcript.Text, tempRoot, cancellationToken).ConfigureAwait(false);
+                var postProcessing = await PostProcessTranscriptAsync(
+                    transcript.Text,
+                    transcript.Language,
+                    cancellationToken).ConfigureAwait(false);
 
-                LogEvent("transcript", message, transcript.Text, new
+                if (postProcessing.Error is { Length: > 0 } && postProcessing.Attempted && string.IsNullOrWhiteSpace(postProcessing.Model))
+                {
+                    await _botClient.SendTextMessageAsync(
+                        chatId: message.Chat.Id,
+                        text: $"⚠️ GPT пост-обработка не выполнена: {postProcessing.Error}",
+                        cancellationToken: cancellationToken).ConfigureAwait(false);
+                }
+
+                await SendTranscriptAsync(message, postProcessing.Text, tempRoot, cancellationToken).ConfigureAwait(false);
+
+                if (!string.IsNullOrWhiteSpace(postProcessing.Summary))
+                {
+                    await _botClient.SendTextMessageAsync(
+                        chatId: message.Chat.Id,
+                        text: "📄 Краткое резюме:\n" + postProcessing.Summary,
+                        cancellationToken: cancellationToken).ConfigureAwait(false);
+                }
+
+                LogEvent("transcript", message, postProcessing.Text, new
                 {
                     language = transcript.Language,
                     language_probability = transcript.LanguageProbability,
-                    model = _model
+                    model = _model,
+                    openai_model = postProcessing.Model,
+                    openai_error = postProcessing.Error,
+                    summary = postProcessing.Summary
                 });
             }
             catch (OperationCanceledException)
@@ -519,6 +566,127 @@ namespace YandexSpeech.services.Telegram
             return ParseTranscript(response.TranscriptJson);
         }
 
+        private async Task<OpenAiPostProcessingResult> PostProcessTranscriptAsync(
+            string rawText,
+            string? language,
+            CancellationToken cancellationToken)
+        {
+            var text = rawText.Trim();
+            var options = _optionsMonitor.CurrentValue;
+
+            if (!options.EnableOpenAiPostProcessing)
+            {
+                return new OpenAiPostProcessingResult(text, null, null, "OpenAI post-processing is disabled.", false);
+            }
+
+            var apiKey = !string.IsNullOrWhiteSpace(options.OpenAiApiKey)
+                ? options.OpenAiApiKey
+                : _globalOpenAiApiKey;
+
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                return new OpenAiPostProcessingResult(text, null, null, "OpenAI API key is not configured.", false);
+            }
+
+            var model = string.IsNullOrWhiteSpace(options.OpenAiModel)
+                ? DefaultOpenAiModel
+                : options.OpenAiModel!.Trim();
+
+            if (string.IsNullOrWhiteSpace(model))
+            {
+                model = DefaultOpenAiModel;
+            }
+
+            var threshold = options.OpenAiSummaryWordThreshold > 0
+                ? options.OpenAiSummaryWordThreshold
+                : DefaultSummaryThreshold;
+
+            var needSummary = CountWords(text) > threshold;
+            var userMessage = $"LANG_HINT={language ?? "unknown"}\nNEED_SUMMARY={(needSummary ? "yes" : "no")}\n\nRAW_TEXT:\n{text}";
+
+            var payload = new
+            {
+                model,
+                temperature = 0.2,
+                response_format = new { type = "json_object" },
+                messages = new object[]
+                {
+                    new { role = "system", content = OpenAiSystemPrompt },
+                    new { role = "user", content = userMessage }
+                }
+            };
+
+            var client = _httpClientFactory.CreateClient(nameof(TelegramTranscriptionBot) + ".OpenAI");
+            client.Timeout = TimeSpan.FromMinutes(2);
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, OpenAiEndpoint)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(payload, OpenAiRequestJsonOptions), Encoding.UTF8, "application/json")
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+            try
+            {
+                using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var message = $"OpenAI HTTP {(int)response.StatusCode}: {response.ReasonPhrase?.Trim() ?? "Unknown"}. {Truncate(responseBody, 400)}";
+                    return new OpenAiPostProcessingResult(text, null, null, message, true);
+                }
+
+                using var responseJson = JsonDocument.Parse(responseBody);
+                if (!responseJson.RootElement.TryGetProperty("choices", out var choices)
+                    || choices.ValueKind != JsonValueKind.Array
+                    || choices.GetArrayLength() == 0)
+                {
+                    return new OpenAiPostProcessingResult(text, null, null, "OpenAI response did not contain choices.", true);
+                }
+
+                var content = choices[0].GetProperty("message").GetProperty("content").GetString();
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    return new OpenAiPostProcessingResult(text, null, null, "OpenAI response content is empty.", true);
+                }
+
+                using var payloadJson = TryParseJsonDocument(content!);
+                if (payloadJson is null)
+                {
+                    return new OpenAiPostProcessingResult(text, null, null, "OpenAI response content is not valid JSON.", true);
+                }
+
+                var root = payloadJson.RootElement;
+                var polished = root.TryGetProperty("polished", out var polishedElement) && polishedElement.ValueKind == JsonValueKind.String
+                    ? polishedElement.GetString()
+                    : null;
+
+                var finalText = string.IsNullOrWhiteSpace(polished) ? text : polished!.Trim();
+
+                string? summary = null;
+                if (needSummary
+                    && root.TryGetProperty("summary", out var summaryElement)
+                    && summaryElement.ValueKind == JsonValueKind.String)
+                {
+                    var summaryValue = summaryElement.GetString();
+                    if (!string.IsNullOrWhiteSpace(summaryValue))
+                    {
+                        summary = summaryValue!.Trim();
+                    }
+                }
+
+                return new OpenAiPostProcessingResult(finalText, summary, model, null, true);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                return new OpenAiPostProcessingResult(text, null, null, $"{ex.GetType().Name}: {ex.Message}", true);
+            }
+        }
+
         private async Task SendTranscriptAsync(Message originalMessage, string text, string workingDirectory, CancellationToken cancellationToken)
         {
             if (_botClient is null)
@@ -605,6 +773,59 @@ namespace YandexSpeech.services.Telegram
             }
 
             return (builder.ToString().Trim(), language, probability);
+        }
+
+        private static JsonDocument? TryParseJsonDocument(string content)
+        {
+            try
+            {
+                return JsonDocument.Parse(content);
+            }
+            catch (JsonException)
+            {
+                var start = content.IndexOf('{');
+                var end = content.LastIndexOf('}');
+                if (start >= 0 && end > start)
+                {
+                    var slice = content[start..(end + 1)];
+                    try
+                    {
+                        return JsonDocument.Parse(slice);
+                    }
+                    catch (JsonException)
+                    {
+                        // ignore
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static int CountWords(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return 0;
+            }
+
+            return Regex.Matches(text, "\\w+", RegexOptions.CultureInvariant | RegexOptions.Multiline).Count;
+        }
+
+        private static string Truncate(string value, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            var trimmed = value.Trim();
+            if (trimmed.Length <= maxLength)
+            {
+                return trimmed;
+            }
+
+            return trimmed[..maxLength] + "…";
         }
 
         private async Task EditStatusAsync(Message? status, string text, CancellationToken cancellationToken)
