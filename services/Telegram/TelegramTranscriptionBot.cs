@@ -18,9 +18,9 @@ using System.Net.Http;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.InputFiles;
 using YandexSpeech.services.Options;
 using YandexSpeech.services.Whisper;
+using IOFile = System.IO.File;
 
 namespace YandexSpeech.services.Telegram
 {
@@ -213,7 +213,7 @@ namespace YandexSpeech.services.Telegram
                     await _botClient.SendTextMessageAsync(
                         chatId: message.Chat.Id,
                         text: "Пришлите voice или аудиофайл — распознаю локально (GPU).",
-                        replyToMessageId: message.MessageId,
+                        replyParameters: new ReplyParameters { MessageId = message.MessageId },
                         cancellationToken: cancellationToken).ConfigureAwait(false);
                     break;
                 case "/model":
@@ -221,7 +221,7 @@ namespace YandexSpeech.services.Telegram
                     await _botClient.SendTextMessageAsync(
                         chatId: message.Chat.Id,
                         text: info,
-                        replyToMessageId: message.MessageId,
+                        replyParameters: new ReplyParameters { MessageId = message.MessageId },
                         cancellationToken: cancellationToken).ConfigureAwait(false);
                     break;
             }
@@ -245,7 +245,7 @@ namespace YandexSpeech.services.Telegram
                 status = await _botClient.SendTextMessageAsync(
                     chatId: message.Chat.Id,
                     text: "⏳ Обрабатываю…",
-                    replyToMessageId: message.MessageId,
+                    replyParameters: new ReplyParameters { MessageId = message.MessageId },
                     cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -371,8 +371,8 @@ namespace YandexSpeech.services.Telegram
             fileName ??= Path.GetFileName(file.FilePath ?? $"{Guid.NewGuid():N}.bin");
             var destination = Path.Combine(directory, fileName);
 
-            await using var fs = File.Create(destination);
-            await _botClient.DownloadFileAsync(file.FilePath!, fs, cancellationToken: cancellationToken).ConfigureAwait(false);
+            await using var fs = IOFile.Create(destination);
+            await _botClient.DownloadFile(file.FilePath!, fs, cancellationToken: cancellationToken).ConfigureAwait(false);
             return destination;
         }
 
@@ -496,12 +496,12 @@ namespace YandexSpeech.services.Telegram
 
             var fileName = $"transcript_{DateTime.UtcNow:yyyyMMdd_HHmmss}Z.txt";
             var filePath = Path.Combine(workingDirectory, fileName);
-            await File.WriteAllTextAsync(filePath, text, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
+            await IOFile.WriteAllTextAsync(filePath, text, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
 
-            await using var stream = File.OpenRead(filePath);
+            await using var stream = IOFile.OpenRead(filePath);
             await _botClient.SendDocumentAsync(
                 chatId: originalMessage.Chat.Id,
-                document: Telegram.Bot.Types.InputFiles.InputFile.FromStream(stream, fileName),
+                document: InputFile.FromStream(stream, fileName),
                 caption: "🧾 Текст не поместился — отправляю .txt",
                 cancellationToken: cancellationToken).ConfigureAwait(false);
         }
@@ -621,7 +621,7 @@ namespace YandexSpeech.services.Telegram
                 var line = JsonSerializer.Serialize(record, _logJsonOptions);
                 lock (_logLock)
                 {
-                    File.AppendAllText(path, line + Environment.NewLine, Encoding.UTF8);
+                    IOFile.AppendAllText(path, line + Environment.NewLine, Encoding.UTF8);
                 }
             }
             catch (Exception ex)
