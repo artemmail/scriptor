@@ -1,5 +1,3 @@
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -31,7 +29,7 @@ namespace YandexSpeech.Controllers
         }
 
         [HttpPost("webhook")]
-        public async Task<IActionResult> HandleUpdate([FromBody] Update? update, CancellationToken cancellationToken)
+        public IActionResult HandleUpdate([FromBody] Update? update)
         {
             var options = _optionsMonitor.CurrentValue;
             if (!options.Enabled)
@@ -57,7 +55,7 @@ namespace YandexSpeech.Controllers
                 return Ok();
             }
 
-            await _bot.ProcessUpdateAsync(update, cancellationToken).ConfigureAwait(false);
+            _bot.EnqueueWebhookUpdate(update);
             return Ok();
         }
     }
