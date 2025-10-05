@@ -57,6 +57,8 @@ builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient(nameof(TelegramTranscriptionBot));
 
+builder.Services.AddSingleton<IFfmpegService, FfmpegService>();
+
 // 3. DbContext
 var conn = builder.Configuration.GetConnectionString("DefaultConnection")
            ?? throw new InvalidOperationException("DefaultConnection not found");
