@@ -22,6 +22,14 @@ namespace YandexSpeech.services.Options
 
         public string? FfmpegExecutable { get; set; }
 
+        public bool EnableOpenAiPostProcessing { get; set; }
+
+        public string? OpenAiModel { get; set; }
+
+        public string? OpenAiApiKey { get; set; }
+
+        public int OpenAiSummaryWordThreshold { get; set; } = 70;
+
         public void Validate()
         {
             if (!Enabled)
