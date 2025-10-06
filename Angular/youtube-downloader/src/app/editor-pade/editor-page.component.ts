@@ -4,7 +4,6 @@ import { ActivatedRoute, Router }       from '@angular/router';
 import { Title }                        from '@angular/platform-browser';
 import { CommonModule }                 from '@angular/common';
 import { FormsModule }                  from '@angular/forms';
-import { MatButtonModule }              from '@angular/material/button';
 import { MatIconModule }                from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { LMarkdownEditorModule }        from 'ngx-markdown-editor';
@@ -26,7 +25,6 @@ import { MarkdownRendererService1 }     from '../task-result/markdown-renderer.s
     LMarkdownEditorModule,
     MatCardModule,
     TaskProgressComponent,
-    MatButtonModule,
     MatIconModule,
     MatSnackBarModule
   ],
@@ -39,6 +37,10 @@ export class EditorPageComponent implements OnInit {
   loading = true;
   errorMessage: string | null = null;
   task: YoutubeCaptionTaskDto | null = null;
+
+  get hasContent(): boolean {
+    return !!this.markdownContent?.trim();
+  }
 
   // Опции редактора
   editorOptions = {

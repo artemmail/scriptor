@@ -12,50 +12,67 @@
     </md-editor>
   </mat-card>
 
-  <div class="actions">
-    <button mat-raised-button color="primary"
-            (click)="onDownloadMd()"
-            [disabled]="!markdownContent.trim()">
-      <mat-icon>download</mat-icon>
-      Download .md
-    </button>
-    <button mat-raised-button color="accent"
-            (click)="onDownloadHtml()"
-            [disabled]="!markdownContent.trim()">
-      <mat-icon>download</mat-icon>
-      Download .html
-    </button>
+  <div class="actions-panel">
+    <div class="actions-header">
+      <h2>Действия</h2>
+      <div class="actions-buttons">
+        <button
+          class="btn btn-outline"
+          type="button"
+          [matMenuTriggerFor]="downloadMenu"
+          [disabled]="isDownloading || !hasContent"
+          aria-label="Скачать"
+        >
+          <mat-icon>download</mat-icon>
+          <span>Скачать</span>
+        </button>
+        <button
+          class="btn btn-outline"
+          type="button"
+          [matMenuTriggerFor]="copyMenu"
+          [disabled]="isDownloading || !hasContent"
+          aria-label="Копировать"
+        >
+          <mat-icon>content_copy</mat-icon>
+          <span>Копировать</span>
+        </button>
+      </div>
+    </div>
 
-        <button mat-raised-button color="accent"
-            (click)="onCopyHtml()"
-            [disabled]="!markdownContent.trim()">
-      <mat-icon>content_copy</mat-icon>
-      Copy .html
-    </button>
-
-
-
-    <button mat-raised-button color="warn"
-            (click)="onDownloadPdf()"
-            [disabled]="!markdownContent.trim() || isDownloading">
-      <mat-icon>download</mat-icon>
-      Download .pdf
-    </button>
-    <button mat-raised-button color="basic"
-            (click)="onDownloadWord()"
-            [disabled]="!markdownContent.trim() || isDownloading">
-      <mat-icon>download</mat-icon>
-      Download .docx
-    </button>
-
-    <button mat-raised-button color="primary"
-        (click)="onCopyBbcode()"
-        [disabled]="!markdownContent.trim() || isDownloading">
-  <mat-icon>content_copy</mat-icon>
-  Copy .bbcode (phpBB)
-</button>
-
-
+    <div class="actions-status" *ngIf="isDownloading">
+      <mat-icon class="status-icon">hourglass_top</mat-icon>
+      <span>Подготавливаем файл…</span>
+    </div>
   </div>
+
+  <mat-menu #downloadMenu="matMenu">
+    <button mat-menu-item (click)="onDownloadMd()" [disabled]="!hasContent">
+      <mat-icon>article</mat-icon>
+      <span>Markdown (.md)</span>
+    </button>
+    <button mat-menu-item (click)="onDownloadHtml()" [disabled]="!hasContent">
+      <mat-icon>language</mat-icon>
+      <span>HTML</span>
+    </button>
+    <button mat-menu-item (click)="onDownloadPdf()" [disabled]="!hasContent || isDownloading">
+      <mat-icon>picture_as_pdf</mat-icon>
+      <span>PDF</span>
+    </button>
+    <button mat-menu-item (click)="onDownloadWord()" [disabled]="!hasContent || isDownloading">
+      <mat-icon>description</mat-icon>
+      <span>Word (.docx)</span>
+    </button>
+  </mat-menu>
+
+  <mat-menu #copyMenu="matMenu">
+    <button mat-menu-item (click)="onCopyHtml()" [disabled]="!hasContent">
+      <mat-icon>code</mat-icon>
+      <span>HTML</span>
+    </button>
+    <button mat-menu-item (click)="onCopyBbcode()" [disabled]="!hasContent || isDownloading">
+      <mat-icon>forum</mat-icon>
+      <span>BBCode (phpBB)</span>
+    </button>
+  </mat-menu>
 
 </div>
