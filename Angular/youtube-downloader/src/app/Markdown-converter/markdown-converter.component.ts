@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatMenuModule } from '@angular/material/menu';
 import { LMarkdownEditorModule } from 'ngx-markdown-editor';
 import { MatCardModule } from '@angular/material/card';
 import { SubtitleService } from '../services/subtitle.service';
@@ -22,7 +23,8 @@ import { YoutubeCaptionTaskDto } from '../services/subtitle.service';
     MatCardModule,
     MatButtonModule,
     MatIconModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    MatMenuModule
   ],
   templateUrl: './markdown-converter.component.html',
   styleUrls: ['./markdown-converter.component.css']
@@ -175,5 +177,9 @@ export class MarkdownConverterComponent implements OnInit {
     a.download = filename;
     a.click();
     window.URL.revokeObjectURL(url);
+  }
+
+  get hasContent(): boolean {
+    return this.markdownContent.trim().length > 0;
   }
 }

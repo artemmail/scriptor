@@ -14,24 +14,42 @@
       </md-editor>
     </mat-card>
 
-    <div class="actions">
-      <button mat-raised-button color="primary"
-              (click)="onDownloadMd()"
-              [disabled]="!markdownContent.trim()">
-        <mat-icon>download</mat-icon>
-        Скачать .md
-      </button>
-      <button mat-raised-button color="accent"
-              (click)="onSave()"
-              [disabled]="!markdownContent.trim()">
-        <mat-icon>save</mat-icon>
-        Сохранить
-      </button>
-      <button mat-raised-button color="warn"
-              (click)="onDelete()">
-        <mat-icon>delete</mat-icon>
-        Удалить задачу
-      </button>
+    <div class="actions-panel">
+      <div class="actions-header">
+        <h2>Действия</h2>
+        <div class="actions-buttons">
+          <button
+            class="btn btn-outline"
+            type="button"
+            (click)="onDownloadMd()"
+            [disabled]="!hasContent"
+            aria-label="Скачать Markdown"
+          >
+            <mat-icon>download</mat-icon>
+            <span>Скачать .md</span>
+          </button>
+          <button
+            class="btn btn-primary"
+            type="button"
+            (click)="onSave()"
+            [disabled]="!hasContent"
+            aria-label="Сохранить изменения"
+          >
+            <mat-icon>save</mat-icon>
+            <span>Сохранить</span>
+          </button>
+          <button
+            class="btn btn-danger"
+            type="button"
+            (click)="onDelete()"
+            [disabled]="!task"
+            aria-label="Удалить задачу"
+          >
+            <mat-icon>delete</mat-icon>
+            <span>Удалить задачу</span>
+          </button>
+        </div>
+      </div>
     </div>
 
   </ng-container>
@@ -45,8 +63,8 @@
         [taskId]="taskId"
         (taskLoaded)="onTaskLoaded($event)"
         (taskDone)="onTaskDone($event)"
-        (taskError)="onTaskError($event)">
-      </app-task-progress>
+        (taskError)="onTaskError($event)"
+      ></app-task-progress>
     </ng-template>
   </ng-template>
 

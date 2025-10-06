@@ -32,11 +32,84 @@
   min-height: 0;
 }
 
-.actions {
-  /* Вторая «ячейка» — на кнопки */
+.actions-panel {
   grid-row: 2;
-  padding: 16px;
+  padding: 24px;
+  background: rgba(248, 250, 255, 0.9);
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
   display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.actions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.actions-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #0f172a;
+}
+
+.actions-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.actions-status {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
-  background: white; /* если нужно отделить визуально */
+  font-size: 0.95rem;
+  color: #475569;
+  font-weight: 500;
+}
+
+.status-icon {
+  font-size: 20px;
+  color: #2563eb;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+  cursor: pointer;
+  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1d4ed8;
+  border-color: rgba(29, 78, 216, 0.25);
+}
+
+.btn mat-icon {
+  font-size: 20px;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.2);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  box-shadow: none;
+  transform: none;
+}
+
+.btn-outline {
+  background: rgba(255, 255, 255, 0.92);
 }
