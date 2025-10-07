@@ -239,6 +239,13 @@ await MarkIncompleteOpenAiTasksAsErroredAsync(app.Services);
 
 // (пропущена инициализация ролей и IndexNow для краткости)
 
+app.UseHttpsRedirection();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
 app.UseRouting();
 app.UseCors("AllowAngularApp");
 app.UseAuthentication();
@@ -248,7 +255,6 @@ app.UseEndpoints(endpoints => endpoints.MapControllers());
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseHttpsRedirection();
     app.UseSpa(spa =>
     {
         spa.Options.SourcePath = "ClientApp";
