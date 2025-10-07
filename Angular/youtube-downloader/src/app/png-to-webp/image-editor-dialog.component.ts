@@ -12,9 +12,10 @@ import {
   signal,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleChange, MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
 export interface CropRect {
@@ -72,7 +73,8 @@ interface ActiveCropHandle {
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
-    MatButtonToggleModule,
+    MatFormFieldModule,
+    MatSelectModule,
     MatTooltipModule,
   ],
   templateUrl: './image-editor-dialog.component.html',
@@ -113,8 +115,6 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
 
   readonly isCropping: WritableSignal<boolean> = signal(false);
   readonly isFullscreen: WritableSignal<boolean> = signal(false);
-  protected readonly trackZoomOption = (_: number, option: number): number => option;
-
   private image: ImageBitmap | HTMLImageElement | null = null;
   private resizeObserver?: ResizeObserver;
   private pointerActive = false;
@@ -261,8 +261,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     this.focusOnCropArea(crop);
   }
 
-  onZoomChange(event: MatButtonToggleChange): void {
-    const value = event.value as number;
+  onZoomSelectionChange(value: number): void {
     if (typeof value !== 'number') return;
     this.updateZoom(value, { resetPan: true });
   }
