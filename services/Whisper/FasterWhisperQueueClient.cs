@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
-using RabbitMQ.Client.Impl;
 using YandexSpeech.services.Options;
 
 namespace YandexSpeech.services.Whisper
@@ -19,8 +18,8 @@ namespace YandexSpeech.services.Whisper
         private readonly ILogger<FasterWhisperQueueClient> _logger;
         private readonly EventBusOptions _options;
         private readonly ConcurrentDictionary<string, TaskCompletionSource<FasterWhisperQueueResponse>> _pending = new();
-        private readonly AutorecoveringConnection _connection;
-        private readonly AutorecoveringChannel _channel;
+        private readonly IConnection _connection;
+        private readonly IChannel _channel;
         private readonly object _channelLock = new();
         private readonly CancellationTokenSource _receiverCts = new();
         private readonly Task _receiverTask;
@@ -184,7 +183,7 @@ namespace YandexSpeech.services.Whisper
 
         private static ConnectionFactory CreateFactory(EventBusAccessOptions access, string? brokerName)
         {
-            var factory = new ConnectionFactory
+            var factory = new RabbitMQ.Client.ConnectionFactory
             {
                 HostName = access.Host,
                 UserName = access.UserName,
@@ -199,22 +198,12 @@ namespace YandexSpeech.services.Whisper
             return factory;
         }
 
-        private static AutorecoveringConnection CreateConnection(ConnectionFactory factory)
+        private static IConnection CreateConnection(ConnectionFactory factory)
+            => factory.CreateConnectionAsync().GetAwaiter().GetResult();
+
+        private static IChannel CreateChannel(IConnection connection)
         {
-            var connection = factory.CreateConnection();
-            if (connection is not AutorecoveringConnection autorecoveringConnection)
-                throw new InvalidOperationException("RabbitMQ factory did not create an autorecovering connection.");
-
-            return autorecoveringConnection;
-        }
-
-        private static AutorecoveringChannel CreateChannel(AutorecoveringConnection connection)
-        {
-            var model = connection.CreateModel();
-            if (model is not AutorecoveringChannel channel)
-                throw new InvalidOperationException("RabbitMQ connection did not create an autorecovering channel.");
-
-            return channel;
+            return connection.CreateChannel();
         }
 
         private static ValueTask DisposeSafelyAsync(IDisposable? disposable)
