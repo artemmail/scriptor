@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Bot;
@@ -30,9 +31,13 @@ namespace YandexSpeech.services.Telegram
                 throw new ArgumentNullException(nameof(request));
 
             var clientType = client.GetType();
+            var bindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
             foreach (var methodName in CandidateMethodNames)
             {
-                foreach (var method in clientType.GetMethods().Where(m => string.Equals(m.Name, methodName, StringComparison.OrdinalIgnoreCase)))
+                foreach (var method in clientType
+                             .GetMethods(bindingFlags)
+                             .Where(m => string.Equals(m.Name, methodName, StringComparison.OrdinalIgnoreCase)
+                                         || m.Name.EndsWith('.' + methodName, StringComparison.OrdinalIgnoreCase)))
                 {
                     var targetMethod = method;
                     if (method.IsGenericMethodDefinition)
