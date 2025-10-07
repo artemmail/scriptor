@@ -332,16 +332,25 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   private resizeCanvas(): void {
     const canvas = this.canvas;
     const container = this.canvasContainerRef.nativeElement;
-    const rect = container.getBoundingClientRect();
+
+    // размеры области без учета рамок, чтобы холст не обрезался справа/снизу
+    let width = Math.floor(container.clientWidth);
+    let height = Math.floor(container.clientHeight);
+
+    if (!width || !height) {
+      const rect = container.getBoundingClientRect();
+      width = Math.floor(rect.width);
+      height = Math.floor(rect.height);
+    }
 
     // CSS размер
-    this.canvasCssWidth = Math.max(200, Math.floor(rect.width));
-    this.canvasCssHeight = Math.max(200, Math.floor(rect.height));
+    this.canvasCssWidth = Math.max(200, width);
+    this.canvasCssHeight = Math.max(200, height);
 
     // HiDPI backing store
     this.devicePixelRatio = window.devicePixelRatio || 1;
-    canvas.width = Math.floor(this.canvasCssWidth * this.devicePixelRatio);
-    canvas.height = Math.floor(this.canvasCssHeight * this.devicePixelRatio);
+    canvas.width = Math.max(1, Math.round(this.canvasCssWidth * this.devicePixelRatio));
+    canvas.height = Math.max(1, Math.round(this.canvasCssHeight * this.devicePixelRatio));
     canvas.style.width = `${this.canvasCssWidth}px`;
     canvas.style.height = `${this.canvasCssHeight}px`;
 
