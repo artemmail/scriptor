@@ -1,14 +1,15 @@
 :host {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  max-width: 960px;
-  max-height: 90vh;
   box-sizing: border-box;
+  max-height: 90vh;
+  width: min(960px, calc(100vw - 32px));
+  max-width: 100%;
 }
 
 :host-context(.image-editor-dialog-fullscreen) {
   width: 100vw;
+  max-width: none;
   height: 100vh;
   max-height: 100vh;
   padding: 32px;
@@ -43,7 +44,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .controls .spacer {
@@ -55,35 +56,46 @@
   flex: 0 0 auto;
 }
 
-.icon-button-group {
+.toolbar-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
   align-items: center;
+  gap: 8px;
+}
+
+.toolbar-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  text-transform: none;
+}
+
+.toolbar-action mat-icon {
+  font-size: 20px;
+}
+
+.toolbar-action.active,
+.toolbar-action[color='primary'] {
+  background-color: rgba(63, 81, 181, 0.08);
+}
+
+.toolbar-action[color='warn'] {
+  background-color: rgba(244, 67, 54, 0.08);
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 32px;
+  background-color: rgba(0, 0, 0, 0.12);
+  margin: 0 4px;
+  align-self: center;
 }
 
 .crop-group {
   flex-wrap: nowrap;
-}
-
-.icon-button-group button.mat-mdc-icon-button {
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border-radius: 8px;
-}
-
-.icon-button-group button.mat-mdc-icon-button .mat-mdc-button-touch-target {
-  width: 40px;
-  height: 40px;
-}
-
-.icon-button-group button.active {
-  background-color: rgba(63, 81, 181, 0.12);
-}
-
-.icon-button-group button[color='warn'] {
-  border-radius: 50%;
 }
 
 .crop-info {
