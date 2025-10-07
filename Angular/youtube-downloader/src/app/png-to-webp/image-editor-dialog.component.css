@@ -40,6 +40,11 @@
   gap: 20px;
 }
 
+:host-context(.image-editor-dialog-fullscreen) .content.mat-mdc-dialog-content {
+  max-height: none;
+  overflow: visible;
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;
