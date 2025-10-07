@@ -213,8 +213,8 @@ export class PngToWebpComponent implements OnDestroy {
         name: this.originalFile()?.name ?? 'image.png',
       },
       panelClass: 'image-editor-panel',
-      width: '90vw',
-      maxWidth: '960px',
+      width: '100%',
+      maxWidth: 'calc(100vw - 48px)',
     });
 
     const result = await firstValueFrom(dialogRef.afterClosed());

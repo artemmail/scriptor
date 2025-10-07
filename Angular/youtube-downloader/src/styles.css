@@ -25,6 +25,15 @@ body {
 }
 
 .image-editor-panel.image-editor-dialog-fullscreen .mat-mdc-dialog-surface {
+  margin: 0;
+  overflow: hidden;
+}
+
+.image-editor-panel .mat-mdc-dialog-surface {
+  width: 100%;
+}
+
+.image-editor-panel.image-editor-dialog-fullscreen .mat-mdc-dialog-surface {
   height: 100%;
   width: 100%;
   max-width: none;
