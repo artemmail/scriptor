@@ -92,6 +92,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   private static readonly FULLSCREEN_PANEL_CLASS = 'image-editor-dialog-fullscreen';
 
   private readonly baseZoomOptions: number[] = [1, 2, 4, ImageEditorDialogComponent.MAX_ZOOM];
+  private readonly initialState: EditorState;
 
   readonly zoom: WritableSignal<number> = signal(1);
   readonly zoomOptions: Signal<readonly number[]> = computed(() => {
@@ -159,7 +160,14 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     private dialogRef: MatDialogRef<ImageEditorDialogComponent, ImageEditorDialogResult>,
   ) {
     this.dialogRef.disableClose = true;
-    const previous = this.data.previousState;
+    const previous = this.data.previousState ?? null;
+    this.initialState = {
+      rotation: previous?.rotation ?? 0,
+      flipHorizontal: previous?.flipHorizontal ?? false,
+      flipVertical: previous?.flipVertical ?? false,
+      crop: previous?.crop ? { ...previous.crop } : null,
+    };
+
     if (previous) {
       this.rotation.set(previous.rotation);
       this.flipHorizontal.set(previous.flipHorizontal);
@@ -293,17 +301,24 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
 
   reset(): void {
     this.updateZoom(1, { resetPan: true, schedule: false });
-    this.rotation.set(0);
-    this.flipHorizontal.set(false);
-    this.flipVertical.set(false);
-    this.cropRect.set(null);
+
+    const { rotation, flipHorizontal, flipVertical, crop } = this.initialState;
+    this.rotation.set(rotation);
+    this.flipHorizontal.set(flipHorizontal);
+    this.flipVertical.set(flipVertical);
+    const initialCrop = crop ? { ...crop } : null;
+    this.cropRect.set(initialCrop);
     this.isCropping.set(false);
     this.newCropStartImage = null;
     this.pointerDownScreen = null;
     this.dragStarted = false;
     this.hoverHandle = null;
     this.updateCursorForHandle(null);
-    this.scheduleRender();
+    if (initialCrop) {
+      this.focusOnCropArea(initialCrop);
+    } else {
+      this.scheduleRender();
+    }
   }
 
   async apply(): Promise<void> {
