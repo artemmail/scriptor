@@ -16,7 +16,6 @@ using Microsoft.Extensions.Options;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using Telegram.Bot;
-using Telegram.Bot.Requests;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using YandexSpeech.services.Interface;
@@ -813,114 +812,82 @@ namespace YandexSpeech.services.Telegram
 
         private Task<User> GetMeAsync(CancellationToken cancellationToken)
         {
-            return RequireClient().MakeRequestAsync(new GetMeRequest(), cancellationToken);
+            return RequireClient().GetMeAsync(cancellationToken);
         }
 
         private async Task DeleteWebhookAsync(bool dropPendingUpdates, CancellationToken cancellationToken)
         {
-            var request = new DeleteWebhookRequest
-            {
-                DropPendingUpdates = dropPendingUpdates
-            };
-
-            await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
+            await RequireClient()
+                .DeleteWebhookAsync(dropPendingUpdates: dropPendingUpdates, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
         }
 
         private async Task SetWebhookAsync(string url, IEnumerable<UpdateType>? allowedUpdates, string? secretToken, CancellationToken cancellationToken)
         {
-            var request = new SetWebhookRequest
-            {
-                Url = url,
-                AllowedUpdates = allowedUpdates,
-                SecretToken = secretToken
-            };
-
-            await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
+            await RequireClient()
+                .SetWebhookAsync(
+                    url: url,
+                    allowedUpdates: allowedUpdates,
+                    secretToken: secretToken,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
         }
 
         private Task<Update[]> GetUpdatesAsync(int offset, int timeout, IEnumerable<UpdateType>? allowedUpdates, CancellationToken cancellationToken)
         {
-            var request = new GetUpdatesRequest
-            {
-                Offset = offset,
-                Timeout = timeout,
-                AllowedUpdates = allowedUpdates
-            };
-
-            return RequireClient().MakeRequestAsync(request, cancellationToken);
+            return RequireClient().GetUpdatesAsync(
+                offset: offset,
+                timeout: timeout,
+                allowedUpdates: allowedUpdates,
+                cancellationToken: cancellationToken);
         }
 
         private Task<Message> SendTextMessageAsync(ChatId chatId, string text, ReplyParameters? replyParameters, CancellationToken cancellationToken)
         {
-            var request = new SendMessageRequest
-            {
-                ChatId = chatId,
-                Text = text,
-                ReplyParameters = replyParameters
-            };
-
-            return RequireClient().MakeRequestAsync(request, cancellationToken);
+            return RequireClient().SendMessage(
+                chatId: chatId,
+                text: text,
+                replyParameters: replyParameters,
+                cancellationToken: cancellationToken);
         }
 
         private async Task SendChatActionAsync(ChatId chatId, ChatAction chatAction, CancellationToken cancellationToken)
         {
-            var request = new SendChatActionRequest
-            {
-                ChatId = chatId,
-                Action = chatAction
-            };
-            await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
+            await RequireClient().SendChatActionAsync(chatId, chatAction, cancellationToken).ConfigureAwait(false);
         }
 
         private Task<Message> SendDocumentAsync(ChatId chatId, InputFile document, string? caption, CancellationToken cancellationToken)
         {
-            var request = new SendDocumentRequest
-            {
-                ChatId = chatId,
-                Document = document,
-                Caption = caption
-            };
-
-            return RequireClient().MakeRequestAsync(request, cancellationToken);
+            return RequireClient().SendDocument(
+                chatId: chatId,
+                document: document,
+                caption: caption,
+                cancellationToken: cancellationToken);
         }
 
         private Task<Message> EditMessageTextAsync(ChatId chatId, int messageId, string text, CancellationToken cancellationToken)
         {
-            var request = new EditMessageTextRequest
-            {
-                ChatId = chatId,
-                MessageId = messageId,
-                Text = text
-            };
-            return RequireClient().MakeRequestAsync(request, cancellationToken);
+            return RequireClient().EditMessageTextAsync(
+                chatId: chatId,
+                messageId: messageId,
+                text: text,
+                cancellationToken: cancellationToken);
         }
 
         private async Task DeleteMessageAsync(ChatId chatId, int messageId, CancellationToken cancellationToken)
         {
-            var request = new DeleteMessageRequest
-            {
-                ChatId = chatId,
-                MessageId = messageId
-            };
-            await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
+            await RequireClient().DeleteMessageAsync(chatId, messageId, cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task<object> GetFileAsync(string fileId, CancellationToken cancellationToken)
+        private async Task<File> GetFileAsync(string fileId, CancellationToken cancellationToken)
         {
-            var request = new GetFileRequest
-            {
-                FileId = fileId
-            };
-
-            var file = await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
+            var file = await RequireClient().GetFileAsync(fileId, cancellationToken).ConfigureAwait(false);
             return file ?? throw new InvalidOperationException("Telegram GetFile request returned null.");
         }
 
-        private async Task DownloadFileAsync(object file, Stream destination, CancellationToken cancellationToken)
+        private async Task DownloadFileAsync(File file, Stream destination, CancellationToken cancellationToken)
         {
-            var fileType = file?.GetType() ?? throw new InvalidOperationException("Telegram file instance was null.");
-            var filePath = fileType.GetProperty("FilePath")?.GetValue(file) as string
-                          ?? throw new InvalidOperationException("Telegram response did not include a file path.");
+            var filePath = file?.FilePath ?? throw new InvalidOperationException("Telegram response did not include a file path.");
 
             var token = _botToken ?? throw new InvalidOperationException("Telegram bot token is not available.");
             var baseUrl = _apiBaseUrl.EndsWith("/file", StringComparison.OrdinalIgnoreCase)
