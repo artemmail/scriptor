@@ -58,6 +58,33 @@ namespace YandexSpeech.services.Telegram
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
 
+        private static readonly HashSet<string> AudioFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".aac",
+            ".flac",
+            ".m4a",
+            ".mp3",
+            ".oga",
+            ".ogg",
+            ".opus",
+            ".wav",
+            ".weba",
+            ".wma"
+        };
+
+        private static readonly HashSet<string> VideoFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".3gp",
+            ".avi",
+            ".m4v",
+            ".mkv",
+            ".mov",
+            ".mp4",
+            ".mpeg",
+            ".mpg",
+            ".webm"
+        };
+
         private CancellationToken _stoppingToken = CancellationToken.None;
 
         private ITelegramBotClient? _botClient;
@@ -245,9 +272,10 @@ namespace YandexSpeech.services.Telegram
                     return;
                 }
 
-                if (HasAudioPayload(message))
+                var audioPayload = FindAudioPayload(message);
+                if (audioPayload is not null)
                 {
-                    await HandleAudioAsync(message, cancellationToken).ConfigureAwait(false);
+                    await HandleAudioAsync(message, audioPayload, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)
@@ -336,25 +364,28 @@ namespace YandexSpeech.services.Telegram
             }
         }
 
-        private async Task HandleAudioAsync(Message message, CancellationToken cancellationToken)
+        private async Task HandleAudioAsync(Message triggerMessage, AudioPayload audioPayload, CancellationToken cancellationToken)
         {
             if (_botClient is null)
             {
                 return;
             }
 
-            LogEvent("incoming", message, message.Caption ?? string.Empty, null);
+            var logCaption = audioPayload.Caption ?? triggerMessage.Caption ?? triggerMessage.Text ?? string.Empty;
+            var logExtra = audioPayload.CreateLogContext();
 
-            await _botClient.SendChatActionAsync(message.Chat.Id, ChatAction.Typing, cancellationToken: cancellationToken)
+            LogEvent("incoming", triggerMessage, logCaption, logExtra);
+
+            await _botClient.SendChatActionAsync(triggerMessage.Chat.Id, ChatAction.Typing, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
             Message? status = null;
             try
             {
                 status = await _botClient.SendTextMessageAsync(
-                    chatId: message.Chat.Id,
+                    chatId: triggerMessage.Chat.Id,
                     text: "⏳ Обрабатываю…",
-                    replyParameters: new ReplyParameters { MessageId = message.MessageId },
+                    replyParameters: new ReplyParameters { MessageId = triggerMessage.MessageId },
                     cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -367,7 +398,7 @@ namespace YandexSpeech.services.Telegram
 
             try
             {
-                var sourcePath = await DownloadMediaAsync(message, tempRoot, cancellationToken).ConfigureAwait(false);
+                var sourcePath = await DownloadMediaAsync(audioPayload, tempRoot, cancellationToken).ConfigureAwait(false);
                 if (sourcePath is null)
                 {
                     await EditStatusAsync(status, "Не нашёл голос/аудио в сообщении.", cancellationToken).ConfigureAwait(false);
@@ -395,7 +426,7 @@ namespace YandexSpeech.services.Telegram
                     $"📝 Готово. Язык: {transcript.Language ?? "?"} (p={probability}).\nМодель: {_model} ({_device}, dtype {NormalizeCt2(_device, _computeType)}).";
 
                 await _botClient.SendTextMessageAsync(
-                    chatId: message.Chat.Id,
+                    chatId: triggerMessage.Chat.Id,
                     text: header,
                     cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -407,30 +438,32 @@ namespace YandexSpeech.services.Telegram
                 if (postProcessing.Error is { Length: > 0 } && postProcessing.Attempted && string.IsNullOrWhiteSpace(postProcessing.Model))
                 {
                     await _botClient.SendTextMessageAsync(
-                        chatId: message.Chat.Id,
+                        chatId: triggerMessage.Chat.Id,
                         text: $"⚠️ GPT пост-обработка не выполнена: {postProcessing.Error}",
                         cancellationToken: cancellationToken).ConfigureAwait(false);
                 }
 
-                await SendTranscriptAsync(message, postProcessing.Text, tempRoot, cancellationToken).ConfigureAwait(false);
+                await SendTranscriptAsync(triggerMessage, postProcessing.Text, tempRoot, cancellationToken).ConfigureAwait(false);
 
                 if (!string.IsNullOrWhiteSpace(postProcessing.Summary))
                 {
                     await _botClient.SendTextMessageAsync(
-                        chatId: message.Chat.Id,
+                        chatId: triggerMessage.Chat.Id,
                         text: "📄 Краткое резюме:\n" + postProcessing.Summary,
                         cancellationToken: cancellationToken).ConfigureAwait(false);
                 }
 
-                LogEvent("transcript", message, postProcessing.Text, new
+                var transcriptLog = MergeLogContexts(logExtra, new Dictionary<string, object?>
                 {
-                    language = transcript.Language,
-                    language_probability = transcript.LanguageProbability,
-                    model = _model,
-                    openai_model = postProcessing.Model,
-                    openai_error = postProcessing.Error,
-                    summary = postProcessing.Summary
+                    ["language"] = transcript.Language,
+                    ["language_probability"] = transcript.LanguageProbability,
+                    ["model"] = _model,
+                    ["openai_model"] = postProcessing.Model,
+                    ["openai_error"] = postProcessing.Error,
+                    ["summary"] = postProcessing.Summary
                 });
+
+                LogEvent("transcript", triggerMessage, postProcessing.Text, transcriptLog);
             }
             catch (OperationCanceledException)
             {
@@ -441,10 +474,10 @@ namespace YandexSpeech.services.Telegram
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to process audio message {MessageId}.", message.MessageId);
+                _logger.LogError(ex, "Failed to process audio payload {MessageId}.", audioPayload.SourceMessageId);
                 var errorText = $"⚠️ Ошибка: {ex.Message}";
                 await EditStatusAsync(status, errorText, cancellationToken).ConfigureAwait(false);
-                LogEvent("error", message, ex.Message, null);
+                LogEvent("error", triggerMessage, ex.Message, logExtra);
             }
             finally
             {
@@ -452,60 +485,23 @@ namespace YandexSpeech.services.Telegram
             }
         }
 
-        private async Task<string?> DownloadMediaAsync(Message message, string directory, CancellationToken cancellationToken)
+        private async Task<string?> DownloadMediaAsync(AudioPayload payload, string directory, CancellationToken cancellationToken)
         {
             if (_botClient is null)
             {
                 return null;
             }
 
-            string? fileId = null;
-            string? fileName = null;
-
-            if (message.Voice is { } voice)
-            {
-                fileId = voice.FileId;
-                fileName = $"{voice.FileUniqueId}.oga";
-            }
-            else if (message.Audio is { } audio)
-            {
-                fileId = audio.FileId;
-                fileName = !string.IsNullOrWhiteSpace(audio.FileName)
-                    ? Path.GetFileName(audio.FileName)
-                    : $"{audio.FileUniqueId}.mp3";
-            }
-            else if (message.VideoNote is { } videoNote)
-            {
-                fileId = videoNote.FileId;
-                fileName = $"{videoNote.FileUniqueId}.mp4";
-            }
-            else if (message.Document is { } document &&
-                     !string.IsNullOrWhiteSpace(document.MimeType) &&
-                     document.MimeType.StartsWith("audio", StringComparison.OrdinalIgnoreCase))
-            {
-                fileId = document.FileId;
-                fileName = !string.IsNullOrWhiteSpace(document.FileName)
-                    ? Path.GetFileName(document.FileName)
-                    : $"{document.FileUniqueId}.bin";
-            }
-
-            if (string.IsNullOrWhiteSpace(fileId))
+            if (string.IsNullOrWhiteSpace(payload.FileId) || string.IsNullOrWhiteSpace(payload.FileName))
             {
                 return null;
             }
 
-            var file = await _botClient.GetFileAsync(fileId, cancellationToken: cancellationToken).ConfigureAwait(false);
-            var extension = Path.GetExtension(file.FilePath ?? string.Empty);
-            if (!string.IsNullOrWhiteSpace(extension) && (fileName is null || Path.GetExtension(fileName) is ""))
-            {
-                fileName = Path.ChangeExtension(fileName ?? file.FileId ?? Guid.NewGuid().ToString("N"), extension);
-            }
-
-            fileName ??= Path.GetFileName(file.FilePath ?? $"{Guid.NewGuid():N}.bin");
-            var destination = Path.Combine(directory, fileName);
+            var file = await _botClient.GetFileAsync(payload.FileId, cancellationToken: cancellationToken).ConfigureAwait(false);
+            var destination = Path.Combine(directory, payload.FileName);
 
             await using var fs = IOFile.Create(destination);
-            await _botClient.DownloadFile(file.FilePath!, fs, cancellationToken: cancellationToken).ConfigureAwait(false);
+            await _botClient.DownloadFileAsync(file.FilePath!, fs, cancellationToken).ConfigureAwait(false);
             return destination;
         }
 
@@ -916,14 +912,432 @@ namespace YandexSpeech.services.Telegram
             return user.FirstName;
         }
 
-        private static bool HasAudioPayload(Message message)
+        private static IReadOnlyDictionary<string, object?> ExtractOriginMetadata(MessageOrigin? origin)
         {
-            return message.Voice is not null
-                   || message.Audio is not null
-                   || message.VideoNote is not null
-                   || (message.Document is not null
-                       && !string.IsNullOrWhiteSpace(message.Document.MimeType)
-                       && message.Document.MimeType.StartsWith("audio", StringComparison.OrdinalIgnoreCase));
+            var metadata = new Dictionary<string, object?>();
+            if (origin is null)
+            {
+                return metadata;
+            }
+
+            switch (origin)
+            {
+                case MessageOriginUser user:
+                    metadata["external_reply_origin_type"] = "user";
+                    metadata["external_reply_origin_sender_user_id"] = user.SenderUser?.Id;
+                    metadata["external_reply_origin_sender_user_username"] = user.SenderUser?.Username;
+                    metadata["external_reply_origin_sender_user_full_name"] = BuildFullName(user.SenderUser);
+                    metadata["external_reply_origin_date"] = user.Date.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
+                    break;
+                case MessageOriginHiddenUser hidden:
+                    metadata["external_reply_origin_type"] = "hidden_user";
+                    metadata["external_reply_origin_sender_user_name"] = hidden.SenderUserName;
+                    metadata["external_reply_origin_date"] = hidden.Date.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
+                    break;
+                case MessageOriginChat chat:
+                    metadata["external_reply_origin_type"] = "chat";
+                    metadata["external_reply_origin_sender_chat_id"] = chat.SenderChat?.Id;
+                    metadata["external_reply_origin_sender_chat_username"] = chat.SenderChat?.Username;
+                    metadata["external_reply_origin_sender_chat_title"] = chat.SenderChat?.Title;
+                    metadata["external_reply_origin_author_signature"] = chat.AuthorSignature;
+                    metadata["external_reply_origin_date"] = chat.Date.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
+                    break;
+                case MessageOriginChannel channel:
+                    metadata["external_reply_origin_type"] = "channel";
+                    metadata["external_reply_origin_chat_id"] = channel.Chat.Id;
+                    metadata["external_reply_origin_chat_username"] = channel.Chat.Username;
+                    metadata["external_reply_origin_chat_title"] = channel.Chat.Title;
+                    metadata["external_reply_origin_message_id"] = channel.MessageId;
+                    metadata["external_reply_origin_author_signature"] = channel.AuthorSignature;
+                    metadata["external_reply_origin_date"] = channel.Date.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
+                    break;
+                default:
+                    metadata["external_reply_origin_type"] = origin.GetType().Name;
+                    break;
+            }
+
+            return metadata;
+        }
+
+        private AudioPayload? FindAudioPayload(Message message)
+        {
+            var visitedMessages = new HashSet<int>();
+            Message? current = message;
+
+            while (current is not null)
+            {
+                if (TryCreatePayloadFromMessage(current, out var payload))
+                {
+                    return payload;
+                }
+
+                if (current.ExternalReply is { } externalReply)
+                {
+                    var externalPayload = TryCreatePayloadFromExternalReply(externalReply);
+                    if (externalPayload is not null)
+                    {
+                        return externalPayload;
+                    }
+                }
+
+                if (!visitedMessages.Add(current.MessageId))
+                {
+                    break;
+                }
+
+                current = current.ReplyToMessage;
+            }
+
+            if (message.ExternalReply is { } messageExternalReply)
+            {
+                return TryCreatePayloadFromExternalReply(messageExternalReply);
+            }
+
+            return null;
+        }
+
+        private static bool TryCreatePayloadFromMessage(Message message, out AudioPayload payload)
+        {
+            var source = new MessagePayloadSource(message.Chat?.Id, message.MessageId);
+
+            if (message.Voice is { } voice)
+            {
+                payload = CreateVoicePayload(voice.FileId, voice.FileUniqueId, voice.MimeType, message.Caption, source);
+                return true;
+            }
+
+            if (message.Audio is { } audio)
+            {
+                payload = CreateAudioPayload(audio.FileId, audio.FileUniqueId, audio.FileName, audio.MimeType, message.Caption, source);
+                return true;
+            }
+
+            if (message.VideoNote is { } videoNote)
+            {
+                payload = CreateVideoNotePayload(videoNote.FileId, videoNote.FileUniqueId, message.Caption, source);
+                return true;
+            }
+
+            if (message.Video is { } video)
+            {
+                payload = CreateVideoPayload(video.FileId, video.FileUniqueId, video.MimeType, message.Caption, source);
+                return true;
+            }
+
+            if (message.Document is { } document)
+            {
+                var documentKind = GetDocumentMediaKind(document.FileName, document.MimeType);
+                if (documentKind is not null)
+                {
+                    payload = CreateDocumentPayload(documentKind.Value, document.FileId, document.FileUniqueId, document.FileName, document.MimeType, message.Caption, source);
+                    return true;
+                }
+            }
+
+            payload = default!;
+            return false;
+        }
+
+        private AudioPayload? TryCreatePayloadFromExternalReply(ExternalReplyInfo externalReply)
+        {
+            var originMetadata = ExtractOriginMetadata(externalReply.Origin);
+            var source = new ExternalReplyPayloadSource(externalReply.Chat?.Id, externalReply.MessageId, originMetadata);
+
+            if (externalReply.Voice is { } voice)
+            {
+                return CreateVoicePayload(voice.FileId, voice.FileUniqueId, voice.MimeType, null, source);
+            }
+
+            if (externalReply.Audio is { } audio)
+            {
+                return CreateAudioPayload(audio.FileId, audio.FileUniqueId, audio.FileName, audio.MimeType, null, source);
+            }
+
+            if (externalReply.VideoNote is { } videoNote)
+            {
+                return CreateVideoNotePayload(videoNote.FileId, videoNote.FileUniqueId, null, source);
+            }
+
+            if (externalReply.Video is { } video)
+            {
+                return CreateVideoPayload(video.FileId, video.FileUniqueId, video.MimeType, null, source);
+            }
+
+            if (externalReply.Document is { } document)
+            {
+                var documentKind = GetDocumentMediaKind(document.FileName, document.MimeType);
+                if (documentKind is not null)
+                {
+                    return CreateDocumentPayload(documentKind.Value, document.FileId, document.FileUniqueId, document.FileName, document.MimeType, null, source);
+                }
+            }
+
+            return null;
+        }
+
+        private static AudioPayload CreateVoicePayload(string fileId, string fileUniqueId, string? mimeType, string? caption, PayloadSource source)
+        {
+            var extension = GetDefaultExtension(MediaPayloadKind.Voice, mimeType);
+            var fileName = BuildFileName(null, fileUniqueId, extension);
+            return new AudioPayload(MediaPayloadKind.Voice, fileId, fileName, mimeType, caption, source);
+        }
+
+        private static AudioPayload CreateAudioPayload(string fileId, string fileUniqueId, string? fileName, string? mimeType, string? caption, PayloadSource source)
+        {
+            var extension = GetDefaultExtension(MediaPayloadKind.Audio, mimeType);
+            var resolvedFileName = BuildFileName(fileName, fileUniqueId, extension);
+            return new AudioPayload(MediaPayloadKind.Audio, fileId, resolvedFileName, mimeType, caption, source);
+        }
+
+        private static AudioPayload CreateVideoNotePayload(string fileId, string fileUniqueId, string? caption, PayloadSource source)
+        {
+            var fileName = BuildFileName(null, fileUniqueId, ".mp4");
+            return new AudioPayload(MediaPayloadKind.VideoNote, fileId, fileName, "video/mp4", caption, source);
+        }
+
+        private static AudioPayload CreateVideoPayload(string fileId, string fileUniqueId, string? mimeType, string? caption, PayloadSource source)
+        {
+            var extension = GetDefaultExtension(MediaPayloadKind.Video, mimeType);
+            var fileName = BuildFileName(null, fileUniqueId, extension);
+            return new AudioPayload(MediaPayloadKind.Video, fileId, fileName, mimeType, caption, source);
+        }
+
+        private static AudioPayload CreateDocumentPayload(MediaPayloadKind kind, string fileId, string fileUniqueId, string? fileName, string? mimeType, string? caption, PayloadSource source)
+        {
+            var extension = GetDefaultExtension(kind, mimeType);
+            var resolvedFileName = BuildFileName(fileName, fileUniqueId, extension);
+            return new AudioPayload(kind, fileId, resolvedFileName, mimeType, caption, source);
+        }
+
+        private static MediaPayloadKind? GetDocumentMediaKind(string? fileName, string? mimeType)
+        {
+            if (!string.IsNullOrWhiteSpace(mimeType))
+            {
+                if (mimeType.StartsWith("audio", StringComparison.OrdinalIgnoreCase))
+                {
+                    return MediaPayloadKind.DocumentAudio;
+                }
+
+                if (mimeType.StartsWith("video", StringComparison.OrdinalIgnoreCase))
+                {
+                    return MediaPayloadKind.DocumentVideo;
+                }
+            }
+
+            var extension = Path.GetExtension(fileName ?? string.Empty);
+            if (!string.IsNullOrWhiteSpace(extension))
+            {
+                if (AudioFileExtensions.Contains(extension))
+                {
+                    return MediaPayloadKind.DocumentAudio;
+                }
+
+                if (VideoFileExtensions.Contains(extension))
+                {
+                    return MediaPayloadKind.DocumentVideo;
+                }
+            }
+
+            return null;
+        }
+
+        private static string BuildFileName(string? providedName, string fallbackStem, string defaultExtension)
+        {
+            var candidate = string.IsNullOrWhiteSpace(providedName) ? fallbackStem : Path.GetFileName(providedName);
+            if (string.IsNullOrWhiteSpace(candidate))
+            {
+                candidate = fallbackStem;
+            }
+
+            var sanitized = SanitizeFileName(candidate);
+            if (string.IsNullOrWhiteSpace(Path.GetExtension(sanitized)) && !string.IsNullOrWhiteSpace(defaultExtension))
+            {
+                sanitized = Path.ChangeExtension(sanitized, defaultExtension);
+            }
+
+            return sanitized;
+        }
+
+        private static string GetDefaultExtension(MediaPayloadKind kind, string? mimeType)
+        {
+            if (!string.IsNullOrWhiteSpace(mimeType))
+            {
+                var normalized = mimeType.ToLowerInvariant();
+                if (normalized.Contains("ogg"))
+                {
+                    return ".ogg";
+                }
+
+                if (normalized.Contains("opus"))
+                {
+                    return ".opus";
+                }
+
+                if (normalized.Contains("mpeg") || normalized.Contains("mp3"))
+                {
+                    return ".mp3";
+                }
+
+                if (normalized.Contains("x-m4a") || normalized.Contains("m4a"))
+                {
+                    return ".m4a";
+                }
+
+                if (normalized.Contains("aac"))
+                {
+                    return ".aac";
+                }
+
+                if (normalized.Contains("flac"))
+                {
+                    return ".flac";
+                }
+
+                if (normalized.Contains("wav"))
+                {
+                    return ".wav";
+                }
+
+                if (normalized.Contains("webm"))
+                {
+                    return ".webm";
+                }
+
+                if (normalized.Contains("mp4"))
+                {
+                    return ".mp4";
+                }
+
+                if (normalized.Contains("3gpp") || normalized.Contains("3gp"))
+                {
+                    return ".3gp";
+                }
+            }
+
+            return kind switch
+            {
+                MediaPayloadKind.Voice => ".oga",
+                MediaPayloadKind.Audio => ".mp3",
+                MediaPayloadKind.Video => ".mp4",
+                MediaPayloadKind.VideoNote => ".mp4",
+                MediaPayloadKind.DocumentAudio => ".mp3",
+                MediaPayloadKind.DocumentVideo => ".mp4",
+                _ => ".bin"
+            };
+        }
+
+        private static string SanitizeFileName(string value)
+        {
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var builder = new StringBuilder(value.Length);
+            foreach (var ch in value)
+            {
+                builder.Append(invalidChars.Contains(ch) ? '_' : ch);
+            }
+
+            var sanitized = builder.ToString().Trim();
+            if (string.IsNullOrWhiteSpace(sanitized) || sanitized is "." or "..")
+            {
+                sanitized = Guid.NewGuid().ToString("N");
+            }
+
+            return sanitized;
+        }
+
+        private enum MediaPayloadKind
+        {
+            Voice,
+            Audio,
+            Video,
+            VideoNote,
+            DocumentAudio,
+            DocumentVideo
+        }
+
+        private abstract record PayloadSource(long? ChatIdValue, int? MessageIdValue)
+        {
+            public long? ChatId { get; } = ChatIdValue;
+            public int? MessageId { get; } = MessageIdValue;
+
+            public abstract IReadOnlyDictionary<string, object?> CreateLogContext();
+        }
+
+        private sealed record MessagePayloadSource(long? ChatIdValue, int? MessageIdValue)
+            : PayloadSource(ChatIdValue, MessageIdValue)
+        {
+            public override IReadOnlyDictionary<string, object?> CreateLogContext()
+            {
+                return new Dictionary<string, object?>
+                {
+                    ["audio_source_origin"] = "message",
+                    ["audio_source_message_id"] = MessageId,
+                    ["audio_source_chat_id"] = ChatId
+                };
+            }
+        }
+
+        private sealed record ExternalReplyPayloadSource(
+            long? ChatIdValue,
+            int? MessageIdValue,
+            IReadOnlyDictionary<string, object?> OriginMetadata)
+            : PayloadSource(ChatIdValue, MessageIdValue)
+        {
+            public override IReadOnlyDictionary<string, object?> CreateLogContext()
+            {
+                var context = new Dictionary<string, object?>
+                {
+                    ["audio_source_origin"] = "external_reply",
+                    ["external_reply_message_id"] = MessageId,
+                    ["external_reply_chat_id"] = ChatId
+                };
+
+                foreach (var pair in OriginMetadata)
+                {
+                    context[pair.Key] = pair.Value;
+                }
+
+                return context;
+            }
+        }
+
+        private sealed record AudioPayload(
+            MediaPayloadKind Kind,
+            string FileId,
+            string FileName,
+            string? MimeType,
+            string? Caption,
+            PayloadSource Source)
+        {
+            public Dictionary<string, object?> CreateLogContext()
+            {
+                var context = new Dictionary<string, object?>
+                {
+                    ["audio_source_kind"] = Kind.ToString().ToLowerInvariant(),
+                    ["audio_file_name"] = FileName,
+                    ["audio_file_mime_type"] = MimeType
+                };
+
+                foreach (var pair in Source.CreateLogContext())
+                {
+                    context[pair.Key] = pair.Value;
+                }
+
+                return context;
+            }
+
+            public long? SourceChatId => Source.ChatId;
+            public int? SourceMessageId => Source.MessageId;
+        }
+
+        private static Dictionary<string, object?> MergeLogContexts(Dictionary<string, object?> baseContext, Dictionary<string, object?> additional)
+        {
+            var merged = new Dictionary<string, object?>(baseContext);
+            foreach (var pair in additional)
+            {
+                merged[pair.Key] = pair.Value;
+            }
+
+            return merged;
         }
 
         private static void TryDeleteDirectory(string path)
