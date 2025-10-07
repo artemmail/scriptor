@@ -22,61 +22,78 @@
       </mat-select>
     </mat-form-field>
 
-    <div class="icon-button-group" aria-label="Поворот изображения">
+    <div class="toolbar-divider" role="separator" aria-orientation="vertical"></div>
+
+    <div class="toolbar-group" aria-label="Поворот изображения">
       <button
-        mat-icon-button
+        mat-button
         type="button"
+        class="toolbar-action"
         (click)="rotateRight()"
         matTooltip="Повернуть на 90° против часовой стрелки"
         aria-label="Повернуть на 90 градусов против часовой стрелки"
       >
         <mat-icon>rotate_90_degrees_ccw</mat-icon>
+        <span>90° влево</span>
       </button>
       <button
-        mat-icon-button
+        mat-button
         type="button"
+        class="toolbar-action"
         (click)="rotate180()"
         matTooltip="Повернуть на 180°"
         aria-label="Повернуть на 180 градусов"
       >
         <mat-icon>rotate_left</mat-icon>
+        <span>180°</span>
       </button>
       <button
-        mat-icon-button
+        mat-button
         type="button"
+        class="toolbar-action"
         (click)="rotate270()"
         matTooltip="Повернуть на 90° по часовой стрелке"
         aria-label="Повернуть на 90 градусов по часовой стрелке"
       >
         <mat-icon>rotate_90_degrees_cw</mat-icon>
+        <span>90° вправо</span>
       </button>
     </div>
 
-    <div class="icon-button-group" aria-label="Отражение изображения">
+    <div class="toolbar-divider" role="separator" aria-orientation="vertical"></div>
+
+    <div class="toolbar-group" aria-label="Отражение изображения">
       <button
-        mat-icon-button
+        mat-button
         type="button"
+        class="toolbar-action"
         (click)="flipHorizontally()"
         matTooltip="Отразить по горизонтали"
         aria-label="Отразить изображение по горизонтали"
       >
         <mat-icon>flip</mat-icon>
+        <span>Отразить по горизонтали</span>
       </button>
       <button
-        mat-icon-button
+        mat-button
         type="button"
+        class="toolbar-action"
         (click)="flipVertically()"
         matTooltip="Отразить по вертикали"
         aria-label="Отразить изображение по вертикали"
       >
         <mat-icon>swap_vert</mat-icon>
+        <span>Отразить по вертикали</span>
       </button>
     </div>
 
-    <div class="icon-button-group crop-group" aria-label="Обрезка изображения">
+    <div class="toolbar-divider" role="separator" aria-orientation="vertical"></div>
+
+    <div class="toolbar-group crop-group" aria-label="Обрезка изображения">
       <button
-        mat-icon-button
+        mat-button
         type="button"
+        class="toolbar-action"
         (click)="toggleCrop()"
         [color]="isCropping() ? 'primary' : undefined"
         [class.active]="isCropping()"
@@ -84,30 +101,37 @@
         aria-label="Выделить область для обрезки"
       >
         <mat-icon>crop</mat-icon>
+        <span>Обрезка</span>
       </button>
       <button
         *ngIf="isCropping()"
-        mat-icon-button
+        mat-button
         color="primary"
         type="button"
+        class="toolbar-action"
         (click)="applyCropSelection()"
         matTooltip="Применить обрезку"
         aria-label="Применить обрезку"
       >
         <mat-icon>done</mat-icon>
+        <span>Применить</span>
       </button>
     </div>
 
-    <div class="icon-button-group">
+    <div class="toolbar-divider" role="separator" aria-orientation="vertical"></div>
+
+    <div class="toolbar-group">
       <button
-        mat-icon-button
+        mat-button
         color="warn"
         type="button"
+        class="toolbar-action"
         (click)="reset()"
         matTooltip="Сбросить все изменения"
         aria-label="Сбросить все изменения"
       >
         <mat-icon>refresh</mat-icon>
+        <span>Сбросить</span>
       </button>
     </div>
 
