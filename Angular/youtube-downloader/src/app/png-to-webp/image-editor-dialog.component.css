@@ -30,22 +30,79 @@
 .content {
   flex: 1 1 auto;
   display: flex;
-  flex-direction: row;
-  gap: 24px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 16px;
   min-height: 0;
 }
 
 :host-context(.image-editor-dialog-fullscreen) .content {
-  gap: 32px;
+  gap: 20px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.controls .spacer {
   flex: 1 1 auto;
-  min-height: 0;
+}
+
+.zoom-select {
+  min-width: 180px;
+  flex: 0 0 auto;
+}
+
+.icon-button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.crop-group {
+  flex-wrap: nowrap;
+}
+
+.icon-button-group button.mat-mdc-icon-button {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 8px;
+}
+
+.icon-button-group button.mat-mdc-icon-button .mat-mdc-button-touch-target {
+  width: 40px;
+  height: 40px;
+}
+
+.icon-button-group button.active {
+  background-color: rgba(63, 81, 181, 0.12);
+}
+
+.icon-button-group button[color='warn'] {
+  border-radius: 50%;
+}
+
+.crop-info {
+  font-size: 0.85rem;
+  color: rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(0, 0, 0, 0.6);
 }
 
 .canvas-area {
   position: relative;
-  flex: 1 1 60%;
+  flex: 1 1 auto;
   min-height: 420px;
+  width: 100%;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.12);
@@ -78,85 +135,16 @@
   pointer-events: none;
 }
 
-.toolbar {
-  flex: 1 1 40%;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-:host-context(.image-editor-dialog-fullscreen) .toolbar {
-  flex: 0 0 auto;
-}
-
-.toolbar section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.toolbar h3 {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-.icon-button-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
-.icon-button-group button.mat-mdc-icon-button {
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border-radius: 8px;
-}
-
-.icon-button-group button.mat-mdc-icon-button .mat-mdc-button-touch-target {
-  width: 40px;
-  height: 40px;
-}
-
-.icon-button-group button.active {
-  background-color: rgba(63, 81, 181, 0.12);
-}
-
-.icon-button-group button[color='warn'] {
-  border-radius: 50%;
-}
-
-.crop-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.crop-info {
-  font-size: 0.85rem;
-  color: rgba(0, 0, 0, 0.6);
-}
-
-.hint {
-  margin: 0;
-  font-size: 0.8rem;
-  color: rgba(0, 0, 0, 0.6);
-}
-
 .actions {
   padding-top: 16px;
 }
 
 @media (max-width: 900px) {
-  .content {
-    flex-direction: column;
+  .zoom-select {
+    min-width: 140px;
   }
 
   .canvas-area {
-    width: 100%;
     min-height: 360px;
   }
 }
@@ -168,6 +156,6 @@
   }
 
   :host-context(.image-editor-dialog-fullscreen) .content {
-    gap: 24px;
+    gap: 16px;
   }
 }
