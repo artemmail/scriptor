@@ -1,6 +1,7 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -323,14 +324,14 @@ namespace YandexSpeech.services.Whisper
             var channelType = channel.GetType();
             var declareArgs = new object?[] { queueName, durable, false, false, null };
 
-            var method = channelType.GetMethod("QueueDeclare", new[] { typeof(string), typeof(bool), typeof(bool), typeof(bool), typeof(IDictionary) });
+            var method = GetQueueDeclareMethod(channelType, async: false);
             if (method is not null)
             {
                 method.Invoke(channel, declareArgs);
                 return;
             }
 
-            var asyncMethod = channelType.GetMethod("QueueDeclareAsync", new[] { typeof(string), typeof(bool), typeof(bool), typeof(bool), typeof(IDictionary), typeof(CancellationToken) });
+            var asyncMethod = GetQueueDeclareMethod(channelType, async: true);
             if (asyncMethod is not null)
             {
                 var args = declareArgs.Concat(new object?[] { CancellationToken.None }).ToArray();
@@ -368,6 +369,74 @@ namespace YandexSpeech.services.Whisper
             }
 
             throw new InvalidOperationException("RabbitMQ channel does not expose a supported QueueDeclare method.");
+        }
+
+        private static MethodInfo? GetQueueDeclareMethod(Type channelType, bool async)
+        {
+            var candidates = channelType.GetMethods().Where(m => m.Name == (async ? "QueueDeclareAsync" : "QueueDeclare"));
+
+            foreach (var candidate in candidates)
+            {
+                var parameters = candidate.GetParameters();
+
+                if (!TryMatchQueueDeclareParameters(parameters, async))
+                {
+                    continue;
+                }
+
+                return candidate;
+            }
+
+            return null;
+        }
+
+        private static bool TryMatchQueueDeclareParameters(IReadOnlyList<ParameterInfo> parameters, bool async)
+        {
+            if (async)
+            {
+                if (parameters.Count != 6)
+                {
+                    return false;
+                }
+
+                if (parameters[^1].ParameterType != typeof(CancellationToken))
+                {
+                    return false;
+                }
+
+                parameters = parameters.Take(parameters.Count - 1).ToArray();
+            }
+            else if (parameters.Count != 5)
+            {
+                return false;
+            }
+
+            return parameters[0].ParameterType == typeof(string)
+                   && parameters[1].ParameterType == typeof(bool)
+                   && parameters[2].ParameterType == typeof(bool)
+                   && parameters[3].ParameterType == typeof(bool)
+                   && IsDictionaryParameter(parameters[4].ParameterType);
+        }
+
+        private static bool IsDictionaryParameter(Type parameterType)
+        {
+            if (typeof(IDictionary).IsAssignableFrom(parameterType))
+            {
+                return true;
+            }
+
+            if (parameterType.IsGenericType)
+            {
+                var genericType = parameterType.GetGenericTypeDefinition();
+
+                if (genericType == typeof(IDictionary<,>) || genericType == typeof(IReadOnlyDictionary<,>))
+                {
+                    var genericArguments = parameterType.GetGenericArguments();
+                    return genericArguments[0] == typeof(string);
+                }
+            }
+
+            return false;
         }
 
         public static void BasicQos(object channel, ushort prefetchCount)
