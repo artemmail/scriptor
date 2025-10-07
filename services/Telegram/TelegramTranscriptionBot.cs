@@ -828,8 +828,9 @@ namespace YandexSpeech.services.Telegram
 
         private async Task SetWebhookAsync(string url, IEnumerable<UpdateType>? allowedUpdates, string? secretToken, CancellationToken cancellationToken)
         {
-            var request = new SetWebhookRequest(url)
+            var request = new SetWebhookRequest
             {
+                Url = url,
                 AllowedUpdates = allowedUpdates,
                 SecretToken = secretToken
             };
@@ -851,8 +852,10 @@ namespace YandexSpeech.services.Telegram
 
         private Task<Message> SendTextMessageAsync(ChatId chatId, string text, ReplyParameters? replyParameters, CancellationToken cancellationToken)
         {
-            var request = new SendMessageRequest(chatId, text)
+            var request = new SendMessageRequest
             {
+                ChatId = chatId,
+                Text = text,
                 ReplyParameters = replyParameters
             };
 
@@ -861,14 +864,20 @@ namespace YandexSpeech.services.Telegram
 
         private async Task SendChatActionAsync(ChatId chatId, ChatAction chatAction, CancellationToken cancellationToken)
         {
-            var request = new SendChatActionRequest(chatId, chatAction);
+            var request = new SendChatActionRequest
+            {
+                ChatId = chatId,
+                Action = chatAction
+            };
             await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
         }
 
         private Task<Message> SendDocumentAsync(ChatId chatId, InputFile document, string? caption, CancellationToken cancellationToken)
         {
-            var request = new SendDocumentRequest(chatId, document)
+            var request = new SendDocumentRequest
             {
+                ChatId = chatId,
+                Document = document,
                 Caption = caption
             };
 
@@ -877,19 +886,33 @@ namespace YandexSpeech.services.Telegram
 
         private Task<Message> EditMessageTextAsync(ChatId chatId, int messageId, string text, CancellationToken cancellationToken)
         {
-            var request = new EditMessageTextRequest(chatId, messageId, text);
+            var request = new EditMessageTextRequest
+            {
+                ChatId = chatId,
+                MessageId = messageId,
+                Text = text
+            };
             return RequireClient().MakeRequestAsync(request, cancellationToken);
         }
 
         private async Task DeleteMessageAsync(ChatId chatId, int messageId, CancellationToken cancellationToken)
         {
-            var request = new DeleteMessageRequest(chatId, messageId);
+            var request = new DeleteMessageRequest
+            {
+                ChatId = chatId,
+                MessageId = messageId
+            };
             await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
         }
 
         private Task<Telegram.Bot.Types.File> GetFileAsync(string fileId, CancellationToken cancellationToken)
         {
-            return RequireClient().MakeRequestAsync(new GetFileRequest(fileId), cancellationToken);
+            var request = new GetFileRequest
+            {
+                FileId = fileId
+            };
+
+            return RequireClient().MakeRequestAsync(request, cancellationToken);
         }
 
         private async Task DownloadFileAsync(Telegram.Bot.Types.File file, Stream destination, CancellationToken cancellationToken)
