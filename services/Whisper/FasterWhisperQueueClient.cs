@@ -245,33 +245,25 @@ namespace YandexSpeech.services.Whisper
 
             foreach (var methodName in new[] { "CreateConnectionAsync", "CreateAutorecoveringConnectionAsync" })
             {
-                var asyncMethod = factoryType.GetMethod(methodName, Type.EmptyTypes);
-                if (asyncMethod is not null)
+                foreach (var asyncMethod in factoryType.GetMethods().Where(m => m.Name == methodName))
                 {
-                    var task = asyncMethod.Invoke(factory, Array.Empty<object?>())
-                               ?? throw new InvalidOperationException($"RabbitMQ factory method {methodName} returned null.");
+                    if (!TryInvokeWithOptionalParameters(factory, asyncMethod, out var result))
+                    {
+                        continue;
+                    }
+
+                    var task = result ?? throw new InvalidOperationException($"RabbitMQ factory method {methodName} returned null.");
                     return Await(task);
                 }
             }
 
             foreach (var method in factoryType.GetMethods().Where(m => m.Name == "CreateConnection"))
             {
-                var parameters = method.GetParameters();
-                object?[] args;
-                if (parameters.Length == 0)
-                {
-                    args = Array.Empty<object?>();
-                }
-                else if (parameters.Length == 1 && parameters[0].ParameterType == typeof(string))
-                {
-                    args = new object?[] { null };
-                }
-                else
+                if (!TryInvokeWithOptionalParameters(factory, method, out var result))
                 {
                     continue;
                 }
 
-                var result = method.Invoke(factory, args);
                 if (result is not null)
                 {
                     return result;
@@ -290,21 +282,27 @@ namespace YandexSpeech.services.Whisper
 
             foreach (var methodName in new[] { "CreateChannelAsync", "CreateModelAsync" })
             {
-                var asyncMethod = connectionType.GetMethod(methodName, Type.EmptyTypes);
-                if (asyncMethod is not null)
+                foreach (var asyncMethod in connectionType.GetMethods().Where(m => m.Name == methodName))
                 {
-                    var task = asyncMethod.Invoke(connection, Array.Empty<object?>())
-                               ?? throw new InvalidOperationException($"RabbitMQ connection method {methodName} returned null.");
+                    if (!TryInvokeWithOptionalParameters(connection, asyncMethod, out var result))
+                    {
+                        continue;
+                    }
+
+                    var task = result ?? throw new InvalidOperationException($"RabbitMQ connection method {methodName} returned null.");
                     return Await(task);
                 }
             }
 
             foreach (var methodName in new[] { "CreateChannel", "CreateModel" })
             {
-                var method = connectionType.GetMethod(methodName, Type.EmptyTypes);
-                if (method is not null)
+                foreach (var method in connectionType.GetMethods().Where(m => m.Name == methodName))
                 {
-                    var result = method.Invoke(connection, Array.Empty<object?>());
+                    if (!TryInvokeWithOptionalParameters(connection, method, out var result))
+                    {
+                        continue;
+                    }
+
                     if (result is not null)
                     {
                         return result;
@@ -740,6 +738,54 @@ namespace YandexSpeech.services.Whisper
             }
 
             return body;
+        }
+
+        private static bool TryInvokeWithOptionalParameters(object instance, MethodInfo method, out object? result)
+        {
+            if (instance is null)
+                throw new ArgumentNullException(nameof(instance));
+            if (method is null)
+                throw new ArgumentNullException(nameof(method));
+
+            var parameters = method.GetParameters();
+            if (parameters.Length == 0)
+            {
+                result = method.Invoke(instance, Array.Empty<object?>());
+                return true;
+            }
+
+            var args = new object?[parameters.Length];
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                var parameter = parameters[i];
+
+                if (parameter.HasDefaultValue)
+                {
+                    args[i] = parameter.DefaultValue;
+                }
+                else if (parameter.ParameterType == typeof(string))
+                {
+                    args[i] = null;
+                }
+                else if (parameter.ParameterType == typeof(CancellationToken))
+                {
+                    args[i] = CancellationToken.None;
+                }
+                else if (parameter.IsOptional)
+                {
+                    args[i] = parameter.ParameterType.IsValueType
+                        ? Activator.CreateInstance(parameter.ParameterType)
+                        : null;
+                }
+                else
+                {
+                    result = null;
+                    return false;
+                }
+            }
+
+            result = method.Invoke(instance, args);
+            return true;
         }
 
         private static object Await(object task)
