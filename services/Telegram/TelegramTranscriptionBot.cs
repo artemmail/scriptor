@@ -50,32 +50,16 @@ namespace YandexSpeech.services.Telegram
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
 
+        // ⬇️ Расширено: больше реальных аудио-расширений (часто прилетают с octet-stream)
         private static readonly HashSet<string> AudioFileExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            ".aac",
-            ".amr",
-            ".flac",
-            ".m4a",
-            ".mp3",
-            ".oga",
-            ".ogg",
-            ".opus",
-            ".wav",
-            ".weba",
-            ".wma"
+            ".aac",".amr",".flac",".m4a",".m4b",".mp3",".mpga",".oga",".ogg",".opus",
+            ".wav",".weba",".wma",".caf"
         };
 
         private static readonly HashSet<string> VideoFileExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            ".3gp",
-            ".avi",
-            ".m4v",
-            ".mkv",
-            ".mov",
-            ".mp4",
-            ".mpeg",
-            ".mpg",
-            ".webm"
+            ".3gp",".3gpp",".avi",".m4v",".mkv",".mov",".mp4",".mpeg",".mpg",".webm"
         };
 
         private CancellationToken _stoppingToken = CancellationToken.None;
@@ -480,7 +464,8 @@ namespace YandexSpeech.services.Telegram
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to process audio payload {MessageId}.", audioPayload.SourceMessageId);
-                var errorText = $"⚠️ Ошибка: {ex.Message}";
+                var errorHint = "⚠️ Ошибка обработки. Возможно, это не аудио/видео или формат не поддерживается.";
+                var errorText = $"{errorHint}\n{ex.Message}";
                 await EditStatusAsync(status, errorText, cancellationToken).ConfigureAwait(false);
                 LogEvent("error", triggerMessage, ex.Message, logExtra);
             }
@@ -856,7 +841,6 @@ namespace YandexSpeech.services.Telegram
                 .ConfigureAwait(false);
         }
 
-
         private Task<Message> SendDocumentAsync(ChatId chatId, InputFile document, string? caption, CancellationToken cancellationToken)
         {
             return RequireClient().SendDocument(
@@ -1146,6 +1130,13 @@ namespace YandexSpeech.services.Telegram
                     payload = CreateDocumentPayload(documentKind.Value, document.FileId, document.FileUniqueId, document.FileName, document.MimeType, message.Caption, source);
                     return true;
                 }
+
+                // ⬇️ Фолбэк: octet-stream без расширения — пробуем как аудио
+                if (IsOctetStream(document.MimeType))
+                {
+                    payload = CreateDocumentPayload(MediaPayloadKind.DocumentAudio, document.FileId, document.FileUniqueId, document.FileName, document.MimeType, message.Caption, source);
+                    return true;
+                }
             }
 
             payload = default!;
@@ -1183,6 +1174,12 @@ namespace YandexSpeech.services.Telegram
                 if (documentKind is not null)
                 {
                     return CreateDocumentPayload(documentKind.Value, document.FileId, document.FileUniqueId, document.FileName, document.MimeType, null, source);
+                }
+
+                // ⬇️ Фолбэк: octet-stream без расширения — пробуем как аудио
+                if (IsOctetStream(document.MimeType))
+                {
+                    return CreateDocumentPayload(MediaPayloadKind.DocumentAudio, document.FileId, document.FileUniqueId, document.FileName, document.MimeType, null, source);
                 }
             }
 
@@ -1223,35 +1220,35 @@ namespace YandexSpeech.services.Telegram
             return new AudioPayload(kind, fileId, resolvedFileName, mimeType, caption, source);
         }
 
+        // ⬇️ Новый помощник: распознаём application/octet-stream
+        private static bool IsOctetStream(string? mimeType) =>
+            string.Equals(mimeType, "application/octet-stream", StringComparison.OrdinalIgnoreCase);
+
+        // ⬇️ Устойчивое определение медиа-типа документа
         private static MediaPayloadKind? GetDocumentMediaKind(string? fileName, string? mimeType)
         {
-            if (!string.IsNullOrWhiteSpace(mimeType))
+            // 1) Явные audio/* или video/* — принимаем сразу
+            if (!string.IsNullOrWhiteSpace(mimeType) && !IsOctetStream(mimeType))
             {
                 if (mimeType.StartsWith("audio", StringComparison.OrdinalIgnoreCase))
-                {
                     return MediaPayloadKind.DocumentAudio;
-                }
 
                 if (mimeType.StartsWith("video", StringComparison.OrdinalIgnoreCase))
-                {
                     return MediaPayloadKind.DocumentVideo;
-                }
             }
 
+            // 2) Для octet-stream (и любых странных mime) — проверяем расширение
             var extension = Path.GetExtension(fileName ?? string.Empty);
             if (!string.IsNullOrWhiteSpace(extension))
             {
                 if (AudioFileExtensions.Contains(extension))
-                {
                     return MediaPayloadKind.DocumentAudio;
-                }
 
                 if (VideoFileExtensions.Contains(extension))
-                {
                     return MediaPayloadKind.DocumentVideo;
-                }
             }
 
+            // 3) Не удалось определить
             return null;
         }
 
@@ -1277,60 +1274,17 @@ namespace YandexSpeech.services.Telegram
             if (!string.IsNullOrWhiteSpace(mimeType))
             {
                 var normalized = mimeType.ToLowerInvariant();
-                if (normalized.Contains("ogg"))
-                {
-                    return ".ogg";
-                }
-
-                if (normalized.Contains("opus"))
-                {
-                    return ".opus";
-                }
-
-                if (normalized.Contains("mpeg") || normalized.Contains("mp3"))
-                {
-                    return ".mp3";
-                }
-
-                if (normalized.Contains("x-m4a") || normalized.Contains("m4a"))
-                {
-                    return ".m4a";
-                }
-
-                if (normalized.Contains("aac"))
-                {
-                    return ".aac";
-                }
-
-                if (normalized.Contains("amr"))
-                {
-                    return ".amr";
-                }
-
-                if (normalized.Contains("flac"))
-                {
-                    return ".flac";
-                }
-
-                if (normalized.Contains("wav"))
-                {
-                    return ".wav";
-                }
-
-                if (normalized.Contains("webm"))
-                {
-                    return ".webm";
-                }
-
-                if (normalized.Contains("mp4"))
-                {
-                    return ".mp4";
-                }
-
-                if (normalized.Contains("3gpp") || normalized.Contains("3gp"))
-                {
-                    return ".3gp";
-                }
+                if (normalized.Contains("ogg")) return ".ogg";
+                if (normalized.Contains("opus")) return ".opus";
+                if (normalized.Contains("mpeg") || normalized.Contains("mp3")) return ".mp3";
+                if (normalized.Contains("x-m4a") || normalized.Contains("m4a")) return ".m4a";
+                if (normalized.Contains("aac")) return ".aac";
+                if (normalized.Contains("amr")) return ".amr";
+                if (normalized.Contains("flac")) return ".flac";
+                if (normalized.Contains("wav")) return ".wav";
+                if (normalized.Contains("webm")) return ".webm";
+                if (normalized.Contains("mp4")) return ".mp4";
+                if (normalized.Contains("3gpp") || normalized.Contains("3gp")) return ".3gp";
             }
 
             return kind switch
