@@ -714,7 +714,7 @@ namespace YandexSpeech.services.Whisper
                 {
                     var spanValue = spanProperty.GetValue(body);
                     var toArray = typeof(MemoryMarshal).GetMethods(BindingFlags.Public | BindingFlags.Static)
-                        .FirstOrDefault(m => m.Name == nameof(MemoryMarshal.ToArray) && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
+                        .FirstOrDefault(m => m.Name == "ToArray" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
                         ?.MakeGenericMethod(typeof(byte));
                     if (toArray is not null && toArray.Invoke(null, new[] { spanValue }) is byte[] spanResult)
                     {
