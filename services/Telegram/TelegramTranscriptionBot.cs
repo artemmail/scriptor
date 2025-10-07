@@ -905,7 +905,7 @@ namespace YandexSpeech.services.Telegram
             await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
         }
 
-        private Task<Telegram.Bot.Types.File> GetFileAsync(string fileId, CancellationToken cancellationToken)
+        private Task<global::Telegram.Bot.Types.File> GetFileAsync(string fileId, CancellationToken cancellationToken)
         {
             var request = new GetFileRequest
             {
@@ -915,7 +915,7 @@ namespace YandexSpeech.services.Telegram
             return RequireClient().MakeRequestAsync(request, cancellationToken);
         }
 
-        private async Task DownloadFileAsync(Telegram.Bot.Types.File file, Stream destination, CancellationToken cancellationToken)
+        private async Task DownloadFileAsync(global::Telegram.Bot.Types.File file, Stream destination, CancellationToken cancellationToken)
         {
             if (file.FilePath is null)
             {
