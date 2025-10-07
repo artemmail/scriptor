@@ -18,9 +18,13 @@ namespace YandexSpeech.services.Whisper
         private readonly ILogger<FasterWhisperQueueClient> _logger;
         private readonly EventBusOptions _options;
         private readonly ConcurrentDictionary<string, TaskCompletionSource<FasterWhisperQueueResponse>> _pending = new();
+
         private readonly IConnection _connection;
         private readonly IChannel _channel;
-        private readonly object _channelLock = new();
+
+        // ќдин семафор дл€ всех операций с каналом (publish/get/ack).
+        private readonly SemaphoreSlim _channelSync = new(1, 1);
+
         private readonly CancellationTokenSource _receiverCts = new();
         private readonly Task _receiverTask;
 
@@ -34,11 +38,12 @@ namespace YandexSpeech.services.Whisper
 
             var factory = CreateFactory(access, _options.Broker);
             _connection = CreateConnection(factory);
-            _channel = CreateChannel(_connection);
+            _channel = _connection.CreateChannelAsync().Result;
 
-            _channel.QueueDeclare(_options.CommandQueueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
-            _channel.QueueDeclare(_options.QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
-            _channel.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
+            // ƒекларации и QoS (синхронно дожидаемс€, т.к. конструктор не async)
+            _channel.QueueDeclareAsync(_options.CommandQueueName, durable: true, exclusive: false, autoDelete: false, arguments: null).Wait();
+            _channel.QueueDeclareAsync(_options.QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null).Wait();
+            _channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false).Wait();
 
             _receiverTask = Task.Run(() => PollResponsesAsync(_receiverCts.Token));
 
@@ -55,11 +60,15 @@ namespace YandexSpeech.services.Whisper
 
             var correlationId = Guid.NewGuid().ToString("N");
             var body = JsonSerializer.SerializeToUtf8Bytes(request, JsonOptions);
-            var props = _channel.CreateBasicProperties();
-            props.Persistent = true;
-            props.DeliveryMode = 2;
-            props.CorrelationId = correlationId;
-            props.ReplyTo = _options.QueueName;
+
+            // v7: больше нет IChannel.CreateBasicProperties() Ч создаЄм напр€мую BasicProperties
+            var props = new BasicProperties
+            {
+                Persistent = true,               // или props.DeliveryMode = DeliveryModes.Persistent;
+                CorrelationId = correlationId,
+                ReplyTo = _options.QueueName,
+                ContentType = "application/json"
+            };
 
             var tcs = new TaskCompletionSource<FasterWhisperQueueResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
             if (!_pending.TryAdd(correlationId, tcs))
@@ -67,13 +76,22 @@ namespace YandexSpeech.services.Whisper
 
             try
             {
-                lock (_channelLock)
+                //  анал нельз€ шарить конкурентно Ч защищаем publish семафором и ожидаем внутри
+                await _channelSync.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
                 {
-                    _channel.BasicPublish(
+                    await _channel.BasicPublishAsync(
                         exchange: string.Empty,
                         routingKey: _options.CommandQueueName,
+                        mandatory: false,
                         basicProperties: props,
-                        body: body);
+                        body: body,
+                        cancellationToken: cancellationToken
+                    ).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _channelSync.Release();
                 }
             }
             catch
@@ -96,13 +114,23 @@ namespace YandexSpeech.services.Whisper
             while (!cancellationToken.IsCancellationRequested)
             {
                 RabbitMqMessage? message = null;
+
                 try
                 {
-                    var result = _channel.BasicGet(_options.QueueName, autoAck: false);
-                    if (result is not null)
+                    // “оже под тем же семафором Ч pull API использует тот же канал.
+                    await _channelSync.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    try
                     {
-                        var body = result.Body.ToArray();
-                        message = new RabbitMqMessage(body, result.BasicProperties, result.DeliveryTag);
+                        var result = await _channel.BasicGetAsync(_options.QueueName, autoAck: false).ConfigureAwait(false);
+                        if (result is not null)
+                        {
+                            var body = result.Body.ToArray(); // ReadOnlyMemory<byte> -> byte[]
+                            message = new RabbitMqMessage(body, result.BasicProperties, result.DeliveryTag);
+                        }
+                    }
+                    finally
+                    {
+                        _channelSync.Release();
                     }
                 }
                 catch (OperationCanceledException)
@@ -122,11 +150,11 @@ namespace YandexSpeech.services.Whisper
                     continue;
                 }
 
-                HandleResponse(message);
+                await HandleResponse(message).ConfigureAwait(false);
             }
         }
 
-        private void HandleResponse(RabbitMqMessage delivery)
+        private async Task HandleResponse(RabbitMqMessage delivery)
         {
             TaskCompletionSource<FasterWhisperQueueResponse>? pending = null;
             string? correlationId = null;
@@ -151,9 +179,15 @@ namespace YandexSpeech.services.Whisper
             }
             finally
             {
-                lock (_channelLock)
+                // Ack тоже под семафором
+                await _channelSync.WaitAsync().ConfigureAwait(false);
+                try
                 {
-                    _channel.BasicAck(delivery.DeliveryTag, multiple: false);
+                    await _channel.BasicAckAsync(delivery.DeliveryTag, multiple: false).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _channelSync.Release();
                 }
             }
         }
@@ -175,6 +209,7 @@ namespace YandexSpeech.services.Whisper
             finally
             {
                 _receiverCts.Dispose();
+                _channelSync.Dispose();
             }
 
             await DisposeSafelyAsync(_channel).ConfigureAwait(false);
@@ -201,11 +236,6 @@ namespace YandexSpeech.services.Whisper
         private static IConnection CreateConnection(ConnectionFactory factory)
             => factory.CreateConnectionAsync().GetAwaiter().GetResult();
 
-        private static IChannel CreateChannel(IConnection connection)
-        {
-            return connection.CreateChannel();
-        }
-
         private static ValueTask DisposeSafelyAsync(IDisposable? disposable)
         {
             if (disposable is null)
@@ -226,7 +256,8 @@ namespace YandexSpeech.services.Whisper
         }
     }
 
-    internal sealed record RabbitMqMessage(byte[] Body, IBasicProperties? Properties, ulong DeliveryTag);
+    // v7: BasicGetResult.BasicProperties -> IReadOnlyBasicProperties
+    internal sealed record RabbitMqMessage(byte[] Body, IReadOnlyBasicProperties? Properties, ulong DeliveryTag);
 
     public sealed record FasterWhisperQueueRequest
     {
