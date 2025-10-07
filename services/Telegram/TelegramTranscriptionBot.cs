@@ -905,28 +905,28 @@ namespace YandexSpeech.services.Telegram
             await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
         }
 
-        private Task<global::Telegram.Bot.Types.File> GetFileAsync(string fileId, CancellationToken cancellationToken)
+        private async Task<object> GetFileAsync(string fileId, CancellationToken cancellationToken)
         {
             var request = new GetFileRequest
             {
                 FileId = fileId
             };
 
-            return RequireClient().MakeRequestAsync(request, cancellationToken);
+            var file = await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
+            return file ?? throw new InvalidOperationException("Telegram GetFile request returned null.");
         }
 
-        private async Task DownloadFileAsync(global::Telegram.Bot.Types.File file, Stream destination, CancellationToken cancellationToken)
+        private async Task DownloadFileAsync(object file, Stream destination, CancellationToken cancellationToken)
         {
-            if (file.FilePath is null)
-            {
-                throw new InvalidOperationException("Telegram response did not include a file path.");
-            }
+            var fileType = file?.GetType() ?? throw new InvalidOperationException("Telegram file instance was null.");
+            var filePath = fileType.GetProperty("FilePath")?.GetValue(file) as string
+                          ?? throw new InvalidOperationException("Telegram response did not include a file path.");
 
             var token = _botToken ?? throw new InvalidOperationException("Telegram bot token is not available.");
             var baseUrl = _apiBaseUrl.EndsWith("/file", StringComparison.OrdinalIgnoreCase)
                 ? _apiBaseUrl
                 : _apiBaseUrl + "/file";
-            var requestUri = $"{baseUrl}/bot{token}/{file.FilePath}";
+            var requestUri = $"{baseUrl}/bot{token}/{filePath}";
 
             var client = _httpClientFactory.CreateClient(nameof(TelegramTranscriptionBot) + ".Files");
             using var response = await client.GetAsync(requestUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken)

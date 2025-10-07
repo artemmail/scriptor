@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using YandexSpeech.services.Options;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace YandexSpeech.services.Whisper
 {
@@ -696,16 +697,29 @@ namespace YandexSpeech.services.Whisper
                 }
             }
 
+            var toArrayMethod = type.GetMethod("ToArray", Type.EmptyTypes);
+            if (toArrayMethod is not null)
+            {
+                if (toArrayMethod.Invoke(body, Array.Empty<object?>()) is byte[] result)
+                {
+                    return result;
+                }
+            }
+
             var spanProperty = type.GetProperty("Span");
             if (spanProperty is not null)
             {
-                var spanValue = spanProperty.GetValue(body);
-                switch (spanValue)
+                var spanType = spanProperty.PropertyType;
+                if (spanType.FullName == "System.ReadOnlySpan`1[System.Byte]" || spanType.FullName == "System.Span`1[System.Byte]")
                 {
-                    case ReadOnlySpan<byte> ros:
-                        return ros.ToArray();
-                    case Span<byte> span:
-                        return span.ToArray();
+                    var spanValue = spanProperty.GetValue(body);
+                    var toArray = typeof(MemoryMarshal).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                        .FirstOrDefault(m => m.Name == nameof(MemoryMarshal.ToArray) && m.IsGenericMethodDefinition && m.GetParameters().Length == 1)
+                        ?.MakeGenericMethod(typeof(byte));
+                    if (toArray is not null && toArray.Invoke(null, new[] { spanValue }) is byte[] spanResult)
+                    {
+                        return spanResult;
+                    }
                 }
             }
 
@@ -719,14 +733,10 @@ namespace YandexSpeech.services.Whisper
                 return body;
             }
 
-            if (parameterType == typeof(ReadOnlyMemory<byte>) || parameterType.FullName == "System.ReadOnlyMemory`1[System.Byte]")
+            if (parameterType == typeof(ReadOnlyMemory<byte>) ||
+                parameterType.FullName == "System.ReadOnlyMemory`1[System.Byte]")
             {
                 return bodyMemory;
-            }
-
-            if (parameterType == typeof(ReadOnlySpan<byte>) || parameterType.FullName == "System.ReadOnlySpan`1[System.Byte]")
-            {
-                return bodyMemory.Span;
             }
 
             return body;
