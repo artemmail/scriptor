@@ -1,28 +1,19 @@
-using System;
-using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 using System.Globalization;
-using System.IO;
-using System.Linq;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using System.Net.Http;
-using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using YandexSpeech.services.Interface;
 using YandexSpeech.services.Options;
 using YandexSpeech.services.Whisper;
-using System.Text.RegularExpressions;
 using IOFile = System.IO.File;
+using TGFile = Telegram.Bot.Types.TGFile;
 
 namespace YandexSpeech.services.Telegram
 {
@@ -359,7 +350,7 @@ namespace YandexSpeech.services.Telegram
                     await SendTextMessageAsync(
                             message.Chat.Id,
                             "Пришлите voice или аудиофайл — распознаю локально (GPU).",
-                            new ReplyParameters { MessageId = message.MessageId },
+                            new ReplyParameters { MessageId = message.Id },
                             cancellationToken)
                         .ConfigureAwait(false);
                     break;
@@ -368,7 +359,7 @@ namespace YandexSpeech.services.Telegram
                     await SendTextMessageAsync(
                             message.Chat.Id,
                             info,
-                            new ReplyParameters { MessageId = message.MessageId },
+                            new ReplyParameters { MessageId = message.Id },
                             cancellationToken)
                         .ConfigureAwait(false);
                     break;
@@ -396,7 +387,7 @@ namespace YandexSpeech.services.Telegram
                 status = await SendTextMessageAsync(
                         triggerMessage.Chat.Id,
                         "⏳ Обрабатываю…",
-                        new ReplyParameters { MessageId = triggerMessage.MessageId },
+                        new ReplyParameters { MessageId = triggerMessage.Id },
                         cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -812,20 +803,20 @@ namespace YandexSpeech.services.Telegram
 
         private Task<User> GetMeAsync(CancellationToken cancellationToken)
         {
-            return RequireClient().GetMeAsync(cancellationToken);
+            return RequireClient().GetMe(cancellationToken);
         }
 
         private async Task DeleteWebhookAsync(bool dropPendingUpdates, CancellationToken cancellationToken)
         {
             await RequireClient()
-                .DeleteWebhookAsync(dropPendingUpdates: dropPendingUpdates, cancellationToken: cancellationToken)
+                .DeleteWebhook(dropPendingUpdates: dropPendingUpdates, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         }
 
         private async Task SetWebhookAsync(string url, IEnumerable<UpdateType>? allowedUpdates, string? secretToken, CancellationToken cancellationToken)
         {
             await RequireClient()
-                .SetWebhookAsync(
+                .SetWebhook(
                     url: url,
                     allowedUpdates: allowedUpdates,
                     secretToken: secretToken,
@@ -835,7 +826,7 @@ namespace YandexSpeech.services.Telegram
 
         private Task<Update[]> GetUpdatesAsync(int offset, int timeout, IEnumerable<UpdateType>? allowedUpdates, CancellationToken cancellationToken)
         {
-            return RequireClient().GetUpdatesAsync(
+            return RequireClient().GetUpdates(
                 offset: offset,
                 timeout: timeout,
                 allowedUpdates: allowedUpdates,
@@ -853,8 +844,18 @@ namespace YandexSpeech.services.Telegram
 
         private async Task SendChatActionAsync(ChatId chatId, ChatAction chatAction, CancellationToken cancellationToken)
         {
-            await RequireClient().SendChatActionAsync(chatId, chatAction, cancellationToken).ConfigureAwait(false);
+            await RequireClient()
+                .SendChatAction(chatId, action: chatAction, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
         }
+
+        private async Task DeleteMessageAsync(ChatId chatId, int messageId, CancellationToken cancellationToken)
+        {
+            await RequireClient()
+                .DeleteMessage(chatId, messageId, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        }
+
 
         private Task<Message> SendDocumentAsync(ChatId chatId, InputFile document, string? caption, CancellationToken cancellationToken)
         {
@@ -867,25 +868,20 @@ namespace YandexSpeech.services.Telegram
 
         private Task<Message> EditMessageTextAsync(ChatId chatId, int messageId, string text, CancellationToken cancellationToken)
         {
-            return RequireClient().EditMessageTextAsync(
+            return RequireClient().EditMessageText(
                 chatId: chatId,
                 messageId: messageId,
                 text: text,
                 cancellationToken: cancellationToken);
         }
 
-        private async Task DeleteMessageAsync(ChatId chatId, int messageId, CancellationToken cancellationToken)
+        private async Task<TGFile> GetFileAsync(string fileId, CancellationToken cancellationToken)
         {
-            await RequireClient().DeleteMessageAsync(chatId, messageId, cancellationToken).ConfigureAwait(false);
-        }
-
-        private async Task<File> GetFileAsync(string fileId, CancellationToken cancellationToken)
-        {
-            var file = await RequireClient().GetFileAsync(fileId, cancellationToken).ConfigureAwait(false);
+            var file = await RequireClient().GetFile(fileId, cancellationToken).ConfigureAwait(false);
             return file ?? throw new InvalidOperationException("Telegram GetFile request returned null.");
         }
 
-        private async Task DownloadFileAsync(File file, Stream destination, CancellationToken cancellationToken)
+        private async Task DownloadFileAsync(TGFile file, Stream destination, CancellationToken cancellationToken)
         {
             var filePath = file?.FilePath ?? throw new InvalidOperationException("Telegram response did not include a file path.");
 
@@ -945,12 +941,12 @@ namespace YandexSpeech.services.Telegram
 
             try
             {
-                await EditMessageTextAsync(status.Chat.Id, status.MessageId, text, cancellationToken)
+                await EditMessageTextAsync(status.Chat.Id, status.Id, text, cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogDebug(ex, "Failed to edit Telegram status message {MessageId}.", status.MessageId);
+                _logger.LogDebug(ex, "Failed to edit Telegram status message {MessageId}.", status.Id);
             }
         }
 
@@ -963,11 +959,11 @@ namespace YandexSpeech.services.Telegram
 
             try
             {
-                await DeleteMessageAsync(status.Chat.Id, status.MessageId, cancellationToken).ConfigureAwait(false);
+                await DeleteMessageAsync(status.Chat.Id, status.Id, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogDebug(ex, "Failed to delete Telegram status message {MessageId}.", status.MessageId);
+                _logger.LogDebug(ex, "Failed to delete Telegram status message {MessageId}.", status.Id);
             }
         }
 
@@ -1098,7 +1094,7 @@ namespace YandexSpeech.services.Telegram
                     }
                 }
 
-                if (!visitedMessages.Add(current.MessageId))
+                if (!visitedMessages.Add(current.Id))
                 {
                     break;
                 }
@@ -1116,7 +1112,7 @@ namespace YandexSpeech.services.Telegram
 
         private static bool TryCreatePayloadFromMessage(Message message, out AudioPayload payload)
         {
-            var source = new MessagePayloadSource(message.Chat?.Id, message.MessageId);
+            var source = new MessagePayloadSource(message.Chat?.Id, message.Id);
 
             if (message.Voice is { } voice)
             {
