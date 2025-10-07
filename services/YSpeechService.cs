@@ -107,7 +107,7 @@ namespace YandexSpeech.services
 
                 // Если в бакете много объектов, переходим к следующей "странице" с данными
                 listRequest.ContinuationToken = listResponse.NextContinuationToken;
-            } while (listResponse.IsTruncated);
+            } while (listResponse.IsTruncated ?? false);
         }
 
         public async Task<Tokens> GetKeys(string IAMTOKEN)

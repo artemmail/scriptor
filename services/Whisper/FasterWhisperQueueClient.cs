@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -21,7 +20,7 @@ namespace YandexSpeech.services.Whisper
         private readonly EventBusOptions _options;
         private readonly ConcurrentDictionary<string, TaskCompletionSource<FasterWhisperQueueResponse>> _pending = new();
         private readonly IConnection _connection;
-        private readonly IChannel _channel;
+        private readonly IModel _channel;
         private readonly object _channelLock = new();
 
         public FasterWhisperQueueClient(IOptions<EventBusOptions> options, ILogger<FasterWhisperQueueClient> logger)
@@ -43,8 +42,8 @@ namespace YandexSpeech.services.Whisper
 
             var clientName = string.IsNullOrWhiteSpace(_options.Broker) ? "faster-whisper" : _options.Broker;
             TrySetClientProvidedName(factory, clientName);
-            _connection = CreateConnection(factory);
-            _channel = CreateChannel(_connection);
+            _connection = factory.CreateConnection();
+            _channel = _connection.CreateModel();
 
             _channel.QueueDeclare(queue: _options.CommandQueueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
             _channel.QueueDeclare(queue: _options.QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
@@ -107,7 +106,7 @@ namespace YandexSpeech.services.Whisper
                 if (string.IsNullOrEmpty(correlationId) || !_pending.TryRemove(correlationId, out pending))
                 {
                     _logger.LogWarning("Received unexpected FasterWhisper response with correlation id {CorrelationId}", correlationId);
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 var json = Encoding.UTF8.GetString(args.Body.Span);
@@ -142,79 +141,6 @@ namespace YandexSpeech.services.Whisper
             {
                 property.SetValue(factory, clientName);
             }
-        }
-
-        private static IConnection CreateConnection(ConnectionFactory factory)
-        {
-            var nameProperty = typeof(ConnectionFactory).GetProperty("ClientProvidedName");
-            var clientName = nameProperty?.GetValue(factory) as string ?? string.Empty;
-
-            foreach (var method in typeof(ConnectionFactory).GetMethods().Where(m => m.Name is "CreateConnection" or "CreateConnectionAsync"))
-            {
-                var parameters = method.GetParameters();
-                var arguments = new object?[parameters.Length];
-                for (var i = 0; i < parameters.Length; i++)
-                {
-                    var parameter = parameters[i];
-                    if (parameter.ParameterType == typeof(string))
-                    {
-                        arguments[i] = clientName;
-                    }
-                    else if (parameter.ParameterType == typeof(CancellationToken))
-                    {
-                        arguments[i] = CancellationToken.None;
-                    }
-                    else if (parameter.ParameterType == typeof(bool))
-                    {
-                        arguments[i] = true;
-                    }
-                    else if (parameter.HasDefaultValue)
-                    {
-                        arguments[i] = parameter.DefaultValue;
-                    }
-                    else
-                    {
-                        arguments[i] = null;
-                    }
-                }
-
-                var result = method.Invoke(factory, arguments);
-                switch (result)
-                {
-                    case IConnection connection:
-                        return connection;
-                    case Task<IConnection> task:
-                        return task.GetAwaiter().GetResult();
-                    case ValueTask<IConnection> valueTask:
-                        return valueTask.GetAwaiter().GetResult();
-                }
-            }
-
-            throw new NotSupportedException("RabbitMQ ConnectionFactory does not expose a supported CreateConnection method.");
-        }
-
-        private static IChannel CreateChannel(IConnection connection)
-        {
-            foreach (var method in connection.GetType().GetMethods().Where(m => m.Name is "CreateChannel" or "CreateModel"))
-            {
-                if (method.GetParameters().Length != 0)
-                {
-                    continue;
-                }
-
-                var result = method.Invoke(connection, Array.Empty<object?>());
-                switch (result)
-                {
-                    case IChannel channel:
-                        return channel;
-                    case Task<IChannel> task:
-                        return task.GetAwaiter().GetResult();
-                    case ValueTask<IChannel> valueTask:
-                        return valueTask.GetAwaiter().GetResult();
-                }
-            }
-
-            throw new NotSupportedException("RabbitMQ connection does not expose a supported channel creation method.");
         }
 
         private static async ValueTask DisposeSafelyAsync(object? disposable)

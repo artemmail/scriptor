@@ -16,6 +16,7 @@ using Microsoft.Extensions.Options;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using Telegram.Bot;
+using Telegram.Bot.Requests;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using YandexSpeech.services.Interface;
@@ -50,6 +51,7 @@ namespace YandexSpeech.services.Telegram
         private const string DefaultOpenAiModel = "gpt-4.1";
         private const int DefaultSummaryThreshold = 70;
         private const string OpenAiEndpoint = "https://api.openai.com/v1/chat/completions";
+        private const string DefaultTelegramApiBaseUrl = "https://api.telegram.org";
         private const string OpenAiSystemPrompt =
             """You are a meticulous editor for Telegram voice transcriptions. Fix punctuation, casing, and obvious ASR mistakes without adding content. Keep the input language. Output JSON with fields: polished, summary.""";
 
@@ -88,7 +90,9 @@ namespace YandexSpeech.services.Telegram
 
         private CancellationToken _stoppingToken = CancellationToken.None;
 
-        private TelegramBotClient? _botClient;
+        private ITelegramBotClient? _botClient;
+        private string? _botToken;
+        private string _apiBaseUrl = DefaultTelegramApiBaseUrl;
 
         private readonly record struct OpenAiPostProcessingResult(
             string Text,
@@ -158,6 +162,11 @@ namespace YandexSpeech.services.Telegram
                 return;
             }
 
+            _botToken = options.BotToken;
+            _apiBaseUrl = string.IsNullOrWhiteSpace(options.ApiBaseUrl)
+                ? DefaultTelegramApiBaseUrl
+                : NormalizeApiBaseUrl(options.ApiBaseUrl);
+
             var botOptions = string.IsNullOrWhiteSpace(options.ApiBaseUrl)
                 ? new TelegramBotClientOptions(options.BotToken)
                 : new TelegramBotClientOptions(options.BotToken, options.ApiBaseUrl);
@@ -167,12 +176,12 @@ namespace YandexSpeech.services.Telegram
 
             try
             {
-                var me = await _botClient.GetMeAsync(cancellationToken: stoppingToken).ConfigureAwait(false);
+                var me = await GetMeAsync(stoppingToken).ConfigureAwait(false);
                 _logger.LogInformation("Telegram bot connected as @{Username} (id {Id}).", me.Username, me.Id);
 
                 var webhookUrl = options.WebhookUrl;
                 var dropPendingUpdates = useLongPolling || string.IsNullOrWhiteSpace(webhookUrl);
-                await _botClient.DeleteWebhookAsync(dropPendingUpdates, cancellationToken: stoppingToken)
+                await DeleteWebhookAsync(dropPendingUpdates, stoppingToken)
                     .ConfigureAwait(false);
 
                 if (useLongPolling || string.IsNullOrWhiteSpace(webhookUrl))
@@ -189,11 +198,12 @@ namespace YandexSpeech.services.Telegram
 
                 try
                 {
-                    await _botClient.SetWebhookAsync(
-                        url: webhookUrl!,
-                        allowedUpdates: new[] { UpdateType.Message },
-                        secretToken: string.IsNullOrWhiteSpace(options.WebhookSecretToken) ? null : options.WebhookSecretToken,
-                        cancellationToken: stoppingToken).ConfigureAwait(false);
+                    await SetWebhookAsync(
+                            webhookUrl!,
+                            new[] { UpdateType.Message },
+                            string.IsNullOrWhiteSpace(options.WebhookSecretToken) ? null : options.WebhookSecretToken,
+                            stoppingToken)
+                        .ConfigureAwait(false);
 
                     _logger.LogInformation("Telegram webhook configured at {WebhookUrl}.", webhookUrl);
                 }
@@ -303,8 +313,7 @@ namespace YandexSpeech.services.Telegram
             {
                 try
                 {
-                    var updates = await _botClient
-                        .GetUpdatesAsync(offset, timeout: 30, allowedUpdates: allowedUpdates, cancellationToken: stoppingToken)
+                    var updates = await GetUpdatesAsync(offset, 30, allowedUpdates, stoppingToken)
                         .ConfigureAwait(false);
 
                     foreach (var update in updates)
@@ -348,19 +357,21 @@ namespace YandexSpeech.services.Telegram
             switch (command)
             {
                 case "/start":
-                    await _botClient.SendTextMessageAsync(
-                        chatId: message.Chat.Id,
-                        text: "Пришлите voice или аудиофайл — распознаю локально (GPU).",
-                        replyParameters: new ReplyParameters { MessageId = message.MessageId },
-                        cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await SendTextMessageAsync(
+                            message.Chat.Id,
+                            "Пришлите voice или аудиофайл — распознаю локально (GPU).",
+                            new ReplyParameters { MessageId = message.MessageId },
+                            cancellationToken)
+                        .ConfigureAwait(false);
                     break;
                 case "/model":
                     var info = $"faster-whisper: {_model} | device: {_device} | dtype: {NormalizeCt2(_device, _computeType)}\nVAD: off";
-                    await _botClient.SendTextMessageAsync(
-                        chatId: message.Chat.Id,
-                        text: info,
-                        replyParameters: new ReplyParameters { MessageId = message.MessageId },
-                        cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await SendTextMessageAsync(
+                            message.Chat.Id,
+                            info,
+                            new ReplyParameters { MessageId = message.MessageId },
+                            cancellationToken)
+                        .ConfigureAwait(false);
                     break;
             }
         }
@@ -377,17 +388,18 @@ namespace YandexSpeech.services.Telegram
 
             LogEvent("incoming", triggerMessage, logCaption, logExtra);
 
-            await _botClient.SendChatActionAsync(triggerMessage.Chat.Id, ChatAction.Typing, cancellationToken: cancellationToken)
+            await SendChatActionAsync(triggerMessage.Chat.Id, ChatAction.Typing, cancellationToken)
                 .ConfigureAwait(false);
 
             Message? status = null;
             try
             {
-                status = await _botClient.SendTextMessageAsync(
-                    chatId: triggerMessage.Chat.Id,
-                    text: "⏳ Обрабатываю…",
-                    replyParameters: new ReplyParameters { MessageId = triggerMessage.MessageId },
-                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                status = await SendTextMessageAsync(
+                        triggerMessage.Chat.Id,
+                        "⏳ Обрабатываю…",
+                        new ReplyParameters { MessageId = triggerMessage.MessageId },
+                        cancellationToken)
+                    .ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -426,10 +438,8 @@ namespace YandexSpeech.services.Telegram
                 var header =
                     $"📝 Готово. Язык: {transcript.Language ?? "?"} (p={probability}).\nМодель: {_model} ({_device}, dtype {NormalizeCt2(_device, _computeType)}).";
 
-                await _botClient.SendTextMessageAsync(
-                    chatId: triggerMessage.Chat.Id,
-                    text: header,
-                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                await SendTextMessageAsync(triggerMessage.Chat.Id, header, replyParameters: null, cancellationToken)
+                    .ConfigureAwait(false);
 
                 var postProcessing = await PostProcessTranscriptAsync(
                     transcript.Text,
@@ -438,20 +448,24 @@ namespace YandexSpeech.services.Telegram
 
                 if (postProcessing.Error is { Length: > 0 } && postProcessing.Attempted && string.IsNullOrWhiteSpace(postProcessing.Model))
                 {
-                    await _botClient.SendTextMessageAsync(
-                        chatId: triggerMessage.Chat.Id,
-                        text: $"⚠️ GPT пост-обработка не выполнена: {postProcessing.Error}",
-                        cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await SendTextMessageAsync(
+                            triggerMessage.Chat.Id,
+                            $"⚠️ GPT пост-обработка не выполнена: {postProcessing.Error}",
+                            replyParameters: null,
+                            cancellationToken)
+                        .ConfigureAwait(false);
                 }
 
                 await SendTranscriptAsync(triggerMessage, postProcessing.Text, tempRoot, cancellationToken).ConfigureAwait(false);
 
                 if (!string.IsNullOrWhiteSpace(postProcessing.Summary))
                 {
-                    await _botClient.SendTextMessageAsync(
-                        chatId: triggerMessage.Chat.Id,
-                        text: "📄 Краткое резюме:\n" + postProcessing.Summary,
-                        cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await SendTextMessageAsync(
+                            triggerMessage.Chat.Id,
+                            "📄 Краткое резюме:\n" + postProcessing.Summary,
+                            replyParameters: null,
+                            cancellationToken)
+                        .ConfigureAwait(false);
                 }
 
                 var transcriptLog = MergeLogContexts(logExtra, new Dictionary<string, object?>
@@ -498,11 +512,11 @@ namespace YandexSpeech.services.Telegram
                 return null;
             }
 
-            var file = await _botClient.GetFileAsync(payload.FileId, cancellationToken: cancellationToken).ConfigureAwait(false);
+            var file = await GetFileAsync(payload.FileId, cancellationToken).ConfigureAwait(false);
             var destination = Path.Combine(directory, payload.FileName);
 
             await using var fs = IOFile.Create(destination);
-            await _botClient.DownloadFileAsync(file.FilePath!, fs, cancellationToken).ConfigureAwait(false);
+            await DownloadFileAsync(file, fs, cancellationToken).ConfigureAwait(false);
             return destination;
         }
 
@@ -691,19 +705,15 @@ namespace YandexSpeech.services.Telegram
             text = text.Trim();
             if (text.Length == 0)
             {
-                await _botClient.SendTextMessageAsync(
-                    chatId: originalMessage.Chat.Id,
-                    text: "Пустой результат.",
-                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                await SendTextMessageAsync(originalMessage.Chat.Id, "Пустой результат.", null, cancellationToken)
+                    .ConfigureAwait(false);
                 return;
             }
 
             if (text.Length <= limit)
             {
-                await _botClient.SendTextMessageAsync(
-                    chatId: originalMessage.Chat.Id,
-                    text: text,
-                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                await SendTextMessageAsync(originalMessage.Chat.Id, text, null, cancellationToken)
+                    .ConfigureAwait(false);
                 return;
             }
 
@@ -712,11 +722,12 @@ namespace YandexSpeech.services.Telegram
             await IOFile.WriteAllTextAsync(filePath, text, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
 
             await using var stream = IOFile.OpenRead(filePath);
-            await _botClient.SendDocumentAsync(
-                chatId: originalMessage.Chat.Id,
-                document: InputFile.FromStream(stream, fileName),
-                caption: "🧾 Текст не поместился — отправляю .txt",
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+            await SendDocumentAsync(
+                    originalMessage.Chat.Id,
+                    InputFile.FromStream(stream, fileName),
+                    "🧾 Текст не поместился — отправляю .txt",
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
 
         private static (string Text, string? Language, double? LanguageProbability) ParseTranscript(string json)
@@ -800,6 +811,125 @@ namespace YandexSpeech.services.Telegram
             return Regex.Matches(text, "\\w+", RegexOptions.CultureInvariant | RegexOptions.Multiline).Count;
         }
 
+        private Task<User> GetMeAsync(CancellationToken cancellationToken)
+        {
+            return RequireClient().MakeRequestAsync(new GetMeRequest(), cancellationToken);
+        }
+
+        private async Task DeleteWebhookAsync(bool dropPendingUpdates, CancellationToken cancellationToken)
+        {
+            var request = new DeleteWebhookRequest
+            {
+                DropPendingUpdates = dropPendingUpdates
+            };
+
+            await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+
+        private async Task SetWebhookAsync(string url, IEnumerable<UpdateType>? allowedUpdates, string? secretToken, CancellationToken cancellationToken)
+        {
+            var request = new SetWebhookRequest(url)
+            {
+                AllowedUpdates = allowedUpdates,
+                SecretToken = secretToken
+            };
+
+            await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+
+        private Task<Update[]> GetUpdatesAsync(int offset, int timeout, IEnumerable<UpdateType>? allowedUpdates, CancellationToken cancellationToken)
+        {
+            var request = new GetUpdatesRequest
+            {
+                Offset = offset,
+                Timeout = timeout,
+                AllowedUpdates = allowedUpdates
+            };
+
+            return RequireClient().MakeRequestAsync(request, cancellationToken);
+        }
+
+        private Task<Message> SendTextMessageAsync(ChatId chatId, string text, ReplyParameters? replyParameters, CancellationToken cancellationToken)
+        {
+            var request = new SendMessageRequest(chatId, text)
+            {
+                ReplyParameters = replyParameters
+            };
+
+            return RequireClient().MakeRequestAsync(request, cancellationToken);
+        }
+
+        private async Task SendChatActionAsync(ChatId chatId, ChatAction chatAction, CancellationToken cancellationToken)
+        {
+            var request = new SendChatActionRequest(chatId, chatAction);
+            await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+
+        private Task<Message> SendDocumentAsync(ChatId chatId, InputFile document, string? caption, CancellationToken cancellationToken)
+        {
+            var request = new SendDocumentRequest(chatId, document)
+            {
+                Caption = caption
+            };
+
+            return RequireClient().MakeRequestAsync(request, cancellationToken);
+        }
+
+        private Task<Message> EditMessageTextAsync(ChatId chatId, int messageId, string text, CancellationToken cancellationToken)
+        {
+            var request = new EditMessageTextRequest(chatId, messageId, text);
+            return RequireClient().MakeRequestAsync(request, cancellationToken);
+        }
+
+        private async Task DeleteMessageAsync(ChatId chatId, int messageId, CancellationToken cancellationToken)
+        {
+            var request = new DeleteMessageRequest(chatId, messageId);
+            await RequireClient().MakeRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+
+        private Task<Telegram.Bot.Types.File> GetFileAsync(string fileId, CancellationToken cancellationToken)
+        {
+            return RequireClient().MakeRequestAsync(new GetFileRequest(fileId), cancellationToken);
+        }
+
+        private async Task DownloadFileAsync(Telegram.Bot.Types.File file, Stream destination, CancellationToken cancellationToken)
+        {
+            if (file.FilePath is null)
+            {
+                throw new InvalidOperationException("Telegram response did not include a file path.");
+            }
+
+            var token = _botToken ?? throw new InvalidOperationException("Telegram bot token is not available.");
+            var baseUrl = _apiBaseUrl.EndsWith("/file", StringComparison.OrdinalIgnoreCase)
+                ? _apiBaseUrl
+                : _apiBaseUrl + "/file";
+            var requestUri = $"{baseUrl}/bot{token}/{file.FilePath}";
+
+            var client = _httpClientFactory.CreateClient(nameof(TelegramTranscriptionBot) + ".Files");
+            using var response = await client.GetAsync(requestUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            await response.Content.CopyToAsync(destination, cancellationToken).ConfigureAwait(false);
+            await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        private ITelegramBotClient RequireClient()
+        {
+            return _botClient ?? throw new InvalidOperationException("Telegram bot client is not initialized.");
+        }
+
+        private static string NormalizeApiBaseUrl(string value)
+        {
+            var trimmed = value.Trim();
+            if (trimmed.Length == 0)
+            {
+                return DefaultTelegramApiBaseUrl;
+            }
+
+            var withoutSlash = trimmed.TrimEnd('/');
+            return withoutSlash.Length == 0 ? DefaultTelegramApiBaseUrl : withoutSlash;
+        }
+
         private static string Truncate(string value, int maxLength)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -825,11 +955,8 @@ namespace YandexSpeech.services.Telegram
 
             try
             {
-                await _botClient.EditMessageTextAsync(
-                    chatId: status.Chat.Id,
-                    messageId: status.MessageId,
-                    text: text,
-                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                await EditMessageTextAsync(status.Chat.Id, status.MessageId, text, cancellationToken)
+                    .ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -846,7 +973,7 @@ namespace YandexSpeech.services.Telegram
 
             try
             {
-                await _botClient.DeleteMessageAsync(status.Chat.Id, status.MessageId, cancellationToken).ConfigureAwait(false);
+                await DeleteMessageAsync(status.Chat.Id, status.MessageId, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
