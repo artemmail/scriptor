@@ -61,6 +61,7 @@ namespace YandexSpeech.services.Telegram
         private static readonly HashSet<string> AudioFileExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
             ".aac",
+            ".amr",
             ".flac",
             ".m4a",
             ".mp3",
@@ -1186,6 +1187,11 @@ namespace YandexSpeech.services.Telegram
                 if (normalized.Contains("aac"))
                 {
                     return ".aac";
+                }
+
+                if (normalized.Contains("amr"))
+                {
+                    return ".amr";
                 }
 
                 if (normalized.Contains("flac"))
