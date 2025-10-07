@@ -1,4 +1,16 @@
-<h2 mat-dialog-title>Редактирование изображения</h2>
+<h2 mat-dialog-title class="dialog-title">
+  Редактирование изображения
+  <span class="spacer"></span>
+  <button
+    mat-icon-button
+    type="button"
+    (click)="toggleFullscreen()"
+    [matTooltip]="isFullscreen() ? 'Свернуть диалог' : 'Развернуть на весь экран'"
+    [attr.aria-label]="isFullscreen() ? 'Свернуть диалог' : 'Развернуть диалог на весь экран'"
+  >
+    <mat-icon>{{ isFullscreen() ? 'close_fullscreen' : 'open_in_full' }}</mat-icon>
+  </button>
+</h2>
 <div mat-dialog-content class="content">
   <div class="canvas-area" #canvasContainer>
     <div class="checkerboard"></div>
@@ -19,63 +31,106 @@
 
     <section>
       <h3>Поворот</h3>
-      <div class="button-row">
-        <button mat-stroked-button type="button" (click)="rotateRight()">
+      <div class="icon-button-group">
+        <button
+          mat-icon-button
+          type="button"
+          (click)="rotateRight()"
+          matTooltip="Повернуть на 90° против часовой стрелки"
+          aria-label="Повернуть на 90 градусов против часовой стрелки"
+        >
           <mat-icon>rotate_90_degrees_ccw</mat-icon>
-          90°
         </button>
-        <button mat-stroked-button type="button" (click)="rotate180()">
+        <button
+          mat-icon-button
+          type="button"
+          (click)="rotate180()"
+          matTooltip="Повернуть на 180°"
+          aria-label="Повернуть на 180 градусов"
+        >
           <mat-icon>rotate_left</mat-icon>
-          180°
         </button>
-        <button mat-stroked-button type="button" (click)="rotate270()">
+        <button
+          mat-icon-button
+          type="button"
+          (click)="rotate270()"
+          matTooltip="Повернуть на 90° по часовой стрелке"
+          aria-label="Повернуть на 90 градусов по часовой стрелке"
+        >
           <mat-icon>rotate_90_degrees_cw</mat-icon>
-          270°
         </button>
       </div>
     </section>
 
     <section>
       <h3>Отражение</h3>
-      <div class="button-row">
-        <button mat-stroked-button type="button" (click)="flipHorizontally()">
+      <div class="icon-button-group">
+        <button
+          mat-icon-button
+          type="button"
+          (click)="flipHorizontally()"
+          matTooltip="Отразить по горизонтали"
+          aria-label="Отразить изображение по горизонтали"
+        >
           <mat-icon>flip</mat-icon>
-          Слева-направо
         </button>
-        <button mat-stroked-button type="button" (click)="flipVertically()">
+        <button
+          mat-icon-button
+          type="button"
+          (click)="flipVertically()"
+          matTooltip="Отразить по вертикали"
+          aria-label="Отразить изображение по вертикали"
+        >
           <mat-icon>swap_vert</mat-icon>
-          Сверху-вниз
         </button>
       </div>
     </section>
 
     <section>
       <h3>Обрезка</h3>
-      <div class="button-row">
-        <button mat-stroked-button type="button" [color]="isCropping() ? 'primary' : undefined" (click)="toggleCrop()">
-          <mat-icon>crop</mat-icon>
-          {{ isCropping() ? 'Выделите область' : 'Выбрать область' }}
-        </button>
-        <button
-          *ngIf="isCropping()"
-          mat-stroked-button
-          color="primary"
-          type="button"
-          (click)="applyCropSelection()"
-        >
-          <mat-icon>done</mat-icon>
-          Завершить обрезку
-        </button>
+      <div class="crop-controls">
+        <div class="icon-button-group">
+          <button
+            mat-icon-button
+            type="button"
+            (click)="toggleCrop()"
+            [color]="isCropping() ? 'primary' : undefined"
+            [class.active]="isCropping()"
+            matTooltip="Выделить область для обрезки"
+            aria-label="Выделить область для обрезки"
+          >
+            <mat-icon>crop</mat-icon>
+          </button>
+          <button
+            *ngIf="isCropping()"
+            mat-icon-button
+            color="primary"
+            type="button"
+            (click)="applyCropSelection()"
+            matTooltip="Применить обрезку"
+            aria-label="Применить обрезку"
+          >
+            <mat-icon>done</mat-icon>
+          </button>
+        </div>
         <div class="crop-info">{{ cropInfo() }}</div>
       </div>
     </section>
 
     <section>
       <h3>Прочее</h3>
-      <button mat-button color="warn" type="button" (click)="reset()">
-        <mat-icon>refresh</mat-icon>
-        Сбросить
-      </button>
+      <div class="icon-button-group">
+        <button
+          mat-icon-button
+          color="warn"
+          type="button"
+          (click)="reset()"
+          matTooltip="Сбросить все изменения"
+          aria-label="Сбросить все изменения"
+        >
+          <mat-icon>refresh</mat-icon>
+        </button>
+      </div>
       <p class="hint">Перемещайте изображение мышью для панорамирования. Обрезка работает при активной кнопке.</p>
     </section>
   </div>

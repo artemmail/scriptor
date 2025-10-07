@@ -15,6 +15,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleChange, MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 export interface CropRect {
   x: number;
@@ -66,7 +67,14 @@ interface ActiveCropHandle {
 @Component({
   selector: 'app-image-editor-dialog',
   standalone: true,
-  imports: [CommonModule, MatDialogModule, MatButtonModule, MatIconModule, MatButtonToggleModule],
+  imports: [
+    CommonModule,
+    MatDialogModule,
+    MatButtonModule,
+    MatIconModule,
+    MatButtonToggleModule,
+    MatTooltipModule,
+  ],
   templateUrl: './image-editor-dialog.component.html',
   styleUrls: ['./image-editor-dialog.component.css'],
 })
@@ -79,6 +87,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   private static readonly PAN_EPSILON = 1e-2;
   private static readonly MIN_CROP_SIZE = 5;
   private static readonly NEW_CROP_DRAG_THRESHOLD = 3; // px, чтобы новый кроп не ставился по одиночному клику
+  private static readonly FULLSCREEN_PANEL_CLASS = 'image-editor-dialog-fullscreen';
 
   private readonly baseZoomOptions: number[] = [1, 2, 4, ImageEditorDialogComponent.MAX_ZOOM];
 
@@ -103,6 +112,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   });
 
   readonly isCropping: WritableSignal<boolean> = signal(false);
+  readonly isFullscreen: WritableSignal<boolean> = signal(false);
   protected readonly trackZoomOption = (_: number, option: number): number => option;
 
   private image: ImageBitmap | HTMLImageElement | null = null;
@@ -163,6 +173,12 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.isFullscreen()) {
+      this.dialogRef.removePanelClass(ImageEditorDialogComponent.FULLSCREEN_PANEL_CLASS);
+      this.dialogRef.updateSize();
+      this.dialogRef.updatePosition();
+    }
+
     if (this.rafHandle !== null) {
       cancelAnimationFrame(this.rafHandle);
       this.rafHandle = null;
@@ -184,6 +200,27 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
         /* noop */
       }
     }
+  }
+
+  toggleFullscreen(): void {
+    const next = !this.isFullscreen();
+    this.isFullscreen.set(next);
+
+    if (next) {
+      this.dialogRef.addPanelClass(ImageEditorDialogComponent.FULLSCREEN_PANEL_CLASS);
+      this.dialogRef.updateSize('100vw', '100vh');
+      this.dialogRef.updatePosition({ top: '0', left: '0' });
+    } else {
+      this.dialogRef.removePanelClass(ImageEditorDialogComponent.FULLSCREEN_PANEL_CLASS);
+      this.dialogRef.updateSize();
+      this.dialogRef.updatePosition();
+    }
+
+    // Размеры контейнера меняются вместе с диалогом — обновим холст
+    requestAnimationFrame(() => {
+      this.resizeCanvas();
+      this.scheduleRender();
+    });
   }
 
   toggleCrop(): void {
