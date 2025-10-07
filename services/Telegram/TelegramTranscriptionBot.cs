@@ -245,9 +245,10 @@ namespace YandexSpeech.services.Telegram
                     return;
                 }
 
-                if (HasAudioPayload(message))
+                var audioSourceMessage = FindMessageWithAudioPayload(message);
+                if (audioSourceMessage is not null)
                 {
-                    await HandleAudioAsync(message, cancellationToken).ConfigureAwait(false);
+                    await HandleAudioAsync(message, audioSourceMessage, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)
@@ -336,25 +337,42 @@ namespace YandexSpeech.services.Telegram
             }
         }
 
-        private async Task HandleAudioAsync(Message message, CancellationToken cancellationToken)
+        private async Task HandleAudioAsync(Message triggerMessage, Message audioMessage, CancellationToken cancellationToken)
         {
             if (_botClient is null)
             {
                 return;
             }
 
-            LogEvent("incoming", message, message.Caption ?? string.Empty, null);
+            var logCaption = audioMessage.Caption ?? triggerMessage.Caption ?? string.Empty;
+            object? logExtra = null;
+            if (audioMessage.MessageId != triggerMessage.MessageId)
+            {
+                logExtra = new
+                {
+                    audio_source_message_id = audioMessage.MessageId,
+                    audio_source_chat_id = audioMessage.Chat?.Id
+                };
+            }
 
-            await _botClient.SendChatActionAsync(message.Chat.Id, ChatAction.Typing, cancellationToken: cancellationToken)
+            logExtra ??= new
+            {
+                audio_source_message_id = audioMessage.MessageId,
+                audio_source_chat_id = audioMessage.Chat?.Id
+            };
+
+            LogEvent("incoming", triggerMessage, logCaption, logExtra);
+
+            await _botClient.SendChatActionAsync(triggerMessage.Chat.Id, ChatAction.Typing, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
             Message? status = null;
             try
             {
                 status = await _botClient.SendTextMessageAsync(
-                    chatId: message.Chat.Id,
+                    chatId: triggerMessage.Chat.Id,
                     text: "⏳ Обрабатываю…",
-                    replyParameters: new ReplyParameters { MessageId = message.MessageId },
+                    replyParameters: new ReplyParameters { MessageId = triggerMessage.MessageId },
                     cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -367,7 +385,7 @@ namespace YandexSpeech.services.Telegram
 
             try
             {
-                var sourcePath = await DownloadMediaAsync(message, tempRoot, cancellationToken).ConfigureAwait(false);
+                var sourcePath = await DownloadMediaAsync(audioMessage, tempRoot, cancellationToken).ConfigureAwait(false);
                 if (sourcePath is null)
                 {
                     await EditStatusAsync(status, "Не нашёл голос/аудио в сообщении.", cancellationToken).ConfigureAwait(false);
@@ -395,7 +413,7 @@ namespace YandexSpeech.services.Telegram
                     $"📝 Готово. Язык: {transcript.Language ?? "?"} (p={probability}).\nМодель: {_model} ({_device}, dtype {NormalizeCt2(_device, _computeType)}).";
 
                 await _botClient.SendTextMessageAsync(
-                    chatId: message.Chat.Id,
+                    chatId: triggerMessage.Chat.Id,
                     text: header,
                     cancellationToken: cancellationToken).ConfigureAwait(false);
 
@@ -407,29 +425,31 @@ namespace YandexSpeech.services.Telegram
                 if (postProcessing.Error is { Length: > 0 } && postProcessing.Attempted && string.IsNullOrWhiteSpace(postProcessing.Model))
                 {
                     await _botClient.SendTextMessageAsync(
-                        chatId: message.Chat.Id,
+                        chatId: triggerMessage.Chat.Id,
                         text: $"⚠️ GPT пост-обработка не выполнена: {postProcessing.Error}",
                         cancellationToken: cancellationToken).ConfigureAwait(false);
                 }
 
-                await SendTranscriptAsync(message, postProcessing.Text, tempRoot, cancellationToken).ConfigureAwait(false);
+                await SendTranscriptAsync(triggerMessage, postProcessing.Text, tempRoot, cancellationToken).ConfigureAwait(false);
 
                 if (!string.IsNullOrWhiteSpace(postProcessing.Summary))
                 {
                     await _botClient.SendTextMessageAsync(
-                        chatId: message.Chat.Id,
+                        chatId: triggerMessage.Chat.Id,
                         text: "📄 Краткое резюме:\n" + postProcessing.Summary,
                         cancellationToken: cancellationToken).ConfigureAwait(false);
                 }
 
-                LogEvent("transcript", message, postProcessing.Text, new
+                LogEvent("transcript", triggerMessage, postProcessing.Text, new
                 {
                     language = transcript.Language,
                     language_probability = transcript.LanguageProbability,
                     model = _model,
                     openai_model = postProcessing.Model,
                     openai_error = postProcessing.Error,
-                    summary = postProcessing.Summary
+                    summary = postProcessing.Summary,
+                    audio_source_message_id = audioMessage.MessageId,
+                    audio_source_chat_id = audioMessage.Chat?.Id
                 });
             }
             catch (OperationCanceledException)
@@ -441,10 +461,14 @@ namespace YandexSpeech.services.Telegram
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to process audio message {MessageId}.", message.MessageId);
+                _logger.LogError(ex, "Failed to process audio message {MessageId}.", audioMessage.MessageId);
                 var errorText = $"⚠️ Ошибка: {ex.Message}";
                 await EditStatusAsync(status, errorText, cancellationToken).ConfigureAwait(false);
-                LogEvent("error", message, ex.Message, null);
+                LogEvent("error", triggerMessage, ex.Message, new
+                {
+                    audio_source_message_id = audioMessage.MessageId,
+                    audio_source_chat_id = audioMessage.Chat?.Id
+                });
             }
             finally
             {
@@ -914,6 +938,22 @@ namespace YandexSpeech.services.Telegram
             }
 
             return user.FirstName;
+        }
+
+        private static Message? FindMessageWithAudioPayload(Message message)
+        {
+            Message? current = message;
+            while (current is not null)
+            {
+                if (HasAudioPayload(current))
+                {
+                    return current;
+                }
+
+                current = current.ReplyToMessage;
+            }
+
+            return null;
         }
 
         private static bool HasAudioPayload(Message message)
