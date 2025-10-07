@@ -88,7 +88,7 @@ namespace YandexSpeech.services.Telegram
 
         private CancellationToken _stoppingToken = CancellationToken.None;
 
-        private ITelegramBotClient? _botClient;
+        private TelegramBotClient? _botClient;
 
         private readonly record struct OpenAiPostProcessingResult(
             string Text,
