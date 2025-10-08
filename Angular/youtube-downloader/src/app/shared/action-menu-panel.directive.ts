@@ -22,6 +22,6 @@ export class ActionMenuPanelDirective implements OnInit {
     }
 
     classes.add('action-menu-panel');
-    this.matMenu.panelClass = Array.from(classes);
+    this.matMenu.panelClass = Array.from(classes).join(' ');
   }
 }
