@@ -279,43 +279,30 @@ section {
   gap: 12px;
 }
 
-.tasks-list .task-item {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 14px 18px;
+.tasks-list .mat-mdc-list-item {
   border-radius: 18px;
   border: 1px solid rgba(148, 163, 184, 0.2);
   background: rgba(248, 250, 255, 0.9);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease, background 0.2s ease;
-  width: 100%;
-  cursor: pointer;
+  padding-inline: 18px;
+  padding-inline-start: 0px;
 }
 
-.tasks-list .task-item:hover,
-.tasks-list .task-item:focus-visible {
+.tasks-list .mat-mdc-list-item:hover {
   transform: translateY(-2px);
   box-shadow: 0 16px 32px rgba(29, 78, 216, 0.16);
   border-color: rgba(59, 130, 246, 0.45);
 }
 
-.tasks-list .task-item.active {
+.tasks-list .mat-mdc-list-item.active {
   background: linear-gradient(135deg, #3ec7ff, #2a6bff);
   color: #ffffff;
   box-shadow: 0 20px 36px rgba(46, 130, 255, 0.32);
   border-color: transparent;
 }
 
-.tasks-list .task-item.active .mat-mdc-list-item-title,
-.tasks-list .task-item.active .mat-mdc-list-item-line,
-.tasks-list .task-item.active mat-icon {
+.tasks-list .mat-mdc-list-item.active mat-icon {
   color: #ffffff;
-}
-
-.tasks-list .task-item .mat-mdc-focus-indicator,
-.tasks-list .task-item .mat-mdc-list-item-ripple {
-  display: none;
 }
 
 .tasks-list mat-icon {
