@@ -8,6 +8,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatMenuModule } from '@angular/material/menu';
 import { LMarkdownEditorModule } from 'ngx-markdown-editor';
 import { MatCardModule } from '@angular/material/card';
+import { ActionMenuPanelDirective } from '../shared/action-menu-panel.directive';
 import { SubtitleService } from '../services/subtitle.service';
 import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -24,7 +25,8 @@ import { YoutubeCaptionTaskDto } from '../services/subtitle.service';
     MatButtonModule,
     MatIconModule,
     MatSnackBarModule,
-    MatMenuModule
+    MatMenuModule,
+    ActionMenuPanelDirective
   ],
   templateUrl: './markdown-converter.component.html',
   styleUrls: ['./markdown-converter.component.css']
