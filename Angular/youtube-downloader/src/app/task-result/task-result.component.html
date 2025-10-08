@@ -71,7 +71,7 @@
       </div>
     </div>
 
-    <mat-menu #downloadMenu="matMenu" panelClass="action-menu">
+    <mat-menu #downloadMenu="matMenu" panelClass="action-menu-panel">
       <button mat-menu-item (click)="downloadAsPdf()" [disabled]="isDownloading || !canDownloadFromServer">
         <mat-icon>picture_as_pdf</mat-icon>
         <span>PDF</span>
@@ -94,7 +94,7 @@
       </button>
     </mat-menu>
 
-    <mat-menu #copyMenu="matMenu" panelClass="action-menu">
+    <mat-menu #copyMenu="matMenu" panelClass="action-menu-panel">
       <button mat-menu-item (click)="copyToClipboard()" [disabled]="isCopying || !hasResultText">
         <mat-icon>notes</mat-icon>
         <span>Текст (plain)</span>
