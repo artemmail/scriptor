@@ -22,7 +22,7 @@
       Скачать
     </button>
 
-    <mat-menu #downloadMenu="matMenu" panelClass="action-menu-panel">
+    <mat-menu #downloadMenu="matMenu" actionMenuPanel>
       <button
         mat-menu-item
         (click)="onDownload('md')"
@@ -67,7 +67,7 @@
       Копировать
     </button>
 
-    <mat-menu #copyMenu="matMenu" panelClass="action-menu-panel">
+    <mat-menu #copyMenu="matMenu" actionMenuPanel>
       <button
         mat-menu-item
         (click)="onCopy('txt')"

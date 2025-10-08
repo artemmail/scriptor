@@ -15,6 +15,7 @@ import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
 import { RouterModule } from '@angular/router'; // ⬅️ Добавить
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../services/AuthService.service';
+import { ActionMenuPanelDirective } from '../shared/action-menu-panel.directive';
 
 @Component({
   selector: 'app-task-result',
@@ -27,7 +28,8 @@ import { AuthService } from '../services/AuthService.service';
     MatDialogModule,
     MatMenuModule,
     LocalTimePipe,
-    YandexAdComponent
+    YandexAdComponent,
+    ActionMenuPanelDirective
   ],
   templateUrl: './task-result.component.html',
   styleUrls: ['./task-result.component.css']

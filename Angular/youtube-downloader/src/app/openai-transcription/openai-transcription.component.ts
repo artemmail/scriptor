@@ -22,6 +22,7 @@ import { LocalTimePipe } from '../pipe/local-time.pipe';
 import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
 import { MatDialog } from '@angular/material/dialog';
 import { OpenAiTranscriptionUploadDialogComponent } from './openai-transcription-upload-dialog.component';
+import { ActionMenuPanelDirective } from '../shared/action-menu-panel.directive';
 
 @Component({
   selector: 'app-openai-transcriptions',
@@ -36,6 +37,7 @@ import { OpenAiTranscriptionUploadDialogComponent } from './openai-transcription
     MatSnackBarModule,
     LocalTimePipe,
     RouterModule,
+    ActionMenuPanelDirective,
   ],
   templateUrl: './openai-transcription.component.html',
   styleUrls: ['./openai-transcription.component.css'],

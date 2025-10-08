@@ -16,6 +16,7 @@ import {
   OpenAiTranscriptionTaskDetailsDto
 } from '../services/openai-transcription.service';
 import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
+import { ActionMenuPanelDirective } from '../shared/action-menu-panel.directive';
 
 @Component({
   selector: 'app-transcription-editor',
@@ -29,7 +30,8 @@ import { MarkdownRendererService1 } from '../task-result/markdown-renderer.servi
     MatIconModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
-    MatMenuModule
+    MatMenuModule,
+    ActionMenuPanelDirective
   ],
   templateUrl: './transcription-editor.component.html',
   styleUrls: ['./transcription-editor.component.css']

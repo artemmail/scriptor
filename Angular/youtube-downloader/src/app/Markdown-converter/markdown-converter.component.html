@@ -45,7 +45,7 @@
     </div>
   </div>
 
-  <mat-menu #downloadMenu="matMenu" panelClass="action-menu-panel">
+  <mat-menu #downloadMenu="matMenu" actionMenuPanel>
     <button mat-menu-item (click)="onDownloadMd()" [disabled]="!hasContent">
       <mat-icon>article</mat-icon>
       <span>Markdown (.md)</span>
@@ -64,7 +64,7 @@
     </button>
   </mat-menu>
 
-  <mat-menu #copyMenu="matMenu" panelClass="action-menu-panel">
+  <mat-menu #copyMenu="matMenu" actionMenuPanel>
     <button mat-menu-item (click)="onCopyHtml()" [disabled]="!hasContent">
       <mat-icon>code</mat-icon>
       <span>HTML</span>
