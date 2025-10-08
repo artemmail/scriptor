@@ -153,7 +153,7 @@
                       </button>
                     </div>
                  
-                    <mat-menu #downloadMenu="matMenu">
+                    <mat-menu #downloadMenu="matMenu" class="action-menu">
                       <button
                         mat-menu-item
                         (click)="onDownload('md')"
@@ -187,7 +187,7 @@
                         <span>SRT субтитры</span>
                       </button>
                     </mat-menu>
-                    <mat-menu #copyMenu="matMenu">
+                    <mat-menu #copyMenu="matMenu" class="action-menu">
                       <button
                         mat-menu-item
                         (click)="onCopy('txt')"
