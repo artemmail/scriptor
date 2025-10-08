@@ -251,10 +251,15 @@ namespace YandexSpeech.services.Telegram
 
             try
             {
-                if (message.Text is string text && text.StartsWith("/"))
+                if (message.Text is string text)
                 {
-                    await HandleCommandAsync(message, text, cancellationToken).ConfigureAwait(false);
-                    return;
+                    if (text.StartsWith("/"))
+                    {
+                        await HandleCommandAsync(message, text, cancellationToken).ConfigureAwait(false);
+                        return;
+                    }
+
+                    LogEvent("text", message, text, extra: null);
                 }
 
                 var audioPayload = FindAudioPayload(message);
