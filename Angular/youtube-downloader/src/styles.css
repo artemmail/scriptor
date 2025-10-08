@@ -77,11 +77,7 @@ body {
   color: var(--action-menu-panel-accent);
 }
 
-.mat-mdc-menu-panel.action-menu-panel .mat-mdc-menu-item.cdk-focused:not([disabled]),
-.mat-mdc-menu-panel.action-menu-panel .mat-mdc-menu-item.cdk-program-focused:not([disabled]) {
-  background-color: transparent;
-  color: inherit;
-}
+
 
 .mat-mdc-menu-panel.action-menu-panel .mat-mdc-menu-item.cdk-focused:not([disabled]) .mat-icon,
 .mat-mdc-menu-panel.action-menu-panel .mat-mdc-menu-item.cdk-program-focused:not([disabled]) .mat-icon {
