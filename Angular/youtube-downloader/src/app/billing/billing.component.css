@@ -276,8 +276,9 @@ section {
 }
 
 .plan-card mat-card-header {
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 20px;
+  min-height: 120px;
 }
 
 .plan-card mat-card-title {
