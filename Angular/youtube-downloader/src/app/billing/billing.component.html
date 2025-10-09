@@ -1,6 +1,6 @@
 <div class="billing-page" *ngIf="!loadingPlans && !loadingWallet; else loadingTemplate">
   <main class="page-content">
-    <section class="hero">
+    <!--section class="hero">
       <div class="hero-text">
         <h1>Управляйте балансом YouScriptor в одном месте</h1>
         <p class="hero-lead">
@@ -80,12 +80,12 @@
           <p>{{ advantage.description }}</p>
         </article>
       </div>
-    </section>
+    </section-->
 
     <section class="plans">
       <div class="section-header">
-        <h2>Подписки на ваши задачи</h2>
-        <p>Выберите подходящий план — можно подключить бессрочную лицензию или оформить регулярные списания.</p>
+        <h2>Выберите подходящий план</h2>
+        <p>Доступные тарифы для профессионального использования</p>
       </div>
       <div class="plans__grid" *ngIf="plans.length; else plansEmpty">
         <mat-card *ngFor="let plan of plans" class="plan-card">
