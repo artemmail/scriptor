@@ -213,22 +213,22 @@
         <div class="mobile-list">
           <article class="mobile-task" *ngFor="let task of dataSource.data">
             <header class="mobile-task-header">
-              <mat-icon class="status-icon" [ngClass]="getStatusClass(task.status)">
-                {{ getStatusIcon(task.status) }}
-              </mat-icon>
-              <div class="mobile-task-meta">
-                <a [routerLink]="['/recognized', task.slug]" class="mobile-task-title">{{ task.title }}</a>
-                <span class="mobile-task-channel">Канал: {{ task.channelName }}</span>
-                <span class="mobile-task-date">{{ task.createdAt | localTime:'yyyy-MM-dd HH:mm' }}</span>
-              </div>
               <button
                 *ngIf="isAuthenticated"
-                class="youtube-logo-button"
+                class="youtube-logo-button mobile-youtube-button"
                 matRipple
                 (click)="openVideoDialog(task)"
               >
                 <img src="assets/yt.webp" alt="YouTube" class="youtube-logo">
               </button>
+              <div class="mobile-task-meta">
+                <a [routerLink]="['/recognized', task.slug]" class="mobile-task-title">{{ task.title }}</a>
+                <span class="mobile-task-channel">Канал: {{ task.channelName }}</span>
+                <span class="mobile-task-date">{{ task.createdAt | localTime:'yyyy-MM-dd HH:mm' }}</span>
+                <span class="mobile-task-status" [ngClass]="getStatusClass(task.status)">
+                  {{ getStatusText(task.status) }}
+                </span>
+              </div>
             </header>
 
             <section class="mobile-task-body">

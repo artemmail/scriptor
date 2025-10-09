@@ -422,24 +422,28 @@ section {
 }
 
 .mobile-task-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  position: relative;
+  display: block;
 }
 
-.mobile-task-header .status-icon {
-  flex-shrink: 0;
+.mobile-task-header::after {
+  content: '';
+  display: table;
+  clear: both;
+}
+
+.mobile-youtube-button {
+  float: left;
+  margin: 0 12px 8px 0;
 }
 
 .mobile-task-meta {
-  display: grid;
-  gap: 4px;
-  flex: 1;
+  display: block;
   min-width: 0;
 }
 
-.mobile-task-header .youtube-logo-button {
-  margin-left: auto;
+.mobile-task-meta > * + * {
+  margin-top: 4px;
 }
 
 .mobile-task-title {
@@ -459,11 +463,17 @@ section {
   color: #64748b;
 }
 
+.mobile-task-status {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 
 .mobile-task-body {
   display: grid;
   gap: 10px;
-  padding-left: 16px;
+  padding-left: 0;
+  clear: both;
 }
 
 .mobile-actions {
