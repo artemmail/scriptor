@@ -285,16 +285,52 @@ section {
   margin-top: 12px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+}
+
+.expand-toggle {
+  background: rgba(59, 130, 246, 0.12) !important;
+  border-radius: 12px !important;
+  width: 44px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.expand-toggle:hover {
+  background: rgba(59, 130, 246, 0.18) !important;
+  transform: translateY(-1px);
+}
+
+.expand-toggle:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.55);
+  outline-offset: 2px;
 }
 
 .recognized-link {
   font-weight: 600;
   color: #1d4ed8;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: rgba(59, 130, 246, 0.08);
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .recognized-link:hover {
-  text-decoration: underline;
+  text-decoration: none;
+  background: rgba(59, 130, 246, 0.14);
+  color: #1e3a8a;
+}
+
+.recognized-link mat-icon {
+  font-size: 18px;
+  height: 18px;
+  width: 18px;
 }
 
 .icon-status-done {
@@ -386,15 +422,24 @@ section {
 }
 
 .mobile-task-header {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
+  display: flex;
   align-items: center;
+  gap: 12px;
+}
+
+.mobile-task-header .status-icon {
+  flex-shrink: 0;
 }
 
 .mobile-task-meta {
   display: grid;
   gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mobile-task-header .youtube-logo-button {
+  margin-left: auto;
 }
 
 .mobile-task-title {
@@ -414,10 +459,11 @@ section {
   color: #64748b;
 }
 
+
 .mobile-task-body {
   display: grid;
   gap: 10px;
-  padding-left: 36px;
+  padding-left: 16px;
 }
 
 .mobile-actions {
@@ -493,22 +539,11 @@ section {
   }
 
   .mobile-task-body {
-    padding-left: 32px;
+    padding-left: 0;
   }
 
-  .actions {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-
-  .actions button,
-  .actions .recognized-link {
-    width: 100%;
-    text-align: center;
-  }
-
-  .recognized-link {
-    display: inline-block;
+  .mobile-actions {
+    justify-content: space-between;
+    gap: 12px;
   }
 }

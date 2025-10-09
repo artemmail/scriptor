@@ -1,6 +1,6 @@
 <div class="subtitles-page">
   <main class="page-content">
-    <section class="hero">
+    <section class="hero" *ngIf="!isMobile">
       <div class="hero-text">
         <h1>Scriptorium</h1>
         <p class="hero-lead">
@@ -144,10 +144,19 @@
                       <markdown [data]="task.resultShort"></markdown>
                     </div>
                     <div class="actions">
-                      <button mat-stroked-button color="primary" (click)="toggleExpand(task.id)">
-                        {{ isExpanded(task.id) ? 'Свернуть' : 'Развернуть' }}
+                      <button
+                        type="button"
+                        class="expand-toggle"
+                        mat-icon-button
+                        (click)="toggleExpand(task.id)"
+                        [attr.aria-label]="isExpanded(task.id) ? 'Свернуть расшифровку' : 'Развернуть расшифровку'"
+                      >
+                        <mat-icon>{{ isExpanded(task.id) ? 'expand_less' : 'expand_more' }}</mat-icon>
                       </button>
-                      <a [routerLink]="['/recognized', task.slug]" class="recognized-link">Полная версия</a>
+                      <a [routerLink]="['/recognized', task.slug]" class="recognized-link">
+                        <mat-icon aria-hidden="true">open_in_new</mat-icon>
+                        <span>Полная версия</span>
+                      </a>
                     </div>
                   </ng-template>
                 </td>
@@ -245,10 +254,19 @@
                   <markdown [data]="task.resultShort"></markdown>
                 </div>
                 <div class="actions mobile-actions">
-                  <button mat-stroked-button color="primary" (click)="toggleExpand(task.id)">
-                    {{ isExpanded(task.id) ? 'Свернуть' : 'Развернуть' }}
+                  <button
+                    type="button"
+                    class="expand-toggle"
+                    mat-icon-button
+                    (click)="toggleExpand(task.id)"
+                    [attr.aria-label]="isExpanded(task.id) ? 'Свернуть расшифровку' : 'Развернуть расшифровку'"
+                  >
+                    <mat-icon>{{ isExpanded(task.id) ? 'expand_less' : 'expand_more' }}</mat-icon>
                   </button>
-                  <a [routerLink]="['/recognized', task.slug]" class="recognized-link">Полная версия</a>
+                  <a [routerLink]="['/recognized', task.slug]" class="recognized-link">
+                    <mat-icon aria-hidden="true">open_in_new</mat-icon>
+                    <span>Полная версия</span>
+                  </a>
                 </div>
               </ng-template>
             </section>
