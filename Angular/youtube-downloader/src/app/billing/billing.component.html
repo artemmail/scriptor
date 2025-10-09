@@ -1,66 +1,135 @@
-<div class="billing-container" *ngIf="!loadingPlans && !loadingWallet; else loadingTemplate">
-  <section class="wallet" *ngIf="wallet">
-    <mat-card>
-      <mat-card-header>
-        <mat-card-title>Баланс для распознавания митингов</mat-card-title>
-        <mat-card-subtitle>Средства списываются при обработке митингов</mat-card-subtitle>
-      </mat-card-header>
-      <mat-card-content>
-        <div class="wallet__balance">
-          <span class="wallet__amount">{{ wallet.balance | number:'1.0-2' }} {{ wallet.currency }}</span>
-          <span class="wallet__hint" *ngIf="infoMessage">{{ infoMessage }}</span>
+<div class="billing-page" *ngIf="!loadingPlans && !loadingWallet; else loadingTemplate">
+  <main class="page-content">
+    <section class="hero">
+      <div class="hero-text">
+        <h1>Управляйте балансом YouScriptor в одном месте</h1>
+        <p class="hero-lead">
+          Пополняйте кошелёк, выбирайте подписки и контролируйте расходы на распознавание — интерфейс создан в
+          стиле главной страницы, чтобы вам было комфортно работать каждый день.
+        </p>
+        <ul class="hero-highlights">
+          <li *ngFor="let highlight of heroHighlights">{{ highlight }}</li>
+        </ul>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#wallet">Пополнить баланс</a>
+          <a class="btn btn-secondary" [routerLink]="['/transcriptions']">Перейти к задачам</a>
         </div>
-        <form class="wallet__form" (ngSubmit)="deposit()">
-          <mat-form-field appearance="outline">
-            <mat-label>Сумма пополнения</mat-label>
-            <input matInput type="number" [formControl]="depositControl" min="100" max="100000" step="100" />
-            <mat-hint>Минимум 100 ₽</mat-hint>
-            <mat-error *ngIf="depositControl.hasError('required')">Укажите сумму</mat-error>
-            <mat-error *ngIf="depositControl.hasError('min')">Минимальная сумма — 100 ₽</mat-error>
-            <mat-error *ngIf="depositControl.hasError('max')">Максимальная сумма — 100000 ₽</mat-error>
-          </mat-form-field>
-          <button mat-flat-button color="primary" type="submit" [disabled]="depositControl.invalid || submitting">
-            Пополнить кошелёк
-          </button>
-        </form>
-      </mat-card-content>
-    </mat-card>
-  </section>
+      </div>
 
-  <section class="plans">
-    <h2>Подписки</h2>
-    <div class="plans__grid">
-      <mat-card *ngFor="let plan of plans" class="plan-card">
-        <mat-card-header>
-          <mat-card-title>{{ plan.name }}</mat-card-title>
-          <mat-card-subtitle>{{ getPlanDuration(plan) }}</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content>
-          <p class="plan-card__price">{{ formatPrice(plan) }}</p>
-          <p class="plan-card__description" *ngIf="plan.description">{{ plan.description }}</p>
-          <mat-list>
-            <mat-list-item *ngIf="plan.canHideCaptions">
-              <mat-icon matListItemIcon color="primary">visibility_off</mat-icon>
-              <span matListItemTitle>Скрытие собственных видео из общего доступа</span>
-            </mat-list-item>
-            <mat-list-item *ngIf="plan.isUnlimitedRecognitions">
-              <mat-icon matListItemIcon color="primary">speed</mat-icon>
-              <span matListItemTitle>Без ограничений на количество распознаваний</span>
-            </mat-list-item>
-            <mat-list-item *ngIf="!plan.canHideCaptions && !plan.isUnlimitedRecognitions">
-              <mat-icon matListItemIcon color="primary">star</mat-icon>
-              <span matListItemTitle>Специальные возможности аккаунта</span>
-            </mat-list-item>
-          </mat-list>
-        </mat-card-content>
-        <mat-card-actions>
-          <button mat-stroked-button color="primary" (click)="buyPlan(plan)" [disabled]="submitting">
-            Оформить подписку
-          </button>
-        </mat-card-actions>
-      </mat-card>
-    </div>
-  </section>
+      <div class="hero-card" id="wallet">
+        <div class="card-header">Баланс кошелька</div>
+        <ng-container *ngIf="wallet; else walletUnavailable">
+          <div class="card-balance">
+            <div class="card-balance__amount">
+              {{ wallet.balance | number: '1.0-2' }}
+              <span class="card-balance__currency">{{ wallet.currency }}</span>
+            </div>
+            <div class="card-balance__hint" *ngIf="infoMessage; else defaultHint">{{ infoMessage }}</div>
+            <ng-template #defaultHint>
+              <div class="card-balance__hint">Средства списываются автоматически при обработке задач.</div>
+            </ng-template>
+          </div>
+
+          <form class="deposit-form" (ngSubmit)="deposit()">
+            <mat-form-field appearance="outline">
+              <mat-label>Сумма пополнения</mat-label>
+              <input
+                matInput
+                type="number"
+                [formControl]="depositControl"
+                min="100"
+                max="100000"
+                step="100"
+                placeholder="Например, 2000"
+              />
+              <mat-hint>Минимум 100 ₽</mat-hint>
+              <mat-error *ngIf="depositControl.hasError('required')">Укажите сумму</mat-error>
+              <mat-error *ngIf="depositControl.hasError('min')">Минимальная сумма — 100 ₽</mat-error>
+              <mat-error *ngIf="depositControl.hasError('max')">Максимальная сумма — 100000 ₽</mat-error>
+            </mat-form-field>
+
+            <button class="btn btn-primary" type="submit" [disabled]="depositControl.invalid || submitting">
+              Пополнить кошелёк
+            </button>
+          </form>
+
+          <div class="info-banner" *ngIf="infoMessage" aria-live="polite">{{ infoMessage }}</div>
+        </ng-container>
+
+        <ng-template #walletUnavailable>
+          <div class="empty-state">
+            <mat-icon>account_balance_wallet</mat-icon>
+            <h4>Не удалось загрузить баланс</h4>
+            <p>Попробуйте обновить страницу или обратитесь в поддержку.</p>
+          </div>
+        </ng-template>
+      </div>
+    </section>
+
+    <section class="billing-features">
+      <div class="section-header">
+        <h2>Биллинг, которому доверяют команды</h2>
+        <p>Понятные инструменты управления финансами, чтобы вы могли сосредоточиться на работе с расшифровками.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card" *ngFor="let advantage of advantages">
+          <div class="feature-icon">
+            <mat-icon>{{ advantage.icon }}</mat-icon>
+          </div>
+          <h3>{{ advantage.title }}</h3>
+          <p>{{ advantage.description }}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="plans">
+      <div class="section-header">
+        <h2>Подписки на ваши задачи</h2>
+        <p>Выберите подходящий план — можно подключить бессрочную лицензию или оформить регулярные списания.</p>
+      </div>
+      <div class="plans__grid" *ngIf="plans.length; else plansEmpty">
+        <mat-card *ngFor="let plan of plans" class="plan-card">
+          <mat-card-header>
+            <div mat-card-avatar class="plan-card__badge">
+              <mat-icon>{{ plan.isUnlimitedRecognitions ? 'bolt' : 'star' }}</mat-icon>
+            </div>
+            <mat-card-title>{{ plan.name }}</mat-card-title>
+            <mat-card-subtitle>{{ getPlanDuration(plan) }}</mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            <p class="plan-card__price">{{ formatPrice(plan) }}</p>
+            <p class="plan-card__description" *ngIf="plan.description">{{ plan.description }}</p>
+            <mat-nav-list class="plan-benefits">
+              <mat-list-item *ngIf="plan.canHideCaptions">
+                <mat-icon matListItemIcon color="primary">visibility_off</mat-icon>
+                <span matListItemTitle>Скрытие собственных видео из общего доступа</span>
+              </mat-list-item>
+              <mat-list-item *ngIf="plan.isUnlimitedRecognitions">
+                <mat-icon matListItemIcon color="primary">speed</mat-icon>
+                <span matListItemTitle>Без ограничений на количество распознаваний</span>
+              </mat-list-item>
+              <mat-list-item *ngIf="!plan.canHideCaptions && !plan.isUnlimitedRecognitions">
+                <mat-icon matListItemIcon color="primary">workspace_premium</mat-icon>
+                <span matListItemTitle>Специальные возможности аккаунта</span>
+              </mat-list-item>
+            </mat-nav-list>
+          </mat-card-content>
+          <mat-card-actions>
+            <button class="btn btn-outline plan-card__action" type="button" (click)="buyPlan(plan)" [disabled]="submitting">
+              Оформить подписку
+            </button>
+          </mat-card-actions>
+        </mat-card>
+      </div>
+      <ng-template #plansEmpty>
+        <div class="empty-state plans-empty">
+          <mat-icon>inventory_2</mat-icon>
+          <h4>Тарифы временно недоступны</h4>
+          <p>Мы уже работаем над обновлением предложений. Попробуйте открыть страницу позднее.</p>
+        </div>
+      </ng-template>
+    </section>
+  </main>
 </div>
 
 <ng-template #loadingTemplate>

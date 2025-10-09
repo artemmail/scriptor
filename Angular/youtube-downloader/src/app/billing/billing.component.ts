@@ -3,7 +3,6 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -21,7 +20,6 @@ import { PaymentsService, SubscriptionPlan, WalletBalance } from '../services/pa
     RouterModule,
     ReactiveFormsModule,
     MatCardModule,
-    MatButtonModule,
     MatIconModule,
     MatListModule,
     MatSnackBarModule,
@@ -46,6 +44,29 @@ export class BillingComponent implements OnInit, OnDestroy {
   loadingWallet = false;
   submitting = false;
   infoMessage = '';
+  readonly heroHighlights = [
+    'Пополнение кошелька без комиссий и с мгновенным зачислением',
+    'Гибкие подписки под регулярные задачи команды',
+    'Прозрачная аналитика по каждому списанию'
+  ];
+
+  readonly advantages = [
+    {
+      icon: 'payments',
+      title: 'Единый кошелёк',
+      description: 'Оплачивайте распознавание из общего баланса и не беспокойтесь о множестве счетов и договоров.'
+    },
+    {
+      icon: 'schedule',
+      title: 'Планирование бюджетов',
+      description: 'Проверяйте остаток перед крупными проектами и пополняйте кошелёк в пару кликов.'
+    },
+    {
+      icon: 'support_agent',
+      title: 'Поддержка 24/7',
+      description: 'Команда YouScriptor поможет с выставлением счетов, актами и подбором тарифа.'
+    }
+  ];
 
   constructor(
     private readonly paymentsService: PaymentsService,
