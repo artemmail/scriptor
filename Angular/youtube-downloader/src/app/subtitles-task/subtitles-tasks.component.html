@@ -114,6 +114,7 @@
                 </td>
               </ng-container>
 
+              
               <ng-container matColumnDef="channelName">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header="channelName">Канал</th>
                 <td mat-cell *matCellDef="let task">{{ task.channelName }}</td>
@@ -222,12 +223,10 @@
                 <img src="assets/yt.webp" alt="YouTube" class="youtube-logo">
               </button>
               <div class="mobile-task-meta">
-                <a [routerLink]="['/recognized', task.slug]" class="mobile-task-title">{{ task.title }}</a>
-                <span class="mobile-task-channel">Канал: {{ task.channelName }}</span>
+                <a [routerLink]="['/recognized', task.slug]" class="mobile-task-title">{{ task.title }}</a><br>
+                <span class="mobile-task-channel">Канал: {{ task.channelName }}  </span>
                 <span class="mobile-task-date">{{ task.createdAt | localTime:'yyyy-MM-dd HH:mm' }}</span>
-                <span class="mobile-task-status" [ngClass]="getStatusClass(task.status)">
-                  {{ getStatusText(task.status) }}
-                </span>
+                
               </div>
             </header>
 
