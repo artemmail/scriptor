@@ -235,7 +235,10 @@ namespace YandexSpeech.services
 
             try
             {
-                segment.ProcessedText = await _punctuation.FixPunctuationAsync(segment.Text, null);
+                segment.ProcessedText = await _punctuation.FixPunctuationAsync(
+                    segment.Text,
+                    null,
+                    RecognitionProfileNames.PunctuationOnly);
             }
             catch
             {
@@ -259,7 +262,13 @@ namespace YandexSpeech.services
             var processed = new List<string>();
             foreach (var text in rawSegments)
             {
-                try { processed.Add(await _punctuation.FixPunctuationAsync(text, null)); }
+                try
+                {
+                    processed.Add(await _punctuation.FixPunctuationAsync(
+                        text,
+                        null,
+                        RecognitionProfileNames.PunctuationOnly));
+                }
                 catch { processed.Add(text); }
             }
 

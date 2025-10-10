@@ -32,6 +32,8 @@ namespace YandexSpeech.services
         private readonly IYandexDiskDownloadService _yandexDiskDownloadService;
         private readonly IFfmpegService _ffmpegService;
 
+        protected virtual string SegmentProcessingProfileName => RecognitionProfileNames.PunctuationOnly;
+
         public OpenAiTranscriptionService(
             MyDbContext dbContext,
             IConfiguration configuration,
@@ -455,6 +457,7 @@ namespace YandexSpeech.services
                     processedText = await _punctuationService.FixPunctuationAsync(
                         next.Text,
                         context,
+                        SegmentProcessingProfileName,
                         task.Clarification);
                 }
                 catch

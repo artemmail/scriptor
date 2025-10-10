@@ -29,7 +29,7 @@ namespace YandexSpeech.services
 
         public YoutubeCaptionService(
             MyDbContext dbContext,
-            PunctuationService punctuationService,
+            IPunctuationService punctuationService,
             CaptionService captionService,
             IYSubtitlesService slugService,
             ILogger<YoutubeCaptionService> logger)
@@ -277,7 +277,10 @@ namespace YandexSpeech.services
             string processed;
             try
             {
-                processed = await _punctuationService.FixPunctuationAsync(next.Text, previousContext);
+                processed = await _punctuationService.FixPunctuationAsync(
+                    next.Text,
+                    previousContext,
+                    RecognitionProfileNames.PunctuationOnly);
             }
             catch
             {
