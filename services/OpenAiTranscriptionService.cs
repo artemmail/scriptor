@@ -349,10 +349,21 @@ namespace YandexSpeech.services
 
                 var captionSegments = BuildCaptionSegmentsFromWhisper(parsed);
                 var processor = new CaptionProcessor();
+
+                var segmentBlockSize = await GetSegmentBlockSizeAsync(SegmentProcessingProfileName);
+                var maxWordsInSegment = segmentBlockSize.HasValue && segmentBlockSize.Value > 0
+                    ? segmentBlockSize.Value
+                    : int.MaxValue;
+                var windowSize = 400;
+                if (segmentBlockSize.HasValue && segmentBlockSize.Value > 0)
+                {
+                    windowSize = Math.Max(1, Math.Min(400, segmentBlockSize.Value));
+                }
+
                 var blocks = processor.SegmentCaptionSegmentsDetailed(
                     captionSegments,
-                    maxWordsInSegment: 4000,
-                    windowSize: 400,
+                    maxWordsInSegment: maxWordsInSegment,
+                    windowSize: windowSize,
                     pauseThreshold: 1.0);
 
                 var existing = _dbContext.OpenAiRecognizedSegments.Where(s => s.TaskId == task.Id);
@@ -566,6 +577,27 @@ namespace YandexSpeech.services
             if (value >= length)
                 return length - 1;
             return value;
+        }
+
+        private async Task<int?> GetSegmentBlockSizeAsync(string profileName)
+        {
+            if (string.IsNullOrWhiteSpace(profileName))
+                return null;
+
+            var blockSize = await _dbContext.RecognitionProfiles
+                .AsNoTracking()
+                .Where(p => p.Name == profileName)
+                .Select(p => (int?)p.SegmentBlockSize)
+                .FirstOrDefaultAsync();
+
+            if (blockSize is null)
+            {
+                _logger.LogWarning(
+                    "Recognition profile {ProfileName} not found while determining segment block size.",
+                    profileName);
+            }
+
+            return blockSize;
         }
 
         private static List<CaptionSegment> BuildCaptionSegmentsFromWhisper(WhisperTranscriptionResponse parsed)
