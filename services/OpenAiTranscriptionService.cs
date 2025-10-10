@@ -573,7 +573,8 @@ namespace YandexSpeech.services
 
             task.SegmentsProcessed = task.SegmentsTotal;
             task.ProcessedText = string.Join("\n", processedSegments);
-            task.Status = OpenAiTranscriptionStatus.Done;
+            task.Status = OpenAiTranscriptionStatus.Done;            
+            task.Done = true;
             task.ModifiedAt = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
         }
