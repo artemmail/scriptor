@@ -28,6 +28,8 @@ namespace YandexSpeech.Controllers
                 .Select(p => new RecognitionProfileDto
                 {
                     Id = p.Id,
+                    Name = p.Name,
+                    DisplayedName = p.DisplayedName,
                     Request = p.Request,
                     ClarificationTemplate = p.ClarificationTemplate,
                     OpenAiModel = p.OpenAiModel,
@@ -56,6 +58,8 @@ namespace YandexSpeech.Controllers
 
             var profile = new RecognitionProfile
             {
+                Name = validationResult.Name!,
+                DisplayedName = validationResult.DisplayedName!,
                 Request = validationResult.Request!,
                 ClarificationTemplate = validationResult.ClarificationTemplate,
                 OpenAiModel = validationResult.OpenAiModel!,
@@ -94,6 +98,8 @@ namespace YandexSpeech.Controllers
             }
 
             profile.Request = validationResult.Request!;
+            profile.Name = validationResult.Name!;
+            profile.DisplayedName = validationResult.DisplayedName!;
             profile.ClarificationTemplate = validationResult.ClarificationTemplate;
             profile.OpenAiModel = validationResult.OpenAiModel!;
             profile.SegmentBlockSize = validationResult.SegmentBlockSize!.Value;
@@ -123,6 +129,8 @@ namespace YandexSpeech.Controllers
         private static RecognitionProfileDto Map(RecognitionProfile profile) => new RecognitionProfileDto
         {
             Id = profile.Id,
+            Name = profile.Name,
+            DisplayedName = profile.DisplayedName,
             Request = profile.Request,
             ClarificationTemplate = profile.ClarificationTemplate,
             OpenAiModel = profile.OpenAiModel,
@@ -132,6 +140,36 @@ namespace YandexSpeech.Controllers
         private static ValidationResultModel ValidateRequest(UpsertRecognitionProfileRequest request)
         {
             var result = new ValidationResultModel();
+
+            var trimmedName = request.Name?.Trim();
+            if (string.IsNullOrWhiteSpace(trimmedName))
+            {
+                result.IsValid = false;
+                result.ErrorMessage = "Name is required";
+                return result;
+            }
+
+            if (trimmedName!.Length > 200)
+            {
+                result.IsValid = false;
+                result.ErrorMessage = "Name cannot exceed 200 characters";
+                return result;
+            }
+
+            var trimmedDisplayedName = request.DisplayedName?.Trim();
+            if (string.IsNullOrWhiteSpace(trimmedDisplayedName))
+            {
+                result.IsValid = false;
+                result.ErrorMessage = "DisplayedName is required";
+                return result;
+            }
+
+            if (trimmedDisplayedName!.Length > 200)
+            {
+                result.IsValid = false;
+                result.ErrorMessage = "DisplayedName cannot exceed 200 characters";
+                return result;
+            }
 
             var trimmedRequest = request.Request?.Trim();
             if (string.IsNullOrWhiteSpace(trimmedRequest))
@@ -159,6 +197,8 @@ namespace YandexSpeech.Controllers
             result.IsValid = true;
             result.Request = trimmedRequest;
             result.OpenAiModel = trimmedModel;
+            result.Name = trimmedName;
+            result.DisplayedName = trimmedDisplayedName;
             result.ClarificationTemplate = string.IsNullOrWhiteSpace(request.ClarificationTemplate)
                 ? null
                 : request.ClarificationTemplate.Trim();
@@ -171,6 +211,8 @@ namespace YandexSpeech.Controllers
         {
             public bool IsValid { get; set; }
             public string? ErrorMessage { get; set; }
+            public string? Name { get; set; }
+            public string? DisplayedName { get; set; }
             public string? Request { get; set; }
             public string? ClarificationTemplate { get; set; }
             public string? OpenAiModel { get; set; }
