@@ -110,7 +110,11 @@ public sealed class OpenAiTranscriptionServiceTests
     {
         public Task<string> GetAvailableModelsAsync() => Task.FromResult("stub");
 
-        public Task<string> FixPunctuationAsync(string rawText, string previousContext, string? clarification = null)
+        public Task<string> FixPunctuationAsync(
+            string rawText,
+            string? previousContext,
+            string profileName,
+            string? clarification = null)
             => Task.FromResult($"{rawText}-processed");
     }
 

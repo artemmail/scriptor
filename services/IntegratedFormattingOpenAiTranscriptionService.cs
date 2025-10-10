@@ -14,6 +14,8 @@ namespace YandexSpeech.services
     /// </summary>
     public class IntegratedFormattingOpenAiTranscriptionService : OpenAiTranscriptionService
     {
+        protected override string SegmentProcessingProfileName => RecognitionProfileNames.IntegratedFormatting;
+
         public IntegratedFormattingOpenAiTranscriptionService(
             MyDbContext dbContext,
             IConfiguration configuration,
