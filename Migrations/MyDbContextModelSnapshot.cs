@@ -500,6 +500,16 @@ namespace YandexSpeech.Migrations
                     b.Property<string>("ClarificationTemplate")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("DisplayedName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<string>("OpenAiModel")
                         .IsRequired()
                         .HasMaxLength(200)

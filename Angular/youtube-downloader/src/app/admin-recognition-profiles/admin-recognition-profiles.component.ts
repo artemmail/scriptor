@@ -37,7 +37,7 @@ export class AdminRecognitionProfilesComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
 
   profiles: RecognitionProfile[] = [];
-  displayedColumns = ['id', 'openAiModel', 'segmentBlockSize', 'request', 'actions'];
+  displayedColumns = ['id', 'name', 'displayedName', 'openAiModel', 'segmentBlockSize', 'request', 'actions'];
   loading = false;
   saving = false;
   deletingId: number | null = null;
@@ -47,6 +47,8 @@ export class AdminRecognitionProfilesComponent implements OnInit {
   isCreating = false;
 
   readonly form = this.fb.nonNullable.group({
+    name: ['', [Validators.required, Validators.maxLength(200)]],
+    displayedName: ['', [Validators.required, Validators.maxLength(200)]],
     request: ['', [Validators.required, Validators.maxLength(4000)]],
     clarificationTemplate: [''],
     openAiModel: ['', [Validators.required, Validators.maxLength(200)]],
@@ -85,6 +87,8 @@ export class AdminRecognitionProfilesComponent implements OnInit {
     this.selectedProfile = profile;
     this.isCreating = false;
     this.form.setValue({
+      name: profile.name,
+      displayedName: profile.displayedName,
       request: profile.request,
       clarificationTemplate: profile.clarificationTemplate ?? '',
       openAiModel: profile.openAiModel,
@@ -96,6 +100,8 @@ export class AdminRecognitionProfilesComponent implements OnInit {
     this.selectedProfile = null;
     this.isCreating = true;
     this.form.reset({
+      name: '',
+      displayedName: '',
       request: '',
       clarificationTemplate: '',
       openAiModel: '',
@@ -110,6 +116,8 @@ export class AdminRecognitionProfilesComponent implements OnInit {
     }
 
     const payload: RecognitionProfileInput = {
+      name: this.form.value.name?.trim() ?? '',
+      displayedName: this.form.value.displayedName?.trim() ?? '',
       request: this.form.value.request?.trim() ?? '',
       clarificationTemplate: this.form.value.clarificationTemplate?.trim() || null,
       openAiModel: this.form.value.openAiModel?.trim() ?? '',
@@ -158,6 +166,8 @@ export class AdminRecognitionProfilesComponent implements OnInit {
             this.selectedProfile = null;
             this.isCreating = false;
             this.form.reset({
+              name: '',
+              displayedName: '',
               request: '',
               clarificationTemplate: '',
               openAiModel: '',
