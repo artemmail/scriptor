@@ -226,7 +226,22 @@ namespace YandexSpeech.services
             await _dbContext.SaveChangesAsync();
 
             var processor = new CaptionProcessor();
-            var segments = processor.SegmentCaptions(captions, maxWordsInSegment: 4000, windowSize: 400, pauseThreshold: 1.0);
+
+            var segmentBlockSize = await GetSegmentBlockSizeAsync(RecognitionProfileNames.PunctuationOnly);
+            var maxWordsInSegment = segmentBlockSize.HasValue && segmentBlockSize.Value > 0
+                ? segmentBlockSize.Value
+                : int.MaxValue;
+            var windowSize = 400;
+            if (segmentBlockSize.HasValue && segmentBlockSize.Value > 0)
+            {
+                windowSize = Math.Max(1, Math.Min(400, segmentBlockSize.Value));
+            }
+
+            var segments = processor.SegmentCaptions(
+                captions,
+                maxWordsInSegment: maxWordsInSegment,
+                windowSize: windowSize,
+                pauseThreshold: 1.0);
 
             int order = 0;
             var newSegments = segments.Select(s => new RecognizedSegment
@@ -321,6 +336,27 @@ namespace YandexSpeech.services
             await _dbContext.SaveChangesAsync();
 
             await _slugService.NotifyYandexAsync("ru-ticker.com", "f59e3d2c25e394fb", task.Slug);
+        }
+
+        private async Task<int?> GetSegmentBlockSizeAsync(string profileName)
+        {
+            if (string.IsNullOrWhiteSpace(profileName))
+                return null;
+
+            var blockSize = await _dbContext.RecognitionProfiles
+                .AsNoTracking()
+                .Where(p => p.Name == profileName)
+                .Select(p => (int?)p.SegmentBlockSize)
+                .FirstOrDefaultAsync();
+
+            if (blockSize is null)
+            {
+                _logger.LogWarning(
+                    "Recognition profile {ProfileName} not found while determining segment block size.",
+                    profileName);
+            }
+
+            return blockSize;
         }
 
         private string CreatePreview(string text, int wordCount)
