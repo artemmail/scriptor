@@ -68,7 +68,8 @@ namespace YandexSpeech.Controllers
         public async Task<ActionResult<OpenAiTranscriptionTaskDto>> Upload(
             [FromForm] IFormFile? file,
             [FromForm] string? fileUrl,
-            [FromForm] string? clarification)
+            [FromForm] string? clarification,
+            [FromForm] int? recognitionProfileId)
         {
             var normalizedUrl = string.IsNullOrWhiteSpace(fileUrl) ? null : fileUrl.Trim();
             var hasFile = file != null && file.Length > 0;
@@ -115,11 +116,40 @@ namespace YandexSpeech.Controllers
                 ? null
                 : clarification.Trim();
 
+            var profileQuery = _dbContext.RecognitionProfiles
+                .AsNoTracking()
+                .AsQueryable();
+
+            RecognitionProfile? profile;
+
+            if (recognitionProfileId.HasValue)
+            {
+                profile = await profileQuery
+                    .FirstOrDefaultAsync(p => p.Id == recognitionProfileId.Value);
+
+                if (profile == null)
+                {
+                    return BadRequest("Указанный профиль распознавания не найден.");
+                }
+            }
+            else
+            {
+                profile = await profileQuery
+                    .FirstOrDefaultAsync(p => p.Name == RecognitionProfileNames.PunctuationOnly);
+
+                if (profile == null)
+                {
+                    return BadRequest("Профиль распознавания по умолчанию не найден.");
+                }
+            }
+
             var task = await _transcriptionService.StartTranscriptionAsync(
                 storedFilePath,
                 userId,
                 sanitizedClarification,
-                hasUrl ? normalizedUrl : null);
+                hasUrl ? normalizedUrl : null,
+                profile.Id,
+                profile.DisplayedName);
 
             _ = Task.Run(async () =>
             {
@@ -135,7 +165,23 @@ namespace YandexSpeech.Controllers
                 }
             });
 
-            return CreatedAtAction(nameof(GetById), new { id = task.Id }, MapToDto(task));
+            return CreatedAtAction(
+                nameof(GetById),
+                new { id = task.Id },
+                MapToDto(
+                    task.Id,
+                    task.SourceFilePath,
+                    task.Status,
+                    task.Done,
+                    task.Error,
+                    task.CreatedAt,
+                    task.ModifiedAt,
+                    task.SegmentsTotal,
+                    task.SegmentsProcessed,
+                    task.Clarification,
+                    task.RecognitionProfileId,
+                    profile.Name,
+                    task.RecognitionProfileDisplayedName ?? profile.DisplayedName));
         }
 
         [HttpGet]
@@ -161,7 +207,11 @@ namespace YandexSpeech.Controllers
                     t.ModifiedAt,
                     t.SegmentsTotal,
                     t.SegmentsProcessed,
-                    t.Clarification
+                    t.Clarification,
+                    t.RecognitionProfileId,
+                    ProfileName = t.RecognitionProfile != null ? t.RecognitionProfile.Name : null,
+                    ProfileDisplayedName = t.RecognitionProfileDisplayedName
+                        ?? (t.RecognitionProfile != null ? t.RecognitionProfile.DisplayedName : null)
                 })
                 .ToListAsync();
 
@@ -176,9 +226,30 @@ namespace YandexSpeech.Controllers
                     t.ModifiedAt,
                     t.SegmentsTotal,
                     t.SegmentsProcessed,
-                    t.Clarification))
+                    t.Clarification,
+                    t.RecognitionProfileId,
+                    t.ProfileName,
+                    t.ProfileDisplayedName))
                 .ToList();
             return Ok(result);
+        }
+
+        [HttpGet("recognition-profiles")]
+        public async Task<ActionResult<IEnumerable<OpenAiRecognitionProfileOptionDto>>> GetRecognitionProfiles()
+        {
+            var profiles = await _dbContext.RecognitionProfiles
+                .AsNoTracking()
+                .OrderBy(p => p.DisplayedName)
+                .Select(p => new OpenAiRecognitionProfileOptionDto
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    DisplayedName = p.DisplayedName,
+                    ClarificationTemplate = p.ClarificationTemplate
+                })
+                .ToListAsync();
+
+            return Ok(profiles);
         }
 
         [HttpGet("{id}")]
@@ -442,6 +513,7 @@ namespace YandexSpeech.Controllers
         {
             var task = await _dbContext.OpenAiTranscriptionTasks
                 .AsNoTracking()
+                .Include(t => t.RecognitionProfile)
                 .FirstOrDefaultAsync(t => t.Id == taskId && t.CreatedBy == createdBy);
 
             if (task == null)
@@ -635,6 +707,10 @@ namespace YandexSpeech.Controllers
 
         private static OpenAiTranscriptionTaskDto MapToDto(OpenAiTranscriptionTask task)
         {
+            var recognitionProfileName = task.RecognitionProfile?.Name;
+            var recognitionProfileDisplayedName = task.RecognitionProfileDisplayedName
+                ?? task.RecognitionProfile?.DisplayedName;
+
             return MapToDto(
                 task.Id,
                 task.SourceFilePath,
@@ -645,7 +721,10 @@ namespace YandexSpeech.Controllers
                 task.ModifiedAt,
                 task.SegmentsTotal,
                 task.SegmentsProcessed,
-                task.Clarification);
+                task.Clarification,
+                task.RecognitionProfileId,
+                recognitionProfileName,
+                recognitionProfileDisplayedName);
         }
 
         private static OpenAiTranscriptionTaskDto MapToDto(
@@ -658,7 +737,10 @@ namespace YandexSpeech.Controllers
             DateTime modifiedAt,
             int segmentsTotal,
             int segmentsProcessed,
-            string? clarification)
+            string? clarification,
+            int? recognitionProfileId,
+            string? recognitionProfileName,
+            string? recognitionProfileDisplayedName)
         {
             return new OpenAiTranscriptionTaskDto
             {
@@ -672,7 +754,10 @@ namespace YandexSpeech.Controllers
                 ModifiedAt = modifiedAt,
                 SegmentsTotal = segmentsTotal,
                 SegmentsProcessed = segmentsProcessed,
-                Clarification = clarification
+                Clarification = clarification,
+                RecognitionProfileId = recognitionProfileId,
+                RecognitionProfileName = recognitionProfileName,
+                RecognitionProfileDisplayedName = recognitionProfileDisplayedName
             };
         }
 
@@ -692,7 +777,11 @@ namespace YandexSpeech.Controllers
                 ProcessedText = task.ProcessedText,
                 MarkdownText = task.MarkdownText,
                 HasSegments = !string.IsNullOrWhiteSpace(task.SegmentsJson),
-                Clarification = task.Clarification
+                Clarification = task.Clarification,
+                RecognitionProfileId = task.RecognitionProfileId,
+                RecognitionProfileName = task.RecognitionProfile?.Name,
+                RecognitionProfileDisplayedName = task.RecognitionProfileDisplayedName
+                    ?? task.RecognitionProfile?.DisplayedName
             };
 
             dto.Steps = task.Steps?

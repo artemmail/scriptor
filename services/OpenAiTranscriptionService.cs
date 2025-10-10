@@ -61,7 +61,9 @@ namespace YandexSpeech.services
             string sourceFilePath,
             string createdBy,
             string? clarification = null,
-            string? sourceFileUrl = null)
+            string? sourceFileUrl = null,
+            int? recognitionProfileId = null,
+            string? recognitionProfileDisplayedName = null)
         {
             if (string.IsNullOrWhiteSpace(sourceFilePath))
                 throw new ArgumentException("Source file path must be provided.", nameof(sourceFilePath));
@@ -85,7 +87,11 @@ namespace YandexSpeech.services
                     : OpenAiTranscriptionStatus.Downloading,
                 Done = false,
                 CreatedAt = DateTime.UtcNow,
-                ModifiedAt = DateTime.UtcNow
+                ModifiedAt = DateTime.UtcNow,
+                RecognitionProfileId = recognitionProfileId,
+                RecognitionProfileDisplayedName = string.IsNullOrWhiteSpace(recognitionProfileDisplayedName)
+                    ? null
+                    : recognitionProfileDisplayedName.Trim()
             };
 
             _dbContext.OpenAiTranscriptionTasks.Add(task);
@@ -99,6 +105,7 @@ namespace YandexSpeech.services
             var task = await _dbContext.OpenAiTranscriptionTasks
                 .Include(t => t.Steps)
                 .Include(t => t.Segments)
+                .Include(t => t.RecognitionProfile)
                 .FirstOrDefaultAsync(t => t.Id == taskId);
 
             if (task == null)
@@ -112,6 +119,7 @@ namespace YandexSpeech.services
         {
             var task = await _dbContext.OpenAiTranscriptionTasks
                 .Include(t => t.Steps)
+                .Include(t => t.RecognitionProfile)
                 .FirstOrDefaultAsync(t => t.Id == taskId);
 
             if (task == null)
@@ -350,7 +358,8 @@ namespace YandexSpeech.services
                 var captionSegments = BuildCaptionSegmentsFromWhisper(parsed);
                 var processor = new CaptionProcessor();
 
-                var segmentBlockSize = await GetSegmentBlockSizeAsync(SegmentProcessingProfileName);
+                var recognitionProfile = await GetTaskRecognitionProfileNameAsync(task);
+                var segmentBlockSize = await GetSegmentBlockSizeAsync(recognitionProfile);
                 var maxWordsInSegment = segmentBlockSize.HasValue && segmentBlockSize.Value > 0
                     ? segmentBlockSize.Value
                     : int.MaxValue;
@@ -462,10 +471,11 @@ namespace YandexSpeech.services
                 try
                 {
                     var context = string.Join("\n", previousContext);
+                    var recognitionProfile = await GetTaskRecognitionProfileNameAsync(task);
                     processedText = await _punctuationService.FixPunctuationAsync(
                         next.Text,
                         context,
-                        SegmentProcessingProfileName,
+                        recognitionProfile,
                         task.Clarification);
                 }
                 catch
@@ -598,6 +608,31 @@ namespace YandexSpeech.services
             }
 
             return blockSize;
+        }
+
+        private async Task<string> GetTaskRecognitionProfileNameAsync(OpenAiTranscriptionTask task)
+        {
+            if (task.RecognitionProfileId.HasValue)
+            {
+                var reference = _dbContext.Entry(task).Reference(t => t.RecognitionProfile);
+                if (!reference.IsLoaded)
+                {
+                    await reference.LoadAsync();
+                }
+
+                var name = task.RecognitionProfile?.Name;
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    return name;
+                }
+
+                _logger.LogWarning(
+                    "Recognition profile with id {ProfileId} not found for task {TaskId}. Falling back to default profile.",
+                    task.RecognitionProfileId,
+                    task.Id);
+            }
+
+            return SegmentProcessingProfileName;
         }
 
         private static List<CaptionSegment> BuildCaptionSegmentsFromWhisper(WhisperTranscriptionResponse parsed)

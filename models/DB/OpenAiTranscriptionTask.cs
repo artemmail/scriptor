@@ -48,6 +48,14 @@ namespace YandexSpeech.models.DB
 
         public string? Clarification { get; set; }
 
+        public int? RecognitionProfileId { get; set; }
+
+        [MaxLength(200)]
+        public string? RecognitionProfileDisplayedName { get; set; }
+
+        [ForeignKey(nameof(RecognitionProfileId))]
+        public virtual RecognitionProfile? RecognitionProfile { get; set; }
+
         public OpenAiTranscriptionStatus Status { get; set; } = OpenAiTranscriptionStatus.Created;
 
         public bool Done { get; set; }

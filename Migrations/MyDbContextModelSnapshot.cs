@@ -594,6 +594,13 @@ namespace YandexSpeech.Migrations
                     b.Property<string>("ProcessedText")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("RecognitionProfileDisplayedName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("RecognitionProfileId")
+                        .HasColumnType("int");
+
                     b.Property<string>("RecognizedText")
                         .HasColumnType("nvarchar(max)");
 
@@ -618,7 +625,19 @@ namespace YandexSpeech.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("RecognitionProfileId");
+
                     b.ToTable("OpenAiTranscriptionTasks");
+                });
+
+            modelBuilder.Entity("YandexSpeech.models.DB.OpenAiTranscriptionTask", b =>
+                {
+                    b.HasOne("YandexSpeech.models.DB.RecognitionProfile", "RecognitionProfile")
+                        .WithMany()
+                        .HasForeignKey("RecognitionProfileId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("RecognitionProfile");
                 });
 
             modelBuilder.Entity("YandexSpeech.models.DB.PaymentOperation", b =>

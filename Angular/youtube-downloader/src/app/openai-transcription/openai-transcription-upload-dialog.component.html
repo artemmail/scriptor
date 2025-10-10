@@ -5,11 +5,37 @@
     задач.
   </p>
 
-  <mat-tab-group [(selectedIndex)]="selectedTab" class="upload-tabs" [class.uploading]="uploading">
+  <mat-progress-bar *ngIf="profilesLoading" mode="indeterminate"></mat-progress-bar>
+  <div class="error" *ngIf="profilesError">{{ profilesError }}</div>
+
+  <mat-form-field appearance="outline" class="full-width">
+    <mat-label>Профиль распознавания</mat-label>
+    <mat-select
+      [(ngModel)]="selectedProfileId"
+      (selectionChange)="onProfileSelectionChanged($event.value)"
+      [disabled]="uploading || profilesLoading"
+      required
+    >
+      <mat-option *ngFor="let profile of profiles" [value]="profile.id">
+        {{ profile.displayedName }}
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+
+  <mat-tab-group
+    [(selectedIndex)]="selectedTab"
+    class="upload-tabs"
+    [class.uploading]="uploading || profilesLoading"
+  >
     <mat-tab label="Файл">
       <div class="tab-content">
         <label class="file-select" [class.disabled]="uploading">
-          <input type="file" (change)="onFileSelected($event)" accept="audio/*,video/*" [disabled]="uploading" />
+          <input
+            type="file"
+            (change)="onFileSelected($event)"
+            accept="audio/*,video/*"
+            [disabled]="uploading || profilesLoading"
+          />
           <mat-icon>attach_file</mat-icon>
           <span>Выбрать файл</span>
         </label>
@@ -27,7 +53,7 @@
             matInput
             type="url"
             [(ngModel)]="fileUrl"
-            [disabled]="uploading"
+            [disabled]="uploading || profilesLoading"
             placeholder="https://disk.yandex.ru/i/..."
           />
         </mat-form-field>
@@ -41,9 +67,10 @@
       matInput
       rows="3"
       [(ngModel)]="clarification"
-      [disabled]="uploading"
-      placeholder="Например: отметить важных спикеров или уточнить терминологию"
+      [disabled]="uploading || profilesLoading"
+      [placeholder]="clarificationPlaceholder"
     ></textarea>
+    <mat-hint *ngIf="clarificationHint">{{ clarificationHint }}</mat-hint>
   </mat-form-field>
 
   <mat-progress-bar *ngIf="uploading" mode="indeterminate"></mat-progress-bar>

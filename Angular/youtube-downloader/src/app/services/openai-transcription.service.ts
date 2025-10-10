@@ -33,6 +33,9 @@ export interface OpenAiTranscriptionTaskDto {
   segmentsTotal: number;
   segmentsProcessed: number;
   clarification: string | null;
+  recognitionProfileId?: number | null;
+  recognitionProfileName?: string | null;
+  recognitionProfileDisplayedName?: string | null;
 }
 
 export interface OpenAiTranscriptionTaskDetailsDto extends OpenAiTranscriptionTaskDto {
@@ -42,6 +45,13 @@ export interface OpenAiTranscriptionTaskDetailsDto extends OpenAiTranscriptionTa
   hasSegments: boolean;
   steps: OpenAiTranscriptionStepDto[];
   segments: OpenAiRecognizedSegmentDto[];
+}
+
+export interface OpenAiRecognitionProfileOptionDto {
+  id: number;
+  name: string;
+  displayedName: string;
+  clarificationTemplate: string | null;
 }
 
 export interface OpenAiTranscriptionStepDto {
@@ -70,18 +80,28 @@ export class OpenAiTranscriptionService {
 
   constructor(private readonly http: HttpClient) {}
 
-  upload(file: File, clarification?: string | null): Observable<OpenAiTranscriptionTaskDto> {
+  upload(
+    file: File,
+    recognitionProfileId: number,
+    clarification?: string | null
+  ): Observable<OpenAiTranscriptionTaskDto> {
     const formData = new FormData();
     formData.append('file', file, file.name);
+    formData.append('recognitionProfileId', recognitionProfileId.toString());
     if (clarification && clarification.trim().length > 0) {
       formData.append('clarification', clarification.trim());
     }
     return this.http.post<OpenAiTranscriptionTaskDto>(this.apiUrl, formData);
   }
 
-  uploadFromUrl(fileUrl: string, clarification?: string | null): Observable<OpenAiTranscriptionTaskDto> {
+  uploadFromUrl(
+    fileUrl: string,
+    recognitionProfileId: number,
+    clarification?: string | null
+  ): Observable<OpenAiTranscriptionTaskDto> {
     const formData = new FormData();
     formData.append('fileUrl', fileUrl);
+    formData.append('recognitionProfileId', recognitionProfileId.toString());
     if (clarification && clarification.trim().length > 0) {
       formData.append('clarification', clarification.trim());
     }
@@ -162,5 +182,9 @@ export class OpenAiTranscriptionService {
 
   continueTask(id: string): Observable<OpenAiTranscriptionTaskDetailsDto> {
     return this.http.post<OpenAiTranscriptionTaskDetailsDto>(`${this.apiUrl}/${id}/continue`, {});
+  }
+
+  listRecognitionProfiles(): Observable<OpenAiRecognitionProfileOptionDto[]> {
+    return this.http.get<OpenAiRecognitionProfileOptionDto[]>(`${this.apiUrl}/recognition-profiles`);
   }
 }

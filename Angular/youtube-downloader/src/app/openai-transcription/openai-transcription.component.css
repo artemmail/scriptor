@@ -369,6 +369,11 @@ section {
   color: #1e3a8a;
 }
 
+.recognition-profile-display {
+  background: rgba(16, 185, 129, 0.12);
+  color: #065f46;
+}
+
 .status-chip {
   display: inline-flex;
   align-items: center;
