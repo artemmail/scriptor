@@ -101,9 +101,7 @@ public sealed class OpenAiTranscriptionServiceTests
         Assert.Contains(persistedTask.Steps, s =>
             s.Step == OpenAiTranscriptionStatus.ProcessingSegments &&
             s.Status == OpenAiTranscriptionStepStatus.Completed);
-        Assert.Contains(persistedTask.Steps, s =>
-            s.Step == OpenAiTranscriptionStatus.Formatting &&
-            s.Status == OpenAiTranscriptionStepStatus.Completed);
+        
     }
 
     private sealed class StubPunctuationService : IPunctuationService
@@ -149,10 +147,7 @@ public sealed class OpenAiTranscriptionServiceTests
         {
         }
 
-        protected override Task<string> CreateDialogueMarkdownAsync(string transcription, string? clarification)
-        {
-            return Task.FromResult($"markdown::{transcription}");
-        }
+        
     }
 
     private sealed class StubFfmpegService : IFfmpegService

@@ -37,10 +37,6 @@ namespace YandexSpeech.services
         {
         }
 
-        protected override Task<string> CreateDialogueMarkdownAsync(string transcription, string? clarification)
-        {
-            // Segment processing already produced final Markdown, so we simply return the concatenated text.
-            return Task.FromResult(transcription);
-        }
+        
     }
 }

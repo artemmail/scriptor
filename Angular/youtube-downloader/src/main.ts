@@ -39,6 +39,7 @@ import { About2Component } from './app/about2/about2.component';
 import { About3Component } from './app/about3/about3.component';
 import { AdminUsersComponent } from './app/admin-users/admin-users.component';
 import { PngToWebpComponent } from './app/png-to-webp/png-to-webp.component';
+import { AdminRecognitionProfilesComponent } from './app/admin-recognition-profiles/admin-recognition-profiles.component';
 
 
 
@@ -178,6 +179,16 @@ const routes: Routes = [
     canActivate: [RoleGuard],
     data: { roles: ['Admin'] }
   },
+
+{
+    path: 'admin/recognition-profiles',
+    component: AdminRecognitionProfilesComponent,
+    canActivate: [RoleGuard],
+    data: { roles: ['Admin'] }
+  },
+
+
+
   {
     path: 'profile',
     component: ProfileComponent,

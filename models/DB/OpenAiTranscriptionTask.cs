@@ -12,8 +12,7 @@ namespace YandexSpeech.models.DB
         Converting = 10,
         Transcribing = 20,
         Segmenting = 25,
-        ProcessingSegments = 27,
-        Formatting = 30,
+        ProcessingSegments = 27,        
         Done = 900,
         Error = 999
     }

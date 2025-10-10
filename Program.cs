@@ -174,7 +174,7 @@ if (!string.IsNullOrWhiteSpace(vkClientId) && !string.IsNullOrWhiteSpace(vkClien
 
 
 builder.Services.AddScoped<IAudioFileService, AudioFileService>();
-builder.Services.AddScoped<ISpeechWorkflowService, SpeechWorkflowService>();
+
 
 builder.Services.Configure<EventBusOptions>(builder.Configuration.GetSection("EventBus"));
 builder.Services.Configure<TelegramBotOptions>(builder.Configuration.GetSection("Telegram"));
@@ -199,7 +199,7 @@ builder.Services.AddSingleton<YoutubeClient>();
 builder.Services.AddSingleton<CaptionService>();
 builder.Services.AddScoped<IYSpeechService, YSpeechService>();
 builder.Services.AddScoped<IPunctuationService, PunctuationService>();
-builder.Services.AddScoped<ISpeechWorkflowService, SpeechWorkflowService>();
+
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<IUsageService, UsageService>();

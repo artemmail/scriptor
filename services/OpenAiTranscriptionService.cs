@@ -126,8 +126,8 @@ namespace YandexSpeech.services
                 OpenAiTranscriptionStatus.Converting,
                 OpenAiTranscriptionStatus.Transcribing,
                 OpenAiTranscriptionStatus.Segmenting,
-                OpenAiTranscriptionStatus.ProcessingSegments,
-                OpenAiTranscriptionStatus.Formatting
+                OpenAiTranscriptionStatus.ProcessingSegments
+               
             };
 
             try
@@ -158,10 +158,7 @@ namespace YandexSpeech.services
                             break;
                         case OpenAiTranscriptionStatus.ProcessingSegments:
                             await RunSegmentProcessingStepAsync(task);
-                            break;
-                        case OpenAiTranscriptionStatus.Formatting:
-                            await RunFormattingStepAsync(task);
-                            break;
+                            break;                       
                     }
 
                     if (task.Status == statusBefore
@@ -498,34 +495,7 @@ namespace YandexSpeech.services
             }
         }
 
-        private async Task RunFormattingStepAsync(OpenAiTranscriptionTask task)
-        {
-            if (string.IsNullOrWhiteSpace(task.ProcessedText))
-                throw new InvalidOperationException("No processed transcription text is available for formatting.");
-
-            task.Status = OpenAiTranscriptionStatus.Formatting;
-            task.ModifiedAt = DateTime.UtcNow;
-            await _dbContext.SaveChangesAsync();
-
-            var step = await StartStepAsync(task, OpenAiTranscriptionStatus.Formatting);
-
-            try
-            {
-                var markdown = await CreateDialogueMarkdownAsync(task.ProcessedText!, task.Clarification);
-                task.MarkdownText = markdown;
-                task.Status = OpenAiTranscriptionStatus.Done;
-                task.Done = true;
-                task.ModifiedAt = DateTime.UtcNow;
-                await _dbContext.SaveChangesAsync();
-
-                await CompleteStepAsync(step);
-            }
-            catch (Exception ex)
-            {
-                await FailStepAsync(step, ex.Message);
-                throw;
-            }
-        }
+      
 
         private async Task<OpenAiTranscriptionStep> StartStepAsync(OpenAiTranscriptionTask task, OpenAiTranscriptionStatus stepType)
         {
@@ -582,7 +552,7 @@ namespace YandexSpeech.services
 
             task.SegmentsProcessed = task.SegmentsTotal;
             task.ProcessedText = string.Join("\n", processedSegments);
-            task.Status = OpenAiTranscriptionStatus.Formatting;
+            task.Status = OpenAiTranscriptionStatus.Done;
             task.ModifiedAt = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
         }
@@ -671,82 +641,6 @@ namespace YandexSpeech.services
             return segments;
         }
 
-        protected virtual async Task<string> CreateDialogueMarkdownAsync(string transcription, string? clarification)
-        {
-            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(50) };
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _openAiApiKey);
-
-            var messages = new List<object>
-            {
-                new
-                {
-                    role = "system",
-                    content = "You format transcripts into Markdown dialogue. Identify speakers and label them with bold names (either real names found in the text or Speaker 1, Speaker 2, etc.). Each replica must begin with the speaker label followed by a colon. Do not add commentary or analysis."
-                }
-            };
-
-            if (!string.IsNullOrWhiteSpace(clarification))
-            {
-                messages.Add(new
-                {
-                    role = "system",
-                    content = $"Follow these additional instructions while formatting: {clarification.Trim()}"
-                });
-            }
-
-            messages.Add(new { role = "user", content = transcription });
-
-            var body = new
-            {
-                model = FormattingModel,
-                messages,
-                temperature = 0.2
-            };
-
-            for (var attempt = 1; attempt <= FormattingMaxAttempts; attempt++)
-            {
-                try
-                {
-                    using var requestContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
-                    using var response = await client.PostAsync("https://api.openai.com/v1/chat/completions", requestContent);
-
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        var error = await response.Content.ReadAsStringAsync();
-                        throw new InvalidOperationException($"OpenAI formatting failed: {error}");
-                    }
-
-                    var json = await response.Content.ReadAsStringAsync();
-                    using var doc = JsonDocument.Parse(json);
-                    var choices = doc.RootElement.GetProperty("choices");
-                    if (choices.GetArrayLength() == 0)
-                        throw new InvalidOperationException("OpenAI formatting response did not contain choices.");
-
-                    var content = choices[0].GetProperty("message").GetProperty("content").GetString();
-                    if (string.IsNullOrWhiteSpace(content))
-                        throw new InvalidOperationException("OpenAI formatting response is empty.");
-
-                    return content.Trim();
-                }
-                catch (HttpRequestException ex) when (attempt < FormattingMaxAttempts)
-                {
-                    _logger.LogWarning(ex, "Не удалось связаться с OpenAI для форматирования (попытка {Attempt}/{Total}).", attempt, FormattingMaxAttempts);
-                }
-                catch (TaskCanceledException ex) when (attempt < FormattingMaxAttempts)
-                {
-                    _logger.LogWarning(ex, "Запрос на форматирование OpenAI завершился по таймауту (попытка {Attempt}/{Total}).", attempt, FormattingMaxAttempts);
-                }
-                catch (InvalidOperationException ex) when (attempt < FormattingMaxAttempts && ex.Message.StartsWith("OpenAI formatting failed", StringComparison.Ordinal))
-                {
-                    _logger.LogWarning(ex, "OpenAI вернул ошибку при форматировании (попытка {Attempt}/{Total}).", attempt, FormattingMaxAttempts);
-                }
-
-                await Task.Delay(TimeSpan.FromTicks(FormattingRetryDelay.Ticks * attempt));
-            }
-
-            throw new InvalidOperationException($"OpenAI formatting failed after {FormattingMaxAttempts} attempts.");
-        }
-
         private async Task PrepareTaskForContinuationAsync(OpenAiTranscriptionTask task)
         {
             if (task.Status != OpenAiTranscriptionStatus.Error)
@@ -815,12 +709,7 @@ namespace YandexSpeech.services
                 && (string.IsNullOrWhiteSpace(task.SourceFilePath) || !File.Exists(task.SourceFilePath)))
             {
                 return OpenAiTranscriptionStatus.Downloading;
-            }
-
-            if (!string.IsNullOrWhiteSpace(task.MarkdownText))
-            {
-                return OpenAiTranscriptionStatus.Formatting;
-            }
+            }           
 
             if (task.Segments?.Any() == true)
             {
@@ -829,10 +718,7 @@ namespace YandexSpeech.services
                     return OpenAiTranscriptionStatus.ProcessingSegments;
                 }
 
-                if (!string.IsNullOrWhiteSpace(task.ProcessedText))
-                {
-                    return OpenAiTranscriptionStatus.Formatting;
-                }
+               
             }
 
             if (!string.IsNullOrWhiteSpace(task.SegmentsJson) || !string.IsNullOrWhiteSpace(task.RecognizedText))
