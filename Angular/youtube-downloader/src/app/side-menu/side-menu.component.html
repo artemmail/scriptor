@@ -46,6 +46,10 @@
       <mat-icon matListItemIcon>group</mat-icon>
       <span matListItemTitle>Пользователи</span>
     </a>
+    <a mat-list-item *ngIf="hasRole(user, 'Admin')" (click)="navigate('/admin/recognition-profiles')">
+      <mat-icon matListItemIcon>tune</mat-icon>
+      <span matListItemTitle>Профили распознавания</span>
+    </a>
     <a mat-list-item *ngIf="hasRole(user, 'Moderator')" (click)="navigate('/blog/new')">
       <mat-icon matListItemIcon>post_add</mat-icon>
       <span matListItemTitle>Новая тема</span>

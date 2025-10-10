@@ -39,6 +39,8 @@ namespace YandexSpeech
         public DbSet<OpenAiTranscriptionStep> OpenAiTranscriptionSteps { get; set; }
         public DbSet<OpenAiRecognizedSegment> OpenAiRecognizedSegments { get; set; }
 
+        public DbSet<RecognitionProfile> RecognitionProfiles { get; set; }
+
 
         // Новая таблица
         public DbSet<AudioFile> AudioFiles { get; set; }
