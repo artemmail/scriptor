@@ -1,14 +1,19 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter } from '@angular/core';
+import { Component, EventEmitter, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatTabsModule } from '@angular/material/tabs';
-import { OpenAiTranscriptionService, OpenAiTranscriptionTaskDto } from '../services/openai-transcription.service';
+import {
+  OpenAiRecognitionProfileOptionDto,
+  OpenAiTranscriptionService,
+  OpenAiTranscriptionTaskDto,
+} from '../services/openai-transcription.service';
 
 interface UploadDialogResult {
   task: OpenAiTranscriptionTaskDto;
@@ -25,26 +30,39 @@ interface UploadDialogResult {
     MatIconModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     MatProgressBarModule,
     MatTabsModule,
   ],
   templateUrl: './openai-transcription-upload-dialog.component.html',
   styleUrls: ['./openai-transcription-upload-dialog.component.css'],
 })
-export class OpenAiTranscriptionUploadDialogComponent {
+export class OpenAiTranscriptionUploadDialogComponent implements OnInit {
   readonly uploadingChange = new EventEmitter<boolean>();
+  private readonly defaultClarificationPlaceholder =
+    'Например: отметить важных спикеров или уточнить терминологию';
 
   selectedTab = 0;
   selectedFile: File | null = null;
   fileUrl = '';
   clarification = '';
+  clarificationPlaceholder = this.defaultClarificationPlaceholder;
+  clarificationHint: string | null = null;
   uploading = false;
   uploadError: string | null = null;
+  profiles: OpenAiRecognitionProfileOptionDto[] = [];
+  profilesLoading = false;
+  profilesError: string | null = null;
+  selectedProfileId: number | null = null;
 
   constructor(
     private readonly dialogRef: MatDialogRef<OpenAiTranscriptionUploadDialogComponent, UploadDialogResult>,
     private readonly transcriptionService: OpenAiTranscriptionService
   ) {}
+
+  ngOnInit(): void {
+    this.loadRecognitionProfiles();
+  }
 
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -74,6 +92,10 @@ export class OpenAiTranscriptionUploadDialogComponent {
   }
 
   canSubmit(): boolean {
+    if (this.profilesLoading || this.selectedProfileId == null) {
+      return false;
+    }
+
     if (this.selectedTab === 0) {
       return !!this.selectedFile;
     }
@@ -87,7 +109,13 @@ export class OpenAiTranscriptionUploadDialogComponent {
     }
 
     this.beginUpload();
-    this.transcriptionService.upload(this.selectedFile, this.clarification).subscribe({
+    const profileId = this.selectedProfileId;
+    if (profileId == null) {
+      this.handleError('Не выбран профиль распознавания.', 'Не удалось загрузить файл.');
+      return;
+    }
+
+    this.transcriptionService.upload(this.selectedFile, profileId, this.clarification).subscribe({
       next: (task) => this.handleSuccess(task),
       error: (error) => this.handleError(error, 'Не удалось загрузить файл.'),
     });
@@ -100,7 +128,13 @@ export class OpenAiTranscriptionUploadDialogComponent {
     }
 
     this.beginUpload();
-    this.transcriptionService.uploadFromUrl(trimmed, this.clarification).subscribe({
+    const profileId = this.selectedProfileId;
+    if (profileId == null) {
+      this.handleError('Не выбран профиль распознавания.', 'Не удалось загрузить файл по ссылке.');
+      return;
+    }
+
+    this.transcriptionService.uploadFromUrl(trimmed, profileId, this.clarification).subscribe({
       next: (task) => this.handleSuccess(task),
       error: (error) => this.handleError(error, 'Не удалось загрузить файл по ссылке.'),
     });
@@ -148,5 +182,54 @@ export class OpenAiTranscriptionUploadDialogComponent {
     }
 
     return null;
+  }
+
+  private loadRecognitionProfiles(): void {
+    this.profilesLoading = true;
+    this.profilesError = null;
+    this.transcriptionService.listRecognitionProfiles().subscribe({
+      next: (profiles) => {
+        this.profilesLoading = false;
+        this.profiles = profiles;
+        this.profilesError = profiles.length === 0 ? 'Нет доступных профилей распознавания.' : null;
+        const hasCurrent = profiles.some((profile) => profile.id === this.selectedProfileId);
+        this.selectedProfileId = hasCurrent
+          ? this.selectedProfileId
+          : profiles.length > 0
+            ? profiles[0].id
+            : null;
+        this.applySelectedProfile();
+      },
+      error: (error) => {
+        this.profilesLoading = false;
+        this.profilesError = this.extractError(error) ?? 'Не удалось загрузить профили распознавания.';
+        this.selectedProfileId = null;
+        this.applySelectedProfile();
+      },
+    });
+  }
+
+  onProfileSelectionChanged(rawValue: unknown): void {
+    let profileId: number | null = null;
+    if (typeof rawValue === 'number' && Number.isFinite(rawValue)) {
+      profileId = rawValue;
+    } else if (typeof rawValue === 'string') {
+      const parsed = Number(rawValue);
+      profileId = Number.isFinite(parsed) ? parsed : null;
+    }
+
+    this.selectedProfileId = profileId;
+    this.applySelectedProfile();
+  }
+
+  private applySelectedProfile(): void {
+    const profile = this.profiles.find((item) => item.id === this.selectedProfileId);
+    if (profile?.clarificationTemplate) {
+      this.clarificationHint = profile.clarificationTemplate;
+      this.clarificationPlaceholder = profile.clarificationTemplate.replace('{clarification}', 'ваше уточнение');
+    } else {
+      this.clarificationHint = null;
+      this.clarificationPlaceholder = this.defaultClarificationPlaceholder;
+    }
   }
 }

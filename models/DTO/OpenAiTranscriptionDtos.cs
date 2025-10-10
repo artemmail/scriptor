@@ -28,6 +28,12 @@ namespace YandexSpeech.models.DTO
         public int SegmentsProcessed { get; set; }
 
         public string? Clarification { get; set; }
+
+        public int? RecognitionProfileId { get; set; }
+
+        public string? RecognitionProfileName { get; set; }
+
+        public string? RecognitionProfileDisplayedName { get; set; }
     }
 
     public class OpenAiTranscriptionTaskDetailsDto : OpenAiTranscriptionTaskDto

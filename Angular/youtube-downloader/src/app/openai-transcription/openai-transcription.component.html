@@ -109,6 +109,13 @@
                           <strong>Уточнение:</strong>
                           <span>{{ selectedTask.clarification }}</span>
                         </div>
+                        <div
+                          class="clarification-display recognition-profile-display"
+                          *ngIf="selectedTask.recognitionProfileDisplayedName"
+                        >
+                          <strong>Профиль:</strong>
+                          <span>{{ selectedTask.recognitionProfileDisplayedName }}</span>
+                        </div>
                       </div>
                       <span class="status-chip" [ngClass]="getStatusClass(selectedTask.status)">
                         {{ getStatusText(selectedTask.status) }}
