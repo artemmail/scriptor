@@ -489,6 +489,34 @@ namespace YandexSpeech.Migrations
                     b.ToTable("OpenAiRecognizedSegments");
                 });
 
+            modelBuilder.Entity("YandexSpeech.models.DB.RecognitionProfile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ClarificationTemplate")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OpenAiModel")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Request")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SegmentBlockSize")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("RecognitionProfiles");
+                });
+
             modelBuilder.Entity("YandexSpeech.models.DB.OpenAiTranscriptionStep", b =>
                 {
                     b.Property<int>("Id")

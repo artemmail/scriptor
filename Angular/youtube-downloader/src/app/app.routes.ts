@@ -13,6 +13,7 @@ import { About2Component } from './about2/about2.component';
 import { About3Component } from './about3/about3.component';
 import { RoleGuard } from './services/role.guard';
 import { AdminUsersComponent } from './admin-users/admin-users.component';
+import { AdminRecognitionProfilesComponent } from './admin-recognition-profiles/admin-recognition-profiles.component';
 
 export const appRoutes: Routes = [
   { path: '', component: OpenAiTranscriptionComponent },
@@ -25,6 +26,12 @@ export const appRoutes: Routes = [
   {
     path: 'admin/users',
     component: AdminUsersComponent,
+    canActivate: [RoleGuard],
+    data: { roles: ['Admin'] }
+  },
+  {
+    path: 'admin/recognition-profiles',
+    component: AdminRecognitionProfilesComponent,
     canActivate: [RoleGuard],
     data: { roles: ['Admin'] }
   },

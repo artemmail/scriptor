@@ -7,6 +7,7 @@ import { BillingComponent } from './billing/billing.component';
 import { AuthGuard } from './services/auth.guard';
 import { RoleGuard } from './services/role.guard';
 import { AdminUsersComponent } from './admin-users/admin-users.component';
+import { AdminRecognitionProfilesComponent } from './admin-recognition-profiles/admin-recognition-profiles.component';
 import { AboutBusinessComponent } from './about-business/about-business.component';
 import { About1Component } from './about1/about1.component';
 import { About2Component } from './about2/about2.component';
@@ -23,6 +24,12 @@ const routes: Routes = [
   {
     path: 'admin/users',
     component: AdminUsersComponent,
+    canActivate: [RoleGuard],
+    data: { roles: ['Admin'] }
+  },
+  {
+    path: 'admin/recognition-profiles',
+    component: AdminRecognitionProfilesComponent,
     canActivate: [RoleGuard],
     data: { roles: ['Admin'] }
   },
