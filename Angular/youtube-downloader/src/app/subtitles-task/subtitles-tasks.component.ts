@@ -23,6 +23,8 @@ import { VideoDialogComponent, VideoDialogData } from '../video-dialog/video-dia
 import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../services/AuthService.service';
+import { interval, forkJoin } from 'rxjs';
+import { finalize, map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-subtitles-tasks',
@@ -68,6 +70,8 @@ export class SubtitlesTasksComponent implements OnInit {
   loading = false;
   expandedTasks = new Set<string>();
   isAuthenticated = false;
+  private readonly refreshIntervalMs = 10_000;
+  private refreshInProgress = false;
 
   @ViewChild(MatSort) sort!: MatSort;
 
@@ -97,6 +101,7 @@ export class SubtitlesTasksComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.setupAutoRefresh();
     this.route.queryParamMap.subscribe(params => {
       const newUserId = params.get('userId');
       const hasChanged = this.userIdFilter !== newUserId;
@@ -110,6 +115,12 @@ export class SubtitlesTasksComponent implements OnInit {
         this.loadTasks();
       }
     });
+  }
+
+  private setupAutoRefresh(): void {
+    interval(this.refreshIntervalMs)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.refreshTasksInProgress());
   }
 
   private loadTasks(append = false): void {
@@ -141,6 +152,84 @@ export class SubtitlesTasksComponent implements OnInit {
           this.loading = false;
         },
       });
+  }
+
+  private refreshTasksInProgress(): void {
+    if (this.loading || this.refreshInProgress) {
+      return;
+    }
+
+    const pagesToRefresh = this.collectPagesWithActiveTasks();
+    if (!pagesToRefresh.length) {
+      return;
+    }
+
+    const filter = this.filterValue.trim().toLowerCase();
+    this.refreshInProgress = true;
+
+    const requests = pagesToRefresh.map(page =>
+      this.subtitleService
+        .getTasks(
+          page + 1,
+          this.pageSize,
+          this.sortField,
+          this.sortOrder,
+          filter,
+          this.userIdFilter
+        )
+        .pipe(map(res => ({ page, res })))
+    );
+
+    forkJoin(requests)
+      .pipe(finalize(() => {
+        this.refreshInProgress = false;
+      }))
+      .subscribe({
+        next: responses => {
+          const updatedData = [...this.dataSource.data];
+
+          const totalCountUpdate = responses.find(({ res }) => typeof res.totalCount === 'number')?.res.totalCount;
+          if (typeof totalCountUpdate === 'number') {
+            this.totalItems = totalCountUpdate;
+          }
+
+          responses.forEach(({ page, res }) => {
+            res.items.forEach((item, itemIndex) => {
+              const globalIndex = page * this.pageSize + itemIndex;
+              if (globalIndex < updatedData.length && updatedData[globalIndex].id === item.id) {
+                updatedData[globalIndex] = item;
+              } else {
+                const existingIndex = updatedData.findIndex(t => t.id === item.id);
+                if (existingIndex !== -1) {
+                  updatedData[existingIndex] = item;
+                }
+              }
+            });
+          });
+
+          this.dataSource.data = updatedData;
+        },
+        error: err => {
+          console.error('Error refreshing tasks', err);
+        },
+      });
+  }
+
+  private collectPagesWithActiveTasks(): number[] {
+    const activePages = new Set<number>();
+
+    this.dataSource.data.forEach((task, index) => {
+      if (!this.isTaskInProgress(task)) {
+        return;
+      }
+      activePages.add(Math.floor(index / this.pageSize));
+    });
+
+    return Array.from(activePages.values()).sort((a, b) => a - b);
+  }
+
+  private isTaskInProgress(task: YoutubeCaptionTaskDto2): boolean {
+    return !task.done && task.status !== RecognizeStatus.Error;
   }
 
   applyFilter(evt: Event): void {
