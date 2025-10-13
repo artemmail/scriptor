@@ -134,6 +134,21 @@
                       <button
                         class="btn btn-outline"
                         type="button"
+                        (click)="openAnalyticsDialog()"
+                        [disabled]="analyticsInProgress"
+                      >
+                        <mat-icon>insights</mat-icon>
+                        <span>Аналитика</span>
+                      </button>
+                      <mat-progress-spinner
+                        *ngIf="analyticsInProgress"
+                        mode="indeterminate"
+                        diameter="28"
+                        class="inline-spinner"
+                      ></mat-progress-spinner>
+                      <button
+                        class="btn btn-outline"
+                        type="button"
                         [matMenuTriggerFor]="downloadMenu"
                         [disabled]="downloadInProgress || !hasAnyDownloadOption()"
                       >
@@ -236,6 +251,7 @@
                         <span>SRT субтитры</span>
                       </button>
                     </mat-menu>
+                    <div class="error" *ngIf="analyticsError">{{ analyticsError }}</div>
                     <div class="error" *ngIf="exportError">{{ exportError }}</div>
                     <div
                       class="markdown-content"

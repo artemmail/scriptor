@@ -312,6 +312,52 @@ namespace YandexSpeech.Controllers
             return Ok(MapToDetailsDto(preparedTask));
         }
 
+        [HttpPost("{id}/analytics")]
+        public async Task<ActionResult<OpenAiTranscriptionTaskDto>> CloneForAnalytics(
+            string id,
+            [FromBody] StartAnalyticsRequest? request)
+        {
+            if (request == null || !request.RecognitionProfileId.HasValue)
+            {
+                return BadRequest("Не выбран профиль распознавания.");
+            }
+
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
+
+            try
+            {
+                var newTask = await _transcriptionService.CloneForPostProcessingAsync(
+                    id,
+                    userId,
+                    request.RecognitionProfileId.Value,
+                    request.Clarification);
+
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var scopedService = scope.ServiceProvider.GetRequiredService<IOpenAiTranscriptionService>();
+                        await scopedService.ContinueTranscriptionAsync(newTask.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to run analytics for OpenAI transcription task {TaskId}", newTask.Id);
+                    }
+                });
+
+                return Ok(MapToDto(newTask));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpPut("{id}/markdown")]
         public async Task<IActionResult> UpdateMarkdown(string id, [FromBody] UpdateMarkdownRequest request)
         {
@@ -873,6 +919,13 @@ namespace YandexSpeech.Controllers
             }
 
             return task;
+        }
+
+        public class StartAnalyticsRequest
+        {
+            public int? RecognitionProfileId { get; set; }
+
+            public string? Clarification { get; set; }
         }
 
         public class UpdateMarkdownRequest
