@@ -187,4 +187,15 @@ export class OpenAiTranscriptionService {
   listRecognitionProfiles(): Observable<OpenAiRecognitionProfileOptionDto[]> {
     return this.http.get<OpenAiRecognitionProfileOptionDto[]>(`${this.apiUrl}/recognition-profiles`);
   }
+
+  cloneForAnalytics(
+    id: string,
+    recognitionProfileId: number,
+    clarification?: string | null
+  ): Observable<OpenAiTranscriptionTaskDto> {
+    return this.http.post<OpenAiTranscriptionTaskDto>(`${this.apiUrl}/${id}/analytics`, {
+      recognitionProfileId,
+      clarification,
+    });
+  }
 }

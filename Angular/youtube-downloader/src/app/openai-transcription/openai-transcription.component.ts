@@ -23,6 +23,11 @@ import { MarkdownRendererService1 } from '../task-result/markdown-renderer.servi
 import { MatDialog } from '@angular/material/dialog';
 import { OpenAiTranscriptionUploadDialogComponent } from './openai-transcription-upload-dialog.component';
 import { ActionMenuPanelDirective } from '../shared/action-menu-panel.directive';
+import {
+  OpenAiTranscriptionAnalyticsDialogComponent,
+  OpenAiTranscriptionAnalyticsDialogData,
+  OpenAiTranscriptionAnalyticsDialogResult,
+} from './openai-transcription-analytics-dialog.component';
 
 @Component({
   selector: 'app-openai-transcriptions',
@@ -62,6 +67,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   private markdownSource = '';
   isResultFullscreen = false;
   private originalBodyOverflow: string | null = null;
+  analyticsInProgress = false;
+  analyticsError: string | null = null;
 
   readonly OpenAiTranscriptionStatus = OpenAiTranscriptionStatus;
   readonly OpenAiTranscriptionStepStatus = OpenAiTranscriptionStepStatus;
@@ -160,6 +167,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.selectedTaskId = taskId;
     this.selectedTask = null;
     this.detailsError = null;
+    this.analyticsInProgress = false;
+    this.analyticsError = null;
     this.updateRenderedMarkdown(null);
     this.resetFullscreenState();
     this.startPolling();
@@ -690,6 +699,59 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       error: (error) => {
         this.continueInProgress = false;
         this.continueError = this.extractError(error) ?? 'Не удалось продолжить задачу.';
+      },
+    });
+  }
+
+  openAnalyticsDialog(): void {
+    if (!this.selectedTaskId || !this.selectedTask) {
+      return;
+    }
+
+    const data: OpenAiTranscriptionAnalyticsDialogData = {
+      currentProfileId: this.selectedTask.recognitionProfileId ?? null,
+      currentClarification: this.selectedTask.clarification ?? null,
+    };
+
+    const dialogRef = this.dialog.open<
+      OpenAiTranscriptionAnalyticsDialogComponent,
+      OpenAiTranscriptionAnalyticsDialogData,
+      OpenAiTranscriptionAnalyticsDialogResult | undefined
+    >(OpenAiTranscriptionAnalyticsDialogComponent, {
+      width: '520px',
+      autoFocus: false,
+      restoreFocus: false,
+      disableClose: true,
+      data,
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result && result.recognitionProfileId) {
+        this.createAnalyticsTask(result.recognitionProfileId, result.clarification ?? null);
+      }
+    });
+  }
+
+  private createAnalyticsTask(profileId: number, clarification: string | null): void {
+    if (!this.selectedTaskId || this.analyticsInProgress) {
+      return;
+    }
+
+    this.analyticsInProgress = true;
+    this.analyticsError = null;
+
+    this.transcriptionService.cloneForAnalytics(this.selectedTaskId, profileId, clarification).subscribe({
+      next: (task) => {
+        this.analyticsInProgress = false;
+        this.handleUploadSuccess(task);
+        this.snackBar.open('Создана новая задача с выбранным профилем.', 'Закрыть', {
+          duration: 5000,
+        });
+      },
+      error: (error) => {
+        this.analyticsInProgress = false;
+        this.analyticsError =
+          this.extractError(error) ?? 'Не удалось создать задачу с выбранным профилем.';
       },
     });
   }

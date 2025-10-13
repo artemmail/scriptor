@@ -14,5 +14,10 @@ namespace YandexSpeech.services
             string? recognitionProfileDisplayedName = null);
         Task<OpenAiTranscriptionTask?> PrepareForContinuationAsync(string taskId);
         Task<OpenAiTranscriptionTask?> ContinueTranscriptionAsync(string taskId);
+        Task<OpenAiTranscriptionTask> CloneForPostProcessingAsync(
+            string taskId,
+            string createdBy,
+            int recognitionProfileId,
+            string? clarification = null);
     }
 }

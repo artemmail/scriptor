@@ -195,6 +195,106 @@ namespace YandexSpeech.services
             return task;
         }
 
+        public async Task<OpenAiTranscriptionTask> CloneForPostProcessingAsync(
+            string taskId,
+            string createdBy,
+            int recognitionProfileId,
+            string? clarification = null)
+        {
+            if (string.IsNullOrWhiteSpace(taskId))
+                throw new ArgumentException("Task identifier must be provided.", nameof(taskId));
+
+            if (string.IsNullOrWhiteSpace(createdBy))
+                throw new ArgumentException("Creator identifier must be provided.", nameof(createdBy));
+
+            var normalizedClarification = string.IsNullOrWhiteSpace(clarification)
+                ? null
+                : clarification.Trim();
+
+            var sourceTask = await _dbContext.OpenAiTranscriptionTasks
+                .Include(t => t.Segments)
+                .FirstOrDefaultAsync(t => t.Id == taskId && t.CreatedBy == createdBy);
+
+            if (sourceTask == null)
+                throw new InvalidOperationException("Исходная задача не найдена или недоступна.");
+
+            if (!sourceTask.Done || sourceTask.Status != OpenAiTranscriptionStatus.Done)
+                throw new InvalidOperationException("Повторная аналитика доступна только для завершённых задач.");
+
+            if (sourceTask.Segments == null || sourceTask.Segments.Count == 0)
+            {
+                sourceTask.Segments = await _dbContext.OpenAiRecognizedSegments
+                    .Where(s => s.TaskId == sourceTask.Id)
+                    .OrderBy(s => s.Order)
+                    .ToListAsync();
+            }
+
+            if (sourceTask.Segments == null || sourceTask.Segments.Count == 0)
+                throw new InvalidOperationException("Не найдены сегменты для повторной обработки.");
+
+            var recognitionProfile = await _dbContext.RecognitionProfiles
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == recognitionProfileId);
+
+            if (recognitionProfile == null)
+                throw new InvalidOperationException("Указанный профиль распознавания не найден.");
+
+            var duplicateExists = await _dbContext.OpenAiTranscriptionTasks
+                .AsNoTracking()
+                .AnyAsync(t => t.CreatedBy == createdBy
+                               && t.SourceFilePath == sourceTask.SourceFilePath
+                               && t.RecognitionProfileId == recognitionProfileId);
+
+            if (duplicateExists)
+                throw new InvalidOperationException("Для этого файла уже есть задача с выбранным профилем.");
+
+            var newTask = new OpenAiTranscriptionTask
+            {
+                SourceFilePath = sourceTask.SourceFilePath,
+                SourceFileUrl = sourceTask.SourceFileUrl,
+                ConvertedFilePath = sourceTask.ConvertedFilePath,
+                RecognizedText = sourceTask.RecognizedText,
+                SegmentsJson = sourceTask.SegmentsJson,
+                CreatedBy = createdBy,
+                Clarification = normalizedClarification,
+                RecognitionProfileId = recognitionProfile.Id,
+                RecognitionProfileDisplayedName = string.IsNullOrWhiteSpace(recognitionProfile.DisplayedName)
+                    ? null
+                    : recognitionProfile.DisplayedName,
+                Status = OpenAiTranscriptionStatus.ProcessingSegments,
+                Done = false,
+                Error = null,
+                CreatedAt = DateTime.UtcNow,
+                ModifiedAt = DateTime.UtcNow,
+                SegmentsTotal = sourceTask.Segments.Count,
+                SegmentsProcessed = 0,
+                ProcessedText = null,
+                MarkdownText = null
+            };
+
+            _dbContext.OpenAiTranscriptionTasks.Add(newTask);
+
+            var newSegments = sourceTask.Segments
+                .OrderBy(s => s.Order)
+                .Select(segment => new OpenAiRecognizedSegment
+                {
+                    TaskId = newTask.Id,
+                    Order = segment.Order,
+                    Text = segment.Text,
+                    ProcessedText = null,
+                    IsProcessed = false,
+                    IsProcessing = false,
+                    StartSeconds = segment.StartSeconds,
+                    EndSeconds = segment.EndSeconds
+                })
+                .ToList();
+
+            await _dbContext.OpenAiRecognizedSegments.AddRangeAsync(newSegments);
+            await _dbContext.SaveChangesAsync();
+
+            return newTask;
+        }
+
         private async Task RunDownloadStepAsync(OpenAiTranscriptionTask task)
         {
             if (string.IsNullOrWhiteSpace(task.SourceFileUrl))

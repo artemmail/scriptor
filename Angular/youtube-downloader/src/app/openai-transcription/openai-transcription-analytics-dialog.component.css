@@ -1,0 +1,20 @@
+.dialog-content {
+  display: grid;
+  gap: 16px;
+  max-width: 520px;
+}
+
+.dialog-description {
+  margin: 0;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.error {
+  color: #b91c1c;
+  font-weight: 500;
+}
