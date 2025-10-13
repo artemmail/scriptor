@@ -1,5 +1,8 @@
 <div class="about3-page">
   <main class="page-content">
+
+     
+
     <section class="hero">
       <div class="hero-text">
         <h1>Преобразовать аудио и видео в текст</h1>
@@ -8,9 +11,11 @@
           лекций в структурированный текст.
         </p>
         <ul class="hero-highlights">
-          <li>Скорость обработки — 1&nbsp;час записи за 3&nbsp;минуты</li>
-          <li>Поддержка 78 языков и автоматическая расстановка тайм-кодов</li>
-          <li>Удобный редактор с подсветкой важных фрагментов</li>
+          <li>Выделение участников разговора</li>
+          <li>Исправление орфографии, разметка и форматирование</li>          
+          <li>Структурирование в документе в виде таблиц, списков, формул</li>
+          <li>Формирование готового к печати документа в Word и PDF</li>
+          <li>Профили распознавания - переговоры, совещение, собеседование, презентация и другие</li>
         </ul>
         <div class="hero-actions">
           <a class="btn btn-primary" [routerLink]="uploadRoute">Загрузить файл</a>
@@ -28,6 +33,20 @@
           <img [src]="workflowSteps[0].image" [alt]="workflowSteps[0].title" />
           <div class="card-preview-caption">Загрузите или перетащите файл в указанную область</div>
         </div>
+      </div>
+    </section>
+
+    <section class="YouScriptor-advantages">
+      <div class="section-header">
+        <h1>Анализ собеседований, совещаний, переговоров</h1>
+        <p>Интеллектуальный анализ аудио и видео записей митингов</p>
+      </div>
+      <div class="advantage-grid">
+        <article class="advantage-card" *ngFor="let feature of YouScriptorFeatures">
+          <div class="advantage-icon" aria-hidden="true">{{ feature.icon }}</div>
+          <h3>{{ feature.title }}</h3>
+          <p [innerHTML]="feature.description"></p>
+        </article>
       </div>
     </section>
 
@@ -161,19 +180,7 @@
       </div>
     </section>
 
-    <section class="YouScriptor-advantages">
-      <div class="section-header">
-        <h2>YouScriptor</h2>
-        <p>Комплекс инструментов для быстрой и командной работы с расшифровками.</p>
-      </div>
-      <div class="advantage-grid">
-        <article class="advantage-card" *ngFor="let feature of YouScriptorFeatures">
-          <div class="advantage-icon" aria-hidden="true">{{ feature.icon }}</div>
-          <h3>{{ feature.title }}</h3>
-          <p [innerHTML]="feature.description"></p>
-        </article>
-      </div>
-    </section>
+
 
     <section class="business">
       <div class="section-header">
