@@ -223,6 +223,10 @@ section {
   align-items: start;
 }
 
+.import-panel {
+  grid-column: span 2;
+}
+
 .panel {
   background: rgba(255, 255, 255, 0.92);
   border-radius: 32px;
@@ -534,6 +538,10 @@ section {
 
   .workspace-grid {
     grid-template-columns: 1fr;
+  }
+
+  .import-panel {
+    grid-column: auto;
   }
 
   .history-panel {
