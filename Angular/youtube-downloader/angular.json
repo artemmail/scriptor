@@ -59,6 +59,9 @@
               "node_modules/ngx-markdown-editor/assets/marked.min.js",
               "node_modules/ngx-markdown-editor/assets/highlight.js/highlight.min.js",
               "assets/ace-builds/ace.js"
+            ],
+            "allowedCommonJsDependencies": [
+              "file-saver"
             ]
           },
           "configurations": {
@@ -71,6 +74,21 @@
               }
             },
             "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            },
+            "ssr": {
+              "deleteOutputPath": false,
+              "outputHashing": "all",
+              "optimization": {
+                "fonts": {
+                  "inline": false
+                }
+              }
+            },
+            "ssr-development": {
+              "deleteOutputPath": false,
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
@@ -106,6 +124,41 @@
             }
           },
           "defaultConfiguration": "production"
+        },
+        "ssr": {
+          "builder": "@angular-devkit/build-angular:server",
+          "options": {
+            "outputPath": "dist/youtube-downloader/server",
+            "main": "src/main.server.ts",
+            "tsConfig": "tsconfig.server.json"
+          },
+          "configurations": {
+            "production": {},
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve-ssr": {
+          "builder": "@angular-devkit/build-angular:ssr-dev-server",
+          "options": {
+            "browserTarget": "youtube-downloader:build:ssr-development",
+            "serverTarget": "youtube-downloader:server:development"
+          },
+          "configurations": {
+            "development": {
+              "browserTarget": "youtube-downloader:build:ssr-development",
+              "serverTarget": "youtube-downloader:server:development"
+            },
+            "production": {
+              "browserTarget": "youtube-downloader:build:ssr",
+              "serverTarget": "youtube-downloader:server:production"
+            }
+          },
+          "defaultConfiguration": "development"
         },
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n"
