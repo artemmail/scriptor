@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
@@ -48,6 +48,9 @@ import {
   styleUrls: ['./openai-transcription.component.css'],
 })
 export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
+  @ViewChild('detailsPanelContainer')
+  private detailsPanelContainer?: ElementRef<HTMLElement>;
+
   tasks: OpenAiTranscriptionTaskDto[] = [];
   selectedTaskId: string | null = null;
   selectedTask: OpenAiTranscriptionTaskDetailsDto | null = null;
@@ -81,6 +84,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   ];
 
   private pollSubscription?: Subscription;
+  private ensurePanelVisibleScheduled = false;
 
   get downloadInProgress(): boolean {
     return this.exportingPdf || this.exportingDocx || this.downloadingSrt;
@@ -176,6 +180,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.updateRenderedMarkdown(null);
     this.resetFullscreenState();
     this.startPolling();
+    this.scheduleEnsureDetailsPanelVisible();
   }
 
   private startPolling(): void {
@@ -220,6 +225,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   private applyTaskUpdate(task: OpenAiTranscriptionTaskDetailsDto): void {
     this.selectedTask = task;
     this.updateRenderedMarkdown(task);
+    this.scheduleEnsureDetailsPanelVisible();
 
     this.tasks = this.tasks.map((existing) =>
       existing.id === task.id
@@ -235,6 +241,50 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
           }
         : existing
     );
+  }
+
+  private scheduleEnsureDetailsPanelVisible(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (this.ensurePanelVisibleScheduled) {
+      return;
+    }
+
+    this.ensurePanelVisibleScheduled = true;
+
+    const callback = () => {
+      this.ensurePanelVisibleScheduled = false;
+      this.ensureDetailsPanelVisible();
+    };
+
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(callback);
+    } else {
+      setTimeout(callback, 0);
+    }
+  }
+
+  private ensureDetailsPanelVisible(): void {
+    const container = this.detailsPanelContainer?.nativeElement;
+
+    if (!container) {
+      return;
+    }
+
+    const rect = container.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const offset = 24;
+
+    if (rect.top < offset) {
+      window.scrollBy({ top: rect.top - offset, behavior: 'smooth' });
+      return;
+    }
+
+    if (rect.bottom > viewportHeight) {
+      window.scrollBy({ top: rect.bottom - viewportHeight + offset, behavior: 'smooth' });
+    }
   }
 
   private updateRenderedMarkdown(task: OpenAiTranscriptionTaskDetailsDto | null): void {

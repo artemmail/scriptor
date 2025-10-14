@@ -80,7 +80,11 @@
           </div>
         </div>
 
-        <div class="details-panel-container" *ngIf="selectedTaskId; else selectPrompt">
+        <div
+          class="details-panel-container"
+          *ngIf="selectedTaskId; else selectPrompt"
+          #detailsPanelContainer
+        >
           <div class="panel details-panel" [class.has-result]="selectedTask && isTaskCompleted(selectedTask)">
             <ng-container *ngIf="detailsLoading; else taskDetails">
               <div class="loading-state">
