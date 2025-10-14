@@ -707,8 +707,19 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     });
   }
 
+  private canDelete(task: OpenAiTranscriptionTaskDetailsDto | null): boolean {
+    return (
+      !!task &&
+      (task.status === OpenAiTranscriptionStatus.Done || task.status === OpenAiTranscriptionStatus.Error)
+    );
+  }
+
+  canDeleteSelectedTask(): boolean {
+    return this.canDelete(this.selectedTask);
+  }
+
   deleteTask(): void {
-    if (!this.selectedTaskId || this.deleteInProgress) {
+    if (!this.selectedTaskId || this.deleteInProgress || !this.canDeleteSelectedTask()) {
       return;
     }
 

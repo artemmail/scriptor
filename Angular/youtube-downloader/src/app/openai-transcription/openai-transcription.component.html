@@ -177,7 +177,7 @@
                         class="btn btn-outline"
                         type="button"
                         (click)="deleteTask()"
-                        [disabled]="deleteInProgress"
+                        [disabled]="deleteInProgress || !canDeleteSelectedTask()"
                       >
                         <mat-icon>delete</mat-icon>
                         <span>Удалить</span>
@@ -301,7 +301,7 @@
                       class="btn btn-outline"
                       type="button"
                       (click)="deleteTask()"
-                      [disabled]="deleteInProgress || continueInProgress"
+                      [disabled]="deleteInProgress || continueInProgress || !canDeleteSelectedTask()"
                     >
                       <mat-icon>delete</mat-icon>
                       <span>Удалить</span>
