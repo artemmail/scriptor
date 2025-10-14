@@ -337,6 +337,9 @@ section {
 
 .details-panel {
   min-height: 560px;
+  position: sticky;
+  top: calc(var(--app-header-height, 72px) + 24px);
+  align-self: flex-start;
 }
 
 .details-header {
@@ -682,6 +685,11 @@ pre {
 
   .workspace-grid {
     grid-template-columns: 1fr;
+  }
+
+  .details-panel {
+    position: static;
+    top: auto;
   }
 
   .panel {
