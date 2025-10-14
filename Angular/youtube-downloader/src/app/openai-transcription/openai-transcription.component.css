@@ -4,6 +4,7 @@
   font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
   background: linear-gradient(180deg, #f8fbff 0%, #eef2ff 100%);
   min-height: 100vh;
+  --details-panel-offset: calc(var(--app-header-height, 72px) + 16px);
 }
 
 .transcription-page {
@@ -213,6 +214,18 @@ section {
   align-items: start;
 }
 
+.details-panel-container {
+  position: -webkit-sticky;
+  position: sticky;
+  top: var(--details-panel-offset);
+  align-self: flex-start;
+  width: 100%;
+  display: flex;
+  z-index: 1;
+  max-height: calc(100vh - var(--details-panel-offset) - 24px);
+  min-height: min(360px, calc(100vh - var(--details-panel-offset) - 24px));
+}
+
 .tasks-panel {
   min-width: 360px;
 }
@@ -336,10 +349,12 @@ section {
 }
 
 .details-panel {
-  min-height: 560px;
-  position: sticky;
-  top: calc(var(--app-header-height, 72px) + 24px);
-  align-self: flex-start;
+  flex: 1 1 auto;
+  min-height: min(360px, 100%);
+  max-height: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable both-edges;
 }
 
 .details-header {
@@ -698,6 +713,18 @@ pre {
 }
 
 @media (max-width: 768px) {
+  .details-panel-container {
+    position: static;
+    top: auto;
+    max-height: none;
+    min-height: auto;
+  }
+
+  .details-panel {
+    max-height: none;
+    overflow: visible;
+  }
+
   .page-content {
     padding: 48px 20px 80px;
     gap: 64px;
