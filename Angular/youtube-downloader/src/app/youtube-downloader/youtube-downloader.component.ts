@@ -1,5 +1,5 @@
-import { Component, OnInit, OnDestroy, Pipe, PipeTransform } from '@angular/core';
-import { CommonModule }                      from '@angular/common';
+import { Component, OnInit, OnDestroy, Inject } from '@angular/core';
+import { CommonModule, DOCUMENT }              from '@angular/common';
 import { FormControl, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpClientModule }                 from '@angular/common/http';
 import { saveAs }                           from 'file-saver';
@@ -8,17 +8,13 @@ import { saveAs }                           from 'file-saver';
 import { MatFormFieldModule }   from '@angular/material/form-field';
 import { MatInputModule }       from '@angular/material/input';
 import { MatButtonModule }      from '@angular/material/button';
-import { MatSelectModule }      from '@angular/material/select';
-import { MatCardModule }        from '@angular/material/card';
 import { MatIconModule }        from '@angular/material/icon';
-import { MatListModule }        from '@angular/material/list';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatTableModule }       from '@angular/material/table';
 import { MatCheckboxModule }    from '@angular/material/checkbox';
-import { MatTabsModule }        from '@angular/material/tabs';
+import { RouterModule }         from '@angular/router';
 
 import { MergedVideoDto, YoutubeService } from '../services/youtube.service';
-import { RecognitionService } from '../services/recognition.service';
 import { StreamDto } from '../models/stream-dto';
 import { BitratePipe, FileSizePipe } from '../pipe/local-time.pipe';
 
@@ -35,22 +31,46 @@ import { BitratePipe, FileSizePipe } from '../pipe/local-time.pipe';
     FormsModule,
     ReactiveFormsModule,
     HttpClientModule,
-    MatTabsModule,
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
-    MatSelectModule,
-    MatCardModule,
     MatIconModule,
-    MatListModule,
     MatProgressBarModule,
     MatTableModule,
     MatCheckboxModule,
+    RouterModule,
     BitratePipe,
     FileSizePipe, // <-- pipe подключен
   ]
 })
 export class YoutubeDownloaderComponent implements OnInit, OnDestroy {
+  readonly heroHighlights = [
+    'Скачивайте видео и аудио дорожки отдельно или объединяйте их в один файл',
+    'Выбирайте нужное качество и контейнер без ручных настроек',
+    'Получайте готовый результат и историю задач прямо в браузере'
+  ];
+
+  readonly cardHighlights = [
+    {
+      title: 'Интеллектуальный подбор',
+      description: 'Мы группируем потоки по типу, кодеку и размеру, чтобы вам было проще сделать выбор.'
+    },
+    {
+      title: 'Автоматическое объединение',
+      description: 'Сервис создаёт задачу, отслеживает прогресс и сообщает, когда файл готов.'
+    },
+    {
+      title: 'История всегда под рукой',
+      description: 'Скачивайте готовые результаты из истории задач, даже если закрыли вкладку.'
+    }
+  ];
+
+  readonly quickTips = [
+    'Выберите одну видеодорожку и один аудиопоток — этого достаточно для готового ролика.',
+    'Если нужно только аудио, отметьте один поток и получите MP3 без лишних шагов.',
+    'Готовые файлы можно скачать напрямую из истории задач или по ссылке после объединения.'
+  ];
+
   // —— Секция: выбор и объединение стримов ——
   videoUrlControl = new FormControl<string>('', [
     Validators.required,
@@ -82,7 +102,7 @@ export class YoutubeDownloaderComponent implements OnInit, OnDestroy {
 
   constructor(
     private youtubeService: YoutubeService,
-    private recognitionService: RecognitionService
+    @Inject(DOCUMENT) private document: Document | null
   ) {}
 
   ngOnInit(): void {
@@ -307,5 +327,12 @@ export class YoutubeDownloaderComponent implements OnInit, OnDestroy {
         this.errorMessage = `Ошибка при скачивании ${item.taskId}: ${err.message}`;
       }
     });
+  }
+
+  scrollToWorkspace(): void {
+    const target = this.document?.getElementById('downloader-workspace');
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 }

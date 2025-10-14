@@ -17,6 +17,7 @@ import { PngToWebpComponent } from './png-to-webp/png-to-webp.component';
 const routes: Routes = [
   { path: '', component: YoutubeDownloaderComponent },
   { path: 'youtube-downloader', component: YoutubeDownloaderComponent },
+  { path: 'down', component: YoutubeDownloaderComponent },
   { path: 'recognition-tasks', component: RecognitionTasksComponent },
   { path: 'transcriptions', component: OpenAiTranscriptionComponent },
   { path: 'png-to-webp', component: PngToWebpComponent },

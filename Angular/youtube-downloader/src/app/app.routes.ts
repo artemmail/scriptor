@@ -18,6 +18,7 @@ import { AdminRecognitionProfilesComponent } from './admin-recognition-profiles/
 export const appRoutes: Routes = [
   { path: '', component: OpenAiTranscriptionComponent },
   { path: 'youtube-downloader', component: YoutubeDownloaderComponent },
+  { path: 'down', component: YoutubeDownloaderComponent },
   { path: 'recognition-tasks', component: SubtitlesTasksComponent },
   { path: 'transcriptions', component: OpenAiTranscriptionComponent },
   { path: 'markdown-converter', component: MarkdownConverterComponent },

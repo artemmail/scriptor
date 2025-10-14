@@ -1,184 +1,255 @@
-<div class="youtube-downloader">
-  <mat-tab-group>
-    <!-- Tab 1: Импорт и объединение -->
-    <mat-tab label="Импорт и объединение">
-      <mat-card class="p-4">
-        <mat-card-header>
-          <mat-card-title>Импорт и объединение потоков</mat-card-title>
-          <mat-card-subtitle>Укажите URL видео и выберите нужные потоки</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content>
-          <form (submit)="fetchStreams(); $event.preventDefault()" class="stream-form flex flex-col gap-4">
-            <mat-form-field appearance="outline" class="w-full">
-              <mat-label>Ссылка на YouTube видео</mat-label>
-              <input matInput [formControl]="videoUrlControl" placeholder="https://youtube.com/..." />
-              <mat-error *ngIf="videoUrlControl.invalid">Неверный URL.</mat-error>
-            </mat-form-field>
-            <div class="flex justify-end">
-              <button mat-flat-button color="primary" type="submit" [disabled]="isLoading">
-                Загрузить потоки
-              </button>
+<div class="downloader-page">
+  <main class="page-content">
+    <section class="hero">
+      <div class="hero-text">
+        <h1>Загружайте и объединяйте YouTube-видео без лишних шагов</h1>
+        <p class="hero-lead">
+          Сервис YouScriptor помогает быстро получить готовый файл: выбирайте дорожки, следите за прогрессом и
+          скачивайте результат прямо в браузере.
+        </p>
+        <ul class="hero-highlights">
+          <li *ngFor="let highlight of heroHighlights">{{ highlight }}</li>
+        </ul>
+        <div class="hero-actions">
+          <button class="btn btn-primary" type="button" (click)="scrollToWorkspace()">
+            <mat-icon>play_circle</mat-icon>
+            <span>Начать работу</span>
+          </button>
+          <a class="btn btn-secondary" [routerLink]="['/transcriptions']">
+            <mat-icon>record_voice_over</mat-icon>
+            <span>К расшифровкам</span>
+          </a>
+        </div>
+      </div>
+      <div class="hero-card">
+        <div class="card-header">Все операции с одним видео — в одном месте</div>
+        <div class="card-dropzone">
+          <p>Вставьте ссылку, выберите дорожки и запустите объединение. Мы подскажем лучший набор потоков.</p>
+          <span>Поддерживаются ролики любой длины — мы подберём оптимальный контейнер и качество автоматически.</span>
+          <button class="btn btn-primary" type="button" (click)="scrollToWorkspace()">
+            <mat-icon>bolt</mat-icon>
+            <span>Перейти к форме</span>
+          </button>
+        </div>
+        <div class="card-preview">
+          <div class="card-preview-caption">Что вы получаете:</div>
+          <ul class="card-preview-list">
+            <li *ngFor="let highlight of cardHighlights">
+              <h4>{{ highlight.title }}</h4>
+              <p>{{ highlight.description }}</p>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="workspace" id="downloader-workspace">
+      <div class="section-header">
+        <h2>Рабочая область</h2>
+        <p>Вставьте ссылку на ролик, отметьте дорожки и наблюдайте за прогрессом объединения и историей задач.</p>
+      </div>
+
+      <div class="workspace-grid">
+        <div class="panel import-panel">
+          <div class="panel-header">
+            <h3>Импорт и объединение потоков</h3>
+            <span
+              *ngIf="mergeStatus || isMerging"
+              class="status-chip"
+              [ngClass]="{
+                'status-running': isMerging && mergeStatus !== 'Done' && mergeStatus !== 'Error',
+                'status-done': mergeStatus === 'Done',
+                'status-error': mergeStatus === 'Error'
+              }"
+            >
+              {{ mergeStatus || 'В обработке' }}
+            </span>
+          </div>
+
+          <div class="panel-body">
+            <p class="panel-description">
+              Сервис автоматически сортирует потоки по типу и качеству. Отметьте подходящие дорожки и запустите
+              объединение — результат появится в истории задач и будет доступен для скачивания.
+            </p>
+
+            <form (submit)="fetchStreams(); $event.preventDefault()" class="stream-form">
+              <mat-form-field appearance="outline">
+                <mat-label>Ссылка на YouTube-видео</mat-label>
+                <input matInput [formControl]="videoUrlControl" placeholder="https://youtube.com/..." />
+                <mat-error *ngIf="videoUrlControl.invalid">Неверный URL.</mat-error>
+              </mat-form-field>
+              <button mat-flat-button color="primary" type="submit" [disabled]="isLoading">Загрузить потоки</button>
+            </form>
+
+            <mat-progress-bar *ngIf="isLoading" mode="indeterminate"></mat-progress-bar>
+
+            <div class="error" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+            <div class="quick-tips" *ngIf="quickTips.length">
+              <h4>Подсказки</h4>
+              <ul>
+                <li *ngFor="let tip of quickTips">{{ tip }}</li>
+              </ul>
             </div>
-          </form>
 
-          <mat-progress-bar *ngIf="isLoading" mode="indeterminate" class="mt-4"></mat-progress-bar>
-          <div *ngIf="errorMessage" class="error mt-4">{{ errorMessage }}</div>
+            <div class="table-wrapper" *ngIf="streams.length">
+              <table mat-table [dataSource]="streams" class="mat-elevation-z2 selection-table">
+                <ng-container matColumnDef="select">
+                  <th mat-header-cell *matHeaderCellDef></th>
+                  <td mat-cell *matCellDef="let s">
+                    <mat-checkbox
+                      [checked]="isStreamSelected(s)"
+                      (change)="toggleSelection(s, $event.checked)"
+                      [disabled]="isRowDisabled(s)"
+                    ></mat-checkbox>
+                  </td>
+                </ng-container>
 
-          <table
-            mat-table
-            [dataSource]="streams"
-            *ngIf="streams.length"
-            class="mat-elevation-z2 w-full mt-6">
+                <ng-container matColumnDef="typeIcon">
+                  <th mat-header-cell *matHeaderCellDef></th>
+                  <td mat-cell *matCellDef="let s">
+                    <mat-icon>{{ s.type === 'video' ? 'videocam' : 'audiotrack' }}</mat-icon>
+                  </td>
+                </ng-container>
 
-            <!-- Checkbox Column -->
-            <ng-container matColumnDef="select">
-              <th mat-header-cell *matHeaderCellDef></th>
-              <td mat-cell *matCellDef="let s">
-                <mat-checkbox
-                  [checked]="isStreamSelected(s)"
-                  (change)="toggleSelection(s, $event.checked)"
-                  [disabled]="isRowDisabled(s)">
-                </mat-checkbox>
-              </td>
-            </ng-container>
+                <ng-container matColumnDef="codec">
+                  <th mat-header-cell *matHeaderCellDef>Кодек</th>
+                  <td mat-cell *matCellDef="let s">{{ s.codec }}</td>
+                </ng-container>
 
-            <!-- Type -->
-            <ng-container matColumnDef="typeIcon">
-              <th mat-header-cell *matHeaderCellDef></th>
-              <td mat-cell *matCellDef="let s">
-                <mat-icon>{{ s.type === 'video' ? 'videocam' : 'audiotrack' }}</mat-icon>
-              </td>
-            </ng-container>
+                <ng-container matColumnDef="quality">
+                  <th mat-header-cell *matHeaderCellDef>Качество</th>
+                  <td mat-cell *matCellDef="let s">{{ s.qualityLabel?.label || s.qualityLabel || '-' }}</td>
+                </ng-container>
 
-            <!-- Codec -->
-            <ng-container matColumnDef="codec">
-              <th mat-header-cell *matHeaderCellDef>Кодек</th>
-              <td mat-cell *matCellDef="let s">{{ s.codec }}</td>
-            </ng-container>
+                <ng-container matColumnDef="bitrate">
+                  <th mat-header-cell *matHeaderCellDef>Битрейт</th>
+                  <td mat-cell *matCellDef="let s">{{ s.bitrate | bitrate }}</td>
+                </ng-container>
 
-            <!-- Quality -->
-            <ng-container matColumnDef="quality">
-              <th mat-header-cell *matHeaderCellDef>Качество</th>
-              <td mat-cell *matCellDef="let s">
-                {{ s.qualityLabel?.label || s.qualityLabel || '-' }}
-              </td>
-            </ng-container>
+                <ng-container matColumnDef="size">
+                  <th mat-header-cell *matHeaderCellDef>Размер</th>
+                  <td mat-cell *matCellDef="let s">{{ s.size | fileSize }}</td>
+                </ng-container>
 
-            <!-- Bitrate -->
-            <ng-container matColumnDef="bitrate">
-  <th mat-header-cell *matHeaderCellDef>Битрейт</th>
-  <td mat-cell *matCellDef="let s">{{ s.bitrate | bitrate }}</td>
-</ng-container>
+                <ng-container matColumnDef="language" *ngIf="showLanguageColumn">
+                  <th mat-header-cell *matHeaderCellDef>Язык</th>
+                  <td mat-cell *matCellDef="let s">{{ s.language || '-' }}</td>
+                </ng-container>
 
-            <!-- Size -->
-            <ng-container matColumnDef="size">
-              <th mat-header-cell *matHeaderCellDef>Размер</th>
-              <td mat-cell *matCellDef="let s">{{ s.size | fileSize }}</td>
-            </ng-container>
+                <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: displayedColumns" [class.disabled-row]="isRowDisabled(row) && !isStreamSelected(row)"></tr>
+              </table>
+            </div>
 
-            <!-- Language -->
-            <ng-container matColumnDef="language" *ngIf="showLanguageColumn">
-              <th mat-header-cell *matHeaderCellDef>Язык</th>
-              <td mat-cell *matCellDef="let s">{{ s.language || '-' }}</td>
-            </ng-container>
+            <div class="empty-state" *ngIf="!streams.length && !isLoading">
+              <h4>Нет загруженных потоков</h4>
+              <p>Вставьте ссылку на видео и нажмите «Загрузить потоки», чтобы выбрать нужные дорожки.</p>
+            </div>
 
-            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-          </table>
+            <div class="merge-actions">
+              <button
+                mat-flat-button
+                color="accent"
+                (click)="mergeSelectedStreams()"
+                [disabled]="!selectedStreams.length || isMerging"
+              >
+                Объединить дорожки
+              </button>
 
-          <div class="flex justify-end mt-4">
-            <button
-              mat-flat-button
-              color="accent"
-              (click)="mergeSelectedStreams()"
-              [disabled]="!selectedStreams.length || isMerging">
-              Объединить дорожки
+              <div class="merge-progress" *ngIf="isMerging || mergeStatus">
+                <div class="progress-header">
+                  <span>{{ mergeStatus || 'Подготовка задачи' }}</span>
+                  <span>{{ mergeProgress }}%</span>
+                </div>
+                <mat-progress-bar mode="determinate" [value]="mergeProgress"></mat-progress-bar>
+              </div>
+            </div>
+
+            <div class="status-banner" *ngIf="mergeResult || mergeDownloadUrl">
+              <div class="status-text">
+                <strong *ngIf="mergeResult">{{ mergeResult }}</strong>
+                <span *ngIf="!mergeResult && mergeStatus">Статус: {{ mergeStatus }} ({{ mergeProgress }}%)</span>
+              </div>
+              <a
+                *ngIf="mergeDownloadUrl"
+                [href]="mergeDownloadUrl"
+                [attr.download]="mergeFileName"
+                class="btn btn-outline"
+              >
+                <mat-icon>download</mat-icon>
+                <span>Скачать файл</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel history-panel">
+          <div class="panel-header">
+            <h3>История задач</h3>
+            <button class="icon-button" type="button" (click)="loadMergedVideos()" aria-label="Обновить список">
+              <mat-icon>refresh</mat-icon>
             </button>
           </div>
+          <div class="panel-body">
+            <div class="error" *ngIf="mergedErrorMessage">{{ mergedErrorMessage }}</div>
 
-          <mat-progress-bar
-            *ngIf="isMerging"
-            mode="determinate"
-            [value]="mergeProgress"
-            class="mt-4">
-          </mat-progress-bar>
+            <div class="empty-state" *ngIf="!mergedVideos.length && !mergedErrorMessage">
+              <h4>Задач пока нет</h4>
+              <p>Как только вы запустите объединение, готовые файлы появятся здесь.</p>
+            </div>
 
-          <div *ngIf="mergeResult" class="mt-4 font-medium text-success">
-            {{ mergeResult }}
-            <a *ngIf="mergeDownloadUrl" [href]="mergeDownloadUrl" [attr.download]="mergeFileName" class="ml-2">
-              Скачать файл
-            </a>
+            <div class="history-table" *ngIf="mergedVideos.length">
+              <table mat-table [dataSource]="mergedVideos">
+                <ng-container matColumnDef="video">
+                  <th mat-header-cell *matHeaderCellDef>Видео</th>
+                  <td mat-cell *matCellDef="let v">
+                    <a
+                      *ngIf="v.youtubeId"
+                      [href]="'https://youtu.be/' + v.youtubeId"
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      {{ v.title || v.fileName || v.youtubeId }}
+                    </a>
+                    <span *ngIf="!v.youtubeId">{{ v.title || v.fileName || '—' }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="status">
+                  <th mat-header-cell *matHeaderCellDef>Статус</th>
+                  <td mat-cell *matCellDef="let v">{{ v.status }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="progress">
+                  <th mat-header-cell *matHeaderCellDef>Прогресс</th>
+                  <td mat-cell *matCellDef="let v" class="history-progress">
+                    <mat-progress-bar mode="determinate" [value]="v.progress"></mat-progress-bar>
+                    <span>{{ v.progress }}%</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="action">
+                  <th mat-header-cell *matHeaderCellDef>Действие</th>
+                  <td mat-cell *matCellDef="let v">
+                    <button
+                      mat-stroked-button
+                      color="primary"
+                      [disabled]="!v.filePath"
+                      (click)="downloadMergedVideo(v)"
+                    >
+                      Скачать
+                    </button>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="['video', 'status', 'progress', 'action']"></tr>
+                <tr mat-row *matRowDef="let row; columns: ['video', 'status', 'progress', 'action']"></tr>
+              </table>
+            </div>
           </div>
-        </mat-card-content>
-      </mat-card>
-    </mat-tab>
-
-    <!-- Tab 2: История задач -->
-    <mat-tab label="История задач">
-      <mat-card class="mt-4 p-4">
-        <mat-card-header>
-          <mat-card-title>История задач</mat-card-title>
-          <mat-card-subtitle>Статус и прогресс объединения видео</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content>
-          <div *ngIf="mergedErrorMessage" class="error">{{ mergedErrorMessage }}</div>
-          <div *ngIf="!mergedVideos.length && !mergedErrorMessage">Задач пока нет.</div>
-
-          <table
-            mat-table
-            [dataSource]="mergedVideos"
-            *ngIf="mergedVideos.length"
-            class="mat-elevation-z2 w-full">
-
-            <!-- VIDEO (YouTube link with title text) -->
-            <ng-container matColumnDef="video">
-              <th mat-header-cell *matHeaderCellDef>Видео</th>
-              <td mat-cell *matCellDef="let v">
-                <a *ngIf="v.youtubeId"
-                   [href]="'https://youtu.be/' + v.youtubeId"
-                   target="_blank" rel="noopener">
-                  {{ v.title || v.fileName || v.youtubeId }}
-                </a>
-                <span *ngIf="!v.youtubeId">
-                  {{ v.title || v.fileName || '—' }}
-                </span>
-              </td>
-            </ng-container>
-
-            <!-- Status -->
-            <ng-container matColumnDef="status">
-              <th mat-header-cell *matHeaderCellDef>Статус</th>
-              <td mat-cell *matCellDef="let v">{{ v.status }}</td>
-            </ng-container>
-
-            <!-- Progress -->
-            <ng-container matColumnDef="progress">
-              <th mat-header-cell *matHeaderCellDef>Прогресс</th>
-              <td mat-cell *matCellDef="let v">
-                <mat-progress-bar mode="determinate" [value]="v.progress"></mat-progress-bar>
-                <span class="ml-2">{{ v.progress }}%</span>
-              </td>
-            </ng-container>
-
-            <!-- Action (download button only) -->
-            <ng-container matColumnDef="action">
-              <th mat-header-cell *matHeaderCellDef>Действие</th>
-              <td mat-cell *matCellDef="let v">
-                <button
-                  mat-stroked-button
-                  color="primary"
-                  [disabled]="!v.filePath"
-                  (click)="downloadMergedVideo(v)">
-                  Скачать
-                </button>
-              </td>
-            </ng-container>
-
-            <tr mat-header-row *matHeaderRowDef="['video','status','progress','action']"></tr>
-            <tr mat-row *matRowDef="let row; columns: ['video','status','progress','action']"></tr>
-          </table>
-        </mat-card-content>
-      </mat-card>
-    </mat-tab>
-  </mat-tab-group>
+        </div>
+      </div>
+    </section>
+  </main>
 </div>
