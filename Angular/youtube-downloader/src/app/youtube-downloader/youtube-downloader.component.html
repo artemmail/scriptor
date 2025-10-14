@@ -223,9 +223,11 @@
 
                 <ng-container matColumnDef="progress">
                   <th mat-header-cell *matHeaderCellDef>Прогресс</th>
-                  <td mat-cell *matCellDef="let v" class="history-progress">
-                    <mat-progress-bar mode="determinate" [value]="v.progress"></mat-progress-bar>
-                    <span>{{ v.progress }}%</span>
+                  <td mat-cell *matCellDef="let v">
+                    <div class="history-progress">
+                      <mat-progress-bar mode="determinate" [value]="v.progress"></mat-progress-bar>
+                      <span>{{ v.progress }}%</span>
+                    </div>
                   </td>
                 </ng-container>
 
