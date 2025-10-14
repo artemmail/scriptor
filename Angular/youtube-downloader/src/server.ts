@@ -4,11 +4,31 @@ import {
 } from '@angular/ssr/node';
 import express from 'express';
 import type { Server } from 'node:http';
+import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const serverDistFolder = dirname(fileURLToPath(import.meta.url));
-const browserDistFolder = resolve(serverDistFolder, '../browser');
+const browserDistFolder = (() => {
+  const candidates = [
+    resolve(serverDistFolder, '../browser'),
+    resolve(serverDistFolder, '..'),
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(resolve(candidate, 'index.html'))) {
+      return candidate;
+    }
+  }
+
+  const fallback = candidates[0];
+  console.warn(
+    `Unable to locate an index.html file. Falling back to ${fallback}. ` +
+      'Ensure the Angular browser build has been generated.',
+  );
+
+  return fallback;
+})();
 
 const app = express();
 
