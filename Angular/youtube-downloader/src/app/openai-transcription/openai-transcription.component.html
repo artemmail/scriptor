@@ -80,7 +80,7 @@
           </div>
         </div>
 
-        <ng-container *ngIf="selectedTaskId; else selectPrompt">
+        <div class="details-panel-container" *ngIf="selectedTaskId; else selectPrompt">
           <div class="panel details-panel" [class.has-result]="selectedTask && isTaskCompleted(selectedTask)">
             <ng-container *ngIf="detailsLoading; else taskDetails">
               <div class="loading-state">
@@ -343,13 +343,15 @@
               </ng-template>
             </ng-template>
           </div>
-        </ng-container>
+        </div>
 
         <ng-template #selectPrompt>
-          <div class="panel details-panel empty-details">
-            <div class="empty-state">
-              <h4>Выберите задачу</h4>
-              <p>Мы покажем ход обработки и готовый текст, как только вы выберете файл из списка.</p>
+          <div class="details-panel-container">
+            <div class="panel details-panel empty-details">
+              <div class="empty-state">
+                <h4>Выберите задачу</h4>
+                <p>Мы покажем ход обработки и готовый текст, как только вы выберете файл из списка.</p>
+              </div>
             </div>
           </div>
         </ng-template>
