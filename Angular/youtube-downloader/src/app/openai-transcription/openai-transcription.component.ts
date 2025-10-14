@@ -63,6 +63,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   exportingDocx = false;
   downloadingSrt = false;
   copying = false;
+  deleteError: string | null = null;
+  deleteInProgress = false;
   renderedMarkdown: SafeHtml | null = null;
   private markdownSource = '';
   isResultFullscreen = false;
@@ -169,6 +171,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.detailsError = null;
     this.analyticsInProgress = false;
     this.analyticsError = null;
+    this.deleteError = null;
+    this.deleteInProgress = false;
     this.updateRenderedMarkdown(null);
     this.resetFullscreenState();
     this.startPolling();
@@ -699,6 +703,35 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       error: (error) => {
         this.continueInProgress = false;
         this.continueError = this.extractError(error) ?? 'Не удалось продолжить задачу.';
+      },
+    });
+  }
+
+  deleteTask(): void {
+    if (!this.selectedTaskId || this.deleteInProgress) {
+      return;
+    }
+
+    const taskId = this.selectedTaskId;
+    this.deleteInProgress = true;
+    this.deleteError = null;
+    this.continueError = null;
+
+    this.transcriptionService.deleteTask(taskId).subscribe({
+      next: () => {
+        this.deleteInProgress = false;
+        this.stopPolling();
+        this.selectedTaskId = null;
+        this.selectedTask = null;
+        this.tasks = this.tasks.filter((task) => task.id !== taskId);
+        if (this.tasks.length > 0) {
+          this.selectTask(this.tasks[0]);
+        }
+        this.snackBar.open('Задача удалена.', 'OK', { duration: 3000 });
+      },
+      error: (error) => {
+        this.deleteInProgress = false;
+        this.deleteError = this.extractError(error) ?? 'Не удалось удалить задачу.';
       },
     });
   }

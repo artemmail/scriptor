@@ -173,8 +173,23 @@
                         <mat-icon>{{ isResultFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
                         <span>{{ isResultFullscreen ? 'Свернуть' : 'На весь экран' }}</span>
                       </button>
+                      <button
+                        class="btn btn-outline"
+                        type="button"
+                        (click)="deleteTask()"
+                        [disabled]="deleteInProgress"
+                      >
+                        <mat-icon>delete</mat-icon>
+                        <span>Удалить</span>
+                      </button>
+                      <mat-progress-spinner
+                        *ngIf="deleteInProgress"
+                        mode="indeterminate"
+                        diameter="28"
+                        class="inline-spinner"
+                      ></mat-progress-spinner>
                     </div>
-                 
+
                     <mat-menu #downloadMenu="matMenu" actionMenuPanel>
                       <button
                         mat-menu-item
@@ -253,6 +268,7 @@
                     </mat-menu>
                     <div class="error" *ngIf="analyticsError">{{ analyticsError }}</div>
                     <div class="error" *ngIf="exportError">{{ exportError }}</div>
+                    <div class="error" *ngIf="deleteError">{{ deleteError }}</div>
                     <div
                       class="markdown-content"
                       *ngIf="renderedMarkdown; else plainResult"
@@ -276,18 +292,28 @@
                       class="btn btn-outline"
                       type="button"
                       (click)="continueTask()"
-                      [disabled]="continueInProgress"
+                      [disabled]="continueInProgress || deleteInProgress"
                     >
                       <mat-icon>play_arrow</mat-icon>
                       <span>Продолжить задачу</span>
                     </button>
+                    <button
+                      class="btn btn-outline"
+                      type="button"
+                      (click)="deleteTask()"
+                      [disabled]="deleteInProgress || continueInProgress"
+                    >
+                      <mat-icon>delete</mat-icon>
+                      <span>Удалить</span>
+                    </button>
                     <mat-progress-spinner
-                      *ngIf="continueInProgress"
+                      *ngIf="continueInProgress || deleteInProgress"
                       mode="indeterminate"
                       diameter="28"
                       class="inline-spinner"
                     ></mat-progress-spinner>
                     <div class="error" *ngIf="continueError">{{ continueError }}</div>
+                    <div class="error" *ngIf="deleteError">{{ deleteError }}</div>
                   </div>
 
                   <section class="steps-section" *ngIf="selectedTask.steps.length">
