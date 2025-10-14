@@ -1,10 +1,9 @@
 import {
-  AngularNodeAppEngine,
   createNodeRequestHandler,
   isMainModule,
-  writeResponseToNodeResponse,
 } from '@angular/ssr/node';
 import express from 'express';
+import type { Server } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,7 +11,6 @@ const serverDistFolder = dirname(fileURLToPath(import.meta.url));
 const browserDistFolder = resolve(serverDistFolder, '../browser');
 
 const app = express();
-const angularApp = new AngularNodeAppEngine();
 
 /**
  * Example Express Rest API endpoints can be defined here.
@@ -38,28 +36,37 @@ app.use(
 );
 
 /**
- * Handle all other requests by rendering the Angular application.
+ * Handle all other requests by serving the SPA entry point.
  */
-app.use('/**', (req, res, next) => {
-  angularApp
-    .handle(req)
-    .then((response) =>
-      response ? writeResponseToNodeResponse(response, res) : next(),
-    )
-    .catch(next);
+app.get('*', (_req, res) => {
+  res.sendFile(resolve(browserDistFolder, 'index.html'));
 });
+
+let serverInstance: Server | undefined;
+
+/**
+ * Starts the Express server if it hasn't been started yet.
+ * The server listens on the port defined by the `PORT` environment variable, or defaults to 4000.
+ */
+export function startServer(): Server {
+  console.log('Starting Express server...');
+  if (serverInstance) {
+    return serverInstance;
+  }
+
+  const port = process.env['PORT'] || 4000;
+  serverInstance = app.listen(port, () => {
+    console.log(`Node Express server listening on http://localhost:${port}`);
+  });
+
+  return serverInstance;
+}
 
 /**
  * Start the server if this module is the main entry point.
- * The server listens on the port defined by the `PORT` environment variable, or defaults to 4000.
  */
-//if (isMainModule(import.meta.url))
-  
-  {
-  const port = process.env['PORT'] || 4000;
-  app.listen(port, () => {
-    console.log(`Node Express server listening on http://localhost:${port}`);
-  });
+if (isMainModule(import.meta.url)) {
+  startServer();
 }
 
 /**
