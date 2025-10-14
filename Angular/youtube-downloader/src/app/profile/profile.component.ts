@@ -6,7 +6,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { RouterLink } from '@angular/router';
 
 import { AccountService } from '../services/account.service';
 import { AuthService } from '../services/AuthService.service';
@@ -21,8 +20,7 @@ import { AuthService } from '../services/AuthService.service';
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
-    MatProgressSpinnerModule,
-    RouterLink
+    MatProgressSpinnerModule
   ],
   templateUrl: './profile.component.html',
   styleUrls: ['./profile.component.css']

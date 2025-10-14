@@ -1,9 +1,10 @@
 // src/app/services/AuthService.service.ts
-import { Injectable } from '@angular/core';
+import { Inject, Injectable, PLATFORM_ID } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
 import { jwtDecode } from 'jwt-decode';
+import { isPlatformBrowser } from '@angular/common';
 
 export interface TokenResponse { token: string; }
 export interface UserInfo {
@@ -20,14 +21,20 @@ export class AuthService {
   private userSubject = new BehaviorSubject<UserInfo | null>(null);
   user$ = this.userSubject.asObservable();
 
-  constructor(private http: HttpClient) {
+  private readonly isBrowser: boolean;
+
+  constructor(
+    private http: HttpClient,
+    @Inject(PLATFORM_ID) platformId: Object
+  ) {
+    this.isBrowser = isPlatformBrowser(platformId);
     // 1) При старте читаем accessToken и декодируем
     const token = this.getAccessToken();
     if (token) {
       this.decodeAndSaveUser(token);
     }
     // 2) Если уже был сохранён userInfo (например, после перезагрузки)
-    const saved = localStorage.getItem('userInfo');
+    const saved = this.readStorage('userInfo');
     if (saved) {
       const parsed = JSON.parse(saved) as Partial<UserInfo> & { name?: string };
       const roles = Array.isArray(parsed.roles) ? parsed.roles : parsed.roles ? [parsed.roles] : [];
@@ -44,21 +51,25 @@ export class AuthService {
   }
 
   private saveUser(user: UserInfo | null) {
+    if (!this.isBrowser) {
+      this.userSubject.next(user);
+      return;
+    }
+
     if (user) {
-      localStorage.setItem('userInfo', JSON.stringify(user));
+      window.localStorage.setItem('userInfo', JSON.stringify(user));
     } else {
-      localStorage.removeItem('userInfo');
+      window.localStorage.removeItem('userInfo');
     }
     this.userSubject.next(user);
   }
 
   getAccessToken(): string | null {
-    return localStorage.getItem('accessToken');
+    return this.readStorage('accessToken');
   }
 
   setAccessToken(token: string): void {
-    
-    localStorage.setItem('accessToken', token);
+    this.writeStorage('accessToken', token);
     this.decodeAndSaveUser(token);
   }
 
@@ -120,7 +131,7 @@ export class AuthService {
     ).pipe(
       catchError(() => of(void 0)),
       tap(() => {
-        localStorage.removeItem('accessToken');
+        this.removeStorageItem('accessToken');
         this.saveUser(null);
       })
     );
@@ -139,5 +150,38 @@ export class AuthService {
     };
 
     this.saveUser(updated);
+  }
+
+  private readStorage(key: string): string | null {
+    if (!this.isBrowser) {
+      return null;
+    }
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  private writeStorage(key: string, value: string): void {
+    if (!this.isBrowser) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(key, value);
+    } catch {
+      // ignore storage errors in non-browser environments
+    }
+  }
+
+  private removeStorageItem(key: string): void {
+    if (!this.isBrowser) {
+      return;
+    }
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // ignore storage errors in non-browser environments
+    }
   }
 }

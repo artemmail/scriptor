@@ -19,7 +19,7 @@ import { InfiniteScrollModule } from 'ngx-infinite-scroll';
 import { CommonModule } from '@angular/common';
 import { LocalTimePipe } from '../pipe/local-time.pipe';
 import { SubtitleService, YoutubeCaptionTaskDto2, RecognizeStatus } from '../services/subtitle.service';
-import { VideoDialogComponent, VideoDialogData } from '../video-dialog/video-dialog.component';
+import type { VideoDialogData } from '../video-dialog/video-dialog.component';
 import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../services/AuthService.service';
@@ -49,7 +49,6 @@ import { finalize, map } from 'rxjs/operators';
     InfiniteScrollModule,
     /* Stand‑alone components & pipes */
     LocalTimePipe,
-    VideoDialogComponent,
     YandexAdComponent,
   ],
 })
@@ -290,10 +289,12 @@ export class SubtitlesTasksComponent implements OnInit {
     return this.subtitleService.getStatusText(s);
   }
 
-  openVideoDialog(t: YoutubeCaptionTaskDto2): void {
+  async openVideoDialog(t: YoutubeCaptionTaskDto2): Promise<void> {
     if (!this.isAuthenticated) {
       return;
     }
+
+    const { VideoDialogComponent } = await import('../video-dialog/video-dialog.component');
     const data: VideoDialogData = {
       videoId: t.id,
       title: t.title,
