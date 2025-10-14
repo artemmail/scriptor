@@ -702,6 +702,11 @@ pre {
     grid-template-columns: 1fr;
   }
 
+  .details-panel {
+    position: static;
+    top: auto;
+  }
+
   .panel {
     border-radius: 28px;
   }
