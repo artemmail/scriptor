@@ -21,6 +21,163 @@
         </ng-template>
       </div>
     </mat-tab>
+    <mat-tab label="Платежи">
+      <div class="tab-section payments-tab">
+        <div class="alert error" *ngIf="subscriptionError">{{ subscriptionError }}</div>
+        <div class="alert error" *ngIf="plansError">{{ plansError }}</div>
+        <div class="alert success" *ngIf="paymentSuccess">{{ paymentSuccess }}</div>
+        <div class="alert error" *ngIf="paymentError">{{ paymentError }}</div>
+
+        <div class="loading-container" *ngIf="loadingSubscription">
+          <mat-spinner diameter="32"></mat-spinner>
+        </div>
+
+        <ng-container *ngIf="subscriptionSummary">
+          <section class="summary-section">
+            <h3 class="section-title">Текущая подписка</h3>
+            <div class="summary-grid">
+              <div class="summary-row">
+                <span class="summary-label">Статус:</span>
+                <span class="summary-value">
+                  <ng-container *ngIf="subscriptionSummary.hasLifetimeAccess || subscriptionSummary.isLifetime; else statusText">
+                    Пожизненный доступ
+                  </ng-container>
+                  <ng-template #statusText>
+                    <ng-container *ngIf="subscriptionSummary.hasActiveSubscription; else inactiveStatus">
+                      Активна
+                    </ng-container>
+                    <ng-template #inactiveStatus>Не активна</ng-template>
+                    <ng-container *ngIf="subscriptionSummary.status"> ({{ subscriptionSummary.status }})</ng-container>
+                  </ng-template>
+                </span>
+              </div>
+              <div class="summary-row" *ngIf="subscriptionSummary.planName || subscriptionSummary.planCode">
+                <span class="summary-label">Тариф:</span>
+                <span class="summary-value">
+                  {{ subscriptionSummary.planName || '—' }}
+                  <ng-container *ngIf="subscriptionSummary.planCode">
+                    ({{ subscriptionSummary.planCode }})
+                  </ng-container>
+                </span>
+              </div>
+              <div class="summary-row" *ngIf="subscriptionSummary.endsAt">
+                <span class="summary-label">Окончание:</span>
+                <span class="summary-value">{{ subscriptionSummary.endsAt | date: 'medium' }}</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-label">Бесплатные лимиты:</span>
+                <span class="summary-value">
+                  {{ subscriptionSummary.freeRecognitionsPerDay }} распознаваний/день,
+                  {{ subscriptionSummary.freeTranscriptionsPerMonth }} транскрибаций/мес
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <section class="manual-payment-section">
+            <h3 class="section-title">Добавить ручной платёж</h3>
+            <form class="manual-payment-form" [formGroup]="manualPaymentForm" (ngSubmit)="submitManualPayment()">
+              <mat-form-field appearance="fill">
+                <mat-label>Тариф</mat-label>
+                <mat-select formControlName="planCode" required>
+                  <mat-option *ngFor="let plan of plans" [value]="plan.code">
+                    {{ getPlanLabel(plan) }}
+                  </mat-option>
+                </mat-select>
+                <mat-error *ngIf="manualPaymentForm.get('planCode')?.hasError('required')">
+                  Выберите тариф
+                </mat-error>
+              </mat-form-field>
+
+              <mat-form-field appearance="fill">
+                <mat-label>Сумма</mat-label>
+                <input matInput type="number" formControlName="amount" placeholder="По умолчанию из тарифа" />
+              </mat-form-field>
+
+              <mat-form-field appearance="fill">
+                <mat-label>Валюта</mat-label>
+                <input matInput formControlName="currency" maxlength="8" placeholder="Например, RUB" />
+              </mat-form-field>
+
+              <mat-form-field appearance="fill">
+                <mat-label>Дата окончания подписки</mat-label>
+                <input matInput [matDatepicker]="endDatePicker" formControlName="endDate" />
+                <mat-datepicker-toggle matSuffix [for]="endDatePicker"></mat-datepicker-toggle>
+                <mat-datepicker #endDatePicker></mat-datepicker>
+              </mat-form-field>
+
+              <mat-form-field appearance="fill">
+                <mat-label>Дата оплаты</mat-label>
+                <input matInput [matDatepicker]="paidAtPicker" formControlName="paidAt" />
+                <mat-datepicker-toggle matSuffix [for]="paidAtPicker"></mat-datepicker-toggle>
+                <mat-datepicker #paidAtPicker></mat-datepicker>
+              </mat-form-field>
+
+              <mat-form-field appearance="fill">
+                <mat-label>Ссылка/номер платежа</mat-label>
+                <input matInput formControlName="reference" maxlength="128" />
+              </mat-form-field>
+
+              <mat-form-field appearance="fill" class="full-width">
+                <mat-label>Комментарий</mat-label>
+                <textarea matInput formControlName="comment" rows="3" maxlength="512"></textarea>
+              </mat-form-field>
+
+              <div class="form-actions">
+                <button
+                  mat-flat-button
+                  color="primary"
+                  type="submit"
+                  [disabled]="loadingManualPayment || plans.length === 0"
+                >
+                  <span *ngIf="!loadingManualPayment">Сохранить платёж</span>
+                  <span *ngIf="loadingManualPayment">Сохранение…</span>
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <section class="history-section">
+            <h3 class="section-title">История платежей</h3>
+            <div *ngIf="subscriptionSummary.payments?.length; else noPaymentsHistory">
+              <table class="payments-table">
+                <thead>
+                  <tr>
+                    <th>Дата</th>
+                    <th>Сумма</th>
+                    <th>Статус</th>
+                    <th>Провайдер</th>
+                    <th>Комментарий</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let payment of subscriptionSummary.payments; trackBy: trackPayment">
+                    <td>
+                      {{ payment.paidAt ? (payment.paidAt | date: 'medium') : (payment.issuedAt | date: 'medium') }}
+                    </td>
+                    <td>{{ payment.amount }} {{ payment.currency }}</td>
+                    <td>{{ payment.status }}</td>
+                    <td>
+                      <div class="provider-cell">
+                        <span>{{ payment.paymentProvider || '—' }}</span>
+                        <span class="external-id" *ngIf="payment.externalInvoiceId">{{ payment.externalInvoiceId }}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div *ngIf="payment.planName" class="payment-plan">{{ payment.planName }}</div>
+                      <div *ngIf="payment.comment">{{ payment.comment }}</div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <ng-template #noPaymentsHistory>
+              <p class="empty-state">История платежей отсутствует.</p>
+            </ng-template>
+          </section>
+        </ng-container>
+      </div>
+    </mat-tab>
     <mat-tab label="Информация">
       <div class="tab-section info-tab">
         <div class="info-row">

@@ -1,7 +1,12 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AdminUsersPage } from '../models/admin-user.model';
+import {
+  AdminManualSubscriptionPaymentRequest,
+  AdminSubscription,
+  AdminUserSubscriptionSummary,
+  AdminUsersPage
+} from '../models/admin-user.model';
 
 @Injectable({ providedIn: 'root' })
 export class AdminUsersService {
@@ -41,5 +46,15 @@ export class AdminUsersService {
 
   updateUserRoles(userId: string, roles: string[]): Observable<string[]> {
     return this.http.put<string[]>(`${this.apiUrl}/${userId}/roles`, { roles });
+  }
+
+  getUserSubscription(userId: string): Observable<AdminUserSubscriptionSummary> {
+    return this.http.get<AdminUserSubscriptionSummary>(`${this.apiUrl}/${userId}/subscription`);
+  }
+
+  createManualSubscriptionPayment(
+    request: AdminManualSubscriptionPaymentRequest
+  ): Observable<AdminSubscription> {
+    return this.http.post<AdminSubscription>('/api/admin/subscriptions/manual', request);
   }
 }
