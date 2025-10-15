@@ -32,61 +32,67 @@
         </button>
       </mat-form-field>
 
-      <table
-        mat-table
-        [dataSource]="dataSource"
-        class="users-table custom-table"
-        *ngIf="dataSource.data.length; else emptyState"
-        matSort
-        [matSortActive]="sortActive"
-        [matSortDirection]="sortDirection === '' ? 'asc' : sortDirection"
-        matSortDisableClear
-        (matSortChange)="onSortChange($event)"
-      >
-        <ng-container matColumnDef="email">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header="email">Email</th>
-          <td mat-cell *matCellDef="let user" class="clickable-cell">
-            <div class="email-wrapper" [title]="user.email">{{ user.email }}</div>
-          </td>
-        </ng-container>
+      <div class="table-wrapper" *ngIf="dataSource.data.length; else emptyState">
+        <table
+          mat-table
+          [dataSource]="dataSource"
+          class="users-table"
+          matSort
+          [matSortActive]="sortActive"
+          [matSortDirection]="sortDirection === '' ? 'asc' : sortDirection"
+          matSortDisableClear
+          (matSortChange)="onSortChange($event)"
+        >
+          <ng-container matColumnDef="email">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header="email">Email</th>
+            <td mat-cell *matCellDef="let user" class="clickable-cell">
+              <div class="email-wrapper" [title]="user.email">{{ user.email }}</div>
+            </td>
+          </ng-container>
 
-        <ng-container matColumnDef="registeredAt">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header="registeredAt">Дата регистрации</th>
-          <td mat-cell *matCellDef="let user" class="clickable-cell">
-            {{ user.registeredAt | date: 'medium' }}
-          </td>
-        </ng-container>
+          <ng-container matColumnDef="registeredAt">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header="registeredAt">Дата регистрации</th>
+            <td mat-cell *matCellDef="let user" class="clickable-cell">
+              {{ user.registeredAt | date: 'medium' }}
+            </td>
+          </ng-container>
 
-        <ng-container matColumnDef="recognizedVideos">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header="recognizedVideos">Распознанные видео</th>
-          <td mat-cell *matCellDef="let user" class="clickable-cell">
-            <button
-              mat-button
-              class="videos-count"
-              type="button"
-              (click)="goToUserTasks(user, $event)"
-            >
-              <mat-icon color="primary">movie</mat-icon>
-              <span>{{ user.recognizedVideos }}</span>
-            </button>
-          </td>
-        </ng-container>
+          <ng-container matColumnDef="recognizedVideos">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header="recognizedVideos">Распознанные видео</th>
+            <td mat-cell *matCellDef="let user" class="clickable-cell">
+              <button
+                mat-button
+                class="videos-count"
+                type="button"
+                (click)="goToUserTasks(user, $event)"
+              >
+                <mat-icon color="primary">movie</mat-icon>
+                <span>{{ user.recognizedVideos }}</span>
+              </button>
+            </td>
+          </ng-container>
 
-        <ng-container matColumnDef="roles">
-          <th mat-header-cell *matHeaderCellDef>Роли</th>
-          <td mat-cell *matCellDef="let user" class="clickable-cell roles-cell">
-            <ng-container *ngIf="user.roles?.length; else noRoles">
-              <mat-chip-set>
-                <mat-chip *ngFor="let role of user.roles">{{ role }}</mat-chip>
-              </mat-chip-set>
-            </ng-container>
-            <ng-template #noRoles>—</ng-template>
-          </td>
-        </ng-container>
+          <ng-container matColumnDef="roles">
+            <th mat-header-cell *matHeaderCellDef>Роли</th>
+            <td mat-cell *matCellDef="let user" class="clickable-cell roles-cell">
+              <ng-container *ngIf="user.roles?.length; else noRoles">
+                <mat-chip-set>
+                  <mat-chip *ngFor="let role of user.roles">{{ role }}</mat-chip>
+                </mat-chip-set>
+              </ng-container>
+              <ng-template #noRoles>—</ng-template>
+            </td>
+          </ng-container>
 
-        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns" class="clickable-row" (click)="openUserDialog(row)"></tr>
-      </table>
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr
+            mat-row
+            *matRowDef="let row; columns: displayedColumns"
+            class="clickable-row"
+            (click)="openUserDialog(row)"
+          ></tr>
+        </table>
+      </div>
 
       <div class="loader" *ngIf="loading">
         <mat-progress-spinner diameter="36" mode="indeterminate"></mat-progress-spinner>
