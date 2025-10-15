@@ -24,15 +24,6 @@ namespace YandexSpeech.services
         private static readonly IReadOnlyList<PlanSeed> DefaultPlans = new List<PlanSeed>
         {
             new(
-                Code: "hide_videos",
-                Name: "Скрыть мои видео",
-                Description: "Пожизненная подписка, позволяющая скрывать собственные ролики в общем списке.",
-                Period: SubscriptionBillingPeriod.Lifetime,
-                Price: 1490m,
-                CanHideCaptions: true,
-                IsUnlimitedRecognitions: false,
-                Priority: 10),
-            new(
                 Code: "recognition_unlimited_3_days",
                 Name: "Без ограничений на распознавание (3 дня)",
                 Description: "Позволяет снять дневные ограничения на распознавание на трое суток.",
