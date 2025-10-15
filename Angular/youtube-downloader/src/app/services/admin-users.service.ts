@@ -9,13 +9,27 @@ export class AdminUsersService {
 
   constructor(private readonly http: HttpClient) {}
 
-  getUsers(page: number, pageSize: number, filter?: string): Observable<AdminUsersPage> {
+  getUsers(
+    page: number,
+    pageSize: number,
+    filter?: string,
+    sortBy?: string,
+    sortOrder?: 'asc' | 'desc'
+  ): Observable<AdminUsersPage> {
     let params = new HttpParams()
       .set('page', page.toString())
       .set('pageSize', pageSize.toString());
 
     if (filter) {
       params = params.set('filter', filter);
+    }
+
+    if (sortBy) {
+      params = params.set('sortBy', sortBy);
+    }
+
+    if (sortOrder) {
+      params = params.set('sortOrder', sortOrder);
     }
 
     return this.http.get<AdminUsersPage>(this.apiUrl, { params });

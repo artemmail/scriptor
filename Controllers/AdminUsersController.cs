@@ -35,7 +35,9 @@ namespace YandexSpeech.Controllers
         public async Task<ActionResult<AdminUsersPageDto>> GetUsers(
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20,
-            [FromQuery] string? filter = null)
+            [FromQuery] string? filter = null,
+            [FromQuery] string? sortBy = null,
+            [FromQuery] string? sortOrder = null)
         {
             const int maxPageSize = 100;
             page = Math.Max(page, 1);
@@ -67,13 +69,60 @@ namespace YandexSpeech.Controllers
                     {
                         User = user,
                         Recognized = counts.Sum(c => (int?)c.Count) ?? 0
-                    });
+                    })
+                .Select(x => new AdminUserQueryItem
+                {
+                    User = x.User,
+                    Recognized = x.Recognized
+                });
 
             var totalCount = await baseQuery.CountAsync();
 
-            var paged = await baseQuery
-                .OrderByDescending(x => x.Recognized)
-                .ThenBy(x => x.User.Email)
+            var normalizedSortBy = (sortBy ?? string.Empty).Trim().ToLowerInvariant();
+            var normalizedSortOrder = (sortOrder ?? string.Empty).Trim().ToLowerInvariant();
+
+            var validSortFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "email",
+                "registeredat",
+                "recognizedvideos"
+            };
+
+            if (!validSortFields.Contains(normalizedSortBy))
+            {
+                normalizedSortBy = "recognizedvideos";
+            }
+
+            var descending = normalizedSortOrder switch
+            {
+                "asc" => false,
+                "desc" => true,
+                _ => normalizedSortBy == "recognizedvideos"
+            };
+
+            IOrderedQueryable<AdminUserQueryItem> orderedQuery = normalizedSortBy switch
+            {
+                "email" => descending
+                    ? baseQuery.OrderByDescending(x => x.User.Email)
+                    : baseQuery.OrderBy(x => x.User.Email),
+                "registeredat" => descending
+                    ? baseQuery.OrderByDescending(x => x.User.CreatedAt)
+                    : baseQuery.OrderBy(x => x.User.CreatedAt),
+                _ => descending
+                    ? baseQuery.OrderByDescending(x => x.Recognized)
+                    : baseQuery.OrderBy(x => x.Recognized)
+            };
+
+            if (!string.Equals(normalizedSortBy, "recognizedvideos", StringComparison.OrdinalIgnoreCase))
+            {
+                orderedQuery = orderedQuery.ThenByDescending(x => x.Recognized);
+            }
+
+            orderedQuery = orderedQuery
+                .ThenBy(x => x.User.Email ?? string.Empty)
+                .ThenBy(x => x.User.Id);
+
+            var paged = await orderedQuery
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(x => new
@@ -224,5 +273,12 @@ namespace YandexSpeech.Controllers
             var updatedRoles = await _userManager.GetRolesAsync(user);
             return Ok(updatedRoles);
         }
+
+        private sealed class AdminUserQueryItem
+        {
+            public ApplicationUser User { get; init; } = default!;
+            public int Recognized { get; init; }
+        }
+
     }
 }

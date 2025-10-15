@@ -11,6 +11,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { InfiniteScrollModule } from 'ngx-infinite-scroll';
 import { MatTableModule } from '@angular/material/table';
+import { MatSortModule, Sort, SortDirection } from '@angular/material/sort';
 import { AdminUsersService } from '../services/admin-users.service';
 import { AdminUserListItem } from '../models/admin-user.model';
 import { AdminUserRoleDialogComponent } from './admin-user-role-dialog.component';
@@ -32,6 +33,7 @@ import { AdminUserRoleDialogComponent } from './admin-user-role-dialog.component
     MatButtonModule,
     MatDialogModule,
     InfiniteScrollModule,
+    MatSortModule,
     MatTableModule
   ]
 })
@@ -44,6 +46,8 @@ export class AdminUsersComponent implements OnInit {
   loading = false;
   availableRoles: string[] = [];
   displayedColumns: string[] = ['email', 'registeredAt', 'recognizedVideos', 'roles'];
+  sortActive = 'recognizedVideos';
+  sortDirection: SortDirection = 'desc';
 
   constructor(
     private readonly adminUsersService: AdminUsersService,
@@ -115,8 +119,11 @@ export class AdminUsersComponent implements OnInit {
     this.loading = true;
     const page = this.pageIndex + 1;
 
+    const sortOrder = this.sortDirection === '' ? undefined : this.sortDirection;
+    const filter = this.filterValue || undefined;
+
     this.adminUsersService
-      .getUsers(page, this.pageSize, this.filterValue)
+      .getUsers(page, this.pageSize, filter, this.sortActive, sortOrder)
       .subscribe({
         next: res => {
           this.users = append ? this.users.concat(res.items) : res.items;
@@ -133,6 +140,23 @@ export class AdminUsersComponent implements OnInit {
   goToUserTasks(user: AdminUserListItem, event: MouseEvent): void {
     event.stopPropagation();
     this.router.navigate(['/tasks'], { queryParams: { userId: user.id } });
+  }
+
+  onSortChange(sort: Sort): void {
+    if (!sort.active) {
+      return;
+    }
+
+    const direction = sort.direction || 'asc';
+
+    if (this.sortActive === sort.active && this.sortDirection === direction) {
+      return;
+    }
+
+    this.sortActive = sort.active;
+    this.sortDirection = direction;
+    this.pageIndex = 0;
+    this.loadUsers();
   }
 
   private loadRoles(): void {
