@@ -1,10 +1,12 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { SubtitleService } from '../services/subtitle.service';
+import { PaymentsService, SubscriptionSummary } from '../services/payments.service';
+import { UsageLimitResponse, extractUsageLimitResponse } from '../models/usage-limit-response';
 import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
 
 interface WorkflowStep {
@@ -58,10 +60,11 @@ interface FaqItem {
   templateUrl: './about3.component.html',
   styleUrls: ['./about3.component.css'],
 })
-export class About3Component {
+export class About3Component implements OnInit {
   constructor(
     private readonly subtitleService: SubtitleService,
     private readonly router: Router,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   readonly uploadRoute: RouterCommand = '/transcriptions';
@@ -70,6 +73,15 @@ export class About3Component {
   searchValue = '';
   isStarting = false;
   startError: string | null = null;
+  limitResponse: UsageLimitResponse | null = null;
+  remainingQuota: number | null = null;
+  summary: SubscriptionSummary | null = null;
+  summaryLoading = false;
+  summaryError: string | null = null;
+
+  ngOnInit(): void {
+    this.loadSubscriptionSummary();
+  }
 
   readonly trustedCompanies: readonly TrustedCompany[] = [
     {
@@ -290,11 +302,15 @@ export class About3Component {
 
     this.isStarting = true;
     this.startError = null;
+    this.limitResponse = null;
 
     this.subtitleService.startSubtitleRecognition(query, 'user').subscribe({
-      next: (taskId: string) => {
+      next: (response) => {
         this.isStarting = false;
-        this.router.navigate(['/recognized', taskId]);
+        this.remainingQuota = response.remainingQuota ?? null;
+        if (response?.taskId) {
+          this.router.navigate(['/recognized', response.taskId]);
+        }
       },
       error: (err: HttpErrorResponse) => {
         this.isStarting = false;
@@ -304,9 +320,93 @@ export class About3Component {
           return;
         }
 
-        console.error('Не удалось запустить распознавание', err);
-        this.startError = 'Не удалось запустить распознавание. Попробуйте ещё раз позже.';
+        const limit = err.status === 402 ? extractUsageLimitResponse(err) : null;
+        if (limit) {
+          this.limitResponse = limit;
+          this.remainingQuota = limit.remainingQuota ?? null;
+        } else {
+          console.error('Не удалось запустить распознавание', err);
+          this.startError = 'Не удалось запустить распознавание. Попробуйте ещё раз позже.';
+        }
       },
     });
+  }
+
+  loadSubscriptionSummary(): void {
+    this.summaryLoading = true;
+    this.summaryError = null;
+    this.paymentsService.getSubscriptionSummary().subscribe({
+      next: (summary) => {
+        this.summaryLoading = false;
+        this.summary = summary;
+      },
+      error: () => {
+        this.summaryLoading = false;
+        this.summaryError = 'Не удалось загрузить сведения о подписке.';
+      }
+    });
+  }
+
+  get subscriptionStatusMessage(): string {
+    if (!this.summary) {
+      return '';
+    }
+
+    if (this.summary.hasLifetimeAccess || this.summary.isLifetime) {
+      return 'Безлимитный доступ активен';
+    }
+
+    if (this.summary.hasActiveSubscription) {
+      const planName = this.summary.planName || 'Подписка активна';
+      if (this.summary.endsAt) {
+        const ends = new Date(this.summary.endsAt).toLocaleDateString('ru-RU');
+        return `${planName} до ${ends}`;
+      }
+      return planName;
+    }
+
+    return `Бесплатный тариф: ${this.summary.freeRecognitionsPerDay} распознавания в день и ${this.summary.freeTranscriptionsPerMonth} транскрибации в месяц`;
+  }
+
+  get subscriptionChipClass(): string {
+    if (!this.summary) {
+      return 'status-neutral';
+    }
+
+    if (this.summary.hasLifetimeAccess || this.summary.isLifetime) {
+      return 'status-success';
+    }
+
+    if (this.summary.hasActiveSubscription) {
+      return 'status-active';
+    }
+
+    return 'status-trial';
+  }
+
+  get billingUrl(): string {
+    if (this.limitResponse?.paymentUrl) {
+      return this.limitResponse.paymentUrl;
+    }
+
+    if (this.summary?.billingUrl) {
+      return this.summary.billingUrl;
+    }
+
+    return '/billing';
+  }
+
+  navigateToBilling(): void {
+    const url = this.billingUrl;
+    if (!url) {
+      return;
+    }
+
+    if (url.startsWith('http')) {
+      window.open(url, '_blank');
+      return;
+    }
+
+    this.router.navigateByUrl(url);
   }
 }

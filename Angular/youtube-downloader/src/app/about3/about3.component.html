@@ -73,6 +73,33 @@
           <p class="recognition-card-lead">
             Введите идентификатор или ссылку на YouTube, чтобы получить готовый документ.
           </p>
+          <div class="subscription-card" *ngIf="summaryLoading || summary || summaryError || limitResponse">
+            <div class="status-row">
+              <span class="status-chip" [ngClass]="summaryLoading ? 'status-neutral' : subscriptionChipClass">
+                {{ summaryLoading ? 'Загружаем статус подписки…' : subscriptionStatusMessage }}
+              </span>
+              <button class="btn btn-tertiary" type="button" (click)="navigateToBilling()">
+                Перейти к тарифам
+              </button>
+            </div>
+            <p class="summary-error" *ngIf="summaryError">{{ summaryError }}</p>
+            <p class="quota-message" *ngIf="remainingQuota !== null && remainingQuota >= 0 && !summaryLoading">
+              Осталось распознаваний сегодня: {{ remainingQuota }}
+            </p>
+            <p class="summary-description" *ngIf="summary && !summaryLoading">
+              <ng-container *ngIf="summary.hasActiveSubscription || summary.hasLifetimeAccess || summary.isLifetime; else aboutFree">
+                Распознавания доступны без ограничений. Управляйте подпиской в разделе биллинга.
+              </ng-container>
+              <ng-template #aboutFree>
+                Бесплатный тариф: {{ summary.freeRecognitionsPerDay }} распознавания YouTube в день и
+                {{ summary.freeTranscriptionsPerMonth }} транскрибации в месяц.
+              </ng-template>
+            </p>
+            <div class="limit-message" *ngIf="limitResponse">
+              <p>{{ limitResponse.message }}</p>
+              <button class="btn btn-primary" type="button" (click)="navigateToBilling()">Оформить подписку</button>
+            </div>
+          </div>
           <form class="recognition-form" (ngSubmit)="startRecognition()">
             <label class="recognition-label" for="recognition-input">Введите идентификатор или ссылку YouTube</label>
             <div class="recognition-field">

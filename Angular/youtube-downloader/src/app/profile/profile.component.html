@@ -1,6 +1,72 @@
 <div class="profile-page">
   <main class="page-content">
- 
+
+    <section class="subscription-overview">
+      <div class="section-header">
+        <h2>Подписка и доступ</h2>
+        <p>Следите за активностью подписки, продлевайте доступ и просматривайте историю платежей.</p>
+      </div>
+
+      <div class="subscription-grid">
+        <div class="subscription-card" *ngIf="summaryLoading || summary || summaryError">
+          <div class="subscription-state">
+            <span class="subscription-chip" [ngClass]="summaryLoading ? 'status-neutral' : subscriptionChipClass">
+              {{ summaryLoading ? 'Загружаем статус подписки…' : subscriptionStatusMessage }}
+            </span>
+            <button class="btn btn-primary" type="button" (click)="navigateToBilling()">
+              Перейти к тарифам
+            </button>
+          </div>
+          <div class="subscription-body">
+            <p class="summary-error" *ngIf="summaryError">{{ summaryError }}</p>
+            <ng-container *ngIf="summary && !summaryLoading">
+              <p class="summary-description" *ngIf="summary.hasActiveSubscription || summary.hasLifetimeAccess || summary.isLifetime">
+                Расшифровки и распознавания доступны без ограничений. Управляйте подпиской и реквизитами в разделе биллинга.
+              </p>
+              <p class="summary-description" *ngIf="!summary.hasActiveSubscription && !summary.hasLifetimeAccess && !summary.isLifetime">
+                Бесплатный тариф: {{ summary.freeRecognitionsPerDay }} распознавания YouTube в день и
+                {{ summary.freeTranscriptionsPerMonth }} транскрибации в месяц.
+              </p>
+              <p class="summary-meta" *ngIf="summary.endsAt && summary.hasActiveSubscription">
+                Доступ активен до {{ formatDate(summary.endsAt) }}
+              </p>
+            </ng-container>
+          </div>
+        </div>
+
+        <div class="history-card">
+          <div class="history-header">
+            <h3>История платежей</h3>
+            <button class="btn btn-tertiary" type="button" (click)="navigateToBilling()">Пополнить баланс</button>
+          </div>
+          <div class="state" *ngIf="summaryLoading && !summary">
+            <mat-progress-spinner mode="indeterminate" diameter="32"></mat-progress-spinner>
+            <span>Загружаем платежи…</span>
+          </div>
+          <ng-container *ngIf="summary && summary.payments.length > 0; else emptyPayments">
+            <mat-list>
+              <mat-list-item *ngFor="let payment of summary.payments">
+                <div matListItemTitle>{{ payment.planName || 'Пополнение' }}</div>
+                <div matListItemLine>
+                  {{ formatAmount(payment.amount, payment.currency) }} · {{ formatInvoiceStatus(payment.status) }}
+                </div>
+                <div matListItemLine class="payment-meta">
+                  {{ formatDate(payment.paidAt || payment.issuedAt) }}
+                  <span *ngIf="payment.comment"> · {{ payment.comment }}</span>
+                </div>
+              </mat-list-item>
+            </mat-list>
+          </ng-container>
+          <ng-template #emptyPayments>
+            <div class="empty-state">
+              <p>Платежей пока нет. Оформите подписку или пополните баланс, чтобы снять ограничения.</p>
+              <button class="btn btn-secondary" type="button" (click)="navigateToBilling()">Перейти к биллингу</button>
+            </div>
+          </ng-template>
+        </div>
+      </div>
+    </section>
+
 
     <section class="profile-settings">
       <div class="section-header">

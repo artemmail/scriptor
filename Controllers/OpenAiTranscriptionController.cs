@@ -8,6 +8,7 @@ using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -20,6 +21,7 @@ using Microsoft.Extensions.Logging;
 using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 using YandexSpeech.services;
+using YandexSpeech.services.Interface;
 using YandexSpeech.services.Whisper;
 using YandexSpeech.Extensions;
 
@@ -38,6 +40,7 @@ namespace YandexSpeech.Controllers
         private readonly IDocumentGeneratorService _documentGeneratorService;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IYandexDiskDownloadService _yandexDiskDownloadService;
+        private readonly ISubscriptionAccessService _subscriptionAccessService;
 
         public OpenAiTranscriptionController(
             IOpenAiTranscriptionService transcriptionService,
@@ -47,7 +50,8 @@ namespace YandexSpeech.Controllers
             ILogger<OpenAiTranscriptionController> logger,
             IDocumentGeneratorService documentGeneratorService,
             IHttpClientFactory httpClientFactory,
-            IYandexDiskDownloadService yandexDiskDownloadService)
+            IYandexDiskDownloadService yandexDiskDownloadService,
+            ISubscriptionAccessService subscriptionAccessService)
         {
             _transcriptionService = transcriptionService;
             _dbContext = dbContext;
@@ -57,6 +61,7 @@ namespace YandexSpeech.Controllers
             _documentGeneratorService = documentGeneratorService;
             _httpClientFactory = httpClientFactory;
             _yandexDiskDownloadService = yandexDiskDownloadService;
+            _subscriptionAccessService = subscriptionAccessService ?? throw new ArgumentNullException(nameof(subscriptionAccessService));
         }
 
         [HttpPost]
@@ -69,7 +74,8 @@ namespace YandexSpeech.Controllers
             [FromForm] IFormFile? file,
             [FromForm] string? fileUrl,
             [FromForm] string? clarification,
-            [FromForm] int? recognitionProfileId)
+            [FromForm] int? recognitionProfileId,
+            CancellationToken cancellationToken)
         {
             var normalizedUrl = string.IsNullOrWhiteSpace(fileUrl) ? null : fileUrl.Trim();
             var hasFile = file != null && file.Length > 0;
@@ -89,6 +95,20 @@ namespace YandexSpeech.Controllers
             if (string.IsNullOrEmpty(userId))
             {
                 return Unauthorized();
+            }
+
+            var authorization = await _subscriptionAccessService
+                .AuthorizeTranscriptionAsync(userId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!authorization.IsAllowed)
+            {
+                return StatusCode(StatusCodes.Status402PaymentRequired, new UsageLimitExceededResponse
+                {
+                    Message = authorization.Message ?? "Превышен месячный лимит транскрибаций.",
+                    PaymentUrl = authorization.PaymentUrl ?? "/billing",
+                    RemainingQuota = authorization.RemainingQuota
+                });
             }
 
             var uploadsDirectory = Path.Combine(_environment.ContentRootPath, "App_Data", "transcriptions");
@@ -165,23 +185,27 @@ namespace YandexSpeech.Controllers
                 }
             });
 
+            var dto = MapToDto(
+                task.Id,
+                task.SourceFilePath,
+                task.Status,
+                task.Done,
+                task.Error,
+                task.CreatedAt,
+                task.ModifiedAt,
+                task.SegmentsTotal,
+                task.SegmentsProcessed,
+                task.Clarification,
+                task.RecognitionProfileId,
+                profile.Name,
+                task.RecognitionProfileDisplayedName ?? profile.DisplayedName);
+
+            dto.RemainingMonthlyQuota = authorization.RemainingQuota;
+
             return CreatedAtAction(
                 nameof(GetById),
                 new { id = task.Id },
-                MapToDto(
-                    task.Id,
-                    task.SourceFilePath,
-                    task.Status,
-                    task.Done,
-                    task.Error,
-                    task.CreatedAt,
-                    task.ModifiedAt,
-                    task.SegmentsTotal,
-                    task.SegmentsProcessed,
-                    task.Clarification,
-                    task.RecognitionProfileId,
-                    profile.Name,
-                    task.RecognitionProfileDisplayedName ?? profile.DisplayedName));
+                dto);
         }
 
         [HttpGet]

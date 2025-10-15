@@ -17,6 +17,32 @@
           </button>
           <a class="btn btn-secondary" [routerLink]="['/about3']">Узнать о возможностях</a>
         </div>
+        <div class="subscription-card" *ngIf="summaryLoading || summary || summaryError || limitResponse">
+          <div class="status-row">
+            <span class="subscription-chip" [ngClass]="summaryLoading ? 'status-neutral' : subscriptionChipClass">
+              {{ summaryLoading ? 'Загружаем статус подписки…' : subscriptionStatusMessage }}
+            </span>
+            <button class="btn btn-tertiary" type="button" (click)="navigateToBilling()">
+              Перейти к тарифам
+            </button>
+          </div>
+          <p class="summary-error" *ngIf="summaryError">{{ summaryError }}</p>
+          <p class="summary-description" *ngIf="summary && !summaryLoading">
+            <ng-container *ngIf="summary.hasActiveSubscription || summary.hasLifetimeAccess || summary.isLifetime; else transcriptionFree">
+              Расшифровки доступны без ограничений. Управляйте подпиской в разделе биллинга.
+            </ng-container>
+            <ng-template #transcriptionFree>
+              Бесплатный тариф: {{ summary.freeTranscriptionsPerMonth }} транскрибации в месяц и
+              {{ summary.freeRecognitionsPerDay }} распознавания YouTube в день.
+            </ng-template>
+          </p>
+          <div class="limit-message" *ngIf="limitResponse">
+            <p>{{ limitResponse.message }}</p>
+            <button class="btn btn-primary" type="button" (click)="navigateToBilling(limitResponse.paymentUrl ?? undefined)">
+              Оформить подписку
+            </button>
+          </div>
+        </div>
       </div>
       <div class="hero-card">
         <div class="card-header">Перетащите файлы сюда</div>

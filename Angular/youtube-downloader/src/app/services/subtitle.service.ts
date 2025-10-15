@@ -58,6 +58,11 @@ export interface YoutubeCaptionTaskTableDto {
   slug: string;
 }
 
+export interface StartSubtitleRecognitionResponse {
+  taskId: string;
+  remainingQuota?: number | null;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -120,16 +125,16 @@ generatePdfFromMarkdown(id: string, markdown: string): Observable<Blob> {
     youtubeId: string,
     language?: string,
     createdBy: string = 'system'
-  ): Observable<string> {
+  ): Observable<StartSubtitleRecognitionResponse> {
     const params = new HttpParams()
       .set('youtubeId', youtubeId)
       .set('language', language || '')
       .set('createdBy', createdBy);
 
-    return this.http.post<string>(
+    return this.http.post<StartSubtitleRecognitionResponse>(
       `${this.apiUrl}/start`,
       null,
-      { params, responseType: 'text' as 'json' }
+      { params }
     );
   }
 
