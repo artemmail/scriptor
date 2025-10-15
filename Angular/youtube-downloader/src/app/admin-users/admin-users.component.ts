@@ -1,5 +1,5 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, AfterViewInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -10,8 +10,8 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { InfiniteScrollModule } from 'ngx-infinite-scroll';
-import { MatTableModule } from '@angular/material/table';
-import { MatSortModule, Sort, SortDirection } from '@angular/material/sort';
+import { MatTableDataSource, MatTableModule } from '@angular/material/table';
+import { MatSort, MatSortModule, Sort, SortDirection } from '@angular/material/sort';
 import { AdminUsersService } from '../services/admin-users.service';
 import { AdminUserListItem } from '../models/admin-user.model';
 import { AdminUserRoleDialogComponent } from './admin-user-role-dialog.component';
@@ -37,7 +37,7 @@ import { AdminUserRoleDialogComponent } from './admin-user-role-dialog.component
     MatTableModule
   ]
 })
-export class AdminUsersComponent implements OnInit {
+export class AdminUsersComponent implements OnInit, AfterViewInit {
   users: AdminUserListItem[] = [];
   totalCount = 0;
   pageSize = 20;
@@ -48,6 +48,9 @@ export class AdminUsersComponent implements OnInit {
   displayedColumns: string[] = ['email', 'registeredAt', 'recognizedVideos', 'roles'];
   sortActive = 'recognizedVideos';
   sortDirection: SortDirection = 'desc';
+  dataSource = new MatTableDataSource<AdminUserListItem>([]);
+
+  @ViewChild(MatSort) private sortDirective?: MatSort;
 
   constructor(
     private readonly adminUsersService: AdminUsersService,
@@ -58,6 +61,16 @@ export class AdminUsersComponent implements OnInit {
   ngOnInit(): void {
     this.loadRoles();
     this.loadUsers();
+  }
+
+  ngAfterViewInit(): void {
+    if (!this.sortDirective) {
+      return;
+    }
+
+    this.sortDirective.disableClear = true;
+    this.dataSource.sortData = data => data;
+    this.dataSource.sort = this.sortDirective;
   }
 
   applyFilter(event: Event): void {
@@ -127,6 +140,7 @@ export class AdminUsersComponent implements OnInit {
       .subscribe({
         next: res => {
           this.users = append ? this.users.concat(res.items) : res.items;
+          this.dataSource.data = this.users;
           this.totalCount = res.totalCount;
           this.loading = false;
         },
