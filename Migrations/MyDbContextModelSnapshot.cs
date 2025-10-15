@@ -505,6 +505,10 @@ namespace YandexSpeech.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("Hint")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)

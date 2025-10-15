@@ -30,6 +30,7 @@ namespace YandexSpeech.Controllers
                     Id = p.Id,
                     Name = p.Name,
                     DisplayedName = p.DisplayedName,
+                    Hint = p.Hint,
                     Request = p.Request,
                     ClarificationTemplate = p.ClarificationTemplate,
                     OpenAiModel = p.OpenAiModel,
@@ -60,6 +61,7 @@ namespace YandexSpeech.Controllers
             {
                 Name = validationResult.Name!,
                 DisplayedName = validationResult.DisplayedName!,
+                Hint = validationResult.Hint,
                 Request = validationResult.Request!,
                 ClarificationTemplate = validationResult.ClarificationTemplate,
                 OpenAiModel = validationResult.OpenAiModel!,
@@ -100,6 +102,7 @@ namespace YandexSpeech.Controllers
             profile.Request = validationResult.Request!;
             profile.Name = validationResult.Name!;
             profile.DisplayedName = validationResult.DisplayedName!;
+            profile.Hint = validationResult.Hint;
             profile.ClarificationTemplate = validationResult.ClarificationTemplate;
             profile.OpenAiModel = validationResult.OpenAiModel!;
             profile.SegmentBlockSize = validationResult.SegmentBlockSize!.Value;
@@ -131,6 +134,7 @@ namespace YandexSpeech.Controllers
             Id = profile.Id,
             Name = profile.Name,
             DisplayedName = profile.DisplayedName,
+            Hint = profile.Hint,
             Request = profile.Request,
             ClarificationTemplate = profile.ClarificationTemplate,
             OpenAiModel = profile.OpenAiModel,
@@ -199,10 +203,20 @@ namespace YandexSpeech.Controllers
             result.OpenAiModel = trimmedModel;
             result.Name = trimmedName;
             result.DisplayedName = trimmedDisplayedName;
+            result.Hint = string.IsNullOrWhiteSpace(request.Hint)
+                ? null
+                : request.Hint.Trim();
             result.ClarificationTemplate = string.IsNullOrWhiteSpace(request.ClarificationTemplate)
                 ? null
                 : request.ClarificationTemplate.Trim();
             result.SegmentBlockSize = request.SegmentBlockSize;
+
+            if (result.Hint?.Length > 400)
+            {
+                result.IsValid = false;
+                result.ErrorMessage = "Hint cannot exceed 400 characters";
+                return result;
+            }
 
             return result;
         }
@@ -213,6 +227,7 @@ namespace YandexSpeech.Controllers
             public string? ErrorMessage { get; set; }
             public string? Name { get; set; }
             public string? DisplayedName { get; set; }
+            public string? Hint { get; set; }
             public string? Request { get; set; }
             public string? ClarificationTemplate { get; set; }
             public string? OpenAiModel { get; set; }

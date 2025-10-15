@@ -9,5 +9,7 @@ namespace YandexSpeech.models.DTO
         public string DisplayedName { get; set; } = string.Empty;
 
         public string? ClarificationTemplate { get; set; }
+
+        public string? Hint { get; set; }
     }
 }

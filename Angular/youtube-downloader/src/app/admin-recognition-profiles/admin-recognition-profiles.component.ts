@@ -37,7 +37,7 @@ export class AdminRecognitionProfilesComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
 
   profiles: RecognitionProfile[] = [];
-  displayedColumns = ['id', 'name', 'displayedName', 'openAiModel', 'segmentBlockSize', 'request', 'actions'];
+  displayedColumns = ['id', 'name', 'displayedName', 'hint', 'openAiModel', 'segmentBlockSize', 'request', 'actions'];
   loading = false;
   saving = false;
   deletingId: number | null = null;
@@ -49,6 +49,7 @@ export class AdminRecognitionProfilesComponent implements OnInit {
   readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(200)]],
     displayedName: ['', [Validators.required, Validators.maxLength(200)]],
+    hint: ['', [Validators.maxLength(400)]],
     request: ['', [Validators.required, Validators.maxLength(4000)]],
     clarificationTemplate: [''],
     openAiModel: ['', [Validators.required, Validators.maxLength(200)]],
@@ -89,6 +90,7 @@ export class AdminRecognitionProfilesComponent implements OnInit {
     this.form.setValue({
       name: profile.name,
       displayedName: profile.displayedName,
+      hint: profile.hint ?? '',
       request: profile.request,
       clarificationTemplate: profile.clarificationTemplate ?? '',
       openAiModel: profile.openAiModel,
@@ -102,6 +104,7 @@ export class AdminRecognitionProfilesComponent implements OnInit {
     this.form.reset({
       name: '',
       displayedName: '',
+      hint: '',
       request: '',
       clarificationTemplate: '',
       openAiModel: '',
@@ -118,6 +121,7 @@ export class AdminRecognitionProfilesComponent implements OnInit {
     const payload: RecognitionProfileInput = {
       name: this.form.value.name?.trim() ?? '',
       displayedName: this.form.value.displayedName?.trim() ?? '',
+      hint: this.form.value.hint?.trim() || null,
       request: this.form.value.request?.trim() ?? '',
       clarificationTemplate: this.form.value.clarificationTemplate?.trim() || null,
       openAiModel: this.form.value.openAiModel?.trim() ?? '',
