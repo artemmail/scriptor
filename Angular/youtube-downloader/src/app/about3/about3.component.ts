@@ -320,7 +320,7 @@ export class About3Component implements OnInit {
           return;
         }
 
-        const limit = err.status === 402 ? extractUsageLimitResponse(err) : null;
+        const limit = extractUsageLimitResponse(err);
         if (limit) {
           this.limitResponse = limit;
           this.remainingQuota = limit.remainingQuota ?? null;
