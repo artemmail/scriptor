@@ -503,8 +503,8 @@ namespace YandexSpeech.Controllers
                 return taskResult.Result;
             }
 
-            var entity = taskResult.Value!;
-            var filePath = await _documentGeneratorService.GeneratePdfFromMarkdownAsync(entity.Id, entity.MarkdownText!);
+            var (entity, markdown) = taskResult.Value;
+            var filePath = await _documentGeneratorService.GeneratePdfFromMarkdownAsync(entity.Id, markdown);
             try
             {
                 var bytes = await System.IO.File.ReadAllBytesAsync(filePath);
@@ -526,8 +526,8 @@ namespace YandexSpeech.Controllers
                 return taskResult.Result;
             }
 
-            var entity = taskResult.Value!;
-            var filePath = await _documentGeneratorService.GenerateWordFromMarkdownAsync(entity.Id, entity.MarkdownText!);
+            var (entity, markdown) = taskResult.Value;
+            var filePath = await _documentGeneratorService.GenerateWordFromMarkdownAsync(entity.Id, markdown);
             try
             {
                 var bytes = await System.IO.File.ReadAllBytesAsync(filePath);
@@ -549,8 +549,8 @@ namespace YandexSpeech.Controllers
                 return taskResult.Result;
             }
 
-            var entity = taskResult.Value!;
-            var bbcode = await _documentGeneratorService.GenerateBbcodeFromMarkdownAsync(entity.Id, entity.MarkdownText!);
+            var (entity, markdown) = taskResult.Value;
+            var bbcode = await _documentGeneratorService.GenerateBbcodeFromMarkdownAsync(entity.Id, markdown);
             var fileName = CreateExportFileName(entity, "bbcode");
             var bytes = Encoding.UTF8.GetBytes(bbcode);
             return File(bytes, "text/plain", fileName);
@@ -897,7 +897,7 @@ namespace YandexSpeech.Controllers
             return sanitized;
         }
 
-        private async Task<ActionResult<OpenAiTranscriptionTask>> LoadTaskForExportAsync(string id)
+        private async Task<ActionResult<(OpenAiTranscriptionTask Task, string Markdown)>> LoadTaskForExportAsync(string id)
         {
             var userId = User.GetUserId();
             if (string.IsNullOrEmpty(userId))
@@ -914,12 +914,67 @@ namespace YandexSpeech.Controllers
                 return NotFound();
             }
 
-            if (string.IsNullOrWhiteSpace(task.MarkdownText))
+            var markdown = ResolveMarkdownContent(task);
+            if (string.IsNullOrWhiteSpace(markdown))
             {
                 return BadRequest("Task does not contain formatted Markdown.");
             }
 
-            return task;
+            return (task, markdown);
+        }
+
+        private static string? ResolveMarkdownContent(OpenAiTranscriptionTask task)
+        {
+            if (!string.IsNullOrWhiteSpace(task.MarkdownText))
+            {
+                return task.MarkdownText;
+            }
+
+            var fallback = !string.IsNullOrWhiteSpace(task.ProcessedText)
+                ? task.ProcessedText
+                : task.RecognizedText;
+
+            if (string.IsNullOrWhiteSpace(fallback))
+            {
+                return null;
+            }
+
+            return NormalizePlainTextForMarkdown(fallback);
+        }
+
+        private static string NormalizePlainTextForMarkdown(string content)
+        {
+            if (string.IsNullOrEmpty(content))
+            {
+                return string.Empty;
+            }
+
+            var normalized = content.Replace("\r\n", "\n").Replace('\r', '\n');
+            var lines = normalized.Split('\n');
+            var builder = new StringBuilder();
+            var previousEmpty = false;
+
+            foreach (var line in lines)
+            {
+                var trimmed = line.TrimEnd();
+
+                if (trimmed.Length == 0)
+                {
+                    if (!previousEmpty)
+                    {
+                        builder.AppendLine();
+                    }
+
+                    previousEmpty = true;
+                }
+                else
+                {
+                    builder.AppendLine(trimmed);
+                    previousEmpty = false;
+                }
+            }
+
+            return builder.ToString().TrimEnd('\r', '\n');
         }
 
         public class StartAnalyticsRequest
