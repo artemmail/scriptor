@@ -75,7 +75,7 @@ namespace YandexSpeech.Controllers
                     Price = plan.Price,
                     Currency = plan.Currency,
                     MaxRecognitionsPerDay = plan.MaxRecognitionsPerDay,
-                    CanHideCaptions = plan.CanHideCaptions,
+                    CanHideCaptions = true,
                     IsUnlimitedRecognitions = plan.IsUnlimitedRecognitions,
                     IsLifetime = plan.BillingPeriod == SubscriptionBillingPeriod.Lifetime
                 });

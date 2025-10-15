@@ -59,7 +59,7 @@ namespace YandexSpeech.models.DB
 
         public int? MaxRecognitionsPerDay { get; set; }
 
-        public bool CanHideCaptions { get; set; }
+        public bool CanHideCaptions { get; set; } = true;
 
         public bool IsUnlimitedRecognitions { get; set; }
 

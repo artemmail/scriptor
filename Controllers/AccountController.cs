@@ -353,11 +353,13 @@ namespace YandexSpeech.Controllers
                 }
             }
 
+            var canHideCaptions = activeSubscription != null || user.HasLifetimeAccess;
+            claims.Add(new Claim("subscriptionCanHideCaptions", canHideCaptions.ToString()));
+
             if (activePlan != null)
             {
                 claims.Add(new Claim("subscriptionPlanCode", activePlan.Code));
                 claims.Add(new Claim("subscriptionPlanPeriod", activePlan.BillingPeriod.ToString()));
-                claims.Add(new Claim("subscriptionCanHideCaptions", activePlan.CanHideCaptions.ToString()));
                 claims.Add(new Claim("subscriptionUnlimited", activePlan.IsUnlimitedRecognitions.ToString()));
                 if (activePlan.MaxRecognitionsPerDay.HasValue)
                 {
