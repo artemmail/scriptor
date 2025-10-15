@@ -20,26 +20,50 @@ export function extractUsageLimitResponse(error: unknown): UsageLimitResponse | 
   }
 
   if (typeof payload === 'object') {
-    const candidate = payload as {
-      message?: unknown;
-      paymentUrl?: unknown;
-      remainingQuota?: unknown;
-    };
+    const record = payload as Record<string, unknown>;
+    const message = readString(record, ['message', 'Message', 'error', 'Error']);
 
-    if (typeof candidate.message === 'string') {
+    if (typeof message === 'string' && message.trim().length > 0) {
+      const paymentUrl =
+        readString(record, ['paymentUrl', 'PaymentUrl', 'payment_url', 'PaymentURL']) ?? '/billing';
+      const remaining = readNumber(record, ['remainingQuota', 'RemainingQuota', 'remaining_quota']);
+
       return {
-        message: candidate.message,
-        paymentUrl:
-          typeof candidate.paymentUrl === 'string' && candidate.paymentUrl.trim().length > 0
-            ? candidate.paymentUrl
-            : '/billing',
-        remainingQuota:
-          typeof candidate.remainingQuota === 'number'
-            ? candidate.remainingQuota
-            : candidate.remainingQuota == null
-              ? null
-              : Number(candidate.remainingQuota),
+        message,
+        paymentUrl: paymentUrl && paymentUrl.trim().length > 0 ? paymentUrl : '/billing',
+        remainingQuota: remaining,
       };
+    }
+  }
+
+  return null;
+}
+
+function readString(record: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string') {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function readNumber(record: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number') {
+      return value;
+    }
+
+    if (value == null) {
+      return null;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
     }
   }
 

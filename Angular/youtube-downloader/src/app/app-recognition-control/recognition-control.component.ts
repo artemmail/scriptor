@@ -75,7 +75,7 @@ export class RecognitionControlComponent implements OnInit {
             // при 401 перенаправляем на /login
             this.router.navigate(['/login']);
           } else {
-            const limit = err.status === 402 ? extractUsageLimitResponse(err) : null;
+            const limit = extractUsageLimitResponse(err);
             if (limit) {
               this.limitResponse = limit;
               this.remainingQuota = limit.remainingQuota ?? null;
