@@ -9,6 +9,10 @@
   padding: 16px 0;
 }
 
+.payments-tab {
+  gap: 20px;
+}
+
 .roles-list {
   display: flex;
   flex-direction: column;
@@ -52,4 +56,106 @@
 .empty-state {
   margin: 0;
   color: rgba(0, 0, 0, 0.54);
+}
+
+.alert {
+  padding: 10px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.alert.success {
+  background: #e8f5e9;
+  color: #1b5e20;
+}
+
+.alert.error {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0;
+}
+
+.section-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.summary-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.summary-label {
+  min-width: 160px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.summary-value {
+  flex: 1;
+  word-break: break-word;
+}
+
+.manual-payment-section,
+.history-section {
+  border-top: 1px solid #e0e0e0;
+  padding-top: 16px;
+}
+
+.manual-payment-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.manual-payment-form .full-width {
+  grid-column: 1 / -1;
+}
+
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.payments-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.payments-table th,
+.payments-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e0e0e0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.provider-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.external-id {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.payment-plan {
+  font-weight: 600;
 }

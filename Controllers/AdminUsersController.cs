@@ -6,9 +6,13 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
+using YandexSpeech.services.Interface;
+using YandexSpeech.services.Options;
 
 namespace YandexSpeech.Controllers
 {
@@ -20,15 +24,21 @@ namespace YandexSpeech.Controllers
         private readonly MyDbContext _dbContext;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly ISubscriptionService _subscriptionService;
+        private readonly SubscriptionLimitsOptions _subscriptionLimits;
 
         public AdminUsersController(
             MyDbContext dbContext,
             UserManager<ApplicationUser> userManager,
-            RoleManager<IdentityRole> roleManager)
+            RoleManager<IdentityRole> roleManager,
+            ISubscriptionService subscriptionService,
+            IOptions<SubscriptionLimitsOptions> subscriptionLimits)
         {
             _dbContext = dbContext;
             _userManager = userManager;
             _roleManager = roleManager;
+            _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
+            _subscriptionLimits = subscriptionLimits?.Value ?? new SubscriptionLimitsOptions();
         }
 
         [HttpGet]
@@ -188,6 +198,73 @@ namespace YandexSpeech.Controllers
                 Items = items,
                 TotalCount = totalCount
             });
+        }
+
+        [HttpGet("{userId}/subscription")]
+        public async Task<ActionResult<SubscriptionSummaryDto>> GetUserSubscription(
+            string userId,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return BadRequest("Требуется идентификатор пользователя.");
+            }
+
+            var user = await _dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            var subscription = await _subscriptionService
+                .GetActiveSubscriptionAsync(userId, cancellationToken)
+                .ConfigureAwait(false);
+
+            var payments = await _dbContext.SubscriptionInvoices
+                .AsNoTracking()
+                .Include(i => i.UserSubscription)
+                    .ThenInclude(s => s.Plan)
+                .Where(i => i.UserSubscription != null && i.UserSubscription.UserId == userId)
+                .OrderByDescending(i => i.IssuedAt)
+                .Take(50)
+                .Select(i => new SubscriptionPaymentHistoryItemDto
+                {
+                    InvoiceId = i.Id,
+                    PlanName = i.UserSubscription!.Plan?.Name,
+                    Amount = i.Amount,
+                    Currency = i.Currency,
+                    Status = i.Status,
+                    IssuedAt = i.IssuedAt,
+                    PaidAt = i.PaidAt,
+                    PaymentProvider = i.PaymentProvider,
+                    ExternalInvoiceId = i.ExternalInvoiceId,
+                    Comment = i.Payload
+                })
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var plan = subscription?.Plan;
+
+            var summary = new SubscriptionSummaryDto
+            {
+                HasActiveSubscription = subscription != null && subscription.Status == SubscriptionStatus.Active,
+                HasLifetimeAccess = user.HasLifetimeAccess,
+                PlanCode = plan?.Code,
+                PlanName = plan?.Name,
+                Status = subscription?.Status,
+                EndsAt = subscription?.EndDate,
+                IsLifetime = subscription?.IsLifetime ?? user.HasLifetimeAccess,
+                FreeRecognitionsPerDay = _subscriptionLimits.FreeYoutubeRecognitionsPerDay,
+                FreeTranscriptionsPerMonth = _subscriptionLimits.FreeTranscriptionsPerMonth,
+                BillingUrl = _subscriptionLimits.GetBillingUrlOrDefault(),
+                Payments = payments
+            };
+
+            return Ok(summary);
         }
 
         [HttpGet("roles")]
