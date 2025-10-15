@@ -32,23 +32,33 @@
         </button>
       </mat-form-field>
 
-      <table mat-table [dataSource]="users" class="users-table" *ngIf="users.length; else emptyState">
+      <table
+        mat-table
+        [dataSource]="users"
+        class="users-table"
+        *ngIf="users.length; else emptyState"
+        matSort
+        [matSortActive]="sortActive"
+        [matSortDirection]="sortDirection === '' ? 'asc' : sortDirection"
+        matSortDisableClear
+        (matSortChange)="onSortChange($event)"
+      >
         <ng-container matColumnDef="email">
-          <th mat-header-cell *matHeaderCellDef>Email</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="email">Email</th>
           <td mat-cell *matCellDef="let user" class="clickable-cell">
             <div class="email-wrapper" [title]="user.email">{{ user.email }}</div>
           </td>
         </ng-container>
 
         <ng-container matColumnDef="registeredAt">
-          <th mat-header-cell *matHeaderCellDef>Дата регистрации</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="registeredAt">Дата регистрации</th>
           <td mat-cell *matCellDef="let user" class="clickable-cell">
             {{ user.registeredAt | date: 'medium' }}
           </td>
         </ng-container>
 
         <ng-container matColumnDef="recognizedVideos">
-          <th mat-header-cell *matHeaderCellDef>Распознанные видео</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header="recognizedVideos">Распознанные видео</th>
           <td mat-cell *matCellDef="let user" class="clickable-cell">
             <button
               mat-button
