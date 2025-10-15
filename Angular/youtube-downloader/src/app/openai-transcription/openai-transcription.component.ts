@@ -5,7 +5,7 @@ import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatButtonModule } from '@angular/material/button';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { Subscription, timer } from 'rxjs';
 import { exhaustMap } from 'rxjs/operators';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
@@ -28,6 +28,8 @@ import {
   OpenAiTranscriptionAnalyticsDialogData,
   OpenAiTranscriptionAnalyticsDialogResult,
 } from './openai-transcription-analytics-dialog.component';
+import { PaymentsService, SubscriptionSummary } from '../services/payments.service';
+import { UsageLimitResponse, extractUsageLimitResponse } from '../models/usage-limit-response';
 
 @Component({
   selector: 'app-openai-transcriptions',
@@ -74,6 +76,10 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   private originalBodyOverflow: string | null = null;
   analyticsInProgress = false;
   analyticsError: string | null = null;
+  limitResponse: UsageLimitResponse | null = null;
+  summary: SubscriptionSummary | null = null;
+  summaryLoading = false;
+  summaryError: string | null = null;
 
   readonly OpenAiTranscriptionStatus = OpenAiTranscriptionStatus;
   readonly OpenAiTranscriptionStepStatus = OpenAiTranscriptionStepStatus;
@@ -94,12 +100,100 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     private readonly transcriptionService: OpenAiTranscriptionService,
     private readonly markdownRenderer: MarkdownRendererService1,
     private readonly sanitizer: DomSanitizer,
+    private readonly router: Router,
     private readonly dialog: MatDialog,
-    private readonly snackBar: MatSnackBar
+    private readonly snackBar: MatSnackBar,
+    private readonly paymentsService: PaymentsService
   ) {}
 
   ngOnInit(): void {
+    this.loadSubscriptionSummary();
     this.loadTasks(true);
+  }
+
+  loadSubscriptionSummary(): void {
+    this.summaryLoading = true;
+    this.summaryError = null;
+    this.paymentsService.getSubscriptionSummary().subscribe({
+      next: (summary) => {
+        this.summaryLoading = false;
+        this.summary = summary;
+      },
+      error: () => {
+        this.summaryLoading = false;
+        this.summaryError = 'Не удалось загрузить сведения о подписке.';
+      },
+    });
+  }
+
+  get subscriptionStatusMessage(): string {
+    if (!this.summary) {
+      return '';
+    }
+
+    if (this.summary.hasLifetimeAccess || this.summary.isLifetime) {
+      return 'Безлимитный доступ активен';
+    }
+
+    if (this.summary.hasActiveSubscription) {
+      const planName = this.summary.planName || 'Подписка активна';
+      if (this.summary.endsAt) {
+        const ends = new Date(this.summary.endsAt).toLocaleDateString('ru-RU');
+        return `${planName} до ${ends}`;
+      }
+      return planName;
+    }
+
+    return `Бесплатный тариф: ${this.summary.freeTranscriptionsPerMonth} транскрибаций в месяц и ${this.summary.freeRecognitionsPerDay} распознавания YouTube в день`;
+  }
+
+  get subscriptionChipClass(): string {
+    if (!this.summary) {
+      return 'status-neutral';
+    }
+
+    if (this.summary.hasLifetimeAccess || this.summary.isLifetime) {
+      return 'status-success';
+    }
+
+    if (this.summary.hasActiveSubscription) {
+      return 'status-active';
+    }
+
+    return 'status-trial';
+  }
+
+  get billingUrl(): string {
+    if (this.limitResponse?.paymentUrl) {
+      return this.limitResponse.paymentUrl;
+    }
+
+    if (this.summary?.billingUrl) {
+      return this.summary.billingUrl;
+    }
+
+    return '/billing';
+  }
+
+  navigateToBilling(url?: string): void {
+    const target = url ?? this.billingUrl;
+    if (!target) {
+      return;
+    }
+
+    if (target.startsWith('http')) {
+      window.open(target, '_blank');
+      return;
+    }
+
+    this.dialog.closeAll();
+    this.router?.navigateByUrl(target);
+  }
+
+  handleUsageLimit(limit: UsageLimitResponse): void {
+    this.limitResponse = limit;
+    const ref = this.snackBar.open(limit.message, 'Оплатить', { duration: 6000 });
+    ref.onAction().subscribe(() => this.navigateToBilling(limit.paymentUrl ?? this.billingUrl));
   }
 
   ngOnDestroy(): void {
@@ -129,7 +223,9 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     dialogRef.afterClosed().subscribe((result) => {
       subscriptions.forEach((sub) => sub.unsubscribe());
       this.uploading = false;
-      if (result?.task) {
+      if (result?.limit) {
+        this.handleUsageLimit(result.limit);
+      } else if (result?.task) {
         this.handleUploadSuccess(result.task);
       }
     });
@@ -218,6 +314,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   }
 
   private handleUploadSuccess(task: OpenAiTranscriptionTaskDto): void {
+    this.limitResponse = null;
+    this.loadSubscriptionSummary();
     this.tasks = [task, ...this.tasks.filter((t) => t.id !== task.id)];
     this.selectTaskById(task.id);
   }
@@ -752,6 +850,11 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.continueInProgress = false;
+        const limit = extractUsageLimitResponse(error);
+        if (limit) {
+          this.handleUsageLimit(limit);
+          return;
+        }
         this.continueError = this.extractError(error) ?? 'Не удалось продолжить задачу.';
       },
     });
@@ -844,6 +947,11 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.analyticsInProgress = false;
+        const limit = extractUsageLimitResponse(error);
+        if (limit) {
+          this.handleUsageLimit(limit);
+          return;
+        }
         this.analyticsError =
           this.extractError(error) ?? 'Не удалось создать задачу с выбранным профилем.';
       },

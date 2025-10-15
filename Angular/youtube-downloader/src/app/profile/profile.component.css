@@ -17,6 +17,106 @@
   padding: 80px 32px 120px;
 }
 
+.subscription-overview .section-header {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.subscription-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  gap: 32px;
+  align-items: start;
+}
+
+.subscription-card,
+.history-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 32px;
+  padding: 32px;
+  box-shadow: 0 32px 60px rgba(15, 23, 42, 0.12);
+  border: 1px solid rgba(226, 232, 240, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.subscription-state {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.subscription-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+}
+
+.status-success {
+  background: rgba(34, 197, 94, 0.16);
+  color: #166534;
+}
+
+.status-active {
+  background: rgba(37, 99, 235, 0.16);
+  color: #1d4ed8;
+}
+
+.status-trial {
+  background: rgba(251, 191, 36, 0.18);
+  color: #92400e;
+}
+
+.status-neutral {
+  background: rgba(148, 163, 184, 0.24);
+  color: #334155;
+}
+
+.summary-description {
+  margin: 0;
+  color: #1f2937;
+  line-height: 1.5;
+}
+
+.summary-meta {
+  margin: 0;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.summary-error {
+  margin: 0;
+  color: #dc2626;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.payment-meta {
+  color: #64748b;
+}
+
+.empty-state {
+  display: grid;
+  gap: 12px;
+  text-align: left;
+  color: #475569;
+}
+
 section {
   max-width: 1200px;
   margin: 0 auto;
@@ -108,6 +208,16 @@ section {
 .btn-secondary:hover:not(:disabled) {
   background: rgba(29, 78, 216, 0.12);
   transform: translateY(-2px);
+}
+
+.btn-tertiary {
+  background: transparent;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #1d4ed8;
+}
+
+.btn-tertiary:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.08);
 }
 
 .btn:disabled {

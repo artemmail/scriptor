@@ -275,6 +275,7 @@ namespace YandexSpeech.services
         {
             return plan.BillingPeriod switch
             {
+                SubscriptionBillingPeriod.ThreeDays => from.AddDays(3),
                 SubscriptionBillingPeriod.Monthly => from.AddMonths(1),
                 SubscriptionBillingPeriod.Yearly => from.AddYears(1),
                 SubscriptionBillingPeriod.OneTime => from.AddMonths(1),

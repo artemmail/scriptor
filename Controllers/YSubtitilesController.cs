@@ -1,11 +1,15 @@
 ﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Threading;
 using YandexSpeech.models.DB;
+using YandexSpeech.models.DTO;
 using YandexSpeech.services;
+using YandexSpeech.services.Interface;
 using YandexSpeech.Extensions;
 using YoutubeExplode.Videos;
 using YoutubeDownload.Services; // <-- добавили
@@ -27,13 +31,15 @@ namespace YandexSpeech.Controllers
         private readonly IDocumentGeneratorService _pdfGeneratorService;
         private readonly IYSubtitlesService _ySubtitlesService;
         private readonly YoutubeWorkflowService _workflow; // <-- добавили
+        private readonly ISubscriptionAccessService _subscriptionAccessService;
 
         public YSubtitilesController(
             ICaptionTaskManager taskManager,
             IYoutubeCaptionService youtubeCaptionService,
             IDocumentGeneratorService pdfGeneratorService,
             IYSubtitlesService ySubtitlesService,
-            YoutubeWorkflowService workflow // <-- добавили
+            YoutubeWorkflowService workflow, // <-- добавили
+            ISubscriptionAccessService subscriptionAccessService
         )
         {
             _taskManager = taskManager;
@@ -41,6 +47,7 @@ namespace YandexSpeech.Controllers
             _pdfGeneratorService = pdfGeneratorService;
             _ySubtitlesService = ySubtitlesService;
             _workflow = workflow; // <-- добавили
+            _subscriptionAccessService = subscriptionAccessService ?? throw new ArgumentNullException(nameof(subscriptionAccessService));
         }
 
         [HttpGet("{taskId}")]
@@ -213,38 +220,32 @@ namespace YandexSpeech.Controllers
         [HttpPost("start")]
         [Produces("text/plain")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<ActionResult<string>> StartSubtitleRecognition(
+        public async Task<ActionResult<StartSubtitleRecognitionResponse>> StartSubtitleRecognition(
             [FromQuery] string youtubeId,
-            [FromQuery] string? language
+            [FromQuery] string? language,
+            CancellationToken cancellationToken
         )
         {
-            if (Request.Headers.TryGetValue("Authorization", out var hdr))
-                Console.WriteLine($"▶ Authorization header: {hdr}");
-            else
-                Console.WriteLine("▶ No Authorization header");
-
-            var authResult = await HttpContext.AuthenticateAsync(JwtBearerDefaults.AuthenticationScheme);
-            Console.WriteLine($"▶ AuthenticateAsync succeeded: {authResult.Succeeded}");
-            if (authResult.Failure != null)
-                Console.WriteLine($"   → failure: {authResult.Failure.Message}");
-
-            Console.WriteLine($"▶ User.Identity.IsAuthenticated = {User.Identity?.IsAuthenticated}");
-            foreach (var c in User.Claims)
-                Console.WriteLine($"   • {c.Type} = {c.Value}");
-
-            var sub1 = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-            var sub2 = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var email = User.FindFirstValue(ClaimTypes.Email);
-            Console.WriteLine($"▶ sub via JwtRegisteredClaimNames.Sub: {sub1}");
-            Console.WriteLine($"▶ sub via ClaimTypes.NameIdentifier: {sub2}");
-            Console.WriteLine($"▶ email via ClaimTypes.Email: {email}");
-
             if (!User.Identity?.IsAuthenticated ?? true)
                 return Unauthorized("not authenticated");
 
             var userId = User.GetUserId();
             if (userId == null)
                 return Unauthorized("User is not authenticated");
+
+            var authorization = await _subscriptionAccessService
+                .AuthorizeYoutubeRecognitionAsync(userId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!authorization.IsAllowed)
+            {
+                return StatusCode(StatusCodes.Status402PaymentRequired, new UsageLimitExceededResponse
+                {
+                    Message = authorization.Message ?? "Превышен лимит распознаваний.",
+                    PaymentUrl = authorization.PaymentUrl ?? "/billing",
+                    RemainingQuota = authorization.RemainingQuota
+                });
+            }
 
             var clientIp = HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString() ?? "UnknownIP";
 
@@ -256,7 +257,13 @@ namespace YandexSpeech.Controllers
                 userId
             );
 
-            return Ok(taskId);
+            var response = new StartSubtitleRecognitionResponse
+            {
+                TaskId = taskId,
+                RemainingQuota = authorization.RemainingQuota
+            };
+
+            return Ok(response);
         }
     }
 }

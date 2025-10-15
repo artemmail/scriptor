@@ -10,7 +10,8 @@ namespace YandexSpeech.models.DB
         OneTime = 0,
         Monthly = 1,
         Yearly = 2,
-        Lifetime = 3
+        Lifetime = 3,
+        ThreeDays = 4
     }
 
     public enum SubscriptionStatus

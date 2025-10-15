@@ -14,9 +14,11 @@ import {
   OpenAiTranscriptionService,
   OpenAiTranscriptionTaskDto,
 } from '../services/openai-transcription.service';
+import { UsageLimitResponse, extractUsageLimitResponse } from '../models/usage-limit-response';
 
 interface UploadDialogResult {
-  task: OpenAiTranscriptionTaskDto;
+  task?: OpenAiTranscriptionTaskDto;
+  limit?: UsageLimitResponse;
 }
 
 @Component({
@@ -50,6 +52,7 @@ export class OpenAiTranscriptionUploadDialogComponent implements OnInit {
   clarificationHint: string | null = null;
   uploading = false;
   uploadError: string | null = null;
+  limitResponse: UsageLimitResponse | null = null;
   profiles: OpenAiRecognitionProfileOptionDto[] = [];
   profilesLoading = false;
   profilesError: string | null = null;
@@ -83,7 +86,11 @@ export class OpenAiTranscriptionUploadDialogComponent implements OnInit {
     if (this.uploading) {
       return;
     }
-    this.dialogRef.close();
+    if (this.limitResponse) {
+      this.dialogRef.close({ limit: this.limitResponse });
+    } else {
+      this.dialogRef.close();
+    }
   }
 
   onSubmit(): void {
@@ -150,6 +157,7 @@ export class OpenAiTranscriptionUploadDialogComponent implements OnInit {
   private beginUpload(): void {
     this.uploading = true;
     this.uploadError = null;
+    this.limitResponse = null;
     this.uploadingChange.emit(true);
   }
 
@@ -162,7 +170,20 @@ export class OpenAiTranscriptionUploadDialogComponent implements OnInit {
   private handleError(error: unknown, fallback: string): void {
     this.uploading = false;
     this.uploadingChange.emit(false);
+    const limit = extractUsageLimitResponse(error);
+    if (limit) {
+      this.limitResponse = limit;
+      this.uploadError = limit.message;
+      return;
+    }
+
     this.uploadError = this.extractError(error) ?? fallback;
+  }
+
+  confirmLimit(): void {
+    if (this.limitResponse) {
+      this.dialogRef.close({ limit: this.limitResponse });
+    }
   }
 
   private extractError(error: unknown): string | null {

@@ -33,6 +33,15 @@ namespace YandexSpeech.services
                 IsUnlimitedRecognitions: false,
                 Priority: 10),
             new(
+                Code: "recognition_unlimited_3_days",
+                Name: "Без ограничений на распознавание (3 дня)",
+                Description: "Позволяет снять дневные ограничения на распознавание на трое суток.",
+                Period: SubscriptionBillingPeriod.ThreeDays,
+                Price: 490m,
+                CanHideCaptions: false,
+                IsUnlimitedRecognitions: true,
+                Priority: 15),
+            new(
                 Code: "recognition_unlimited_month",
                 Name: "Без ограничений на распознавание (1 месяц)",
                 Description: "Снимает дневные ограничения на распознавание на один месяц.",

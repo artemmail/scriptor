@@ -10,7 +10,12 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Subject, takeUntil } from 'rxjs';
-import { PaymentsService, SubscriptionPlan, WalletBalance } from '../services/payments.service';
+import {
+  PaymentsService,
+  SubscriptionPlan,
+  SubscriptionBillingPeriod,
+  WalletBalance
+} from '../services/payments.service';
 
 @Component({
   selector: 'app-billing',
@@ -186,13 +191,36 @@ export class BillingComponent implements OnInit, OnDestroy {
       return 'Бессрочно';
     }
 
-    switch (plan.billingPeriod) {
+    switch (this.normalizeBillingPeriod(plan.billingPeriod)) {
+      case 'ThreeDays':
+        return '3 дня';
       case 'Monthly':
         return '1 месяц';
       case 'Yearly':
         return '1 год';
       default:
         return 'Разово';
+    }
+  }
+
+  private normalizeBillingPeriod(period: SubscriptionBillingPeriod): string {
+    if (typeof period === 'string') {
+      return period;
+    }
+
+    switch (period) {
+      case 0:
+        return 'OneTime';
+      case 1:
+        return 'Monthly';
+      case 2:
+        return 'Yearly';
+      case 3:
+        return 'Lifetime';
+      case 4:
+        return 'ThreeDays';
+      default:
+        return `${period}`;
     }
   }
 }

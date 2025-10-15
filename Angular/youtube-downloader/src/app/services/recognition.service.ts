@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { StartSubtitleRecognitionResponse } from './subtitle.service';
 
 export interface SpeechRecognitionTaskDto {
   id: string;
@@ -61,12 +62,16 @@ export class RecognitionService {
     youtubeId: string,
     language?: string,
     createdBy: string = 'system'
-  ): Observable<string> {
+  ): Observable<StartSubtitleRecognitionResponse> {
     const params = new HttpParams()
       .set('youtubeId', youtubeId)
       .set('language', language || '')
       .set('createdBy', createdBy);
 
-    return this.http.post<string>(`${this.apiUrl}/start-subtitle-recognition`, null, { params });
+    return this.http.post<StartSubtitleRecognitionResponse>(
+      `${this.apiUrl}/start-subtitle-recognition`,
+      null,
+      { params }
+    );
   }
 }

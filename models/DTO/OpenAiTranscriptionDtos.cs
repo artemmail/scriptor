@@ -34,6 +34,8 @@ namespace YandexSpeech.models.DTO
         public string? RecognitionProfileName { get; set; }
 
         public string? RecognitionProfileDisplayedName { get; set; }
+
+        public int? RemainingMonthlyQuota { get; set; }
     }
 
     public class OpenAiTranscriptionTaskDetailsDto : OpenAiTranscriptionTaskDto

@@ -18,6 +18,7 @@ using YandexSpeech.models.DTO;
 using YandexSpeech.services;
 using YandexSpeech.services.Interface;
 using System.Security.Claims;
+using YandexSpeech.services.Options;
 
 namespace YandexSpeech.Controllers
 {
@@ -34,6 +35,7 @@ namespace YandexSpeech.Controllers
         private readonly ISubscriptionService _subscriptionService;
         private readonly IWalletService _walletService;
         private readonly IOptions<YooMoneyOptions> _yooMoneyOptions;
+        private readonly SubscriptionLimitsOptions _subscriptionLimits;
         private readonly ILogger<PaymentsController> _logger;
 
         public PaymentsController(
@@ -42,6 +44,7 @@ namespace YandexSpeech.Controllers
             ISubscriptionService subscriptionService,
             IWalletService walletService,
             IOptions<YooMoneyOptions> yooMoneyOptions,
+            IOptions<SubscriptionLimitsOptions> subscriptionLimits,
             ILogger<PaymentsController> logger)
         {
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
@@ -49,6 +52,7 @@ namespace YandexSpeech.Controllers
             _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
             _walletService = walletService ?? throw new ArgumentNullException(nameof(walletService));
             _yooMoneyOptions = yooMoneyOptions ?? throw new ArgumentNullException(nameof(yooMoneyOptions));
+            _subscriptionLimits = subscriptionLimits?.Value ?? new SubscriptionLimitsOptions();
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -255,6 +259,67 @@ namespace YandexSpeech.Controllers
             return Ok();
         }
 
+        [HttpGet("subscription/summary")]
+        public async Task<ActionResult<SubscriptionSummaryDto>> GetSubscriptionSummary(CancellationToken cancellationToken)
+        {
+            var userId = GetUserId();
+
+            var subscription = await _subscriptionService
+                .GetActiveSubscriptionAsync(userId, cancellationToken)
+                .ConfigureAwait(false);
+
+            var user = await _dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var payments = await _dbContext.SubscriptionInvoices
+                .AsNoTracking()
+                .Include(i => i.UserSubscription)
+                    .ThenInclude(s => s.Plan)
+                .Where(i => i.UserSubscription != null && i.UserSubscription.UserId == userId)
+                .OrderByDescending(i => i.IssuedAt)
+                .Take(50)
+                .Select(i => new SubscriptionPaymentHistoryItemDto
+                {
+                    InvoiceId = i.Id,
+                    PlanName = i.UserSubscription!.Plan?.Name,
+                    Amount = i.Amount,
+                    Currency = i.Currency,
+                    Status = i.Status,
+                    IssuedAt = i.IssuedAt,
+                    PaidAt = i.PaidAt,
+                    PaymentProvider = i.PaymentProvider,
+                    ExternalInvoiceId = i.ExternalInvoiceId,
+                    Comment = i.Payload
+                })
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var plan = subscription?.Plan;
+            var summary = new SubscriptionSummaryDto
+            {
+                HasActiveSubscription = subscription != null && subscription.Status == SubscriptionStatus.Active,
+                HasLifetimeAccess = user.HasLifetimeAccess,
+                PlanCode = plan?.Code,
+                PlanName = plan?.Name,
+                Status = subscription?.Status,
+                EndsAt = subscription?.EndDate,
+                IsLifetime = subscription?.IsLifetime ?? user.HasLifetimeAccess,
+                FreeRecognitionsPerDay = _subscriptionLimits.FreeYoutubeRecognitionsPerDay,
+                FreeTranscriptionsPerMonth = _subscriptionLimits.FreeTranscriptionsPerMonth,
+                BillingUrl = _subscriptionLimits.GetBillingUrlOrDefault(),
+                Payments = payments
+            };
+
+            return Ok(summary);
+        }
+
         private async Task HandleSubscriptionPaymentAsync(
             PaymentOperation operation,
             PaymentPayload payload,
@@ -266,9 +331,27 @@ namespace YandexSpeech.Controllers
                 throw new InvalidOperationException("Отсутствует идентификатор плана подписки.");
             }
 
-            await _subscriptionService
+            var subscription = await _subscriptionService
                 .ActivateSubscriptionAsync(operation.UserId, payload.PlanId.Value, externalPaymentId: notification.OperationId, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
+
+            var paidAt = DateTime.UtcNow;
+            var invoice = new SubscriptionInvoice
+            {
+                Id = Guid.NewGuid(),
+                UserSubscriptionId = subscription.Id,
+                Amount = notification.Amount ?? operation.Amount,
+                Currency = notification.Currency ?? operation.Currency,
+                Status = SubscriptionInvoiceStatus.Paid,
+                IssuedAt = paidAt,
+                PaidAt = paidAt,
+                PaymentProvider = PaymentProvider.YooMoney.ToString(),
+                ExternalInvoiceId = notification.OperationId,
+                Payload = JsonSerializer.Serialize(notification)
+            };
+
+            _dbContext.SubscriptionInvoices.Add(invoice);
+            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
             await _paymentGatewayService
                 .MarkSucceededAsync(operation.Id, notification.OperationId ?? string.Empty, cancellationToken: cancellationToken)
