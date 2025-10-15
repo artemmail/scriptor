@@ -1,5 +1,5 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, OnInit, AfterViewInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -11,7 +11,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { InfiniteScrollModule } from 'ngx-infinite-scroll';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { MatSort, MatSortModule, Sort, SortDirection } from '@angular/material/sort';
+import { MatSort, MatSortModule, MatSortable, Sort, SortDirection } from '@angular/material/sort';
 import { AdminUsersService } from '../services/admin-users.service';
 import { AdminUserListItem } from '../models/admin-user.model';
 import { AdminUserRoleDialogComponent } from './admin-user-role-dialog.component';
@@ -49,6 +49,7 @@ export class AdminUsersComponent implements OnInit, AfterViewInit {
   sortActive = 'recognizedVideos';
   sortDirection: SortDirection = 'desc';
   dataSource = new MatTableDataSource<AdminUserListItem>([]);
+  private ignoreNextSortEvent = false;
 
   @ViewChild(MatSort) private sortDirective?: MatSort;
 
@@ -71,6 +72,15 @@ export class AdminUsersComponent implements OnInit, AfterViewInit {
     this.sortDirective.disableClear = true;
     this.dataSource.sortData = data => data;
     this.dataSource.sort = this.sortDirective;
+
+    const initialSort: MatSortable = {
+      id: this.sortActive,
+      start: this.sortDirection || 'asc',
+      disableClear: true
+    };
+
+    this.ignoreNextSortEvent = true;
+    this.sortDirective.sort(initialSort);
   }
 
   applyFilter(event: Event): void {
@@ -157,6 +167,11 @@ export class AdminUsersComponent implements OnInit, AfterViewInit {
   }
 
   onSortChange(sort: Sort): void {
+    if (this.ignoreNextSortEvent) {
+      this.ignoreNextSortEvent = false;
+      return;
+    }
+
     if (!sort.active) {
       return;
     }
