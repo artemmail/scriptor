@@ -34,9 +34,9 @@
 
       <table
         mat-table
-        [dataSource]="users"
+        [dataSource]="dataSource"
         class="users-table"
-        *ngIf="users.length; else emptyState"
+        *ngIf="dataSource.data.length; else emptyState"
         matSort
         [matSortActive]="sortActive"
         [matSortDirection]="sortDirection === '' ? 'asc' : sortDirection"
