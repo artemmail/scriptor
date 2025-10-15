@@ -252,21 +252,28 @@ namespace YandexSpeech.services
                 );
             }
 
-            // Сортировка (через System.Linq.Dynamic.Core)
             if (!string.IsNullOrEmpty(sortField))
             {
-                // Пример: "Title descending" или "Title ascending"
-                var ordering = $"{sortField} {(sortOrder == "desc" ? "descending" : "ascending")}";
-                try
-                {
-                 //   query = query.OrderBy(ordering);
+                var descending = string.Equals(sortOrder, "desc", StringComparison.OrdinalIgnoreCase);
 
-                   // query = query.OrderByDescending(t => t.CreatedAt);
-                }
-                catch
+                query = sortField switch
                 {
-                    // Можно проигнорировать или бросить исключение
-                }
+                    "status" => descending
+                        ? query.OrderByDescending(t => t.Status)
+                        : query.OrderBy(t => t.Status),
+                    "title" => descending
+                        ? query.OrderByDescending(t => t.Title)
+                        : query.OrderBy(t => t.Title),
+                    "channelName" => descending
+                        ? query.OrderByDescending(t => t.ChannelName)
+                        : query.OrderBy(t => t.ChannelName),
+                    "createdAt" => descending
+                        ? query.OrderByDescending(t => t.CreatedAt)
+                        : query.OrderBy(t => t.CreatedAt),
+                    _ => descending
+                        ? query.OrderByDescending(t => t.CreatedAt)
+                        : query.OrderBy(t => t.CreatedAt)
+                };
             }
             else
             {
