@@ -29,7 +29,7 @@ namespace YandexSpeech.services
                 Description: "Позволяет снять дневные ограничения на распознавание на трое суток.",
                 Period: SubscriptionBillingPeriod.ThreeDays,
                 Price: 490m,
-                CanHideCaptions: false,
+                CanHideCaptions: true,
                 IsUnlimitedRecognitions: true,
                 Priority: 15),
             new(
@@ -38,7 +38,7 @@ namespace YandexSpeech.services
                 Description: "Снимает дневные ограничения на распознавание на один месяц.",
                 Period: SubscriptionBillingPeriod.Monthly,
                 Price: 890m,
-                CanHideCaptions: false,
+                CanHideCaptions: true,
                 IsUnlimitedRecognitions: true,
                 Priority: 20),
             new(
@@ -47,7 +47,7 @@ namespace YandexSpeech.services
                 Description: "Снимает дневные ограничения на распознавание на один год.",
                 Period: SubscriptionBillingPeriod.Yearly,
                 Price: 8990m,
-                CanHideCaptions: false,
+                CanHideCaptions: true,
                 IsUnlimitedRecognitions: true,
                 Priority: 30)
         };

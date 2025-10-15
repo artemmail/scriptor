@@ -250,7 +250,7 @@ namespace YandexSpeech.services
                 "IsUnlimitedRecognitions"
             };
 
-            UpsertFlag("CanHideCaptions", plan.CanHideCaptions.ToString());
+            UpsertFlag("CanHideCaptions", bool.TrueString);
             UpsertFlag("IsUnlimitedRecognitions", plan.IsUnlimitedRecognitions.ToString());
 
             if (plan.MaxRecognitionsPerDay.HasValue)
