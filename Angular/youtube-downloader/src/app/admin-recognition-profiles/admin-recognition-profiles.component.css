@@ -43,12 +43,18 @@
   width: 100%;
 }
 
-.profiles-table .request-text {
+.profiles-table .request-text,
+.profiles-table .hint-text {
   display: inline-block;
   max-width: 280px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.profiles-table .hint-text {
+  max-width: 220px;
+  color: rgba(0, 0, 0, 0.72);
 }
 
 tr.selected {

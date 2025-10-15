@@ -17,6 +17,9 @@ namespace YandexSpeech.models.DB
         [MaxLength(200)]
         public string DisplayedName { get; set; } = string.Empty;
 
+        [MaxLength(400)]
+        public string? Hint { get; set; }
+
         [Required]
         public string Request { get; set; } = string.Empty;
 

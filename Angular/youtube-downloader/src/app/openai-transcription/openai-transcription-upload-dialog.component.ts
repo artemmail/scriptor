@@ -55,6 +55,13 @@ export class OpenAiTranscriptionUploadDialogComponent implements OnInit {
   profilesError: string | null = null;
   selectedProfileId: number | null = null;
 
+  get selectedProfile(): OpenAiRecognitionProfileOptionDto | undefined {
+    if (this.selectedProfileId == null) {
+      return undefined;
+    }
+    return this.profiles.find((item) => item.id === this.selectedProfileId);
+  }
+
   constructor(
     private readonly dialogRef: MatDialogRef<OpenAiTranscriptionUploadDialogComponent, UploadDialogResult>,
     private readonly transcriptionService: OpenAiTranscriptionService
@@ -193,11 +200,7 @@ export class OpenAiTranscriptionUploadDialogComponent implements OnInit {
         this.profiles = profiles;
         this.profilesError = profiles.length === 0 ? 'Нет доступных профилей распознавания.' : null;
         const hasCurrent = profiles.some((profile) => profile.id === this.selectedProfileId);
-        this.selectedProfileId = hasCurrent
-          ? this.selectedProfileId
-          : profiles.length > 0
-            ? profiles[0].id
-            : null;
+        this.selectedProfileId = hasCurrent ? this.selectedProfileId : null;
         this.applySelectedProfile();
       },
       error: (error) => {
@@ -223,7 +226,7 @@ export class OpenAiTranscriptionUploadDialogComponent implements OnInit {
   }
 
   private applySelectedProfile(): void {
-    const profile = this.profiles.find((item) => item.id === this.selectedProfileId);
+    const profile = this.selectedProfile;
     if (profile?.clarificationTemplate) {
       this.clarificationHint = profile.clarificationTemplate;
       this.clarificationPlaceholder = profile.clarificationTemplate.replace('{clarification}', 'ваше уточнение');

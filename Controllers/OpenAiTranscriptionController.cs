@@ -245,7 +245,8 @@ namespace YandexSpeech.Controllers
                     Id = p.Id,
                     Name = p.Name,
                     DisplayedName = p.DisplayedName,
-                    ClarificationTemplate = p.ClarificationTemplate
+                    ClarificationTemplate = p.ClarificationTemplate,
+                    Hint = p.Hint
                 })
                 .ToListAsync();
 

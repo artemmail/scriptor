@@ -2,6 +2,7 @@ export interface RecognitionProfile {
   id: number;
   name: string;
   displayedName: string;
+  hint: string | null;
   request: string;
   clarificationTemplate: string | null;
   openAiModel: string;
@@ -11,6 +12,7 @@ export interface RecognitionProfile {
 export interface RecognitionProfileInput {
   name: string;
   displayedName: string;
+  hint: string | null;
   request: string;
   clarificationTemplate?: string | null;
   openAiModel: string;

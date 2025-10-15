@@ -52,6 +52,7 @@ export interface OpenAiRecognitionProfileOptionDto {
   name: string;
   displayedName: string;
   clarificationTemplate: string | null;
+  hint: string | null;
 }
 
 export interface OpenAiTranscriptionStepDto {
