@@ -100,15 +100,11 @@
             <p class="plan-card__price">{{ formatPrice(plan) }}</p>
             <p class="plan-card__description" *ngIf="plan.description">{{ plan.description }}</p>
             <mat-nav-list class="plan-benefits">
-              <mat-list-item *ngIf="plan.canHideCaptions">
-                <mat-icon matListItemIcon color="primary">visibility_off</mat-icon>
-                <span matListItemTitle>Скрытие собственных видео из общего доступа</span>
-              </mat-list-item>
               <mat-list-item *ngIf="plan.isUnlimitedRecognitions">
                 <mat-icon matListItemIcon color="primary">speed</mat-icon>
                 <span matListItemTitle>Без ограничений на количество распознаваний</span>
               </mat-list-item>
-              <mat-list-item *ngIf="!plan.canHideCaptions && !plan.isUnlimitedRecognitions">
+              <mat-list-item *ngIf="!plan.isUnlimitedRecognitions">
                 <mat-icon matListItemIcon color="primary">workspace_premium</mat-icon>
                 <span matListItemTitle>Специальные возможности аккаунта</span>
               </mat-list-item>
