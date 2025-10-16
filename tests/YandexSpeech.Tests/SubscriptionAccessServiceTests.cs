@@ -26,8 +26,7 @@ public sealed class SubscriptionAccessServiceTests
         {
             Id = "user-1",
             Email = "user1@example.com",
-            HasLifetimeAccess = true,
-            RecognitionsResetAt = DateTime.UtcNow.AddDays(1)
+            HasLifetimeAccess = true
         });
         await dbContext.SaveChangesAsync();
 
@@ -62,8 +61,7 @@ public sealed class SubscriptionAccessServiceTests
         {
             Id = "user-2",
             Email = "user2@example.com",
-            HasLifetimeAccess = false,
-            RecognitionsResetAt = DateTime.UtcNow.AddDays(1)
+            HasLifetimeAccess = false
         });
         await dbContext.SaveChangesAsync();
 

@@ -29,16 +29,6 @@ namespace YandexSpeech.models.DB
         public bool HasLifetimeAccess { get; set; }
 
         /// <summary>
-        /// Количество распознаваний, выполненных за текущие сутки.
-        /// </summary>
-        public int RecognitionsToday { get; set; }
-
-        /// <summary>
-        /// Время, когда счётчик распознаваний должен быть сброшен.
-        /// </summary>
-        public DateTime? RecognitionsResetAt { get; set; }
-
-        /// <summary>
         /// Навигационное свойство для активных возможностей (feature flags).
         /// </summary>
         public ICollection<UserFeatureFlag> FeatureFlags { get; set; } = new List<UserFeatureFlag>();
