@@ -71,7 +71,8 @@ namespace YandexSpeech.services
             string sortField,
             string sortOrder,
             string filter,
-            string userId = null);
+            string userId = null,
+            bool includeHidden = false);
 
         Task<bool> UpdateVisibilityAsync(
             string taskId,

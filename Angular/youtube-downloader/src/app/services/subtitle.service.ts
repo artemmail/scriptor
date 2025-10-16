@@ -151,7 +151,8 @@ generatePdfFromMarkdown(id: string, markdown: string): Observable<Blob> {
     sortField?: string,
     sortOrder?: string,
     filter?: string,
-    userId?: string | null
+    userId?: string | null,
+    includeHidden = false
   ): Observable<{ items: YoutubeCaptionTaskDto2[]; totalCount: number }> {
     let params = new HttpParams()
       .set('page', page.toString())
@@ -168,6 +169,9 @@ generatePdfFromMarkdown(id: string, markdown: string): Observable<Blob> {
     }
     if (userId) {
       params = params.set('userId', userId);
+    }
+    if (includeHidden) {
+      params = params.set('includeHidden', 'true');
     }
 
     return this.http.get<{ items: YoutubeCaptionTaskDto2[]; totalCount: number }>(

@@ -100,10 +100,15 @@ export class SubtitlesTasksComponent implements OnInit {
     this.authService.user$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(user => {
+        const previousCanManageVisibility = this.canManageVisibility;
         this.isAuthenticated = !!user;
         this.currentUserId = user?.id ?? null;
         this.canManageVisibility = !!user?.canHideCaptions;
         this.updateDisplayedColumns();
+
+        if (previousCanManageVisibility !== this.canManageVisibility && this.dataSource.data.length) {
+          this.loadTasks();
+        }
 
         if (!this.currentUserId && this.userIdFilter) {
           this.showOnlyMine = false;
@@ -144,6 +149,10 @@ export class SubtitlesTasksComponent implements OnInit {
       .subscribe(() => this.refreshTasksInProgress());
   }
 
+  private shouldIncludeHiddenTasks(): boolean {
+    return this.canManageVisibility;
+  }
+
   private loadTasks(append = false): void {
     this.loading = true;
     const page = this.pageIndex + 1;
@@ -155,7 +164,8 @@ export class SubtitlesTasksComponent implements OnInit {
         this.sortField,
         this.sortOrder,
         filter,
-        this.userIdFilter
+        this.userIdFilter,
+        this.shouldIncludeHiddenTasks()
       )
       .subscribe({
         next: res => {
@@ -196,7 +206,8 @@ export class SubtitlesTasksComponent implements OnInit {
           this.sortField,
           this.sortOrder,
           filter,
-          this.userIdFilter
+          this.userIdFilter,
+          this.shouldIncludeHiddenTasks()
         )
         .pipe(map(res => ({ page, res })))
     );

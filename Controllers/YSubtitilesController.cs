@@ -145,10 +145,11 @@ namespace YandexSpeech.Controllers
             [FromQuery] string sortField = null,
             [FromQuery] string sortOrder = null,
             [FromQuery] string filter = null,
-            [FromQuery] string userId = null)
+            [FromQuery] string userId = null,
+            [FromQuery] bool includeHidden = false)
         {
             var (items, totalCount) = await _ySubtitlesService.GetTasksPagedAsync(
-                page, pageSize, sortField, sortOrder, filter, userId);
+                page, pageSize, sortField, sortOrder, filter, userId, includeHidden);
 
             var result = new
             {
