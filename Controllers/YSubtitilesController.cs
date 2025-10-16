@@ -243,7 +243,8 @@ namespace YandexSpeech.Controllers
                 {
                     Message = authorization.Message ?? "Превышен лимит распознаваний.",
                     PaymentUrl = authorization.PaymentUrl ?? "/billing",
-                    RemainingQuota = authorization.RemainingQuota
+                    RemainingQuota = authorization.RemainingQuota,
+                    RecognizedTitles = authorization.RecognizedTitles
                 });
             }
 
