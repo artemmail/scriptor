@@ -1,7 +1,7 @@
 import { Component, DestroyRef, OnInit, ViewChild } from '@angular/core';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { HttpClientModule } from '@angular/common/http';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
@@ -18,7 +18,7 @@ import { InfiniteScrollModule } from 'ngx-infinite-scroll';
 
 import { CommonModule } from '@angular/common';
 import { LocalTimePipe } from '../pipe/local-time.pipe';
-import { SubtitleService, YoutubeCaptionTaskDto2, RecognizeStatus } from '../services/subtitle.service';
+import { SubtitleService, YoutubeCaptionTaskDto2, RecognizeStatus, YoutubeCaptionVisibility } from '../services/subtitle.service';
 import type { VideoDialogData } from '../video-dialog/video-dialog.component';
 import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -56,6 +56,7 @@ export class SubtitlesTasksComponent implements OnInit {
   displayedColumns: string[] = [];
   dataSource = new MatTableDataSource<YoutubeCaptionTaskDto2>();
   RecognizeStatus = RecognizeStatus;
+  Visibility = YoutubeCaptionVisibility;
 
   totalItems = 0;
   pageSize = 15;
@@ -64,13 +65,17 @@ export class SubtitlesTasksComponent implements OnInit {
   sortOrder = '';
   filterValue = '';
   userIdFilter: string | null = null;
+  showOnlyMine = false;
+  currentUserId: string | null = null;
 
   isMobile = false;
   loading = false;
   expandedTasks = new Set<string>();
   isAuthenticated = false;
+  canManageVisibility = false;
   private readonly refreshIntervalMs = 10_000;
   private refreshInProgress = false;
+  private visibilityUpdateInProgress = new Set<string>();
 
   @ViewChild(MatSort) sort!: MatSort;
 
@@ -80,6 +85,7 @@ export class SubtitlesTasksComponent implements OnInit {
     private dialog: MatDialog,
     private breakpointObserver: BreakpointObserver,
     private route: ActivatedRoute,
+    private router: Router,
     private authService: AuthService,
     private destroyRef: DestroyRef
   ) {
@@ -89,13 +95,28 @@ export class SubtitlesTasksComponent implements OnInit {
       .observe([Breakpoints.Handset])
       .subscribe(r => (this.isMobile = r.matches));
 
-    this.updateDisplayedColumns(false);
+    this.updateDisplayedColumns();
 
     this.authService.user$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(user => {
         this.isAuthenticated = !!user;
-        this.updateDisplayedColumns(this.isAuthenticated);
+        this.currentUserId = user?.id ?? null;
+        this.canManageVisibility = !!user?.canHideCaptions;
+        this.updateDisplayedColumns();
+
+        if (!this.currentUserId && this.userIdFilter) {
+          this.showOnlyMine = false;
+          this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { userId: null },
+            queryParamsHandling: 'merge',
+            replaceUrl: true,
+          });
+          return;
+        }
+
+        this.updateShowOnlyMineFlag();
       });
   }
 
@@ -105,6 +126,7 @@ export class SubtitlesTasksComponent implements OnInit {
       const newUserId = params.get('userId');
       const hasChanged = this.userIdFilter !== newUserId;
       this.userIdFilter = newUserId;
+      this.updateShowOnlyMineFlag();
 
       if (hasChanged) {
         this.pageIndex = 0;
@@ -244,6 +266,44 @@ export class SubtitlesTasksComponent implements OnInit {
     input.focus();
   }
 
+  onShowOnlyMineChange(evt: Event): void {
+    const checkbox = evt.target as HTMLInputElement;
+
+    if (!this.currentUserId) {
+      checkbox.checked = false;
+      this.showOnlyMine = false;
+      return;
+    }
+
+    const shouldShowMine = checkbox.checked;
+    this.showOnlyMine = shouldShowMine;
+    this.setShowOnlyMine(shouldShowMine);
+  }
+
+  private setShowOnlyMine(show: boolean): void {
+    if (!this.currentUserId) {
+      this.showOnlyMine = false;
+      return;
+    }
+
+    const targetUserId = show ? this.currentUserId : null;
+    if (targetUserId === this.userIdFilter) {
+      this.updateShowOnlyMineFlag();
+      return;
+    }
+
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { userId: targetUserId },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  private updateShowOnlyMineFlag(): void {
+    this.showOnlyMine = !!this.currentUserId && this.userIdFilter === this.currentUserId;
+  }
+
   onSortChange(sort: Sort): void {
     this.sortField = sort.active;
     this.sortOrder = sort.direction;
@@ -269,6 +329,48 @@ export class SubtitlesTasksComponent implements OnInit {
   }
   toggleExpand(id: string): void {
     this.isExpanded(id) ? this.expandedTasks.delete(id) : this.expandedTasks.add(id);
+  }
+
+  isVisibilityUpdating(taskId: string): boolean {
+    return this.visibilityUpdateInProgress.has(taskId);
+  }
+
+  toggleTaskVisibility(task: YoutubeCaptionTaskDto2): void {
+    if (!this.canManageVisibility || this.visibilityUpdateInProgress.has(task.id)) {
+      return;
+    }
+
+    const nextVisibility =
+      task.visibility === YoutubeCaptionVisibility.Hidden
+        ? YoutubeCaptionVisibility.Public
+        : YoutubeCaptionVisibility.Hidden;
+
+    this.visibilityUpdateInProgress.add(task.id);
+
+    this.subtitleService
+      .updateTaskVisibility(task.id, nextVisibility)
+      .pipe(finalize(() => this.visibilityUpdateInProgress.delete(task.id)))
+      .subscribe({
+        next: () => {
+          task.visibility = nextVisibility;
+          if (!this.userIdFilter) {
+            this.loadTasks();
+          }
+        },
+        error: err => {
+          console.error('Failed to update visibility', err);
+        },
+      });
+  }
+
+  getVisibilityIcon(task: YoutubeCaptionTaskDto2): string {
+    return task.visibility === YoutubeCaptionVisibility.Hidden ? 'visibility_off' : 'visibility';
+  }
+
+  getVisibilityActionLabel(task: YoutubeCaptionTaskDto2): string {
+    return task.visibility === YoutubeCaptionVisibility.Hidden
+      ? 'Показать ролик в общей ленте'
+      : 'Скрыть ролик из общей ленты';
   }
 
   getStatusIcon(s: RecognizeStatus | null): string {
@@ -305,10 +407,22 @@ export class SubtitlesTasksComponent implements OnInit {
     this.dialog.open(VideoDialogComponent, { width: '800px', data });
   }
 
-  private updateDisplayedColumns(includeYoutube: boolean): void {
-    this.displayedColumns = includeYoutube
-      ? ['status', 'createdAt', 'youtube', 'title', 'channelName', 'result']
-      : ['status', 'createdAt', 'title', 'channelName', 'result'];
+  private updateDisplayedColumns(): void {
+    const baseColumns = ['status', 'createdAt'];
+
+    if (this.isAuthenticated) {
+      baseColumns.push('youtube');
+    }
+
+    baseColumns.push('title', 'channelName');
+
+    if (this.canManageVisibility) {
+      baseColumns.push('visibility');
+    }
+
+    baseColumns.push('result');
+
+    this.displayedColumns = baseColumns;
   }
 
   get completedTasksCount(): number {

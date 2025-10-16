@@ -73,6 +73,17 @@
                   Очистить
                 </button>
               </div>
+              <div class="filter-options" *ngIf="isAuthenticated">
+                <label class="filter-option">
+                  <input
+                    type="checkbox"
+                    [checked]="showOnlyMine"
+                    (change)="onShowOnlyMineChange($event)"
+                    aria-label="Показать только собственные ролики"
+                  />
+                  <span>Только мои</span>
+                </label>
+              </div>
             </div>
 
             <app-yandex-ad></app-yandex-ad>
@@ -118,6 +129,25 @@
               <ng-container matColumnDef="channelName">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header="channelName">Канал</th>
                 <td mat-cell *matCellDef="let task">{{ task.channelName }}</td>
+              </ng-container>
+
+              <ng-container *ngIf="canManageVisibility" matColumnDef="visibility">
+                <th mat-header-cell *matHeaderCellDef>В общей ленте</th>
+                <td mat-cell *matCellDef="let task">
+                  <button
+                    type="button"
+                    class="visibility-toggle"
+                    mat-icon-button
+                    (click)="toggleTaskVisibility(task)"
+                    [disabled]="isVisibilityUpdating(task.id)"
+                    [attr.aria-label]="getVisibilityActionLabel(task)"
+                    [attr.title]="getVisibilityActionLabel(task)"
+                  >
+                    <mat-icon [ngClass]="{ 'visibility-hidden': task.visibility === Visibility.Hidden }">
+                      {{ getVisibilityIcon(task) }}
+                    </mat-icon>
+                  </button>
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="result">
@@ -207,6 +237,17 @@
               Очистить
             </button>
           </div>
+          <div class="filter-options" *ngIf="isAuthenticated">
+            <label class="filter-option">
+              <input
+                type="checkbox"
+                [checked]="showOnlyMine"
+                (change)="onShowOnlyMineChange($event)"
+                aria-label="Показать только собственные ролики"
+              />
+              <span>Только мои</span>
+            </label>
+          </div>
         </div>
 
         <app-yandex-ad></app-yandex-ad>
@@ -222,10 +263,25 @@
               >
                 <img src="assets/yt.webp" alt="YouTube" class="youtube-logo">
               </button>
+              <button
+                *ngIf="canManageVisibility"
+                class="visibility-toggle mobile-visibility-toggle"
+                type="button"
+                mat-icon-button
+                [disabled]="isVisibilityUpdating(task.id)"
+                (click)="toggleTaskVisibility(task)"
+                [attr.aria-label]="getVisibilityActionLabel(task)"
+                [attr.title]="getVisibilityActionLabel(task)"
+              >
+                <mat-icon [ngClass]="{ 'visibility-hidden': task.visibility === Visibility.Hidden }">
+                  {{ getVisibilityIcon(task) }}
+                </mat-icon>
+              </button>
               <div class="mobile-task-meta">
                 <a [routerLink]="['/recognized', task.slug]" class="mobile-task-title">{{ task.title }}</a><br>
                 <span class="mobile-task-channel">Канал: {{ task.channelName }}  </span>
-                <span class="mobile-task-date">{{ task.createdAt | localTime:'yyyy-MM-dd HH:mm' }}</span>                
+                <span class="mobile-task-date">{{ task.createdAt | localTime:'yyyy-MM-dd HH:mm' }}</span>
+                <span *ngIf="task.visibility === Visibility.Hidden" class="mobile-visibility-status">Скрыто из ленты</span>
               </div>
             </header>
 

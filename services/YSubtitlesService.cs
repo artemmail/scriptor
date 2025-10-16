@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
@@ -236,9 +238,14 @@ namespace YandexSpeech.services
         {
             var query = _dbContext.YoutubeCaptionTasks
                 .AsQueryable()
-                .Where(x => x.ChannelId != "UCa0jIrHPmqCHopklH8ltmVw");
+                .Where(x => x.ChannelId != "UCa0jIrHPmqCHopklH8ltmVw")
+                .Where(t => t.Visibility != YoutubeCaptionVisibility.Deleted);
 
-            if (!string.IsNullOrEmpty(userId))
+            if (string.IsNullOrEmpty(userId))
+            {
+                query = query.Where(t => t.Visibility == YoutubeCaptionVisibility.Public);
+            }
+            else
             {
                 query = query.Where(t => t.UserId == userId);
             }
@@ -308,9 +315,40 @@ namespace YandexSpeech.services
                 SegmentsTotal = t.SegmentsTotal,
                 // Укороченный результат (используем RemoveMarkdown для превью)
                 ResultShort = RemoveMarkdown(t.Preview),
+                Visibility = t.Visibility,
             }).ToList();
 
             return (itemsDto, totalItems);
+        }
+
+        public async Task<bool> UpdateVisibilityAsync(
+            string taskId,
+            YoutubeCaptionVisibility visibility,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(taskId))
+            {
+                return false;
+            }
+
+            var task = await _dbContext.YoutubeCaptionTasks
+                .FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (task == null)
+            {
+                return false;
+            }
+
+            if (task.Visibility != visibility)
+            {
+                task.Visibility = visibility;
+            }
+
+            task.VisibilityChangedAt = DateTime.UtcNow;
+
+            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return true;
         }
     }
 }

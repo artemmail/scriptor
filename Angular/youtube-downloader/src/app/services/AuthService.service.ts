@@ -13,6 +13,7 @@ export interface UserInfo {
   displayName: string;
   email: string;
   roles: string[];
+  canHideCaptions: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -45,6 +46,7 @@ export class AuthService {
         displayName,
         email: parsed.email ?? '',
         roles,
+        canHideCaptions: !!parsed.canHideCaptions,
       };
       this.userSubject.next(restored);
     }
@@ -92,12 +94,20 @@ export class AuthService {
         payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] ||
         '';
 
+      const rawCanHide =
+        payload.subscriptionCanHideCaptions ??
+        payload['subscriptionCanHideCaptions'];
+      const canHideCaptions = typeof rawCanHide === 'string'
+        ? rawCanHide.toLowerCase() === 'true'
+        : !!rawCanHide;
+
       const user: UserInfo = {
         id:    payload.sub ?? '',
         name:  rawDisplayName,
         displayName: rawDisplayName,
         email: payload.email || '',
-        roles
+        roles,
+        canHideCaptions,
       };
       this.saveUser(user);
     } catch {
@@ -146,7 +156,7 @@ export class AuthService {
     const updated: UserInfo = {
       ...current,
       name: displayName,
-      displayName
+      displayName,
     };
 
     this.saveUser(updated);
