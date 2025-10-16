@@ -71,22 +71,23 @@ namespace YandexSpeech.services
                     {
                         Id = Guid.NewGuid(),
                         Code = seed.Code,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.UtcNow,
+                        Name = seed.Name,
+                        Description = seed.Description,
+                        BillingPeriod = seed.Period,
+                        Price = seed.Price,
+                        Currency = "RUB",
+                        CanHideCaptions = seed.CanHideCaptions,
+                        IsUnlimitedRecognitions = seed.IsUnlimitedRecognitions,
+                        Priority = seed.Priority,
+                        IsActive = true,
+                        UpdatedAt = DateTime.UtcNow
                     };
                     dbContext.SubscriptionPlans.Add(plan);
                     logger.LogInformation("Created subscription plan {Code}", seed.Code);
+                    continue;
                 }
-
-                plan.Name = seed.Name;
-                plan.Description = seed.Description;
-                plan.BillingPeriod = seed.Period;
-                plan.Price = seed.Price;
-                plan.Currency = "RUB";
-                plan.CanHideCaptions = seed.CanHideCaptions;
-                plan.IsUnlimitedRecognitions = seed.IsUnlimitedRecognitions;
-                plan.Priority = seed.Priority;
-                plan.IsActive = true;
-                plan.UpdatedAt = DateTime.UtcNow;
+                logger.LogDebug("Subscription plan {Code} already exists. Skipping update.", seed.Code);
             }
 
             await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
