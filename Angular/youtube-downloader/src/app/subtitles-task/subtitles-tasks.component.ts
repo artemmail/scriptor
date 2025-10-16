@@ -336,7 +336,11 @@ export class SubtitlesTasksComponent implements OnInit {
   }
 
   toggleTaskVisibility(task: YoutubeCaptionTaskDto2): void {
-    if (!this.canManageVisibility || this.visibilityUpdateInProgress.has(task.id)) {
+    if (
+      !this.canManageVisibility ||
+      this.visibilityUpdateInProgress.has(task.id) ||
+      task.visibility === YoutubeCaptionVisibility.Deleted
+    ) {
       return;
     }
 
@@ -364,10 +368,14 @@ export class SubtitlesTasksComponent implements OnInit {
   }
 
   getVisibilityIcon(task: YoutubeCaptionTaskDto2): string {
-    return task.visibility === YoutubeCaptionVisibility.Hidden ? 'visibility_off' : 'visibility';
+    return task.visibility === YoutubeCaptionVisibility.Public ? 'visibility' : 'visibility_off';
   }
 
   getVisibilityActionLabel(task: YoutubeCaptionTaskDto2): string {
+    if (task.visibility === YoutubeCaptionVisibility.Deleted) {
+      return 'Ролик удалён из общей ленты';
+    }
+
     return task.visibility === YoutubeCaptionVisibility.Hidden
       ? 'Показать ролик в общей ленте'
       : 'Скрыть ролик из общей ленты';
