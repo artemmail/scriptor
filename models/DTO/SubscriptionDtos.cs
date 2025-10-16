@@ -12,6 +12,8 @@ namespace YandexSpeech.models.DTO
         public string PaymentUrl { get; set; } = "/billing";
 
         public int? RemainingQuota { get; set; }
+
+        public IReadOnlyList<string>? RecognizedTitles { get; set; }
     }
 
     public class SubscriptionPaymentHistoryItemDto

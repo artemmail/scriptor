@@ -9,7 +9,6 @@ using Xunit;
 using YandexSpeech;
 using YandexSpeech.models.DB;
 using YandexSpeech.services;
-using YandexSpeech.services.Interface;
 using YandexSpeech.services.Models;
 using YandexSpeech.services.Options;
 
@@ -30,26 +29,53 @@ public sealed class SubscriptionAccessServiceTests
         });
         await dbContext.SaveChangesAsync();
 
-        var usageStub = new UsageServiceStub
-        {
-            RegisterAsync = (_, _, _, _, _, _) =>
-            {
-                return Task.FromResult(new RecognitionUsage
-                {
-                    Id = Guid.NewGuid(),
-                    UserId = "user-1",
-                    RecognitionsCount = 1,
-                    Currency = "RUB"
-                });
-            }
-        };
-
-        var service = CreateService(dbContext, usageStub, new SubscriptionServiceStub());
+        var service = CreateService(dbContext, new SubscriptionServiceStub());
 
         var decision = await service.AuthorizeYoutubeRecognitionAsync("user-1");
 
         Assert.True(decision.IsAllowed);
-        Assert.Single(usageStub.RegisterCalls);
+        Assert.Null(decision.RecognizedTitles);
+    }
+
+    [Fact]
+    public async Task AuthorizeYoutubeRecognitionAsync_AllowsWhenUnderLimit()
+    {
+        await using var dbContext = CreateContext(out _);
+
+        dbContext.Users.Add(new ApplicationUser
+        {
+            Id = "user-under-limit",
+            Email = "user2@example.com",
+            HasLifetimeAccess = false
+        });
+        await dbContext.SaveChangesAsync();
+
+        var now = DateTime.UtcNow;
+        dbContext.YoutubeCaptionTasks.Add(new YoutubeCaptionTask
+        {
+            Id = "video-1",
+            UserId = "user-under-limit",
+            Title = "First",
+            Done = true,
+            Status = RecognizeStatus.Done,
+            CreatedAt = now.AddHours(-2),
+            ModifiedAt = now.AddHours(-1)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var options = Options.Create(new SubscriptionLimitsOptions
+        {
+            FreeYoutubeRecognitionsPerDay = 3,
+            BillingRelativeUrl = "/billing"
+        });
+
+        var service = CreateService(dbContext, new SubscriptionServiceStub(), options);
+
+        var decision = await service.AuthorizeYoutubeRecognitionAsync("user-under-limit");
+
+        Assert.True(decision.IsAllowed);
+        Assert.Equal(1, decision.RemainingQuota);
+        Assert.Null(decision.RecognizedTitles);
     }
 
     [Fact]
@@ -63,15 +89,70 @@ public sealed class SubscriptionAccessServiceTests
             Email = "user2@example.com",
             HasLifetimeAccess = false
         });
-        await dbContext.SaveChangesAsync();
 
-        var usageStub = new UsageServiceStub
-        {
-            EvaluateAsync = (_, _, _, _, _) =>
+        var now = DateTime.UtcNow;
+
+        dbContext.YoutubeCaptionTasks.AddRange(
+            new YoutubeCaptionTask
             {
-                return Task.FromResult(new UsageEvaluationResult(false, 0));
-            }
-        };
+                Id = "included-1",
+                UserId = "user-2",
+                Title = "Video C",
+                Done = true,
+                Status = RecognizeStatus.Done,
+                CreatedAt = now.AddHours(-3),
+                ModifiedAt = now.AddHours(-2)
+            },
+            new YoutubeCaptionTask
+            {
+                Id = "included-2",
+                UserId = "user-2",
+                Title = "Video B",
+                Done = true,
+                Status = RecognizeStatus.Done,
+                CreatedAt = now.AddHours(-2),
+                ModifiedAt = now.AddHours(-1)
+            },
+            new YoutubeCaptionTask
+            {
+                Id = "included-3",
+                UserId = "user-2",
+                Title = "Video A",
+                Done = true,
+                Status = RecognizeStatus.Done,
+                CreatedAt = now.AddMinutes(-30),
+                ModifiedAt = now.AddMinutes(-15)
+            },
+            new YoutubeCaptionTask
+            {
+                Id = "excluded-old",
+                UserId = "user-2",
+                Title = "Old",
+                Done = true,
+                Status = RecognizeStatus.Done,
+                CreatedAt = now.AddDays(-2),
+                ModifiedAt = now.AddDays(-2)
+            },
+            new YoutubeCaptionTask
+            {
+                Id = "excluded-error",
+                UserId = "user-2",
+                Title = "Error",
+                Done = true,
+                Status = RecognizeStatus.Error,
+                CreatedAt = now.AddHours(-1),
+                ModifiedAt = now.AddMinutes(-40)
+            },
+            new YoutubeCaptionTask
+            {
+                Id = "excluded-incomplete",
+                UserId = "user-2",
+                Title = "Processing",
+                Done = false,
+                Status = RecognizeStatus.InProgress,
+                CreatedAt = now.AddMinutes(-10)
+            });
+        await dbContext.SaveChangesAsync();
 
         var options = Options.Create(new SubscriptionLimitsOptions
         {
@@ -79,12 +160,7 @@ public sealed class SubscriptionAccessServiceTests
             BillingRelativeUrl = "/billing"
         });
 
-        var service = new SubscriptionAccessService(
-            dbContext,
-            new SubscriptionServiceStub(),
-            usageStub,
-            options,
-            NullLogger<SubscriptionAccessService>.Instance);
+        var service = CreateService(dbContext, new SubscriptionServiceStub(), options);
 
         var decision = await service.AuthorizeYoutubeRecognitionAsync("user-2");
 
@@ -92,8 +168,9 @@ public sealed class SubscriptionAccessServiceTests
         Assert.NotNull(decision.Message);
         Assert.Equal("/billing", decision.PaymentUrl);
         Assert.Equal(0, decision.RemainingQuota);
-        Assert.Empty(usageStub.RegisterCalls);
-        Assert.Single(usageStub.EvaluationCalls);
+        Assert.NotNull(decision.RecognizedTitles);
+        Assert.Equal(new[] { "Video A", "Video B", "Video C" }, decision.RecognizedTitles);
+        Assert.Contains("Уже распознаны", decision.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -115,12 +192,7 @@ public sealed class SubscriptionAccessServiceTests
             BillingRelativeUrl = "/billing"
         });
 
-        var service = new SubscriptionAccessService(
-            dbContext,
-            new SubscriptionServiceStub(),
-            new UsageServiceStub(),
-            options,
-            NullLogger<SubscriptionAccessService>.Instance);
+        var service = CreateService(dbContext, new SubscriptionServiceStub(), options);
 
         var first = await service.AuthorizeTranscriptionAsync("user-3");
         Assert.True(first.IsAllowed);
@@ -143,14 +215,12 @@ public sealed class SubscriptionAccessServiceTests
 
     private static SubscriptionAccessService CreateService(
         MyDbContext dbContext,
-        UsageServiceStub usage,
         SubscriptionServiceStub subscription,
         IOptions<SubscriptionLimitsOptions>? options = null)
     {
         return new SubscriptionAccessService(
             dbContext,
             subscription,
-            usage,
             options ?? Options.Create(new SubscriptionLimitsOptions()),
             NullLogger<SubscriptionAccessService>.Instance);
     }
@@ -189,39 +259,4 @@ public sealed class SubscriptionAccessServiceTests
             => throw new NotImplementedException();
     }
 
-    private sealed class UsageServiceStub : IUsageService
-    {
-        public List<(string UserId, int Requested, int? DailyLimit)> EvaluationCalls { get; } = new();
-        public List<(string UserId, int Recognitions)> RegisterCalls { get; } = new();
-
-        public Func<string, int, int?, bool, CancellationToken, Task<UsageEvaluationResult>> EvaluateAsync { get; set; }
-            = (userId, requested, limit, _, _) =>
-            {
-                return Task.FromResult(new UsageEvaluationResult(true, Math.Max(limit ?? 0, 0) - requested));
-            };
-
-        public Func<string, int, decimal, string, Guid?, CancellationToken, Task<RecognitionUsage>> RegisterAsync { get; set; }
-            = (userId, recognitions, _, currency, _, _) =>
-            {
-                return Task.FromResult(new RecognitionUsage
-                {
-                    Id = Guid.NewGuid(),
-                    UserId = userId,
-                    RecognitionsCount = recognitions,
-                    Currency = currency
-                });
-            };
-
-        public Task<UsageEvaluationResult> EvaluateDailyQuotaAsync(string userId, int requestedRecognitions, int? dailyLimit, bool hasUnlimitedQuota, CancellationToken cancellationToken = default)
-        {
-            EvaluationCalls.Add((userId, requestedRecognitions, dailyLimit));
-            return EvaluateAsync(userId, requestedRecognitions, dailyLimit, hasUnlimitedQuota, cancellationToken);
-        }
-
-        public Task<RecognitionUsage> RegisterUsageAsync(string userId, int recognitionsCount, decimal chargeAmount, string currency, Guid? walletTransactionId = null, CancellationToken cancellationToken = default)
-        {
-            RegisterCalls.Add((userId, recognitionsCount));
-            return RegisterAsync(userId, recognitionsCount, chargeAmount, currency, walletTransactionId, cancellationToken);
-        }
-    }
 }

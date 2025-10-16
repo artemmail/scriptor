@@ -202,7 +202,6 @@ builder.Services.AddScoped<IPunctuationService, PunctuationService>();
 
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
-builder.Services.AddScoped<IUsageService, UsageService>();
 builder.Services.AddScoped<IYandexDiskDownloadService, YandexDiskDownloadService>();
 builder.Services.AddScoped<IPaymentGatewayService, PaymentGatewayService>();
 builder.Services.AddScoped<ISubscriptionAccessService, SubscriptionAccessService>();
