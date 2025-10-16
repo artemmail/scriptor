@@ -86,7 +86,7 @@ export class About3Component implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
   private hasRequestedSummary = false;
   readonly guestSummaryDescription =
-    '3 Youtube ролика и 2 файла с рабочим митингом или собеседованием в месяц бесплатно.';
+    '3 Youtube ролика в сутки и 2 файла с рабочим митингом или собеседованием в месяц бесплатно.';
 
   ngOnInit(): void {
     this.authService.user$
