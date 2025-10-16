@@ -104,8 +104,7 @@ namespace YandexSpeech.Controllers
                     {
                         Email = email,
                         UserName = email,
-                        DisplayName = displayName,
-                        RecognitionsResetAt = DateTime.UtcNow.Date.AddDays(1)
+                        DisplayName = displayName
                     };
 
                     var createRes = await _userManager.CreateAsync(user);
@@ -326,9 +325,7 @@ namespace YandexSpeech.Controllers
                 new(JwtRegisteredClaimNames.Name, user.DisplayName ?? string.Empty),
                 new(ClaimTypes.Name, user.DisplayName ?? string.Empty),
                 new("displayName", user.DisplayName ?? string.Empty),
-                new("lifetimeAccess", user.HasLifetimeAccess.ToString()),
-                new("recognitionsToday", user.RecognitionsToday.ToString()),
-                new("recognitionsResetAt", user.RecognitionsResetAt?.ToString("o") ?? string.Empty)
+                new("lifetimeAccess", user.HasLifetimeAccess.ToString())
             };
 
             UserSubscription? activeSubscription = null;
@@ -403,12 +400,6 @@ namespace YandexSpeech.Controllers
 
         private async Task EnsureFinancialProfileAsync(ApplicationUser user)
         {
-            if (user.RecognitionsResetAt == null)
-            {
-                user.RecognitionsResetAt = DateTime.UtcNow.Date.AddDays(1);
-                await _userManager.UpdateAsync(user);
-            }
-
             var hasWallet = await _dbContext.UserWallets.AnyAsync(w => w.UserId == user.Id);
             if (!hasWallet)
             {

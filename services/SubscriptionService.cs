@@ -128,9 +128,6 @@ namespace YandexSpeech.services
                 user.HasLifetimeAccess = true;
             }
 
-            user.RecognitionsToday = 0;
-            user.RecognitionsResetAt = now.Date.AddDays(1);
-
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await RefreshUserCapabilitiesAsync(userId, cancellationToken).ConfigureAwait(false);
 

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -25,22 +26,26 @@ namespace YandexSpeech.services
         {
             ArgumentException.ThrowIfNullOrEmpty(userId);
 
-            var user = await _dbContext.Users
-                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
-                .ConfigureAwait(false)
-                ?? throw new InvalidOperationException($"User '{userId}' was not found.");
+            var userExists = await _dbContext.Users
+                .AsNoTracking()
+                .AnyAsync(u => u.Id == userId, cancellationToken)
+                .ConfigureAwait(false);
 
-            ResetCounterIfRequired(user);
+            if (!userExists)
+            {
+                throw new InvalidOperationException($"User '{userId}' was not found.");
+            }
 
             if (hasUnlimitedQuota || !dailyLimit.HasValue || dailyLimit.Value <= 0)
             {
                 return new UsageEvaluationResult(true, int.MaxValue);
             }
 
-            var remaining = dailyLimit.Value - user.RecognitionsToday;
+            var usedRecognitions = await GetRecognitionsLast24HoursAsync(userId, cancellationToken).ConfigureAwait(false);
+            var remaining = dailyLimit.Value - usedRecognitions;
             if (remaining < requestedRecognitions)
             {
-                return new UsageEvaluationResult(false, Math.Max(remaining, 0), "Daily recognition limit exceeded");
+                return new UsageEvaluationResult(false, Math.Max(remaining, 0), "Recognition limit for the last 24 hours exceeded");
             }
 
             return new UsageEvaluationResult(true, remaining - requestedRecognitions);
@@ -53,14 +58,15 @@ namespace YandexSpeech.services
                 throw new ArgumentOutOfRangeException(nameof(recognitionsCount));
             }
 
-            var user = await _dbContext.Users
-                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
-                .ConfigureAwait(false)
-                ?? throw new InvalidOperationException($"User '{userId}' was not found.");
+            var userExists = await _dbContext.Users
+                .AsNoTracking()
+                .AnyAsync(u => u.Id == userId, cancellationToken)
+                .ConfigureAwait(false);
 
-            ResetCounterIfRequired(user);
-
-            user.RecognitionsToday += recognitionsCount;
+            if (!userExists)
+            {
+                throw new InvalidOperationException($"User '{userId}' was not found.");
+            }
 
             var date = DateTime.UtcNow.Date;
             var usage = await _dbContext.RecognitionUsage
@@ -96,14 +102,19 @@ namespace YandexSpeech.services
             return usage;
         }
 
-        private void ResetCounterIfRequired(ApplicationUser user)
+        private Task<int> GetRecognitionsLast24HoursAsync(string userId, CancellationToken cancellationToken)
         {
-            var now = DateTime.UtcNow;
-            if (user.RecognitionsResetAt == null || user.RecognitionsResetAt <= now)
-            {
-                user.RecognitionsToday = 0;
-                user.RecognitionsResetAt = now.Date.AddDays(1);
-            }
+            var cutoff = DateTime.UtcNow.AddDays(-1);
+
+            return _dbContext.YoutubeCaptionTasks
+                .AsNoTracking()
+                .Where(t => t.UserId == userId)
+                .Where(t => t.Done)
+                .Where(t => !t.Status.HasValue || (int)t.Status.Value != 990)
+                .Where(t =>
+                    (t.ModifiedAt.HasValue && t.ModifiedAt.Value >= cutoff) ||
+                    (!t.ModifiedAt.HasValue && t.CreatedAt.HasValue && t.CreatedAt.Value >= cutoff))
+                .CountAsync(cancellationToken);
         }
     }
 }
