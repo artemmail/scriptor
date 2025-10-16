@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using YandexSpeech.models.DB;
 using YandexSpeech.services.Models;
 using YandexSpeech.services.Options;
+using YandexSpeech.services.Interface;
 
 namespace YandexSpeech.services
 {
