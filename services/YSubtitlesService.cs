@@ -234,18 +234,26 @@ namespace YandexSpeech.services
             string sortField,
             string sortOrder,
             string filter,
-            string userId = null)
+            string userId = null,
+            bool includeHidden = false)
         {
             var query = _dbContext.YoutubeCaptionTasks
                 .AsQueryable()
                 .Where(x => x.ChannelId != "UCa0jIrHPmqCHopklH8ltmVw")
                 .Where(t => t.Visibility != YoutubeCaptionVisibility.Deleted);
 
-            if (string.IsNullOrEmpty(userId))
+            if (!includeHidden)
             {
-                query = query.Where(t => t.Visibility == YoutubeCaptionVisibility.Public);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    query = query.Where(t => t.Visibility == YoutubeCaptionVisibility.Public);
+                }
+                else
+                {
+                    query = query.Where(t => t.UserId == userId);
+                }
             }
-            else
+            else if (!string.IsNullOrEmpty(userId))
             {
                 query = query.Where(t => t.UserId == userId);
             }
