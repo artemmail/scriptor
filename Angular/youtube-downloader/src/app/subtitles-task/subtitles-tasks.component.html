@@ -139,11 +139,16 @@
                     class="visibility-toggle"
                     mat-icon-button
                     (click)="toggleTaskVisibility(task)"
-                    [disabled]="isVisibilityUpdating(task.id)"
+                    [disabled]="isVisibilityUpdating(task.id) || task.visibility === Visibility.Deleted"
                     [attr.aria-label]="getVisibilityActionLabel(task)"
                     [attr.title]="getVisibilityActionLabel(task)"
                   >
-                    <mat-icon [ngClass]="{ 'visibility-hidden': task.visibility === Visibility.Hidden }">
+                    <mat-icon
+                      [ngClass]="{
+                        'visibility-hidden': task.visibility === Visibility.Hidden,
+                        'visibility-deleted': task.visibility === Visibility.Deleted
+                      }"
+                    >
                       {{ getVisibilityIcon(task) }}
                     </mat-icon>
                   </button>
@@ -268,12 +273,17 @@
                 class="visibility-toggle mobile-visibility-toggle"
                 type="button"
                 mat-icon-button
-                [disabled]="isVisibilityUpdating(task.id)"
+                [disabled]="isVisibilityUpdating(task.id) || task.visibility === Visibility.Deleted"
                 (click)="toggleTaskVisibility(task)"
                 [attr.aria-label]="getVisibilityActionLabel(task)"
                 [attr.title]="getVisibilityActionLabel(task)"
               >
-                <mat-icon [ngClass]="{ 'visibility-hidden': task.visibility === Visibility.Hidden }">
+                <mat-icon
+                  [ngClass]="{
+                    'visibility-hidden': task.visibility === Visibility.Hidden,
+                    'visibility-deleted': task.visibility === Visibility.Deleted
+                  }"
+                >
                   {{ getVisibilityIcon(task) }}
                 </mat-icon>
               </button>
@@ -281,7 +291,13 @@
                 <a [routerLink]="['/recognized', task.slug]" class="mobile-task-title">{{ task.title }}</a><br>
                 <span class="mobile-task-channel">Канал: {{ task.channelName }}  </span>
                 <span class="mobile-task-date">{{ task.createdAt | localTime:'yyyy-MM-dd HH:mm' }}</span>
-                <span *ngIf="task.visibility === Visibility.Hidden" class="mobile-visibility-status">Скрыто из ленты</span>
+                <span
+                  *ngIf="task.visibility !== Visibility.Public"
+                  class="mobile-visibility-status"
+                  [ngClass]="{ 'mobile-visibility-deleted': task.visibility === Visibility.Deleted }"
+                >
+                  {{ task.visibility === Visibility.Deleted ? 'Удалено из ленты' : 'Скрыто из ленты' }}
+                </span>
               </div>
             </header>
 
