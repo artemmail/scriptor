@@ -288,7 +288,7 @@ namespace YandexSpeech.Controllers
                 .Select(i => new SubscriptionPaymentHistoryItemDto
                 {
                     InvoiceId = i.Id,
-                    PlanName = i.UserSubscription!.Plan?.Name,
+                    PlanName = i.UserSubscription.Plan.Name,
                     Amount = i.Amount,
                     Currency = i.Currency,
                     Status = i.Status,

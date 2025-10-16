@@ -217,8 +217,7 @@ namespace YandexSpeech.Controllers
             }
         }
 
-        [HttpPost("start")]
-        [Produces("text/plain")]
+        [HttpPost("start")]        
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<ActionResult<StartSubtitleRecognitionResponse>> StartSubtitleRecognition(
             [FromQuery] string youtubeId,
