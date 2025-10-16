@@ -17,6 +17,12 @@ export enum RecognizeStatus {
   Error = 999
 }
 
+export enum YoutubeCaptionVisibility {
+  Public = 0,
+  Hidden = 1,
+  Deleted = 2,
+}
+
 export interface YoutubeCaptionTaskDto {
   id: string;
   title: string | null;
@@ -47,6 +53,7 @@ export interface YoutubeCaptionTaskDto2 {
   error: string;
   segmentsTotal: number;
   segmentsProcessed: number;
+  visibility: YoutubeCaptionVisibility;
 }
 
 // Новая упрощённая модель для таблицы
@@ -167,6 +174,10 @@ generatePdfFromMarkdown(id: string, markdown: string): Observable<Blob> {
       `${this.apiUrl}/GetTasks`,
       { params }
     );
+  }
+
+  updateTaskVisibility(taskId: string, visibility: YoutubeCaptionVisibility): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/${taskId}/visibility`, { visibility });
   }
   
   generatePdf(taskId: string): Observable<Blob> {

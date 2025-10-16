@@ -1,4 +1,5 @@
-﻿using YandexSpeech.models.DB;
+﻿using System.Threading;
+using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 
 namespace YandexSpeech.services
@@ -71,5 +72,10 @@ namespace YandexSpeech.services
             string sortOrder,
             string filter,
             string userId = null);
+
+        Task<bool> UpdateVisibilityAsync(
+            string taskId,
+            YoutubeCaptionVisibility visibility,
+            CancellationToken cancellationToken = default);
     }
 }

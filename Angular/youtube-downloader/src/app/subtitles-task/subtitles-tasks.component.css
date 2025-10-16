@@ -184,6 +184,33 @@ section {
   color: #94a3b8;
 }
 
+.filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.filter-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.filter-option input {
+  width: 18px;
+  height: 18px;
+  accent-color: #1d4ed8;
+}
+
+.filter-option input:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.55);
+  outline-offset: 2px;
+}
+
 .filter-reset-btn {
   border: none;
   padding: 8px 18px;
@@ -309,6 +336,32 @@ section {
   outline-offset: 2px;
 }
 
+.visibility-toggle {
+  background: rgba(59, 130, 246, 0.12) !important;
+  border-radius: 12px !important;
+  width: 44px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1d4ed8;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.visibility-toggle:hover:not([disabled]) {
+  background: rgba(59, 130, 246, 0.18) !important;
+  color: #1e3a8a;
+}
+
+.visibility-toggle[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.visibility-hidden {
+  color: #ef4444 !important;
+}
+
 .recognized-link {
   font-weight: 600;
   color: #1d4ed8;
@@ -426,6 +479,11 @@ section {
   display: block;
 }
 
+.mobile-visibility-toggle {
+  float: right;
+  margin: 0 0 8px 12px;
+}
+
 .mobile-task-header::after {
   content: '';
   display: table;
@@ -461,6 +519,14 @@ section {
 .mobile-task-date {
   font-size: 0.85rem;
   color: #64748b;
+}
+
+.mobile-visibility-status {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #ef4444;
 }
 
 .mobile-task-status {
@@ -525,6 +591,10 @@ section {
     width: 100%;
   }
 
+  .mobile-toolbar .filter-options {
+    justify-content: flex-start;
+  }
+
   .tasks-card mat-card-header,
   .tasks-card mat-card-content {
     padding-left: 12px;
@@ -544,7 +614,7 @@ section {
     gap: 16px;
   }
 
-  .mobile-task {
+  .mobile-task { 
     gap: 8px;
   }
 

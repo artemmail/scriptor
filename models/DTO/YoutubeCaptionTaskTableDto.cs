@@ -19,5 +19,6 @@ namespace YandexSpeech.models.DTO
         public int SegmentsProcessed { get; set; }
         public int SegmentsTotal { get; set; }
         public DateTime? UploadDate { get; internal set; }
+        public YoutubeCaptionVisibility Visibility { get; set; }
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Threading;
@@ -18,6 +19,11 @@ using System.Text;
 public class UpdateResultDto
 {
     public string Result { get; set; } = string.Empty;
+}
+
+public class UpdateVisibilityDto
+{
+    public YoutubeCaptionVisibility Visibility { get; set; }
 }
 
 namespace YandexSpeech.Controllers
@@ -78,6 +84,40 @@ namespace YandexSpeech.Controllers
                 return BadRequest("Result must be provided.");
 
             var updated = await _taskManager.UpdateTaskResultAsync(taskId, dto.Result);
+            if (!updated)
+                return NotFound("Task not found.");
+
+            return NoContent();
+        }
+
+        [HttpPut("{taskId}/visibility")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<IActionResult> UpdateVisibility(
+            string taskId,
+            [FromBody] UpdateVisibilityDto dto,
+            CancellationToken cancellationToken)
+        {
+            if (dto == null)
+                return BadRequest("Visibility must be provided.");
+
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized("User is not authenticated");
+
+            var task = await _ySubtitlesService.GetTaskByIdAsync(taskId);
+            if (task == null)
+                return NotFound("Task not found.");
+
+            var isAdmin = User.IsInRole("Admin");
+            var isOwner = string.Equals(task.UserId, userId, StringComparison.Ordinal);
+
+            var canHide = bool.TryParse(User.FindFirstValue("subscriptionCanHideCaptions"), out var parsed) && parsed;
+            if (!isAdmin && (!isOwner || !canHide))
+                return Forbid();
+
+            var updated = await _ySubtitlesService.UpdateVisibilityAsync(task.Id, dto.Visibility, cancellationToken)
+                .ConfigureAwait(false);
+
             if (!updated)
                 return NotFound("Task not found.");
 
