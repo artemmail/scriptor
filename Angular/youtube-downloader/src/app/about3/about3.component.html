@@ -73,7 +73,7 @@
           <p class="recognition-card-lead">
             Введите идентификатор или ссылку на YouTube, чтобы получить готовый документ.
           </p>
-          <div class="subscription-card" *ngIf="summaryLoading || summary || summaryError || limitResponse">
+          <div class="subscription-card" *ngIf="shouldShowSubscriptionCard">
             <div class="status-row">
               <span class="status-chip" [ngClass]="summaryLoading ? 'status-neutral' : subscriptionChipClass">
                 {{ summaryLoading ? 'Загружаем статус подписки…' : subscriptionStatusMessage }}
@@ -86,13 +86,23 @@
             <p class="quota-message" *ngIf="remainingQuota !== null && remainingQuota >= 0 && !summaryLoading">
               Осталось распознаваний сегодня: {{ remainingQuota }}
             </p>
-            <p class="summary-description" *ngIf="summary && !summaryLoading">
-              <ng-container *ngIf="summary.hasActiveSubscription || summary.hasLifetimeAccess || summary.isLifetime; else aboutFree">
-                Распознавания доступны без ограничений. Управляйте подпиской в разделе биллинга.
+            <p class="summary-description" *ngIf="!summaryLoading">
+              <ng-container *ngIf="isAuthenticated; else guestSummary">
+                <ng-container *ngIf="summary; else summaryFallback">
+                  <ng-container *ngIf="summary.hasActiveSubscription || summary.hasLifetimeAccess || summary.isLifetime; else aboutFree">
+                    Распознавания доступны без ограничений. Управляйте подпиской в разделе биллинга.
+                  </ng-container>
+                  <ng-template #aboutFree>
+                    Бесплатный тариф: {{ summary.freeRecognitionsPerDay }} распознавания YouTube в день и
+                    {{ summary.freeTranscriptionsPerMonth }} транскрибации в месяц.
+                  </ng-template>
+                </ng-container>
+                <ng-template #summaryFallback>
+                  Узнать актуальные условия можно в разделе биллинга.
+                </ng-template>
               </ng-container>
-              <ng-template #aboutFree>
-                Бесплатный тариф: {{ summary.freeRecognitionsPerDay }} распознавания YouTube в день и
-                {{ summary.freeTranscriptionsPerMonth }} транскрибации в месяц.
+              <ng-template #guestSummary>
+                {{ guestSummaryDescription }}
               </ng-template>
             </p>
             <div class="limit-message" *ngIf="limitResponse">

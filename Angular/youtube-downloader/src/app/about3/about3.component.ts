@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -8,6 +8,9 @@ import { SubtitleService } from '../services/subtitle.service';
 import { PaymentsService, SubscriptionSummary } from '../services/payments.service';
 import { UsageLimitResponse, extractUsageLimitResponse } from '../models/usage-limit-response';
 import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
+import { AuthService } from '../services/AuthService.service';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 interface WorkflowStep {
   readonly title: string;
@@ -60,11 +63,12 @@ interface FaqItem {
   templateUrl: './about3.component.html',
   styleUrls: ['./about3.component.css'],
 })
-export class About3Component implements OnInit {
+export class About3Component implements OnInit, OnDestroy {
   constructor(
     private readonly subtitleService: SubtitleService,
     private readonly router: Router,
     private readonly paymentsService: PaymentsService,
+    private readonly authService: AuthService,
   ) {}
 
   readonly uploadRoute: RouterCommand = '/transcriptions';
@@ -78,9 +82,37 @@ export class About3Component implements OnInit {
   summary: SubscriptionSummary | null = null;
   summaryLoading = false;
   summaryError: string | null = null;
+  isAuthenticated = false;
+  private readonly destroy$ = new Subject<void>();
+  private hasRequestedSummary = false;
+  readonly guestSummaryDescription =
+    'Получите 15 минут расшифровки бесплатно после регистрации. Подписка не нужна, чтобы попробовать сервис.';
 
   ngOnInit(): void {
-    this.loadSubscriptionSummary();
+    this.authService.user$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(user => {
+        this.isAuthenticated = !!user;
+
+        if (!this.isAuthenticated) {
+          this.summaryLoading = false;
+          this.summaryError = null;
+          this.summary = null;
+          this.remainingQuota = null;
+          this.hasRequestedSummary = false;
+          return;
+        }
+
+        if (!this.hasRequestedSummary) {
+          this.hasRequestedSummary = true;
+          this.loadSubscriptionSummary();
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   readonly trustedCompanies: readonly TrustedCompany[] = [
@@ -348,6 +380,10 @@ export class About3Component implements OnInit {
   }
 
   get subscriptionStatusMessage(): string {
+    if (!this.isAuthenticated) {
+      return 'Гостевой режим: попробуйте сервис бесплатно';
+    }
+
     if (!this.summary) {
       return '';
     }
@@ -369,6 +405,10 @@ export class About3Component implements OnInit {
   }
 
   get subscriptionChipClass(): string {
+    if (!this.isAuthenticated) {
+      return 'status-trial';
+    }
+
     if (!this.summary) {
       return 'status-neutral';
     }
@@ -408,5 +448,9 @@ export class About3Component implements OnInit {
     }
 
     this.router.navigateByUrl(url);
+  }
+
+  get shouldShowSubscriptionCard(): boolean {
+    return this.summaryLoading || !!this.summary || !!this.summaryError || !!this.limitResponse || !this.isAuthenticated;
   }
 }
