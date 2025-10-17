@@ -41,26 +41,45 @@
   <mat-progress-bar *ngIf="profilesLoading" mode="indeterminate"></mat-progress-bar>
   <div class="error" *ngIf="profilesError">{{ profilesError }}</div>
 
-  <mat-form-field appearance="outline" class="full-width">
-    <mat-label>Профиль распознавания</mat-label>
+  <div class="profile-select">
+    <label class="profile-select__label" id="recognition-profile-label">
+      Профиль распознавания
+      <span aria-hidden="true" class="profile-select__required">*</span>
+    </label>
     <mat-select
+      class="profile-select__control"
       [(ngModel)]="selectedProfileId"
       (selectionChange)="onProfileSelectionChanged($event.value)"
-      [disabled]="uploading || profilesLoading"
+      [disabled]="uploading || profilesLoading || !profiles.length"
+      [panelClass]="'profile-select__panel'"
+      [attr.aria-describedby]="selectedProfile?.hint ? 'recognition-profile-hint' : null"
+      [attr.aria-labelledby]="'recognition-profile-label'"
       name="recognitionProfile"
       required
     >
+      <mat-select-trigger>
+        <div
+          class="profile-select__field"
+          [class.profile-select__field--placeholder]="!selectedProfile"
+        >
+          <mat-icon aria-hidden="true">account_circle</mat-icon>
+          <span class="profile-select__value">
+            {{ selectedProfile?.displayedName || 'Выберите профиль' }}
+          </span>
+          <mat-icon aria-hidden="true" class="profile-select__arrow">expand_more</mat-icon>
+        </div>
+      </mat-select-trigger>
       <mat-option *ngFor="let profile of profiles" [value]="profile.id">
         {{ profile.displayedName }}
       </mat-option>
     </mat-select>
-  </mat-form-field>
+  </div>
 
   <div class="error" *ngIf="!profilesLoading && profiles.length && selectedProfileId == null">
     Выберите профиль распознавания — от этого зависит формат итогового диалога.
   </div>
 
-  <div class="profile-hint" *ngIf="selectedProfile?.hint">
+  <div class="profile-hint" *ngIf="selectedProfile?.hint" id="recognition-profile-hint">
     {{ selectedProfile?.hint }}
   </div>
 
@@ -97,7 +116,7 @@
     <mat-tab label="Яндекс диск">
       <div class="tab-content link-tab-content">
         <div class="link-input">
-          <label class="link-input__label" for="yandex-link-input">Ссылка на публичный файл</label>
+          <label class="link-input__label" for="yandex-link-input">Ссылка на публичный файл /transcriptions</label>
           <div class="link-input__field" [class.disabled]="uploading || profilesLoading">
             <mat-icon aria-hidden="true">link</mat-icon>
             <input
