@@ -22,6 +22,7 @@ import { LocalTimePipe } from '../pipe/local-time.pipe';
 import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
 import { MatDialog } from '@angular/material/dialog';
 import { OpenAiTranscriptionUploadDialogComponent } from './openai-transcription-upload-dialog.component';
+import { OpenAiTranscriptionUploadFormComponent } from './openai-transcription-upload-form.component';
 import { ActionMenuPanelDirective } from '../shared/action-menu-panel.directive';
 import {
   OpenAiTranscriptionAnalyticsDialogComponent,
@@ -45,6 +46,7 @@ import { UsageLimitResponse, extractUsageLimitResponse } from '../models/usage-l
     LocalTimePipe,
     RouterModule,
     ActionMenuPanelDirective,
+    OpenAiTranscriptionUploadFormComponent,
   ],
   templateUrl: './openai-transcription.component.html',
   styleUrls: ['./openai-transcription.component.css'],
@@ -196,6 +198,10 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     ref.onAction().subscribe(() => this.navigateToBilling(limit.paymentUrl ?? this.billingUrl));
   }
 
+  onUploadStateChange(state: boolean): void {
+    this.uploading = state;
+  }
+
   ngOnDestroy(): void {
     this.stopPolling();
     this.resetFullscreenState();
@@ -313,7 +319,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     }
   }
 
-  private handleUploadSuccess(task: OpenAiTranscriptionTaskDto): void {
+  handleUploadSuccess(task: OpenAiTranscriptionTaskDto): void {
     this.limitResponse = null;
     this.loadSubscriptionSummary();
     this.tasks = [task, ...this.tasks.filter((t) => t.id !== task.id)];

@@ -45,21 +45,12 @@
         </div>
       </div>
       <div class="hero-card">
-        <div class="card-header">Перетащите файлы сюда</div>
-        <div class="card-dropzone">
-          <p>Загрузите аудио или видео и получите чистый текст с автоматической разметкой и форматированием.</p>
-          <span>Поддерживаем файлы до 1,5 ГБ и длительностью до 300 минут.</span>
-          <button class="btn btn-primary" type="button" (click)="openUploadDialog()" [disabled]="uploading">
-            <mat-icon>cloud_upload</mat-icon>
-            <span>Начать загрузку</span>
-          </button>
-        </div>
-        <div class="card-preview">
-          <img src="assets/about3/YouScriptor/upload_frame-600x.png" alt="Загрузка файлов в YouScriptor" />
-          <div class="card-preview-caption">
-            Загруженные файлы попадут в очередь, а статус задач обновится автоматически.
-          </div>
-        </div>
+        <app-openai-transcription-upload-form
+          layout="card"
+          (success)="handleUploadSuccess($event)"
+          (limit)="handleUsageLimit($event)"
+          (uploadingChange)="onUploadStateChange($event)"
+        ></app-openai-transcription-upload-form>
       </div>
     </section>
 
