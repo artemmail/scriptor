@@ -124,17 +124,24 @@
     </mat-tab>
   </mat-tab-group>
 
-  <mat-form-field appearance="outline" class="full-width clarification-field">
-    <mat-label>Уточнение (необязательно)</mat-label>
-    <textarea
-      matInput
-      rows="3"
-      [(ngModel)]="clarification"
-      [disabled]="uploading || profilesLoading"
-      [placeholder]="clarificationPlaceholder"
-    ></textarea>
-    <mat-hint *ngIf="clarificationHint">{{ clarificationHint }}</mat-hint>
-  </mat-form-field>
+  <div class="clarification-input">
+    <label class="clarification-input__label" for="clarification-input-field">Уточнение (необязательно)</label>
+    <div
+      class="clarification-input__field"
+      [class.disabled]="uploading || profilesLoading"
+    >
+      <mat-icon aria-hidden="true">sticky_note_2</mat-icon>
+      <textarea
+        id="clarification-input-field"
+        rows="3"
+        [(ngModel)]="clarification"
+        [disabled]="uploading || profilesLoading"
+        [placeholder]="clarificationPlaceholder"
+        autocomplete="off"
+      ></textarea>
+    </div>
+    <div class="clarification-input__hint" *ngIf="clarificationHint">{{ clarificationHint }}</div>
+  </div>
 
   <mat-progress-bar *ngIf="uploading" mode="indeterminate"></mat-progress-bar>
   <div class="error" *ngIf="uploadError">{{ uploadError }}</div>
