@@ -1,0 +1,26 @@
+<section class="hero">
+  <div class="hero-text">
+    <h1>{{ title }}</h1>
+    <p class="hero-lead">{{ lead }}</p>
+    <ul class="hero-highlights">
+      <li *ngFor="let highlight of highlights">{{ highlight }}</li>
+      <li *ngIf="showSubscriptionStatus">
+        <div class="status-row">
+          <span
+            class="subscription-chip"
+            [ngClass]="summaryLoading ? 'status-neutral' : subscriptionChipClass"
+          >
+            {{ summaryLoading ? subscriptionLoadingLabel : subscriptionStatusMessage }}
+          </span>
+          <button class="btn btn-tertiary" type="button" (click)="onBillingClick()">
+            {{ billingButtonLabel }}
+          </button>
+        </div>
+      </li>
+    </ul>
+    <ng-content select="[hero-actions]"></ng-content>
+  </div>
+  <div class="hero-card">
+    <ng-content></ng-content>
+  </div>
+</section>

@@ -1,43 +1,22 @@
 <div class="transcription-page">
   <main class="page-content">
-    <section class="hero">
-      <div class="hero-text">
-       
-
-        <h1>Преобразовать аудио и видео в текст</h1>
-        <p class="hero-lead">
-          Online-сервис автоматической транскрибации помогает за считанные минуты превратить записи интервью, созвонов и
-          лекций в структурированный текст.
-        </p>
-        <ul class="hero-highlights">
-          <li>Выделение участников разговора</li>
-          <li>Исправление орфографии, разметка и форматирование</li>          
-          <li>Структурирование в документе в виде таблиц, списков, формул</li>
-          <li>Формирование готового к печати документа в Word и PDF</li>
-          <li>Профили распознавания - переговоры, совещение, собеседование, презентация и другие</li>
-          <li> <div class="status-row">
-            <span class="subscription-chip" [ngClass]="summaryLoading ? 'status-neutral' : subscriptionChipClass">
-              {{ summaryLoading ? 'Загружаем статус подписки…' : subscriptionStatusMessage }}
-            </span>
-            <button class="btn btn-tertiary" type="button" (click)="navigateToBilling()">
-              Перейти к тарифам
-            </button>
-          </div></li>
-        </ul>
-
-      
-     
-       
-      </div>
-      <div class="hero-card">
-        <app-openai-transcription-upload-form
-          layout="card"
-          (success)="handleUploadSuccess($event)"
-          (limit)="handleUsageLimit($event)"
-          (uploadingChange)="onUploadStateChange($event)"
-        ></app-openai-transcription-upload-form>
-      </div>
-    </section>
+    <app-transcription-hero
+      [title]="heroTitle"
+      [lead]="heroLead"
+      [highlights]="heroHighlights"
+      [showSubscriptionStatus]="true"
+      [summaryLoading]="summaryLoading"
+      [subscriptionChipClass]="subscriptionChipClass"
+      [subscriptionStatusMessage]="subscriptionStatusMessage"
+      (billingClick)="navigateToBilling()"
+    >
+      <app-openai-transcription-upload-form
+        layout="card"
+        (success)="handleUploadSuccess($event)"
+        (limit)="handleUsageLimit($event)"
+        (uploadingChange)="onUploadStateChange($event)"
+      ></app-openai-transcription-upload-form>
+    </app-transcription-hero>
 
     <section class="workspace">
       <div class="section-header">
