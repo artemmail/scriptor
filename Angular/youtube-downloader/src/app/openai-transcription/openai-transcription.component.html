@@ -1,23 +1,26 @@
 <div class="transcription-page">
-  <main class="page-content">
-    <app-transcription-hero
-      [title]="heroTitle"
-      [lead]="heroLead"
-      [highlights]="heroHighlights"
-      [showSubscriptionStatus]="true"
-      [summaryLoading]="summaryLoading"
-      [subscriptionChipClass]="subscriptionChipClass"
-      [subscriptionStatusMessage]="subscriptionStatusMessage"
-      (billingClick)="navigateToBilling()"
-    >
-      <app-openai-transcription-upload-form
-        layout="card"
-        (success)="handleUploadSuccess($event)"
-        (limit)="handleUsageLimit($event)"
-        (uploadingChange)="onUploadStateChange($event)"
-      ></app-openai-transcription-upload-form>
-    </app-transcription-hero>
+  <app-transcription-hero
+    class="transcription-hero"
+    [title]="heroTitle"
+    [lead]="heroLead"
+    [highlights]="heroHighlights"
+    [showSubscriptionStatus]="true"
+    [summaryLoading]="summaryLoading"
+    [subscriptionChipClass]="subscriptionChipClass"
+    [subscriptionStatusMessage]="subscriptionStatusMessage"
+    [fullWidth]="true"
+    [cardless]="true"
+    (billingClick)="navigateToBilling()"
+  >
+    <app-openai-transcription-upload-form
+      layout="card"
+      (success)="handleUploadSuccess($event)"
+      (limit)="handleUsageLimit($event)"
+      (uploadingChange)="onUploadStateChange($event)"
+    ></app-openai-transcription-upload-form>
+  </app-transcription-hero>
 
+  <main class="page-content">
     <section class="workspace">
       <div class="section-header">
         <h2>Рабочая область</h2>
