@@ -181,18 +181,24 @@ namespace YandexSpeech.Controllers
         }
 
         [HttpGet("profile")]
+        [AllowAnonymous]
         public async Task<ActionResult<UserProfileDto>> GetProfile()
         {
-            var userId = _userManager.GetUserId(User);
-            if (userId == null)
+            if (User?.Identity == null || !User.Identity.IsAuthenticated)
             {
-                return Unauthorized();
+                return Ok(null);
+            }
+
+            var userId = _userManager.GetUserId(User);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Ok(null);
             }
 
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
             {
-                return Unauthorized();
+                return Ok(null);
             }
 
             await EnsureDisplayNameAsync(user);
