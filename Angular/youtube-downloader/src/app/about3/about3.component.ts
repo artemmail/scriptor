@@ -9,6 +9,9 @@ import { PaymentsService, SubscriptionSummary } from '../services/payments.servi
 import { UsageLimitResponse, extractUsageLimitResponse } from '../models/usage-limit-response';
 import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
 import { AuthService } from '../services/AuthService.service';
+import { TranscriptionHeroComponent } from '../shared/transcription-hero/transcription-hero.component';
+import { OpenAiTranscriptionUploadFormComponent } from '../openai-transcription/openai-transcription-upload-form.component';
+import { OpenAiTranscriptionTaskDto } from '../services/openai-transcription.service';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
@@ -59,7 +62,15 @@ interface FaqItem {
 @Component({
   selector: 'app-about3',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, MatExpansionModule, YandexAdComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    MatExpansionModule,
+    YandexAdComponent,
+    TranscriptionHeroComponent,
+    OpenAiTranscriptionUploadFormComponent,
+  ],
   templateUrl: './about3.component.html',
   styleUrls: ['./about3.component.css'],
 })
@@ -73,6 +84,17 @@ export class About3Component implements OnInit, OnDestroy {
 
   readonly uploadRoute: RouterCommand = '/transcriptions';
   readonly trialRoute: RouterCommand = '/billing';
+
+  readonly heroTitle = 'Преобразовать аудио и видео в текст';
+  readonly heroLead =
+    'Online-сервис автоматической транскрибации помогает за считанные минуты превратить записи интервью, созвонов и лекций в структурированный текст.';
+  readonly heroHighlights: readonly string[] = [
+    'Выделение участников разговора',
+    'Исправление орфографии, разметка и форматирование',
+    'Структурирование в документе в виде таблиц, списков, формул',
+    'Формирование готового к печати документа в Word и PDF',
+    'Профили распознавания — переговоры, совещание, собеседование, презентация и другие',
+  ];
 
   searchValue = '';
   isStarting = false;
@@ -448,6 +470,26 @@ export class About3Component implements OnInit, OnDestroy {
     }
 
     this.router.navigateByUrl(url);
+  }
+
+  handleHeroUploadSuccess(task: OpenAiTranscriptionTaskDto): void {
+    this.limitResponse = null;
+    this.loadSubscriptionSummary();
+
+    if (task?.id) {
+      this.router.navigate(['/transcriptions', task.id, 'edit']);
+    } else {
+      this.router.navigate(['/transcriptions']);
+    }
+  }
+
+  handleHeroUsageLimit(limit: UsageLimitResponse): void {
+    this.limitResponse = limit;
+    this.remainingQuota = limit.remainingQuota ?? null;
+  }
+
+  onHeroUploadStateChange(_: boolean): void {
+    // Карточка загрузки управляет собственным состоянием, дополнительной обработки не требуется.
   }
 
   get shouldShowSubscriptionCard(): boolean {

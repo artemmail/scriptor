@@ -24,6 +24,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { OpenAiTranscriptionUploadDialogComponent } from './openai-transcription-upload-dialog.component';
 import { OpenAiTranscriptionUploadFormComponent } from './openai-transcription-upload-form.component';
 import { ActionMenuPanelDirective } from '../shared/action-menu-panel.directive';
+import { TranscriptionHeroComponent } from '../shared/transcription-hero/transcription-hero.component';
 import {
   OpenAiTranscriptionAnalyticsDialogComponent,
   OpenAiTranscriptionAnalyticsDialogData,
@@ -46,6 +47,7 @@ import { UsageLimitResponse, extractUsageLimitResponse } from '../models/usage-l
     LocalTimePipe,
     RouterModule,
     ActionMenuPanelDirective,
+    TranscriptionHeroComponent,
     OpenAiTranscriptionUploadFormComponent,
   ],
   templateUrl: './openai-transcription.component.html',
@@ -85,10 +87,15 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
 
   readonly OpenAiTranscriptionStatus = OpenAiTranscriptionStatus;
   readonly OpenAiTranscriptionStepStatus = OpenAiTranscriptionStepStatus;
-  readonly heroHighlights = [
-    'Скорость обработки — 1 час записи за 3 минуты',
-    'Поддержка 78 языков и автоматические тайм-коды',
-    'Удобный редактор с командной работой и AI-помощником',
+  readonly heroTitle = 'Преобразовать аудио и видео в текст';
+  readonly heroLead =
+    'Online-сервис автоматической транскрибации помогает за считанные минуты превратить записи интервью, созвонов и лекций в структурированный текст.';
+  readonly heroHighlights: readonly string[] = [
+    'Выделение участников разговора',
+    'Исправление орфографии, разметка и форматирование',
+    'Структурирование в документе в виде таблиц, списков, формул',
+    'Формирование готового к печати документа в Word и PDF',
+    'Профили распознавания — переговоры, совещание, собеседование, презентация и другие',
   ];
 
   private pollSubscription?: Subscription;
