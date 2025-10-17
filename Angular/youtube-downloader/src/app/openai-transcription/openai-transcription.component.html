@@ -2,47 +2,32 @@
   <main class="page-content">
     <section class="hero">
       <div class="hero-text">
-        <h1>Создавайте расшифровки в пару кликов</h1>
+       
+
+        <h1>Преобразовать аудио и видео в текст</h1>
         <p class="hero-lead">
-          YouScriptor автоматически распознаёт речь, добавляет тайм-коды и помогает командам быстрее готовить отчёты,
-          протоколы и статьи.
+          Online-сервис автоматической транскрибации помогает за считанные минуты превратить записи интервью, созвонов и
+          лекций в структурированный текст.
         </p>
         <ul class="hero-highlights">
-          <li *ngFor="let highlight of heroHighlights">{{ highlight }}</li>
-        </ul>
-        <div class="hero-actions">
-          <button class="btn btn-primary" type="button" (click)="openUploadDialog()" [disabled]="uploading">
-            <mat-icon>cloud_upload</mat-icon>
-            <span>Загрузить файл</span>
-          </button>
-          <a class="btn btn-secondary" [routerLink]="['/about3']">Узнать о возможностях</a>
-        </div>
-        <div class="subscription-card" *ngIf="summaryLoading || summary || summaryError || limitResponse">
-          <div class="status-row">
+          <li>Выделение участников разговора</li>
+          <li>Исправление орфографии, разметка и форматирование</li>          
+          <li>Структурирование в документе в виде таблиц, списков, формул</li>
+          <li>Формирование готового к печати документа в Word и PDF</li>
+          <li>Профили распознавания - переговоры, совещение, собеседование, презентация и другие</li>
+          <li> <div class="status-row">
             <span class="subscription-chip" [ngClass]="summaryLoading ? 'status-neutral' : subscriptionChipClass">
               {{ summaryLoading ? 'Загружаем статус подписки…' : subscriptionStatusMessage }}
             </span>
             <button class="btn btn-tertiary" type="button" (click)="navigateToBilling()">
               Перейти к тарифам
             </button>
-          </div>
-          <p class="summary-error" *ngIf="summaryError">{{ summaryError }}</p>
-          <p class="summary-description" *ngIf="summary && !summaryLoading">
-            <ng-container *ngIf="summary.hasActiveSubscription || summary.hasLifetimeAccess || summary.isLifetime; else transcriptionFree">
-              Расшифровки доступны без ограничений. Управляйте подпиской в разделе биллинга.
-            </ng-container>
-            <ng-template #transcriptionFree>
-              Бесплатный тариф: {{ summary.freeTranscriptionsPerMonth }} транскрибации в месяц и
-              {{ summary.freeRecognitionsPerDay }} распознавания YouTube в день.
-            </ng-template>
-          </p>
-          <div class="limit-message" *ngIf="limitResponse">
-            <p>{{ limitResponse.message }}</p>
-            <button class="btn btn-primary" type="button" (click)="navigateToBilling(limitResponse.paymentUrl ?? undefined)">
-              Оформить подписку
-            </button>
-          </div>
-        </div>
+          </div></li>
+        </ul>
+
+      
+     
+       
       </div>
       <div class="hero-card">
         <app-openai-transcription-upload-form
