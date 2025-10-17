@@ -1,0 +1,133 @@
+<ng-container *ngIf="isDialogLayout; else cardLayout">
+  <h2 mat-dialog-title>Новая расшифровка</h2>
+  <mat-dialog-content class="dialog-content">
+    <p class="dialog-hint">
+      Выберите способ загрузки: добавьте файл или укажите ссылку. После распознавания запись появится в списке
+      задач.
+    </p>
+    <ng-container *ngTemplateOutlet="formContent"></ng-container>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="onCancel()" [disabled]="uploading">Отмена</button>
+    <button mat-raised-button color="primary" type="button" (click)="onSubmit()" [disabled]="!canSubmit() || uploading">
+      <mat-icon>cloud_upload</mat-icon>
+      <span>Отправить</span>
+    </button>
+  </mat-dialog-actions>
+</ng-container>
+
+<ng-template #cardLayout>
+  <section class="card-layout" [class.drag-over]="dragOver">
+    <header class="card-header">
+      <h3>Перетащите файл или загрузите ссылку</h3>
+      <p>
+        Загружайте аудио и видео до 1,5 ГБ. Мы распознаем речь, добавим тайм-коды и подготовим текст для команды.
+      </p>
+    </header>
+    <div class="card-body" (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+      <ng-container *ngTemplateOutlet="formContent"></ng-container>
+    </div>
+    <footer class="card-footer">
+      <button class="btn btn-primary" type="button" (click)="onSubmit()" [disabled]="!canSubmit() || uploading">
+        <mat-icon>cloud_upload</mat-icon>
+        <span>Начать загрузку</span>
+      </button>
+      <p>Файлы после отправки появятся в списке задач, а прогресс обновится автоматически.</p>
+    </footer>
+  </section>
+</ng-template>
+
+<ng-template #formContent>
+  <mat-progress-bar *ngIf="profilesLoading" mode="indeterminate"></mat-progress-bar>
+  <div class="error" *ngIf="profilesError">{{ profilesError }}</div>
+
+  <mat-form-field appearance="outline" class="full-width">
+    <mat-label>Профиль распознавания</mat-label>
+    <mat-select
+      [(ngModel)]="selectedProfileId"
+      (selectionChange)="onProfileSelectionChanged($event.value)"
+      [disabled]="uploading || profilesLoading"
+      name="recognitionProfile"
+      required
+    >
+      <mat-option *ngFor="let profile of profiles" [value]="profile.id">
+        {{ profile.displayedName }}
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+
+  <div class="error" *ngIf="!profilesLoading && profiles.length && selectedProfileId == null">
+    Выберите профиль распознавания — от этого зависит формат итогового диалога.
+  </div>
+
+  <div class="profile-hint" *ngIf="selectedProfile?.hint">
+    {{ selectedProfile?.hint }}
+  </div>
+
+  <mat-tab-group
+    [(selectedIndex)]="selectedTab"
+    class="upload-tabs"
+    [class.uploading]="uploading || profilesLoading"
+  >
+    <mat-tab label="Файл">
+      <div
+        class="tab-content dropzone"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+        [class.drag-over]="dragOver"
+      >
+        <label class="file-select" [class.disabled]="uploading || profilesLoading">
+          <input
+            type="file"
+            (change)="onFileSelected($event)"
+            accept="audio/*,video/*"
+            [disabled]="uploading || profilesLoading"
+          />
+          <mat-icon>attach_file</mat-icon>
+          <span>Выбрать файл</span>
+        </label>
+        <div class="drop-hint">Или перетащите файл сюда</div>
+        <div class="file-name" *ngIf="selectedFile">
+          <mat-icon>insert_drive_file</mat-icon>
+          <span>{{ selectedFile.name }}</span>
+        </div>
+      </div>
+    </mat-tab>
+    <mat-tab label="Яндекс диск">
+      <div class="tab-content">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Ссылка на публичный файл</mat-label>
+          <input
+            matInput
+            type="url"
+            [(ngModel)]="fileUrl"
+            [disabled]="uploading || profilesLoading"
+            placeholder="https://disk.yandex.ru/i/..."
+          />
+        </mat-form-field>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+
+  <mat-form-field appearance="outline" class="full-width clarification-field">
+    <mat-label>Уточнение (необязательно)</mat-label>
+    <textarea
+      matInput
+      rows="3"
+      [(ngModel)]="clarification"
+      [disabled]="uploading || profilesLoading"
+      [placeholder]="clarificationPlaceholder"
+    ></textarea>
+    <mat-hint *ngIf="clarificationHint">{{ clarificationHint }}</mat-hint>
+  </mat-form-field>
+
+  <mat-progress-bar *ngIf="uploading" mode="indeterminate"></mat-progress-bar>
+  <div class="error" *ngIf="uploadError">{{ uploadError }}</div>
+  <div class="limit-message" *ngIf="limitResponse">
+    <p>{{ limitResponse.message }}</p>
+    <button mat-stroked-button color="primary" type="button" (click)="confirmLimit()">
+      Перейти к оплате
+    </button>
+  </div>
+</ng-template>

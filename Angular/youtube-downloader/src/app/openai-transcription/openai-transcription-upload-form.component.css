@@ -1,0 +1,160 @@
+:host {
+  display: block;
+}
+
+.dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 320px;
+}
+
+.dialog-hint {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.card-layout {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.card-layout.drag-over {
+  border-color: rgba(25, 118, 210, 0.4);
+  box-shadow: 0 18px 46px rgba(25, 118, 210, 0.18);
+}
+
+.card-header h3 {
+  margin: 0 0 8px;
+}
+
+.card-header p {
+  margin: 0;
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.card-body {
+  display: grid;
+  gap: 16px;
+}
+
+.card-footer {
+  display: grid;
+  gap: 12px;
+}
+
+.card-footer p {
+  margin: 0;
+  color: rgba(15, 23, 42, 0.64);
+  font-size: 0.95rem;
+}
+
+.upload-tabs {
+  margin-top: 8px;
+}
+
+.upload-tabs.uploading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 4px 4px;
+}
+
+.tab-content.dropzone {
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 20px;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.tab-content.dropzone.drag-over {
+  border-color: rgba(25, 118, 210, 0.6);
+  background: rgba(25, 118, 210, 0.04);
+}
+
+.file-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.file-select input {
+  display: none;
+}
+
+.file-select:hover {
+  border-color: rgba(25, 118, 210, 0.6);
+  background-color: rgba(25, 118, 210, 0.04);
+}
+
+.file-select.disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.drop-hint {
+  font-size: 0.9rem;
+  color: rgba(15, 23, 42, 0.6);
+}
+
+.file-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: rgba(0, 0, 0, 0.75);
+}
+
+.full-width {
+  width: 100%;
+}
+
+.clarification-field textarea {
+  resize: vertical;
+}
+
+.error {
+  color: #d32f2f;
+}
+
+.limit-message {
+  display: grid;
+  gap: 12px;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  border-radius: 12px;
+  padding: 16px;
+  color: #b91c1c;
+}
+
+.profile-hint {
+  color: rgba(0, 0, 0, 0.72);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 600px) {
+  .card-layout {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dialog-content {
+    min-width: 0;
+  }
+}
