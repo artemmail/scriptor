@@ -472,15 +472,11 @@ export class About3Component implements OnInit, OnDestroy {
     this.router.navigateByUrl(url);
   }
 
-  handleHeroUploadSuccess(task: OpenAiTranscriptionTaskDto): void {
+  handleHeroUploadSuccess(_task: OpenAiTranscriptionTaskDto): void {
     this.limitResponse = null;
     this.loadSubscriptionSummary();
 
-    if (task?.id) {
-      this.router.navigate(['/transcriptions', task.id, 'edit']);
-    } else {
-      this.router.navigate(['/transcriptions']);
-    }
+    this.router.navigate(['/transcriptions']);
   }
 
   handleHeroUsageLimit(limit: UsageLimitResponse): void {
