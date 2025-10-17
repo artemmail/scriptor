@@ -2,6 +2,7 @@
   display: block;
   color: #0f172a;
   font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --form-control-max-width: 720px;
 }
 
 .dialog-content {
@@ -218,7 +219,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  width: min(100%, 540px);
+  width: min(100%, var(--form-control-max-width));
   background: #f8fafc;
   border-radius: 20px;
   border: 1px solid rgba(148, 163, 184, 0.32);
@@ -293,7 +294,7 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  width: min(100%, 540px);
+  width: min(100%, var(--form-control-max-width));
   background: #f8fafc;
   border-radius: 20px;
   border: 1px solid rgba(148, 163, 184, 0.32);
@@ -338,6 +339,12 @@
 .clarification-input__hint {
   font-size: 0.85rem;
   color: rgba(30, 41, 59, 0.7);
+}
+
+@media (max-width: 960px) {
+  :host {
+    --form-control-max-width: 100%;
+  }
 }
 
 :host ::ng-deep .mat-mdc-form-field {
