@@ -276,8 +276,119 @@
   opacity: 0.6;
 }
 
-.full-width {
+.profile-select {
+  display: grid;
+  gap: 12px;
+}
+
+.profile-select__label {
+  font-weight: 600;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.profile-select__required {
+  color: #ef4444;
+  font-size: 0.85em;
+  line-height: 1;
+}
+
+:host ::ng-deep mat-select.profile-select__control {
+  width: min(100%, var(--form-control-max-width));
+}
+
+:host ::ng-deep mat-select.profile-select__control .mat-mdc-select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f8fafc;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  padding: 14px 16px 14px 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+}
+
+:host ::ng-deep mat-select.profile-select__control.mat-mdc-select-panel-open .mat-mdc-select-trigger {
+  border-color: rgba(59, 130, 246, 0.65);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+:host ::ng-deep mat-select.profile-select__control.mat-mdc-select-disabled .mat-mdc-select-trigger {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+:host ::ng-deep mat-select.profile-select__control .mat-mdc-select-arrow-wrapper {
+  display: none;
+}
+
+:host ::ng-deep mat-select.profile-select__control mat-icon {
+  color: #2563eb;
+  font-size: 20px;
+}
+
+:host ::ng-deep mat-select.profile-select__control .profile-select__field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   width: 100%;
+}
+
+:host ::ng-deep mat-select.profile-select__control .profile-select__value {
+  flex: 1;
+  font-size: 1rem;
+  color: #0f172a;
+  line-height: 1.55;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:host ::ng-deep mat-select.profile-select__control .profile-select__field--placeholder .profile-select__value {
+  color: #94a3b8;
+}
+
+:host ::ng-deep mat-select.profile-select__control .profile-select__arrow {
+  margin-left: auto;
+  color: rgba(15, 23, 42, 0.6);
+  font-size: 22px;
+}
+
+:host ::ng-deep .profile-select__panel .mat-mdc-option {
+  font-size: 0.95rem;
+  padding: 12px 16px;
+}
+
+:host ::ng-deep .profile-select__panel {
+  border-radius: 18px;
+  box-shadow:
+    0 24px 48px rgba(15, 23, 42, 0.18),
+    0 4px 14px rgba(37, 99, 235, 0.12);
+  padding: 8px 0;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+:host ::ng-deep .profile-select__panel .mat-mdc-option.mdc-list-item--selected,
+:host ::ng-deep .profile-select__panel .mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled) {
+  background: linear-gradient(135deg, rgba(62, 199, 255, 0.25), rgba(42, 107, 255, 0.35));
+  color: #0f172a;
+}
+
+:host ::ng-deep .profile-select__panel .mat-mdc-option.mdc-list-item--selected.mdc-list-item--activated,
+:host ::ng-deep .profile-select__panel .mat-mdc-option.mdc-list-item--selected.mdc-list-item--activated:not(.mdc-list-item--disabled) {
+  background: linear-gradient(135deg, rgba(62, 199, 255, 0.35), rgba(42, 107, 255, 0.45));
+}
+
+:host ::ng-deep .profile-select__panel .mat-mdc-option:hover:not(.mdc-list-item--disabled) {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+:host ::ng-deep .profile-select__panel .mat-mdc-option .mdc-list-item__primary-text {
+  white-space: normal;
 }
 
 .clarification-input {
@@ -345,88 +456,6 @@
   :host {
     --form-control-max-width: 100%;
   }
-}
-
-:host ::ng-deep .mat-mdc-form-field {
-  --field-bg: rgba(241, 245, 255, 0.65);
-  --field-border: rgba(148, 163, 184, 0.45);
-  --field-border-active: rgba(37, 99, 235, 0.75);
-  --field-shadow: 0 12px 32px rgba(37, 99, 235, 0.14);
-  width: 100%;
-}
-
-:host ::ng-deep .mat-mdc-text-field-wrapper {
-  background: var(--field-bg);
-  border-radius: 18px !important;
-  border: 1px solid var(--field-border);
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    background 0.2s ease;
-  padding: 6px 12px;
-}
-
-:host ::ng-deep .mat-mdc-form-field:hover .mat-mdc-text-field-wrapper:not(.mdc-text-field--disabled) {
-  border-color: rgba(59, 130, 246, 0.65);
-}
-
-:host ::ng-deep .mat-mdc-form-field.mat-focused .mat-mdc-text-field-wrapper {
-  border-color: var(--field-border-active);
-  box-shadow: var(--field-shadow);
-  background: rgba(255, 255, 255, 0.85);
-}
-
-:host ::ng-deep .mat-mdc-form-field .mat-mdc-select-trigger,
-:host ::ng-deep .mat-mdc-form-field .mat-mdc-input-element,
-:host ::ng-deep .mat-mdc-form-field textarea.mat-mdc-input-element {
-  color: #0f172a;
-  font-weight: 500;
-}
-
-:host ::ng-deep .mat-mdc-select-arrow svg {
-  color: #1d4ed8;
-}
-
-:host ::ng-deep .mat-mdc-form-field.mat-focused .mat-mdc-select-arrow svg {
-  color: #1e40af;
-}
-
-:host ::ng-deep .mat-mdc-select-panel {
-  border-radius: 18px;
-  box-shadow:
-    0 24px 48px rgba(15, 23, 42, 0.18),
-    0 4px 14px rgba(37, 99, 235, 0.12);
-  padding: 8px 0;
-}
-
-:host ::ng-deep .mat-mdc-option {
-  font-weight: 500;
-  color: #0f172a;
-}
-
-:host ::ng-deep .mat-mdc-option.mdc-list-item--selected.mdc-list-item--activated,
-:host ::ng-deep .mat-mdc-option.mdc-list-item--selected.mdc-list-item--activated:not(.mdc-list-item--disabled) {
-  background: linear-gradient(135deg, rgba(62, 199, 255, 0.35), rgba(42, 107, 255, 0.45));
-}
-
-:host ::ng-deep .mat-mdc-option:hover:not(.mdc-list-item--disabled) {
-  background: rgba(37, 99, 235, 0.1);
-}
-
-:host ::ng-deep .mat-mdc-option.mdc-list-item--selected,
-:host ::ng-deep .mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled) {
-  background: linear-gradient(135deg, rgba(62, 199, 255, 0.25), rgba(42, 107, 255, 0.35));
-  color: #0f172a;
-}
-
-:host ::ng-deep .mat-mdc-form-field-subscript-wrapper {
-  padding: 0 4px;
-}
-
-:host ::ng-deep .mat-mdc-hint,
-:host ::ng-deep .mat-mdc-form-field-hint {
-  color: rgba(30, 41, 59, 0.75);
-  font-size: 0.85rem;
 }
 
 .error {
