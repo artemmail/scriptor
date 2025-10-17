@@ -1,5 +1,7 @@
 :host {
   display: block;
+  color: #0f172a;
+  font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
 }
 
 .dialog-content {
@@ -11,51 +13,98 @@
 
 .dialog-hint {
   margin: 0;
-  color: rgba(0, 0, 0, 0.65);
+  color: rgba(15, 23, 42, 0.7);
+  line-height: 1.6;
 }
 
 .card-layout {
-  display: grid;
-  gap: 16px;
-  padding: 24px;
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 36px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 32px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 32px 60px rgba(15, 23, 42, 0.12);
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.card-layout::before {
+  content: '';
+  position: absolute;
+  inset: -40% -25% auto auto;
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.28), rgba(59, 130, 246, 0));
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.card-layout::after {
+  content: '';
+  position: absolute;
+  inset: auto auto -45% -30%;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.2), rgba(14, 165, 233, 0));
+  pointer-events: none;
+  opacity: 0.7;
 }
 
 .card-layout.drag-over {
-  border-color: rgba(25, 118, 210, 0.4);
-  box-shadow: 0 18px 46px rgba(25, 118, 210, 0.18);
+  border-color: rgba(37, 99, 235, 0.45);
+  box-shadow:
+    0 36px 68px rgba(37, 99, 235, 0.22),
+    0 14px 32px rgba(37, 99, 235, 0.12);
+}
+
+.card-header {
+  display: grid;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
 }
 
 .card-header h3 {
-  margin: 0 0 8px;
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .card-header p {
   margin: 0;
-  color: rgba(15, 23, 42, 0.72);
+  color: #475569;
+  line-height: 1.6;
 }
 
 .card-body {
-  display: grid;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+  z-index: 1;
 }
 
 .card-footer {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 12px;
+  text-align: center;
+  color: #475569;
 }
 
 .card-footer p {
   margin: 0;
-  color: rgba(15, 23, 42, 0.64);
   font-size: 0.95rem;
+  line-height: 1.55;
 }
 
 .upload-tabs {
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 .upload-tabs.uploading {
@@ -66,31 +115,52 @@
 .tab-content {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px 4px 4px;
+  gap: 16px;
+  padding: 20px 12px 12px;
 }
 
 .tab-content.dropzone {
-  border: 1px dashed rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
-  padding: 20px;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(148, 163, 184, 0.7);
+  border-radius: 24px;
+  padding: 32px 24px;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.05));
+  color: #475569;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    transform 0.25s ease,
+    background 0.25s ease;
 }
 
 .tab-content.dropzone.drag-over {
-  border-color: rgba(25, 118, 210, 0.6);
-  background: rgba(25, 118, 210, 0.04);
+  border-color: rgba(37, 99, 235, 0.65);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(14, 165, 233, 0.12));
+  box-shadow: 0 18px 40px rgba(37, 99, 235, 0.16);
+  transform: translateY(-2px);
 }
 
 .file-select {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  border: 1px dashed rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 28px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #3ec7ff, #2a6bff);
+  color: #ffffff;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  border: none;
+  box-shadow: 0 18px 36px rgba(46, 130, 255, 0.35);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.file-select mat-icon {
+  font-size: 22px;
 }
 
 .file-select input {
@@ -98,26 +168,36 @@
 }
 
 .file-select:hover {
-  border-color: rgba(25, 118, 210, 0.6);
-  background-color: rgba(25, 118, 210, 0.04);
+  transform: translateY(-2px);
+  box-shadow: 0 22px 42px rgba(46, 130, 255, 0.45);
 }
 
 .file-select.disabled {
   cursor: default;
   opacity: 0.6;
+  box-shadow: none;
+  transform: none;
 }
 
 .drop-hint {
-  font-size: 0.9rem;
-  color: rgba(15, 23, 42, 0.6);
+  font-size: 0.95rem;
+  color: rgba(30, 41, 59, 0.78);
 }
 
 .file-name {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: 0.95rem;
-  color: rgba(0, 0, 0, 0.75);
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 16px;
+  padding: 10px 16px;
+  box-shadow: 0 12px 28px rgba(148, 163, 184, 0.28);
+}
+
+.file-name mat-icon {
+  color: #2563eb;
 }
 
 .full-width {
@@ -128,33 +208,271 @@
   resize: vertical;
 }
 
+:host ::ng-deep .mat-mdc-form-field {
+  --field-bg: rgba(241, 245, 255, 0.65);
+  --field-border: rgba(148, 163, 184, 0.45);
+  --field-border-active: rgba(37, 99, 235, 0.75);
+  --field-shadow: 0 12px 32px rgba(37, 99, 235, 0.14);
+  width: 100%;
+}
+
+:host ::ng-deep .mat-mdc-text-field-wrapper {
+  background: var(--field-bg);
+  border-radius: 18px !important;
+  border: 1px solid var(--field-border);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+  padding: 6px 12px;
+}
+
+:host ::ng-deep .mat-mdc-form-field:hover .mat-mdc-text-field-wrapper:not(.mdc-text-field--disabled) {
+  border-color: rgba(59, 130, 246, 0.65);
+}
+
+:host ::ng-deep .mat-mdc-form-field.mat-focused .mat-mdc-text-field-wrapper {
+  border-color: var(--field-border-active);
+  box-shadow: var(--field-shadow);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+:host ::ng-deep .mat-mdc-form-field .mat-mdc-select-trigger,
+:host ::ng-deep .mat-mdc-form-field .mat-mdc-input-element,
+:host ::ng-deep .mat-mdc-form-field textarea.mat-mdc-input-element {
+  color: #0f172a;
+  font-weight: 500;
+}
+
+:host ::ng-deep .mat-mdc-select-arrow svg {
+  color: #1d4ed8;
+}
+
+:host ::ng-deep .mat-mdc-form-field.mat-focused .mat-mdc-select-arrow svg {
+  color: #1e40af;
+}
+
+:host ::ng-deep .mat-mdc-select-panel {
+  border-radius: 18px;
+  box-shadow:
+    0 24px 48px rgba(15, 23, 42, 0.18),
+    0 4px 14px rgba(37, 99, 235, 0.12);
+  padding: 8px 0;
+}
+
+:host ::ng-deep .mat-mdc-option {
+  font-weight: 500;
+  color: #0f172a;
+}
+
+:host ::ng-deep .mat-mdc-option.mdc-list-item--selected.mdc-list-item--activated,
+:host ::ng-deep .mat-mdc-option.mdc-list-item--selected.mdc-list-item--activated:not(.mdc-list-item--disabled) {
+  background: linear-gradient(135deg, rgba(62, 199, 255, 0.35), rgba(42, 107, 255, 0.45));
+}
+
+:host ::ng-deep .mat-mdc-option:hover:not(.mdc-list-item--disabled) {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+:host ::ng-deep .mat-mdc-option.mdc-list-item--selected,
+:host ::ng-deep .mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled) {
+  background: linear-gradient(135deg, rgba(62, 199, 255, 0.25), rgba(42, 107, 255, 0.35));
+  color: #0f172a;
+}
+
+:host ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+  padding: 0 4px;
+}
+
+:host ::ng-deep .mat-mdc-hint,
+:host ::ng-deep .mat-mdc-form-field-hint {
+  color: rgba(30, 41, 59, 0.75);
+  font-size: 0.85rem;
+}
+
+:host ::ng-deep .clarification-field .mat-mdc-text-field-wrapper {
+  background: rgba(14, 165, 233, 0.07);
+}
+
+:host ::ng-deep .clarification-field textarea.mat-mdc-input-element::placeholder {
+  color: rgba(30, 41, 59, 0.55);
+  font-weight: 400;
+}
+
+:host ::ng-deep .clarification-field .mat-mdc-form-field-label,
+:host ::ng-deep .clarification-field .mat-mdc-floating-label {
+  color: rgba(30, 41, 59, 0.85);
+}
+
+:host ::ng-deep .clarification-field.mat-focused .mat-mdc-text-field-wrapper {
+  background: rgba(255, 255, 255, 0.85);
+}
+
 .error {
-  color: #d32f2f;
+  color: #dc2626;
+  font-weight: 500;
 }
 
 .limit-message {
   display: grid;
   gap: 12px;
-  background: rgba(248, 113, 113, 0.1);
-  border: 1px solid rgba(220, 38, 38, 0.25);
-  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.14), rgba(239, 68, 68, 0.08));
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: 16px;
   padding: 16px;
   color: #b91c1c;
 }
 
 .profile-hint {
-  color: rgba(0, 0, 0, 0.72);
+  color: rgba(15, 23, 42, 0.8);
   font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.btn mat-icon {
+  font-size: 20px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #3ec7ff, #2a6bff);
+  color: #ffffff;
+  box-shadow: 0 12px 32px rgba(46, 130, 255, 0.35);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px rgba(46, 130, 255, 0.45);
+}
+
+.btn-secondary {
+  background: rgba(59, 130, 246, 0.08);
+  color: #1d4ed8;
+  border-color: rgba(29, 78, 216, 0.3);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(29, 78, 216, 0.12);
+  transform: translateY(-2px);
+}
+
+.btn-outline {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(59, 130, 246, 0.25);
+  color: #1d4ed8;
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  border-radius: 14px;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.18);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+  transform: none;
+}
+
+:host ::ng-deep .upload-tabs .mat-mdc-tab-header {
+  border-bottom: none;
+  margin-bottom: 12px;
+}
+
+:host ::ng-deep .upload-tabs .mat-mdc-tab-label-container {
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(241, 245, 255, 0.75);
+}
+
+:host ::ng-deep .upload-tabs .mat-mdc-tab {
+  border-radius: 999px;
+  margin: 0 4px;
+}
+
+:host ::ng-deep .upload-tabs .mat-mdc-tab .mdc-tab__content {
+  padding: 0 14px;
+}
+
+:host ::ng-deep .upload-tabs .mat-mdc-tab.mdc-tab--active {
+  background: linear-gradient(135deg, rgba(62, 199, 255, 0.9), rgba(42, 107, 255, 0.9));
+  box-shadow: 0 12px 26px rgba(46, 130, 255, 0.28);
+}
+
+:host ::ng-deep .upload-tabs .mat-mdc-tab .mdc-tab__text-label {
+  font-weight: 600;
+  color: #1e293b;
+  transition: color 0.2s ease;
+}
+
+:host ::ng-deep .upload-tabs .mat-mdc-tab.mdc-tab--active .mdc-tab__text-label {
+  color: #ffffff;
+}
+
+:host ::ng-deep .upload-tabs .mat-ripple-element,
+:host ::ng-deep .upload-tabs .mat-mdc-tab-ripple .mat-ripple-element {
+  display: none;
+}
+
+.profile-hint,
+.error,
+.limit-message,
+.card-footer p {
+  text-align: left;
+}
+
+@media (max-width: 1024px) {
+  .card-layout {
+    padding: 28px;
+  }
+}
+
+@media (max-width: 768px) {
+  .card-layout {
+    padding: 24px;
+    border-radius: 28px;
+  }
+
+  .tab-content.dropzone {
+    padding: 28px 18px;
+  }
 }
 
 @media (max-width: 600px) {
   .card-layout {
-    padding: 16px;
+    padding: 20px;
+    border-radius: 24px;
   }
 }
 
 @media (max-width: 480px) {
   .dialog-content {
     min-width: 0;
+  }
+
+  .card-header h3 {
+    font-size: 1.5rem;
+  }
+
+  .file-select {
+    width: 100%;
   }
 }
