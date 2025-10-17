@@ -259,10 +259,30 @@ namespace YandexSpeech.Controllers
             return Ok();
         }
 
+        [AllowAnonymous]
         [HttpGet("subscription/summary")]
         public async Task<ActionResult<SubscriptionSummaryDto>> GetSubscriptionSummary(CancellationToken cancellationToken)
         {
-            var userId = GetUserId();
+            var summary = new SubscriptionSummaryDto
+            {
+                HasActiveSubscription = false,
+                HasLifetimeAccess = false,
+                PlanCode = null,
+                PlanName = null,
+                Status = null,
+                EndsAt = null,
+                IsLifetime = false,
+                FreeRecognitionsPerDay = _subscriptionLimits.FreeYoutubeRecognitionsPerDay,
+                FreeTranscriptionsPerMonth = _subscriptionLimits.FreeTranscriptionsPerMonth,
+                BillingUrl = _subscriptionLimits.GetBillingUrlOrDefault(),
+                Payments = Array.Empty<SubscriptionPaymentHistoryItemDto>()
+            };
+
+            var userId = TryGetUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Ok(summary);
+            }
 
             var subscription = await _subscriptionService
                 .GetActiveSubscriptionAsync(userId, cancellationToken)
@@ -275,7 +295,7 @@ namespace YandexSpeech.Controllers
 
             if (user == null)
             {
-                return Unauthorized();
+                return Ok(summary);
             }
 
             var payments = await _dbContext.SubscriptionInvoices
@@ -302,20 +322,14 @@ namespace YandexSpeech.Controllers
                 .ConfigureAwait(false);
 
             var plan = subscription?.Plan;
-            var summary = new SubscriptionSummaryDto
-            {
-                HasActiveSubscription = subscription != null && subscription.Status == SubscriptionStatus.Active,
-                HasLifetimeAccess = user.HasLifetimeAccess,
-                PlanCode = plan?.Code,
-                PlanName = plan?.Name,
-                Status = subscription?.Status,
-                EndsAt = subscription?.EndDate,
-                IsLifetime = subscription?.IsLifetime ?? user.HasLifetimeAccess,
-                FreeRecognitionsPerDay = _subscriptionLimits.FreeYoutubeRecognitionsPerDay,
-                FreeTranscriptionsPerMonth = _subscriptionLimits.FreeTranscriptionsPerMonth,
-                BillingUrl = _subscriptionLimits.GetBillingUrlOrDefault(),
-                Payments = payments
-            };
+            summary.HasActiveSubscription = subscription != null && subscription.Status == SubscriptionStatus.Active;
+            summary.HasLifetimeAccess = user.HasLifetimeAccess;
+            summary.PlanCode = plan?.Code;
+            summary.PlanName = plan?.Name;
+            summary.Status = subscription?.Status;
+            summary.EndsAt = subscription?.EndDate;
+            summary.IsLifetime = subscription?.IsLifetime ?? user.HasLifetimeAccess;
+            summary.Payments = payments;
 
             return Ok(summary);
         }
@@ -429,8 +443,12 @@ namespace YandexSpeech.Controllers
 
         private string GetUserId()
         {
-            var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
-            return userId ?? throw new InvalidOperationException("Не удалось определить пользователя.");
+            return TryGetUserId() ?? throw new InvalidOperationException("Не удалось определить пользователя.");
+        }
+
+        private string? TryGetUserId()
+        {
+            return User.FindFirstValue(ClaimTypes.NameIdentifier);
         }
 
         private bool ValidateSignature(YooMoneyNotification notification)
