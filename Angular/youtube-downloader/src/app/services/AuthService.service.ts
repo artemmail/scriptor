@@ -140,10 +140,7 @@ export class AuthService {
       `${this.apiUrl}/logout`, {}, { withCredentials: true }
     ).pipe(
       catchError(() => of(void 0)),
-      tap(() => {
-        this.removeStorageItem('accessToken');
-        this.saveUser(null);
-      })
+      tap(() => this.clearAuthState())
     );
   }
 
@@ -193,5 +190,10 @@ export class AuthService {
     } catch {
       // ignore storage errors in non-browser environments
     }
+  }
+
+  clearAuthState(): void {
+    this.removeStorageItem('accessToken');
+    this.saveUser(null);
   }
 }

@@ -18,7 +18,11 @@ export const authInterceptor: HttpInterceptorFn =
     const token       = authService.getAccessToken();
 
     // не трогаем ручки логина / refresh
-    if (req.url.endsWith('/login') || req.url.endsWith('/refresh-token')) {
+    if (
+      req.url.endsWith('/login') ||
+      req.url.endsWith('/refresh-token') ||
+      req.url.endsWith('/logout')
+    ) {
       return next(req);
     }
 
@@ -30,6 +34,11 @@ export const authInterceptor: HttpInterceptorFn =
     return next(authReq).pipe(
       catchError(err => {
         if (err instanceof HttpErrorResponse && [401, 419].includes(err.status)) {
+          if (!token) {
+            authService.clearAuthState();
+            router.navigate(['/login']);
+            return throwError(() => err);
+          }
           // пробуем обновить JWT
           return attemptRefresh(authReq, next, authService, router);
         }
@@ -60,6 +69,7 @@ function attemptRefresh(
       catchError(finalErr => {
         isRefreshing = false;
         // удаляем токены и уводим на /login
+        auth.clearAuthState();
         auth.logout().subscribe({
           next: () => router.navigate(['/login']),
           error: () => router.navigate(['/login'])
