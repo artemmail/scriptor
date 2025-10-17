@@ -260,6 +260,7 @@ namespace YandexSpeech.Controllers
         }
 
         [HttpGet("recognition-profiles")]
+        [AllowAnonymous]
         public async Task<ActionResult<IEnumerable<OpenAiRecognitionProfileOptionDto>>> GetRecognitionProfiles()
         {
             var profiles = await _dbContext.RecognitionProfiles
