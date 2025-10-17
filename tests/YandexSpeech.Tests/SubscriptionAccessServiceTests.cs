@@ -9,6 +9,7 @@ using Xunit;
 using YandexSpeech;
 using YandexSpeech.models.DB;
 using YandexSpeech.services;
+using YandexSpeech.services.Interface;
 using YandexSpeech.services.Models;
 using YandexSpeech.services.Options;
 

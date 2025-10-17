@@ -19,10 +19,7 @@
 <ng-template #cardLayout>
   <section class="card-layout" [class.drag-over]="dragOver">
     <header class="card-header">
-      <h3>Перетащите файл или загрузите ссылку</h3>
-      <p>
-        Загружайте аудио и видео до 1,5 ГБ. Мы распознаем речь, добавим тайм-коды и подготовим текст для команды.
-      </p>
+      <h3>Транскрибация аудио/видео</h3>    
     </header>
     <div class="card-body" (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
       <ng-container *ngTemplateOutlet="formContent"></ng-container>
@@ -31,8 +28,7 @@
       <button class="btn btn-primary" type="button" (click)="onSubmit()" [disabled]="!canSubmit() || uploading">
         <mat-icon>cloud_upload</mat-icon>
         <span>Начать загрузку</span>
-      </button>
-      <p>Файлы после отправки появятся в списке задач, а прогресс обновится автоматически.</p>
+      </button>      
     </footer>
   </section>
 </ng-template>
@@ -43,7 +39,7 @@
 
   <div class="profile-select">
     <label class="profile-select__label" id="recognition-profile-label">
-      Профиль распознавания
+      Выберите формат и аналитику итогового документа
       <span aria-hidden="true" class="profile-select__required">*</span>
     </label>
     <mat-select
@@ -76,7 +72,7 @@
   </div>
 
   <div class="error" *ngIf="!profilesLoading && profiles.length && selectedProfileId == null">
-    Выберите профиль распознавания — от этого зависит формат итогового диалога.
+    Нужно выбрать способ анализа аудио-потока
   </div>
 
   <div class="profile-hint" *ngIf="selectedProfile?.hint" id="recognition-profile-hint">
@@ -144,7 +140,7 @@
   </mat-tab-group>
 
   <div class="clarification-input">
-    <label class="clarification-input__label" for="clarification-input-field">Уточнение (необязательно)</label>
+    <label class="clarification-input__label" for="clarification-input-field">Указания для дополнительного анализа:</label>
     <div
       class="clarification-input__field"
       [class.disabled]="uploading || profilesLoading"
@@ -159,7 +155,7 @@
         autocomplete="off"
       ></textarea>
     </div>
-    <div class="clarification-input__hint" *ngIf="clarificationHint">{{ clarificationHint }}</div>
+    
   </div>
 
   <mat-progress-bar *ngIf="uploading" mode="indeterminate"></mat-progress-bar>
