@@ -7,6 +7,9 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
   imports: [CommonModule],
   templateUrl: './transcription-hero.component.html',
   styleUrls: ['./transcription-hero.component.css'],
+  host: {
+    '[class.hero-full-width]': 'fullWidth',
+  },
 })
 export class TranscriptionHeroComponent {
   @Input() title = '';
@@ -18,6 +21,8 @@ export class TranscriptionHeroComponent {
   @Input() subscriptionStatusMessage = '';
   @Input() subscriptionLoadingLabel = 'Загружаем статус подписки…';
   @Input() billingButtonLabel = 'Перейти к тарифам';
+  @Input() fullWidth = false;
+  @Input() cardless = false;
 
   @Output() billingClick = new EventEmitter<void>();
 
