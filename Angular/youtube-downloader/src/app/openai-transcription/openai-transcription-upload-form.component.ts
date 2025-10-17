@@ -109,6 +109,15 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
     this.dragOver = false;
   }
 
+  clearLink(input: HTMLInputElement): void {
+    if (this.uploading || this.profilesLoading) {
+      return;
+    }
+
+    this.fileUrl = '';
+    input.focus();
+  }
+
   onDragOver(event: DragEvent): void {
     if (this.uploading || this.profilesLoading) {
       return;

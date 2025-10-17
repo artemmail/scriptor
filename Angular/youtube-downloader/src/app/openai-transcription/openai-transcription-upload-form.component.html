@@ -95,17 +95,31 @@
       </div>
     </mat-tab>
     <mat-tab label="Яндекс диск">
-      <div class="tab-content">
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Ссылка на публичный файл</mat-label>
-          <input
-            matInput
-            type="url"
-            [(ngModel)]="fileUrl"
-            [disabled]="uploading || profilesLoading"
-            placeholder="https://disk.yandex.ru/i/..."
-          />
-        </mat-form-field>
+      <div class="tab-content link-tab-content">
+        <div class="link-input">
+          <label class="link-input__label" for="yandex-link-input">Ссылка на публичный файл</label>
+          <div class="link-input__field" [class.disabled]="uploading || profilesLoading">
+            <mat-icon aria-hidden="true">link</mat-icon>
+            <input
+              #yandexLinkInput
+              id="yandex-link-input"
+              type="url"
+              [(ngModel)]="fileUrl"
+              [disabled]="uploading || profilesLoading"
+              placeholder="https://disk.yandex.ru/i/..."
+              autocomplete="off"
+            />
+            <button
+              *ngIf="fileUrl"
+              type="button"
+              class="link-input__clear"
+              (click)="clearLink(yandexLinkInput)"
+              [disabled]="uploading || profilesLoading"
+            >
+              Очистить
+            </button>
+          </div>
+        </div>
       </div>
     </mat-tab>
   </mat-tab-group>
