@@ -279,8 +279,65 @@
   width: 100%;
 }
 
-.clarification-field textarea {
+.clarification-input {
+  display: grid;
+  gap: 12px;
+}
+
+.clarification-input__label {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.clarification-input__field {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: min(100%, 540px);
+  background: #f8fafc;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  padding: 14px 16px 14px 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: border 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.clarification-input__field:focus-within {
+  border-color: rgba(59, 130, 246, 0.65);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.clarification-input__field.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.clarification-input__field mat-icon {
+  color: #2563eb;
+  font-size: 20px;
+  margin-top: 4px;
+}
+
+.clarification-input__field textarea {
+  flex: 1;
+  min-height: 72px;
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  color: #0f172a;
+  line-height: 1.55;
   resize: vertical;
+  outline: none;
+}
+
+.clarification-input__field textarea::placeholder {
+  color: #94a3b8;
+}
+
+.clarification-input__hint {
+  font-size: 0.85rem;
+  color: rgba(30, 41, 59, 0.7);
 }
 
 :host ::ng-deep .mat-mdc-form-field {
@@ -363,24 +420,6 @@
 :host ::ng-deep .mat-mdc-form-field-hint {
   color: rgba(30, 41, 59, 0.75);
   font-size: 0.85rem;
-}
-
-:host ::ng-deep .clarification-field .mat-mdc-text-field-wrapper {
-  background: rgba(14, 165, 233, 0.07);
-}
-
-:host ::ng-deep .clarification-field textarea.mat-mdc-input-element::placeholder {
-  color: rgba(30, 41, 59, 0.55);
-  font-weight: 400;
-}
-
-:host ::ng-deep .clarification-field .mat-mdc-form-field-label,
-:host ::ng-deep .clarification-field .mat-mdc-floating-label {
-  color: rgba(30, 41, 59, 0.85);
-}
-
-:host ::ng-deep .clarification-field.mat-focused .mat-mdc-text-field-wrapper {
-  background: rgba(255, 255, 255, 0.85);
 }
 
 .error {
