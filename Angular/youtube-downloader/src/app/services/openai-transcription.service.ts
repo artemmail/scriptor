@@ -36,6 +36,7 @@ export interface OpenAiTranscriptionTaskDto {
   recognitionProfileId?: number | null;
   recognitionProfileName?: string | null;
   recognitionProfileDisplayedName?: string | null;
+  createdByEmail?: string | null;
 }
 
 export interface OpenAiTranscriptionTaskDetailsDto extends OpenAiTranscriptionTaskDto {
@@ -109,8 +110,9 @@ export class OpenAiTranscriptionService {
     return this.http.post<OpenAiTranscriptionTaskDto>(this.apiUrl, formData);
   }
 
-  list(): Observable<OpenAiTranscriptionTaskDto[]> {
-    return this.http.get<OpenAiTranscriptionTaskDto[]>(this.apiUrl);
+  list(includeAll = false): Observable<OpenAiTranscriptionTaskDto[]> {
+    const params = includeAll ? { includeAll: 'true' } : undefined;
+    return this.http.get<OpenAiTranscriptionTaskDto[]>(this.apiUrl, { params });
   }
 
   getTask(id: string): Observable<OpenAiTranscriptionTaskDetailsDto> {

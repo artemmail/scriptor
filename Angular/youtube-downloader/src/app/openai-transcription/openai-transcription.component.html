@@ -30,15 +30,25 @@
         <div class="panel tasks-panel">
           <div class="panel-header">
             <h3>Мои расшифровки</h3>
-            <button
-              class="icon-button"
-              type="button"
-              (click)="loadTasks()"
-              [disabled]="uploading"
-              aria-label="Обновить список"
-            >
-              <mat-icon>refresh</mat-icon>
-            </button>
+            <div class="panel-header-actions">
+              <mat-checkbox
+                *ngIf="canShowAllTasks"
+                class="show-all-checkbox"
+                [checked]="isShowingAllTasks"
+                (change)="onShowAllChange($event.checked)"
+              >
+                Все пользователи
+              </mat-checkbox>
+              <button
+                class="icon-button"
+                type="button"
+                (click)="loadTasks()"
+                [disabled]="uploading"
+                aria-label="Обновить список"
+              >
+                <mat-icon>refresh</mat-icon>
+              </button>
+            </div>
           </div>
           <div class="panel-body">
             <div class="error" *ngIf="listError">{{ listError }}</div>
@@ -51,7 +61,10 @@
                 [class.active]="task.id === selectedTaskId"
               >
                 <mat-icon matListItemIcon>{{ getTaskIcon(task) }}</mat-icon>
-                <span matListItemTitle>{{ task.displayName }}</span>
+                <span matListItemTitle class="task-title">
+                  <span class="task-email" *ngIf="isAdmin && task.createdByEmail">{{ task.createdByEmail }}</span>
+                  <span class="task-display-name">{{ task.displayName }}</span>
+                </span>
                 <span matListItemLine>{{ getStatusText(task.status) }} · {{ task.modifiedAt | localTime }}</span>
               </a>
             </mat-nav-list>
