@@ -381,6 +381,8 @@ namespace YandexSpeech.Controllers
                 return Unauthorized();
             }
 
+            var userEmail = User.FindFirstValue(ClaimTypes.Email);
+
             try
             {
                 var newTask = await _transcriptionService.CloneForPostProcessingAsync(
