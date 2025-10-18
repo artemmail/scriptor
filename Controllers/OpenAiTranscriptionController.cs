@@ -1,29 +1,17 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Headers;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using YandexSpeech.Extensions;
 using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 using YandexSpeech.services;
 using YandexSpeech.services.Interface;
 using YandexSpeech.services.Whisper;
-using YandexSpeech.Extensions;
 
 namespace YandexSpeech.Controllers
 {
@@ -99,7 +87,7 @@ namespace YandexSpeech.Controllers
 
             var userEmail = User.FindFirstValue(ClaimTypes.Email);
 
-            var userEmail = User.FindFirstValue(ClaimTypes.Email);
+            //  var userEmail = User.FindFirstValue(ClaimTypes.Email);
 
             var authorization = await _subscriptionAccessService
                 .AuthorizeTranscriptionAsync(userId, cancellationToken)
