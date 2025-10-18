@@ -10,6 +10,7 @@ import { Subscription, timer } from 'rxjs';
 import { exhaustMap } from 'rxjs/operators';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import {
   OpenAiTranscriptionService,
   OpenAiTranscriptionStatus,
@@ -32,6 +33,7 @@ import {
 } from './openai-transcription-analytics-dialog.component';
 import { PaymentsService, SubscriptionSummary } from '../services/payments.service';
 import { UsageLimitResponse, extractUsageLimitResponse } from '../models/usage-limit-response';
+import { AuthService } from '../services/AuthService.service';
 
 @Component({
   selector: 'app-openai-transcriptions',
@@ -44,6 +46,7 @@ import { UsageLimitResponse, extractUsageLimitResponse } from '../models/usage-l
     MatMenuModule,
     MatButtonModule,
     MatSnackBarModule,
+    MatCheckboxModule,
     LocalTimePipe,
     RouterModule,
     ActionMenuPanelDirective,
@@ -100,9 +103,20 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
 
   private pollSubscription?: Subscription;
   private ensurePanelVisibleScheduled = false;
+  private userSubscription?: Subscription;
+  isAdmin = false;
+  showAllTasks = false;
 
   get downloadInProgress(): boolean {
     return this.exportingPdf || this.exportingDocx || this.downloadingSrt;
+  }
+
+  get canShowAllTasks(): boolean {
+    return this.isAdmin;
+  }
+
+  get isShowingAllTasks(): boolean {
+    return this.isAdmin && this.showAllTasks;
   }
 
   constructor(
@@ -112,10 +126,25 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     private readonly router: Router,
     private readonly dialog: MatDialog,
     private readonly snackBar: MatSnackBar,
-    private readonly paymentsService: PaymentsService
+    private readonly paymentsService: PaymentsService,
+    private readonly authService: AuthService
   ) {}
 
   ngOnInit(): void {
+    this.userSubscription = this.authService.user$.subscribe((user) => {
+      const wasAdmin = this.isAdmin;
+      this.isAdmin = !!user?.roles?.some((role) => role.toLowerCase() === 'admin');
+
+      if (!this.isAdmin && this.showAllTasks) {
+        this.showAllTasks = false;
+        this.loadTasks(true);
+        return;
+      }
+
+      if (wasAdmin !== this.isAdmin) {
+        this.loadTasks(!this.selectedTaskId);
+      }
+    });
     this.loadSubscriptionSummary();
     this.loadTasks(true);
   }
@@ -212,6 +241,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.stopPolling();
     this.resetFullscreenState();
+    this.userSubscription?.unsubscribe();
   }
 
   openUploadDialog(): void {
@@ -246,7 +276,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
 
   loadTasks(selectFirstAvailable = false): void {
     this.listError = null;
-    this.transcriptionService.list().subscribe({
+    const includeAll = this.isAdmin && this.showAllTasks;
+    this.transcriptionService.list(includeAll).subscribe({
       next: (tasks) => {
         this.tasks = tasks;
 
@@ -268,6 +299,15 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
         this.listError = this.extractError(error) ?? 'Не удалось получить список задач.';
       },
     });
+  }
+
+  onShowAllChange(checked: boolean): void {
+    if (!this.isAdmin) {
+      return;
+    }
+
+    this.showAllTasks = checked;
+    this.loadTasks(true);
   }
 
   selectTask(task: OpenAiTranscriptionTaskDto): void {
@@ -349,6 +389,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
             segmentsProcessed: task.segmentsProcessed,
             segmentsTotal: task.segmentsTotal,
             clarification: task.clarification,
+            createdByEmail: task.createdByEmail ?? existing.createdByEmail,
           }
         : existing
     );

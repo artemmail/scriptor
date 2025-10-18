@@ -97,6 +97,10 @@ namespace YandexSpeech.Controllers
                 return Unauthorized();
             }
 
+            var userEmail = User.FindFirstValue(ClaimTypes.Email);
+
+            var userEmail = User.FindFirstValue(ClaimTypes.Email);
+
             var authorization = await _subscriptionAccessService
                 .AuthorizeTranscriptionAsync(userId, cancellationToken)
                 .ConfigureAwait(false);
@@ -199,7 +203,8 @@ namespace YandexSpeech.Controllers
                 task.Clarification,
                 task.RecognitionProfileId,
                 profile.Name,
-                task.RecognitionProfileDisplayedName ?? profile.DisplayedName);
+                task.RecognitionProfileDisplayedName ?? profile.DisplayedName,
+                userEmail);
 
             dto.RemainingMonthlyQuota = authorization.RemainingQuota;
 
@@ -210,7 +215,7 @@ namespace YandexSpeech.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult> List()
+        public async Task<ActionResult> List([FromQuery] bool includeAll = false)
         {
             var userId = User.GetUserId();
             if (string.IsNullOrEmpty(userId))
@@ -218,27 +223,44 @@ namespace YandexSpeech.Controllers
                 return Unauthorized();
             }
 
-            var tasks = await _dbContext.OpenAiTranscriptionTasks
-                .Where(t => t.CreatedBy == userId)
-                .OrderByDescending(t => t.CreatedAt)
-                .Select(t => new
+            var isAdmin = User.IsInRole("Admin");
+            var canViewAll = includeAll && isAdmin;
+
+            var baseQuery = _dbContext.OpenAiTranscriptionTasks
+                .AsNoTracking()
+                .Include(t => t.RecognitionProfile)
+                .AsQueryable();
+
+            if (!canViewAll)
+            {
+                baseQuery = baseQuery.Where(t => t.CreatedBy == userId);
+            }
+
+            var tasks = await (
+                from task in baseQuery
+                join user in _dbContext.Users.AsNoTracking()
+                    on task.CreatedBy equals user.Id into users
+                from creator in users.DefaultIfEmpty()
+                orderby task.CreatedAt descending
+                select new
                 {
-                    t.Id,
-                    t.SourceFilePath,
-                    t.Status,
-                    t.Done,
-                    t.Error,
-                    t.CreatedAt,
-                    t.ModifiedAt,
-                    t.SegmentsTotal,
-                    t.SegmentsProcessed,
-                    t.Clarification,
-                    t.RecognitionProfileId,
-                    ProfileName = t.RecognitionProfile != null ? t.RecognitionProfile.Name : null,
-                    ProfileDisplayedName = t.RecognitionProfileDisplayedName
-                        ?? (t.RecognitionProfile != null ? t.RecognitionProfile.DisplayedName : null)
-                })
-                .ToListAsync();
+                    task.Id,
+                    task.SourceFilePath,
+                    task.Status,
+                    task.Done,
+                    task.Error,
+                    task.CreatedAt,
+                    task.ModifiedAt,
+                    task.SegmentsTotal,
+                    task.SegmentsProcessed,
+                    task.Clarification,
+                    task.RecognitionProfileId,
+                    ProfileName = task.RecognitionProfile != null ? task.RecognitionProfile.Name : null,
+                    ProfileDisplayedName = task.RecognitionProfileDisplayedName
+                        ?? (task.RecognitionProfile != null ? task.RecognitionProfile.DisplayedName : null),
+                    CreatedByEmail = creator.Email
+                }
+            ).ToListAsync();
 
             var result = tasks
                 .Select(t => MapToDto(
@@ -254,7 +276,8 @@ namespace YandexSpeech.Controllers
                     t.Clarification,
                     t.RecognitionProfileId,
                     t.ProfileName,
-                    t.ProfileDisplayedName))
+                    t.ProfileDisplayedName,
+                    isAdmin ? t.CreatedByEmail : null))
                 .ToList();
             return Ok(result);
         }
@@ -288,14 +311,21 @@ namespace YandexSpeech.Controllers
                 return Unauthorized();
             }
 
-            var task = await LoadTaskWithDetailsAsync(id, userId);
+            var isAdmin = User.IsInRole("Admin");
+            var task = await LoadTaskWithDetailsAsync(id, userId, isAdmin);
 
             if (task == null)
             {
                 return NotFound();
             }
 
-            return Ok(MapToDetailsDto(task));
+            string? createdByEmail = null;
+            if (isAdmin)
+            {
+                createdByEmail = await GetUserEmailAsync(task.CreatedBy);
+            }
+
+            return Ok(MapToDetailsDto(task, createdByEmail));
         }
 
         [HttpPost("{id}/continue")]
@@ -307,9 +337,11 @@ namespace YandexSpeech.Controllers
                 return Unauthorized();
             }
 
+            var isAdmin = User.IsInRole("Admin");
+
             var taskExists = await _dbContext.OpenAiTranscriptionTasks
                 .AsNoTracking()
-                .AnyAsync(t => t.Id == id && t.CreatedBy == userId);
+                .AnyAsync(t => t.Id == id && (t.CreatedBy == userId || isAdmin));
 
             if (!taskExists)
             {
@@ -336,7 +368,13 @@ namespace YandexSpeech.Controllers
                 }
             });
 
-            return Ok(MapToDetailsDto(preparedTask));
+            string? createdByEmail = null;
+            if (isAdmin)
+            {
+                createdByEmail = await GetUserEmailAsync(preparedTask.CreatedBy);
+            }
+
+            return Ok(MapToDetailsDto(preparedTask, createdByEmail));
         }
 
         [HttpPost("{id}/analytics")]
@@ -377,7 +415,7 @@ namespace YandexSpeech.Controllers
                     }
                 });
 
-                return Ok(MapToDto(newTask));
+                return Ok(MapToDto(newTask, userEmail));
             }
             catch (InvalidOperationException ex)
             {
@@ -582,12 +620,19 @@ namespace YandexSpeech.Controllers
             return File(bytes, "text/plain", fileName);
         }
 
-        private async Task<OpenAiTranscriptionTask?> LoadTaskWithDetailsAsync(string taskId, string createdBy)
+        private async Task<OpenAiTranscriptionTask?> LoadTaskWithDetailsAsync(string taskId, string createdBy, bool isAdmin)
         {
-            var task = await _dbContext.OpenAiTranscriptionTasks
+            var query = _dbContext.OpenAiTranscriptionTasks
                 .AsNoTracking()
                 .Include(t => t.RecognitionProfile)
-                .FirstOrDefaultAsync(t => t.Id == taskId && t.CreatedBy == createdBy);
+                .Where(t => t.Id == taskId);
+
+            if (!isAdmin)
+            {
+                query = query.Where(t => t.CreatedBy == createdBy);
+            }
+
+            var task = await query.FirstOrDefaultAsync();
 
             if (task == null)
             {
@@ -611,6 +656,15 @@ namespace YandexSpeech.Controllers
             task.Segments = segments;
 
             return task;
+        }
+
+        private async Task<string?> GetUserEmailAsync(string userId)
+        {
+            return await _dbContext.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => u.Email)
+                .FirstOrDefaultAsync();
         }
 
         private static async Task<string> SaveUploadedFileAsync(IFormFile file, string uploadsDirectory)
@@ -778,7 +832,7 @@ namespace YandexSpeech.Controllers
             return fileName;
         }
 
-        private static OpenAiTranscriptionTaskDto MapToDto(OpenAiTranscriptionTask task)
+        private static OpenAiTranscriptionTaskDto MapToDto(OpenAiTranscriptionTask task, string? createdByEmail = null)
         {
             var recognitionProfileName = task.RecognitionProfile?.Name;
             var recognitionProfileDisplayedName = task.RecognitionProfileDisplayedName
@@ -797,7 +851,8 @@ namespace YandexSpeech.Controllers
                 task.Clarification,
                 task.RecognitionProfileId,
                 recognitionProfileName,
-                recognitionProfileDisplayedName);
+                recognitionProfileDisplayedName,
+                createdByEmail);
         }
 
         private static OpenAiTranscriptionTaskDto MapToDto(
@@ -813,7 +868,8 @@ namespace YandexSpeech.Controllers
             string? clarification,
             int? recognitionProfileId,
             string? recognitionProfileName,
-            string? recognitionProfileDisplayedName)
+            string? recognitionProfileDisplayedName,
+            string? createdByEmail)
         {
             return new OpenAiTranscriptionTaskDto
             {
@@ -830,11 +886,12 @@ namespace YandexSpeech.Controllers
                 Clarification = clarification,
                 RecognitionProfileId = recognitionProfileId,
                 RecognitionProfileName = recognitionProfileName,
-                RecognitionProfileDisplayedName = recognitionProfileDisplayedName
+                RecognitionProfileDisplayedName = recognitionProfileDisplayedName,
+                CreatedByEmail = createdByEmail
             };
         }
 
-        private static OpenAiTranscriptionTaskDetailsDto MapToDetailsDto(OpenAiTranscriptionTask task)
+        private static OpenAiTranscriptionTaskDetailsDto MapToDetailsDto(OpenAiTranscriptionTask task, string? createdByEmail = null)
         {
             var dto = new OpenAiTranscriptionTaskDetailsDto
             {
@@ -854,7 +911,8 @@ namespace YandexSpeech.Controllers
                 RecognitionProfileId = task.RecognitionProfileId,
                 RecognitionProfileName = task.RecognitionProfile?.Name,
                 RecognitionProfileDisplayedName = task.RecognitionProfileDisplayedName
-                    ?? task.RecognitionProfile?.DisplayedName
+                    ?? task.RecognitionProfile?.DisplayedName,
+                CreatedByEmail = createdByEmail
             };
 
             dto.Steps = task.Steps?
