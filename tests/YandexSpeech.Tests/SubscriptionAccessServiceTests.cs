@@ -175,6 +175,67 @@ public sealed class SubscriptionAccessServiceTests
     }
 
     [Fact]
+    public async Task AuthorizeYoutubeRecognitionAsync_CountsInProgressRecognitions()
+    {
+        await using var dbContext = CreateContext(out _);
+
+        dbContext.Users.Add(new ApplicationUser
+        {
+            Id = "user-progress",
+            Email = "user-progress@example.com",
+            HasLifetimeAccess = false
+        });
+
+        var now = DateTime.UtcNow;
+
+        dbContext.YoutubeCaptionTasks.AddRange(
+            new YoutubeCaptionTask
+            {
+                Id = "done-1",
+                UserId = "user-progress",
+                Title = "Completed",
+                Done = true,
+                Status = RecognizeStatus.Done,
+                CreatedAt = now.AddHours(-3),
+                ModifiedAt = now.AddHours(-2)
+            },
+            new YoutubeCaptionTask
+            {
+                Id = "in-progress-1",
+                UserId = "user-progress",
+                Title = "Processing",
+                Done = false,
+                Status = RecognizeStatus.InProgress,
+                CreatedAt = now.AddMinutes(-30),
+                ModifiedAt = now.AddMinutes(-5)
+            },
+            new YoutubeCaptionTask
+            {
+                Id = "in-progress-2",
+                UserId = "user-progress",
+                Title = "Queued",
+                Done = false,
+                Status = RecognizeStatus.FetchingMetadata,
+                CreatedAt = now.AddMinutes(-10)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var options = Options.Create(new SubscriptionLimitsOptions
+        {
+            FreeYoutubeRecognitionsPerDay = 3
+        });
+
+        var service = CreateService(dbContext, new SubscriptionServiceStub(), options);
+
+        var decision = await service.AuthorizeYoutubeRecognitionAsync("user-progress");
+
+        Assert.False(decision.IsAllowed);
+        Assert.Equal(0, decision.RemainingQuota);
+        Assert.NotNull(decision.RecognizedTitles);
+        Assert.Equal(new[] { "Completed" }, decision.RecognizedTitles);
+    }
+
+    [Fact]
     public async Task AuthorizeTranscriptionAsync_RespectsMonthlyFreeLimit()
     {
         await using var dbContext = CreateContext(out _);

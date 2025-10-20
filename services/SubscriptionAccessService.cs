@@ -66,11 +66,10 @@ namespace YandexSpeech.services
             var usageQuery = _dbContext.YoutubeCaptionTasks
                 .AsNoTracking()
                 .Where(t => t.UserId == userId)
-                .Where(t => t.Done)
                 .Where(t => t.Status != RecognizeStatus.Error)
                 .Where(t =>
                     (t.ModifiedAt.HasValue && t.ModifiedAt.Value >= cutoff) ||
-                    (!t.ModifiedAt.HasValue && t.CreatedAt.HasValue && t.CreatedAt.Value >= cutoff));
+                    (t.CreatedAt.HasValue && t.CreatedAt.Value >= cutoff));
 
             var usedRecognitions = await usageQuery.CountAsync(cancellationToken).ConfigureAwait(false);
 
@@ -83,6 +82,7 @@ namespace YandexSpeech.services
                 var remainingQuota = Math.Max(dailyLimit - usedRecognitions, 0);
                 _logger.LogInformation("User {UserId} exceeded daily recognition limit. Remaining {Remaining}", userId, remainingQuota);
                 var recognizedTitles = await usageQuery
+                    .Where(t => t.Done)
                     .OrderByDescending(t => t.ModifiedAt ?? t.CreatedAt ?? DateTime.MinValue)
                     .Select(t => string.IsNullOrWhiteSpace(t.Title) ? t.Id : t.Title!)
                     .Take(3)
