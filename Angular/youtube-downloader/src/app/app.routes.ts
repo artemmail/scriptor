@@ -14,6 +14,7 @@ import { About3Component } from './about3/about3.component';
 import { RoleGuard } from './services/role.guard';
 import { AdminUsersComponent } from './admin-users/admin-users.component';
 import { AdminRecognitionProfilesComponent } from './admin-recognition-profiles/admin-recognition-profiles.component';
+import { AdminPaymentsComponent } from './admin-payments/admin-payments.component';
 import { RecognitionControlComponent } from './app-recognition-control/recognition-control.component';
 import { TaskPageComponent } from './task-page/task-page.component';
 import { ServiceNewsComponent } from './service-news/service-news.component';
@@ -69,6 +70,12 @@ export const appRoutes: Routes = [
   {
     path: 'admin/users',
     component: AdminUsersComponent,
+    canActivate: [RoleGuard],
+    data: { roles: ['Admin'] }
+  },
+  {
+    path: 'admin/payments',
+    component: AdminPaymentsComponent,
     canActivate: [RoleGuard],
     data: { roles: ['Admin'] }
   },

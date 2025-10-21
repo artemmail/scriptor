@@ -1,0 +1,110 @@
+<mat-card class="admin-payments-card">
+  <mat-card-header>
+    <mat-card-title>Операции YooMoney</mat-card-title>
+    <mat-card-subtitle>История операций, полученная через YooMoney API</mat-card-subtitle>
+  </mat-card-header>
+  <mat-card-content>
+    <div class="table-wrapper">
+      <div class="loading-overlay" *ngIf="loading">
+        <mat-progress-spinner mode="indeterminate" diameter="48"></mat-progress-spinner>
+      </div>
+      <table
+        mat-table
+        [dataSource]="operations"
+        class="operations-table"
+        [class.has-overlay]="loading"
+        *ngIf="operations.length > 0; else emptyState"
+      >
+        <ng-container matColumnDef="dateTime">
+          <th mat-header-cell *matHeaderCellDef>Дата и время</th>
+          <td mat-cell *matCellDef="let operation">
+            {{ operation.dateTime ? (operation.dateTime | date: 'medium') : '—' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="operationId">
+          <th mat-header-cell *matHeaderCellDef>ID операции</th>
+          <td mat-cell *matCellDef="let operation">
+            <span class="operation-id" [matTooltip]="operation.operationId || ''">
+              {{ operation.operationId || '—' }}
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="title">
+          <th mat-header-cell *matHeaderCellDef>Описание</th>
+          <td mat-cell *matCellDef="let operation">
+            {{ operation.title || '—' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="amount">
+          <th mat-header-cell *matHeaderCellDef>Сумма</th>
+          <td mat-cell *matCellDef="let operation">
+            {{ formatAmount(operation) }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Статус</th>
+          <td mat-cell *matCellDef="let operation">
+            <span class="status-chip" [class.status-chip--empty]="!operation.status">
+              {{ operation.status || '—' }}
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="additionalData">
+          <th mat-header-cell *matHeaderCellDef>Доп. данные</th>
+          <td mat-cell *matCellDef="let operation">
+            <span *ngIf="hasAdditionalData(operation); else noAdditionalData">
+              {{ operation.additionalKeys.join(', ') }}
+            </span>
+            <ng-template #noAdditionalData>—</ng-template>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="actions-header"></th>
+          <td mat-cell *matCellDef="let operation" class="actions-cell">
+            <button
+              mat-icon-button
+              color="primary"
+              (click)="openDetails(operation, $event)"
+              [disabled]="!operation.operationId"
+              matTooltip="Подробнее"
+              aria-label="Показать детали операции"
+            >
+              <mat-icon>open_in_new</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr
+          mat-row
+          *matRowDef="let row; columns: displayedColumns; trackBy: trackByOperationId"
+          (click)="openDetails(row)"
+          class="operation-row"
+        ></tr>
+      </table>
+      <ng-template #emptyState>
+        <div class="empty-state" *ngIf="!loading && !error">Операции YooMoney не найдены.</div>
+      </ng-template>
+      <div class="error-message" *ngIf="error">
+        {{ error }}
+      </div>
+    </div>
+  </mat-card-content>
+  <mat-card-actions align="end">
+    <mat-paginator
+      [length]="total"
+      [pageSize]="pageSize"
+      [pageIndex]="pageIndex"
+      [pageSizeOptions]="pageSizeOptions"
+      [disabled]="loading"
+      (page)="onPageChange($event)"
+      showFirstLastButtons
+    ></mat-paginator>
+  </mat-card-actions>
+</mat-card>

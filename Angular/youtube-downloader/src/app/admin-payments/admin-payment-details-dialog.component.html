@@ -1,0 +1,100 @@
+<h2 mat-dialog-title>Детали операции YooMoney</h2>
+<mat-dialog-content>
+  <div class="summary" *ngIf="summary">
+    <div class="summary-row">
+      <span class="summary-label">ID операции</span>
+      <span class="summary-value">{{ summary.operationId || '—' }}</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-label">Описание</span>
+      <span class="summary-value">{{ summary.title || '—' }}</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-label">Статус</span>
+      <span class="summary-value">{{ summary.status || '—' }}</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-label">Сумма</span>
+      <span class="summary-value">
+        {{ summary.amount != null ? (summary.amount | number: '1.2-2') : '—' }}
+      </span>
+    </div>
+  </div>
+
+  <div class="loading" *ngIf="loading">
+    <mat-progress-spinner diameter="48" mode="indeterminate"></mat-progress-spinner>
+  </div>
+
+  <div class="error" *ngIf="!loading && error">
+    {{ error }}
+  </div>
+
+  <ng-container *ngIf="!loading && !error && operationDetails as details">
+    <div class="details-grid">
+      <div class="details-label">ID операции</div>
+      <div class="details-value">{{ details.operationId || '—' }}</div>
+
+      <div class="details-label">Описание</div>
+      <div class="details-value">{{ details.title || '—' }}</div>
+
+      <div class="details-label">Статус</div>
+      <div class="details-value">{{ details.status || '—' }}</div>
+
+      <div class="details-label">Сумма</div>
+      <div class="details-value">{{ details.amount != null ? (details.amount | number: '1.2-2') : '—' }}</div>
+
+      <div class="details-label">Дата и время</div>
+      <div class="details-value">{{ details.dateTime ? (details.dateTime | date: 'medium') : '—' }}</div>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <section class="section" *ngIf="details.additionalData as additional">
+      <header class="section-header">
+        <h3>Дополнительные данные</h3>
+        <button mat-icon-button matTooltip="Скопировать JSON" (click)="copyJson(additional)">
+          <mat-icon>content_copy</mat-icon>
+        </button>
+      </header>
+      <pre class="json-view">{{ additional | json }}</pre>
+    </section>
+
+    <section class="section" *ngIf="billIdentifier">
+      <header class="section-header">
+        <h3>Счёт YooMoney</h3>
+        <span class="section-meta">{{ billIdentifier }}</span>
+        <span class="spacer"></span>
+        <button
+          mat-stroked-button
+          color="primary"
+          (click)="loadBillDetails()"
+          [disabled]="loadingBill"
+        >
+          <mat-icon>receipt_long</mat-icon>
+          <span>Обновить детали счёта</span>
+        </button>
+      </header>
+
+      <div class="loading" *ngIf="loadingBill">
+        <mat-progress-spinner diameter="32" mode="indeterminate"></mat-progress-spinner>
+      </div>
+
+      <div class="error" *ngIf="!loadingBill && billError">
+        {{ billError }}
+      </div>
+
+      <pre class="json-view" *ngIf="billDetails">{{ billDetails | json }}</pre>
+      <div class="hint" *ngIf="!loadingBill && !billDetails && !billError">
+        Нажмите кнопку, чтобы загрузить детали счёта.
+      </div>
+    </section>
+  </ng-container>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Закрыть</button>
+  <button mat-flat-button color="primary" (click)="reloadDetails()" [disabled]="loading">
+    <mat-icon>refresh</mat-icon>
+    <span>Обновить</span>
+  </button>
+</mat-dialog-actions>

@@ -1,0 +1,93 @@
+:host {
+  display: block;
+  padding: 24px;
+}
+
+.admin-payments-card {
+  width: 100%;
+  position: relative;
+}
+
+.table-wrapper {
+  position: relative;
+  overflow-x: auto;
+  min-height: 240px;
+}
+
+.operations-table {
+  width: 100%;
+  min-width: 960px;
+}
+
+.operation-row {
+  cursor: pointer;
+}
+
+.operation-row:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.operation-id {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 13px;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background-color: rgba(76, 175, 80, 0.15);
+  color: #2e7d32;
+  font-size: 12px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-chip--empty {
+  background-color: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.54);
+}
+
+.actions-header,
+.actions-cell {
+  width: 72px;
+  text-align: right;
+}
+
+.actions-cell button {
+  margin-right: -8px;
+}
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.8);
+  z-index: 2;
+}
+
+.loading-overlay ~ .operations-table,
+.loading-overlay ~ .empty-state {
+  filter: blur(1px);
+  pointer-events: none;
+}
+
+.error-message {
+  color: #d32f2f;
+  margin-top: 16px;
+}
+
+.empty-state {
+  padding: 48px 0;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.54);
+  font-size: 15px;
+}
+
+mat-card-actions {
+  padding-inline: 16px;
+}

@@ -46,6 +46,10 @@
       <mat-icon matListItemIcon>group</mat-icon>
       <span matListItemTitle>Пользователи</span>
     </a>
+    <a mat-list-item *ngIf="hasRole(user, 'Admin')" (click)="navigate('/admin/payments')">
+      <mat-icon matListItemIcon>receipt_long</mat-icon>
+      <span matListItemTitle>Платежи YooMoney</span>
+    </a>
     <a mat-list-item *ngIf="hasRole(user, 'Admin')" (click)="navigate('/admin/recognition-profiles')">
       <mat-icon matListItemIcon>tune</mat-icon>
       <span matListItemTitle>Профили распознавания</span>
