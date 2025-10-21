@@ -36,6 +36,8 @@ namespace YandexSpeech.models.DTO
 
         public string? Status { get; set; }
 
+        public bool Applied { get; set; }
+
         public decimal Amount { get; set; }
 
         public string Currency { get; set; } = "RUB";

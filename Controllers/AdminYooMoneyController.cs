@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,13 +21,23 @@ namespace YandexSpeech.Controllers
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Admin")]
     public class AdminYooMoneyController : ControllerBase
     {
+        private const string WalletPayloadType = "wallet";
+
         private readonly IYooMoneyRepository _yooMoneyRepository;
         private readonly MyDbContext _dbContext;
+        private readonly IPaymentGatewayService _paymentGatewayService;
+        private readonly IWalletService _walletService;
 
-        public AdminYooMoneyController(IYooMoneyRepository yooMoneyRepository, MyDbContext dbContext)
+        public AdminYooMoneyController(
+            IYooMoneyRepository yooMoneyRepository,
+            MyDbContext dbContext,
+            IPaymentGatewayService paymentGatewayService,
+            IWalletService walletService)
         {
             _yooMoneyRepository = yooMoneyRepository ?? throw new ArgumentNullException(nameof(yooMoneyRepository));
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+            _paymentGatewayService = paymentGatewayService ?? throw new ArgumentNullException(nameof(paymentGatewayService));
+            _walletService = walletService ?? throw new ArgumentNullException(nameof(walletService));
         }
 
         [HttpGet("operation-history")]
@@ -114,6 +125,91 @@ namespace YandexSpeech.Controllers
             return Ok(dto);
         }
 
+        [HttpPost("payment-operations/{operationId}/apply")]
+        public async Task<ActionResult<AdminPaymentOperationDetailsDto>> ApplyPaymentOperation(
+            string operationId,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(operationId))
+            {
+                return BadRequest("operationId is required.");
+            }
+
+            if (!Guid.TryParse(operationId, out var parsedOperationId))
+            {
+                return BadRequest("operationId must be a valid GUID.");
+            }
+
+            var operation = await _dbContext.PaymentOperations
+                .Include(o => o.User)
+                .FirstOrDefaultAsync(o => o.Id == parsedOperationId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (operation == null)
+            {
+                return NotFound();
+            }
+
+            if (operation.Status == PaymentOperationStatus.Succeeded || operation.WalletTransactionId.HasValue)
+            {
+                var applied = MapPaymentOperation(operation);
+                return Ok(applied);
+            }
+
+            if (operation.Status == PaymentOperationStatus.Failed || operation.Status == PaymentOperationStatus.Cancelled)
+            {
+                return BadRequest("Эту операцию нельзя применить, потому что она завершилась неуспешно.");
+            }
+
+            if (string.IsNullOrWhiteSpace(operation.UserId))
+            {
+                return BadRequest("У операции отсутствует пользователь для применения.");
+            }
+
+            if (operation.Amount <= 0m)
+            {
+                return BadRequest("Сумма операции должна быть больше нуля для применения.");
+            }
+
+            var payload = DeserializePayload(operation.Payload);
+            if (payload != null &&
+                !string.Equals(payload.Type, WalletPayloadType, StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest("Применение доступно только для операций пополнения кошелька.");
+            }
+
+            var comment = string.IsNullOrWhiteSpace(payload?.Comment)
+                ? "Пополнение счёта"
+                : payload!.Comment!;
+
+            var reference = string.IsNullOrWhiteSpace(operation.ExternalOperationId)
+                ? operation.Id.ToString()
+                : operation.ExternalOperationId!;
+
+            var transaction = await _walletService
+                .DepositAsync(
+                    operation.UserId,
+                    operation.Amount,
+                    operation.Currency,
+                    operation.Id,
+                    reference,
+                    comment,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            var updatedOperation = await _paymentGatewayService
+                .MarkSucceededAsync(operation.Id, reference, transaction.Id, cancellationToken)
+                .ConfigureAwait(false);
+
+            await _dbContext.Entry(updatedOperation)
+                .Reference(o => o.User)
+                .LoadAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var dto = MapPaymentOperation(updatedOperation);
+            return Ok(dto);
+        }
+
         private static AdminYooMoneyOperationDto MapOperation(OperationHistory operation)
         {
             if (operation == null)
@@ -165,6 +261,7 @@ namespace YandexSpeech.Controllers
                 UserDisplayName = operation.User?.DisplayName,
                 Provider = operation.Provider.ToString(),
                 Status = operation.Status.ToString(),
+                Applied = operation.Status == PaymentOperationStatus.Succeeded,
                 Amount = operation.Amount,
                 Currency = operation.Currency,
                 RequestedAt = operation.RequestedAt,
@@ -173,6 +270,26 @@ namespace YandexSpeech.Controllers
                 ExternalOperationId = operation.ExternalOperationId,
                 WalletTransactionId = operation.WalletTransactionId
             };
+        }
+
+        private static PaymentPayload? DeserializePayload(string? payload)
+        {
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                return null;
+            }
+
+            try
+            {
+                return JsonSerializer.Deserialize<PaymentPayload>(payload, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static IDictionary<string, object?>? ConvertAdditionalData(IDictionary<string, JToken>? additionalData)
@@ -200,6 +317,15 @@ namespace YandexSpeech.Controllers
                 JTokenType.Undefined => null,
                 _ => (token as JValue)?.Value ?? token.ToString()
             };
+        }
+
+        private sealed class PaymentPayload
+        {
+            public string? Type { get; set; }
+
+            public Guid? PlanId { get; set; }
+
+            public string? Comment { get; set; }
         }
     }
 }

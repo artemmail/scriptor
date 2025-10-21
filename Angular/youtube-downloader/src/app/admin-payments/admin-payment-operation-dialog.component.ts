@@ -33,6 +33,8 @@ export class AdminPaymentOperationDialogComponent implements OnInit {
   details: AdminPaymentOperationDetails | null = null;
   loading = false;
   error: string | null = null;
+  applying = false;
+  applyError: string | null = null;
 
   constructor(
     @Inject(MAT_DIALOG_DATA) data: AdminPaymentOperationDialogData,
@@ -51,7 +53,35 @@ export class AdminPaymentOperationDialogComponent implements OnInit {
   }
 
   reload(): void {
+    this.applyError = null;
     this.loadDetails();
+  }
+
+  get isApplied(): boolean {
+    return !!this.details?.applied;
+  }
+
+  applyOperation(): void {
+    if (!this.paymentOperationId || this.loading || this.applying || this.isApplied) {
+      return;
+    }
+
+    this.applying = true;
+    this.applyError = null;
+    this.adminPaymentsService.applyPaymentOperation(this.paymentOperationId).subscribe({
+      next: details => {
+        this.details = details;
+        this.applying = false;
+        this.applyError = null;
+      },
+      error: err => {
+        this.applying = false;
+        this.applyError = this.resolveErrorMessage(
+          err,
+          'Не удалось применить платежную операцию.'
+        );
+      }
+    });
   }
 
   formatAmount(details: AdminPaymentOperationDetails | null): string {
@@ -95,11 +125,13 @@ export class AdminPaymentOperationDialogComponent implements OnInit {
       next: details => {
         this.details = details;
         this.loading = false;
+        this.applyError = null;
       },
       error: err => {
         this.loading = false;
         this.details = null;
         this.error = this.resolveErrorMessage(err, 'Не удалось загрузить детали платежной операции.');
+        this.applyError = null;
       }
     });
   }

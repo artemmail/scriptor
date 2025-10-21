@@ -45,4 +45,11 @@ export class AdminPaymentsService {
       `${this.baseUrl}/payment-operations/${encodeURIComponent(operationId)}`
     );
   }
+
+  applyPaymentOperation(operationId: string): Observable<AdminPaymentOperationDetails> {
+    return this.http.post<AdminPaymentOperationDetails>(
+      `${this.baseUrl}/payment-operations/${encodeURIComponent(operationId)}/apply`,
+      {}
+    );
+  }
 }

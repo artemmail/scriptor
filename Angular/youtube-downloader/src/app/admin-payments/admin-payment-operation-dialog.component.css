@@ -72,6 +72,12 @@
   word-break: break-word;
 }
 
+.apply-error {
+  margin-top: 12px;
+  color: #d32f2f;
+  text-align: center;
+}
+
 mat-dialog-actions {
   padding: 16px;
 }
