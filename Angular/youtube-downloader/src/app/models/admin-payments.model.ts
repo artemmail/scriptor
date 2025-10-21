@@ -18,6 +18,7 @@ export interface AdminPaymentOperationDetails {
   userDisplayName?: string | null;
   provider?: string | null;
   status?: string | null;
+  applied: boolean;
   amount: number;
   currency: string;
   requestedAt?: string | null;

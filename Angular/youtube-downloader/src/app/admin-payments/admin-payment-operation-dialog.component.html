@@ -22,6 +22,10 @@
         <dd>{{ details.status || '—' }}</dd>
       </div>
       <div class="details-row">
+        <dt>Применена</dt>
+        <dd>{{ details.applied ? 'Да' : 'Нет' }}</dd>
+      </div>
+      <div class="details-row">
         <dt>Провайдер</dt>
         <dd>{{ details.provider || '—' }}</dd>
       </div>
@@ -64,10 +68,20 @@
       <pre>{{ payloadText }}</pre>
     </section>
   </div>
+
+  <div class="apply-error" *ngIf="applyError">{{ applyError }}</div>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
   <button mat-button (click)="close()">Закрыть</button>
+  <button
+    mat-flat-button
+    color="primary"
+    (click)="applyOperation()"
+    [disabled]="loading || applying || isApplied || !details"
+  >
+    Применить
+  </button>
   <button mat-stroked-button color="primary" (click)="reload()" [disabled]="loading">
     Обновить
   </button>
