@@ -1,24 +1,47 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatTableModule } from '@angular/material/table';
+import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { AdminPaymentsService } from '../services/admin-payments.service';
 import { AdminYooMoneyOperation } from '../models/admin-payments.model';
+import { AdminPaymentsService } from '../services/admin-payments.service';
 import {
   AdminPaymentDetailsDialogComponent,
   AdminPaymentDetailsDialogData
 } from './admin-payment-details-dialog.component';
+import {
+  AdminPaymentOperationDialogComponent,
+  AdminPaymentOperationDialogData
+} from './admin-payment-operation-dialog.component';
+
+interface SpendingCategory {
+  name?: string | null;
+  code?: string | null;
+}
 
 interface AdminYooMoneyOperationViewModel extends AdminYooMoneyOperation {
-  additionalKeys: string[];
   currency: string | null;
+  type: string | null;
+  direction: string | null;
+  label: string | null;
+  groupId: string | null;
+  isSbpOperation: boolean | null;
+  spendingCategories: ReadonlyArray<SpendingCategory>;
+}
+
+interface OperationMetadata {
+  currency: string | null;
+  type: string | null;
+  direction: string | null;
+  label: string | null;
+  groupId: string | null;
+  isSbpOperation: boolean | null;
+  spendingCategories: ReadonlyArray<SpendingCategory>;
 }
 
 @Component({
@@ -32,7 +55,6 @@ interface AdminYooMoneyOperationViewModel extends AdminYooMoneyOperation {
     DatePipe,
     MatTableModule,
     MatPaginatorModule,
-    MatButtonModule,
     MatIconModule,
     MatTooltipModule,
     MatProgressSpinnerModule,
@@ -40,15 +62,19 @@ interface AdminYooMoneyOperationViewModel extends AdminYooMoneyOperation {
   ]
 })
 export class AdminPaymentsComponent implements OnInit {
-  displayedColumns: string[] = [
-    'dateTime',
-    'operationId',
+  readonly displayedColumns: string[] = [
+    'operation_id',
+    'datetime',
     'title',
     'amount',
-    'status',
-    'additionalData',
-    'actions'
+    'type',
+    'direction',
+    'label',
+    'group_id',
+    'is_sbp_operation',
+    'spendingCategories'
   ];
+  readonly dataSource = new MatTableDataSource<AdminYooMoneyOperationViewModel>();
   operations: AdminYooMoneyOperationViewModel[] = [];
   loading = false;
   error: string | null = null;
@@ -81,7 +107,9 @@ export class AdminPaymentsComponent implements OnInit {
           return;
         }
 
-        this.operations = this.toViewModels(list);
+        const viewModels = this.toViewModels(list);
+        this.operations = viewModels;
+        this.dataSource.data = viewModels;
         this.pageSize = pageSize;
         this.pageIndex = pageIndex;
         const hasMore = list.length === pageSize;
@@ -90,6 +118,8 @@ export class AdminPaymentsComponent implements OnInit {
       },
       error: err => {
         this.loading = false;
+        this.dataSource.data = [];
+        this.operations = [];
         this.error = this.resolveErrorMessage(err, 'Не удалось загрузить операции YooMoney.');
       }
     });
@@ -106,8 +136,9 @@ export class AdminPaymentsComponent implements OnInit {
     this.loadOperations(targetPage, event.pageSize);
   }
 
-  openDetails(operation: AdminYooMoneyOperationViewModel, event?: MouseEvent): void {
+  openOperationDetails(operation: AdminYooMoneyOperationViewModel, event?: MouseEvent): void {
     if (event) {
+      event.preventDefault();
       event.stopPropagation();
     }
 
@@ -128,6 +159,28 @@ export class AdminPaymentsComponent implements OnInit {
     });
   }
 
+  openLabelDetails(label: string | null | undefined, event?: MouseEvent): void {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    const identifier = label?.trim();
+    if (!identifier) {
+      return;
+    }
+
+    const data: AdminPaymentOperationDialogData = {
+      paymentOperationId: identifier
+    };
+
+    this.dialog.open(AdminPaymentOperationDialogComponent, {
+      width: '640px',
+      maxWidth: '95vw',
+      data
+    });
+  }
+
   trackByOperationId(index: number, operation: AdminYooMoneyOperationViewModel): string {
     return operation.operationId ?? `${operation.dateTime ?? ''}-${operation.title ?? ''}-${index}`;
   }
@@ -142,39 +195,159 @@ export class AdminPaymentsComponent implements OnInit {
     return currency ? `${amount} ${currency}` : amount;
   }
 
-  hasAdditionalData(operation: AdminYooMoneyOperationViewModel): boolean {
-    return operation.additionalKeys.length > 0;
-  }
-
   private toViewModels(operations: AdminYooMoneyOperation[]): AdminYooMoneyOperationViewModel[] {
-    return operations.map(operation => ({
-      ...operation,
-      additionalKeys: this.extractAdditionalKeys(operation.additionalData),
-      currency: this.extractCurrency(operation.additionalData)
-    }));
+    return operations.map(operation => {
+      const metadata = this.extractOperationMetadata(operation.additionalData);
+      return {
+        ...operation,
+        currency: metadata.currency,
+        type: metadata.type,
+        direction: metadata.direction,
+        label: metadata.label,
+        groupId: metadata.groupId,
+        isSbpOperation: metadata.isSbpOperation,
+        spendingCategories: metadata.spendingCategories
+      };
+    });
   }
 
-  private extractAdditionalKeys(additionalData: Record<string, unknown> | null | undefined): string[] {
+  private extractOperationMetadata(
+    additionalData: Record<string, unknown> | null | undefined
+  ): OperationMetadata {
+    const defaults: OperationMetadata = {
+      currency: null,
+      type: null,
+      direction: null,
+      label: null,
+      groupId: null,
+      isSbpOperation: null,
+      spendingCategories: []
+    };
+
     if (!additionalData || typeof additionalData !== 'object' || Array.isArray(additionalData)) {
+      return defaults;
+    }
+
+    const normalized = new Map<string, unknown>();
+    for (const [key, value] of Object.entries(additionalData)) {
+      normalized.set(key.toLowerCase(), value);
+    }
+
+    const pickValue = (...keys: string[]): unknown => {
+      for (const key of keys) {
+        if (Object.prototype.hasOwnProperty.call(additionalData, key)) {
+          return (additionalData as Record<string, unknown>)[key];
+        }
+
+        const normalizedKey = key.toLowerCase();
+        if (normalized.has(normalizedKey)) {
+          return normalized.get(normalizedKey);
+        }
+      }
+
+      return undefined;
+    };
+
+    const metadata: OperationMetadata = { ...defaults };
+    const currency = this.extractString(
+      pickValue('amount_currency', 'currency', 'currencyCode', 'currency_code')
+    );
+    metadata.currency = currency ? currency.toUpperCase() : null;
+    metadata.type = this.extractString(pickValue('type'));
+    const direction = this.extractString(pickValue('direction'));
+    metadata.direction = direction ? direction.toLowerCase() : null;
+    metadata.label = this.extractString(pickValue('label', 'billId', 'bill_id', 'invoiceId', 'invoice_id'));
+    metadata.groupId = this.extractString(pickValue('group_id', 'groupId'));
+    metadata.isSbpOperation = this.extractBoolean(
+      pickValue('is_sbp_operation', 'sbp', 'isSbpOperation')
+    );
+    metadata.spendingCategories = this.extractSpendingCategories(
+      pickValue('spendingCategories', 'spending_categories')
+    );
+
+    return metadata;
+  }
+
+  private extractString(value: unknown): string | null {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    }
+
+    if (typeof value === 'number' || typeof value === 'bigint') {
+      return value.toString();
+    }
+
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    return null;
+  }
+
+  private extractBoolean(value: unknown): boolean | null {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'number') {
+      if (value === 1) {
+        return true;
+      }
+
+      if (value === 0) {
+        return false;
+      }
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (!normalized) {
+        return null;
+      }
+
+      if (['true', 'yes', 'y', '1'].includes(normalized)) {
+        return true;
+      }
+
+      if (['false', 'no', 'n', '0'].includes(normalized)) {
+        return false;
+      }
+    }
+
+    return null;
+  }
+
+  private extractSpendingCategories(value: unknown): ReadonlyArray<SpendingCategory> {
+    if (value == null) {
       return [];
     }
 
-    return Object.keys(additionalData).sort((a, b) => a.localeCompare(b));
-  }
+    const source = Array.isArray(value) ? value : [value];
+    const categories: SpendingCategory[] = [];
 
-  private extractCurrency(additionalData: Record<string, unknown> | null | undefined): string | null {
-    if (!additionalData || typeof additionalData !== 'object') {
-      return null;
+    for (const item of source) {
+      const normalized = this.normalizeSpendingCategory(item);
+      if (normalized) {
+        categories.push(normalized);
+      }
     }
 
-    const candidates = ['currency', 'currencyCode', 'currency_code', 'amount_currency'];
-    for (const key of candidates) {
-      const value = (additionalData as Record<string, unknown>)[key];
-      if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed) {
-          return trimmed;
-        }
+    return categories;
+  }
+
+  private normalizeSpendingCategory(value: unknown): SpendingCategory | null {
+    if (typeof value === 'string') {
+      const name = this.extractString(value);
+      return name ? { name } : null;
+    }
+
+    if (value && typeof value === 'object') {
+      const record = value as Record<string, unknown>;
+      const name = this.extractString(record['name'] ?? record['title']);
+      const code = this.extractString(record['code'] ?? record['id']);
+      if (name || code) {
+        return { name, code };
       }
     }
 

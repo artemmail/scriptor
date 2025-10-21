@@ -1,0 +1,74 @@
+<h2 mat-dialog-title>Детали платежной операции</h2>
+
+<mat-dialog-content>
+  <div class="state" *ngIf="loading">
+    <mat-progress-spinner mode="indeterminate" diameter="48"></mat-progress-spinner>
+  </div>
+
+  <div class="state state--error" *ngIf="!loading && error">{{ error }}</div>
+
+  <div class="dialog-body" *ngIf="!loading && !error && details">
+    <dl class="details-list">
+      <div class="details-row">
+        <dt>ID операции</dt>
+        <dd>{{ details.id }}</dd>
+      </div>
+      <div class="details-row" *ngIf="details.externalOperationId">
+        <dt>ID во внешней системе</dt>
+        <dd>{{ details.externalOperationId }}</dd>
+      </div>
+      <div class="details-row">
+        <dt>Статус</dt>
+        <dd>{{ details.status || '—' }}</dd>
+      </div>
+      <div class="details-row">
+        <dt>Провайдер</dt>
+        <dd>{{ details.provider || '—' }}</dd>
+      </div>
+      <div class="details-row">
+        <dt>Сумма</dt>
+        <dd>{{ formatAmount(details) }}</dd>
+      </div>
+      <div class="details-row">
+        <dt>Пользователь</dt>
+        <dd>
+          <ng-container *ngIf="details.userId; else noUser">
+            <div>ID: {{ details.userId }}</div>
+            <div *ngIf="details.userEmail">Email: {{ details.userEmail }}</div>
+            <div *ngIf="details.userDisplayName">Имя: {{ details.userDisplayName }}</div>
+          </ng-container>
+          <ng-template #noUser>—</ng-template>
+        </dd>
+      </div>
+      <div class="details-row">
+        <dt>Создана</dt>
+        <dd>{{ details.requestedAt ? (details.requestedAt | date: 'medium') : '—' }}</dd>
+      </div>
+      <div class="details-row">
+        <dt>Завершена</dt>
+        <dd>{{ details.completedAt ? (details.completedAt | date: 'medium') : '—' }}</dd>
+      </div>
+      <div class="details-row">
+        <dt>ID транзакции кошелька</dt>
+        <dd>{{ details.walletTransactionId || '—' }}</dd>
+      </div>
+    </dl>
+
+    <mat-divider *ngIf="payloadText"></mat-divider>
+
+    <section class="payload" *ngIf="payloadText">
+      <header class="payload__header">
+        <mat-icon aria-hidden="true">description</mat-icon>
+        <h3>Дополнительные данные</h3>
+      </header>
+      <pre>{{ payloadText }}</pre>
+    </section>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Закрыть</button>
+  <button mat-stroked-button color="primary" (click)="reload()" [disabled]="loading">
+    Обновить
+  </button>
+</mat-dialog-actions>
