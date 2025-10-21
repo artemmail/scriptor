@@ -1,5 +1,5 @@
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, ElementRef, Inject, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -34,6 +34,7 @@ import {
 import { PaymentsService, SubscriptionSummary } from '../services/payments.service';
 import { UsageLimitResponse, extractUsageLimitResponse } from '../models/usage-limit-response';
 import { AuthService } from '../services/AuthService.service';
+import { PLATFORM_ID } from '@angular/core';
 
 @Component({
   selector: 'app-openai-transcriptions',
@@ -106,6 +107,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   private userSubscription?: Subscription;
   isAdmin = false;
   showAllTasks = false;
+  private readonly isBrowser: boolean;
 
   get downloadInProgress(): boolean {
     return this.exportingPdf || this.exportingDocx || this.downloadingSrt;
@@ -127,8 +129,11 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     private readonly dialog: MatDialog,
     private readonly snackBar: MatSnackBar,
     private readonly paymentsService: PaymentsService,
-    private readonly authService: AuthService
-  ) {}
+    private readonly authService: AuthService,
+    @Inject(PLATFORM_ID) platformId: Object,
+  ) {
+    this.isBrowser = isPlatformBrowser(platformId);
+  }
 
   ngOnInit(): void {
     this.userSubscription = this.authService.user$.subscribe((user) => {
@@ -145,11 +150,17 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
         this.loadTasks(!this.selectedTaskId);
       }
     });
-    this.loadSubscriptionSummary();
+    if (this.isBrowser) {
+      this.loadSubscriptionSummary();
+    }
     this.loadTasks(true);
   }
 
   loadSubscriptionSummary(): void {
+    if (!this.isBrowser) {
+      return;
+    }
+
     this.summaryLoading = true;
     this.summaryError = null;
     this.paymentsService.getSubscriptionSummary().subscribe({
