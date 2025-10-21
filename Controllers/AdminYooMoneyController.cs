@@ -6,7 +6,9 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
+using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 using YandexSpeech.services;
 using YandexSpeech.services.Interface;
@@ -19,10 +21,12 @@ namespace YandexSpeech.Controllers
     public class AdminYooMoneyController : ControllerBase
     {
         private readonly IYooMoneyRepository _yooMoneyRepository;
+        private readonly MyDbContext _dbContext;
 
-        public AdminYooMoneyController(IYooMoneyRepository yooMoneyRepository)
+        public AdminYooMoneyController(IYooMoneyRepository yooMoneyRepository, MyDbContext dbContext)
         {
             _yooMoneyRepository = yooMoneyRepository ?? throw new ArgumentNullException(nameof(yooMoneyRepository));
+            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
         [HttpGet("operation-history")]
@@ -80,6 +84,36 @@ namespace YandexSpeech.Controllers
             return Ok(dto);
         }
 
+        [HttpGet("payment-operations/{operationId}")]
+        public async Task<ActionResult<AdminPaymentOperationDetailsDto>> GetPaymentOperation(
+            string operationId,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(operationId))
+            {
+                return BadRequest("operationId is required.");
+            }
+
+            if (!Guid.TryParse(operationId, out var parsedOperationId))
+            {
+                return BadRequest("operationId must be a valid GUID.");
+            }
+
+            var operation = await _dbContext.PaymentOperations
+                .AsNoTracking()
+                .Include(o => o.User)
+                .FirstOrDefaultAsync(o => o.Id == parsedOperationId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (operation == null)
+            {
+                return NotFound();
+            }
+
+            var dto = MapPaymentOperation(operation);
+            return Ok(dto);
+        }
+
         private static AdminYooMoneyOperationDto MapOperation(OperationHistory operation)
         {
             if (operation == null)
@@ -113,6 +147,31 @@ namespace YandexSpeech.Controllers
                 DateTime = details.DateTime,
                 Status = details.Status,
                 AdditionalData = ConvertAdditionalData(details.AdditionalData)
+            };
+        }
+
+        private static AdminPaymentOperationDetailsDto MapPaymentOperation(PaymentOperation operation)
+        {
+            if (operation == null)
+            {
+                throw new ArgumentNullException(nameof(operation));
+            }
+
+            return new AdminPaymentOperationDetailsDto
+            {
+                Id = operation.Id,
+                UserId = operation.UserId,
+                UserEmail = operation.User?.Email,
+                UserDisplayName = operation.User?.DisplayName,
+                Provider = operation.Provider.ToString(),
+                Status = operation.Status.ToString(),
+                Amount = operation.Amount,
+                Currency = operation.Currency,
+                RequestedAt = operation.RequestedAt,
+                CompletedAt = operation.CompletedAt,
+                Payload = operation.Payload,
+                ExternalOperationId = operation.ExternalOperationId,
+                WalletTransactionId = operation.WalletTransactionId
             };
         }
 

@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
+  AdminPaymentOperationDetails,
   AdminYooMoneyBillDetails,
   AdminYooMoneyOperation,
   AdminYooMoneyOperationDetails
@@ -36,6 +37,12 @@ export class AdminPaymentsService {
   getBillDetails(billId: string): Observable<AdminYooMoneyBillDetails> {
     return this.http.get<AdminYooMoneyBillDetails>(
       `${this.baseUrl}/bill-details/${encodeURIComponent(billId)}`
+    );
+  }
+
+  getPaymentOperationDetails(operationId: string): Observable<AdminPaymentOperationDetails> {
+    return this.http.get<AdminPaymentOperationDetails>(
+      `${this.baseUrl}/payment-operations/${encodeURIComponent(operationId)}`
     );
   }
 }

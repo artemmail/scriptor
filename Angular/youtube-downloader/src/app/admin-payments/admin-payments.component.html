@@ -1,33 +1,43 @@
-<mat-card class="admin-payments-card">
+<mat-card class="table-card">
   <mat-card-header>
-    <mat-card-title>Операции YooMoney</mat-card-title>
+    <mat-card-title>YooMoney</mat-card-title>
     <mat-card-subtitle>История операций, полученная через YooMoney API</mat-card-subtitle>
   </mat-card-header>
+
   <mat-card-content>
-    <div class="table-wrapper">
+    <div class="table-container">
       <div class="loading-overlay" *ngIf="loading">
         <mat-progress-spinner mode="indeterminate" diameter="48"></mat-progress-spinner>
       </div>
+
       <table
         mat-table
-        [dataSource]="operations"
-        class="operations-table"
-        [class.has-overlay]="loading"
-        *ngIf="operations.length > 0; else emptyState"
+        [dataSource]="dataSource"
+        class="custom-table"
+        [class.table-disabled]="loading"
+        *ngIf="dataSource.data.length > 0; else emptyState"
       >
-        <ng-container matColumnDef="dateTime">
-          <th mat-header-cell *matHeaderCellDef>Дата и время</th>
+        <ng-container matColumnDef="operation_id">
+          <th mat-header-cell *matHeaderCellDef>Operation ID</th>
           <td mat-cell *matCellDef="let operation">
-            {{ operation.dateTime ? (operation.dateTime | date: 'medium') : '—' }}
+            <ng-container *ngIf="operation.operationId; else noOperationId">
+              <a
+                href="#"
+                class="table-link"
+                [matTooltip]="operation.operationId || ''"
+                (click)="openOperationDetails(operation, $event)"
+              >
+                {{ operation.operationId }}
+              </a>
+            </ng-container>
+            <ng-template #noOperationId>—</ng-template>
           </td>
         </ng-container>
 
-        <ng-container matColumnDef="operationId">
-          <th mat-header-cell *matHeaderCellDef>ID операции</th>
+        <ng-container matColumnDef="datetime">
+          <th mat-header-cell *matHeaderCellDef>Дата</th>
           <td mat-cell *matCellDef="let operation">
-            <span class="operation-id" [matTooltip]="operation.operationId || ''">
-              {{ operation.operationId || '—' }}
-            </span>
+            {{ operation.dateTime ? (operation.dateTime | date: 'short') : '—' }}
           </td>
         </ng-container>
 
@@ -40,63 +50,103 @@
 
         <ng-container matColumnDef="amount">
           <th mat-header-cell *matHeaderCellDef>Сумма</th>
-          <td mat-cell *matCellDef="let operation">
-            {{ formatAmount(operation) }}
-          </td>
+          <td mat-cell *matCellDef="let operation">{{ formatAmount(operation) }}</td>
         </ng-container>
 
-        <ng-container matColumnDef="status">
-          <th mat-header-cell *matHeaderCellDef>Статус</th>
-          <td mat-cell *matCellDef="let operation">
-            <span class="status-chip" [class.status-chip--empty]="!operation.status">
-              {{ operation.status || '—' }}
-            </span>
-          </td>
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>Тип</th>
+          <td mat-cell *matCellDef="let operation">{{ operation.type || '—' }}</td>
         </ng-container>
 
-        <ng-container matColumnDef="additionalData">
-          <th mat-header-cell *matHeaderCellDef>Доп. данные</th>
+        <ng-container matColumnDef="direction">
+          <th mat-header-cell *matHeaderCellDef>Направление</th>
           <td mat-cell *matCellDef="let operation">
-            <span *ngIf="hasAdditionalData(operation); else noAdditionalData">
-              {{ operation.additionalKeys.join(', ') }}
-            </span>
-            <ng-template #noAdditionalData>—</ng-template>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="actions">
-          <th mat-header-cell *matHeaderCellDef class="actions-header"></th>
-          <td mat-cell *matCellDef="let operation" class="actions-cell">
-            <button
-              mat-icon-button
-              color="primary"
-              (click)="openDetails(operation, $event)"
-              [disabled]="!operation.operationId"
-              matTooltip="Подробнее"
-              aria-label="Показать детали операции"
+            <mat-icon
+              *ngIf="operation.direction === 'in'"
+              class="direction-icon direction-icon--in"
+              aria-label="Входящая операция"
             >
-              <mat-icon>open_in_new</mat-icon>
-            </button>
+              arrow_downward
+            </mat-icon>
+            <mat-icon
+              *ngIf="operation.direction === 'out'"
+              class="direction-icon direction-icon--out"
+              aria-label="Исходящая операция"
+            >
+              arrow_upward
+            </mat-icon>
+            <span *ngIf="operation.direction !== 'in' && operation.direction !== 'out'">
+              {{ operation.direction || '—' }}
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="label">
+          <th mat-header-cell *matHeaderCellDef>Метка</th>
+          <td mat-cell *matCellDef="let operation">
+            <ng-container *ngIf="operation.label; else noLabel">
+              <a
+                href="#"
+                class="table-link"
+                (click)="openLabelDetails(operation.label, $event)"
+              >
+                {{ operation.label }}
+              </a>
+            </ng-container>
+            <ng-template #noLabel>—</ng-template>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="group_id">
+          <th mat-header-cell *matHeaderCellDef>Группа</th>
+          <td mat-cell *matCellDef="let operation">{{ operation.groupId || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="is_sbp_operation">
+          <th mat-header-cell *matHeaderCellDef>СБП операция</th>
+          <td mat-cell *matCellDef="let operation">
+            <mat-icon
+              *ngIf="operation.isSbpOperation === true"
+              class="sbp-icon sbp-icon--success"
+              aria-label="СБП операция"
+            >
+              check_circle
+            </mat-icon>
+            <mat-icon
+              *ngIf="operation.isSbpOperation === false"
+              class="sbp-icon sbp-icon--failed"
+              aria-label="Не СБП операция"
+            >
+              cancel
+            </mat-icon>
+            <span *ngIf="operation.isSbpOperation === null">—</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="spendingCategories">
+          <th mat-header-cell *matHeaderCellDef>Категории расходов</th>
+          <td mat-cell *matCellDef="let operation">
+            <ng-container *ngIf="operation.spendingCategories.length > 0; else noCategories">
+              <ng-container *ngFor="let category of operation.spendingCategories; let last = last">
+                <span class="category-chip">{{ category.name || category.code || '—' }}</span>
+                <br *ngIf="!last" />
+              </ng-container>
+            </ng-container>
+            <ng-template #noCategories>—</ng-template>
           </td>
         </ng-container>
 
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr
-          mat-row
-          *matRowDef="let row; columns: displayedColumns; trackBy: trackByOperationId"
-          (click)="openDetails(row)"
-          class="operation-row"
-        ></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns; trackBy: trackByOperationId"></tr>
       </table>
+
       <ng-template #emptyState>
         <div class="empty-state" *ngIf="!loading && !error">Операции YooMoney не найдены.</div>
       </ng-template>
-      <div class="error-message" *ngIf="error">
-        {{ error }}
-      </div>
+
+      <div class="error-message" *ngIf="error">{{ error }}</div>
     </div>
-  </mat-card-content>
-  <mat-card-actions align="end">
+
     <mat-paginator
       [length]="total"
       [pageSize]="pageSize"
@@ -106,5 +156,5 @@
       (page)="onPageChange($event)"
       showFirstLastButtons
     ></mat-paginator>
-  </mat-card-actions>
+  </mat-card-content>
 </mat-card>
