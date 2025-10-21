@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
@@ -42,6 +44,71 @@ namespace YandexSpeech.Controllers
             _paymentGatewayService = paymentGatewayService ?? throw new ArgumentNullException(nameof(paymentGatewayService));
             _walletService = walletService ?? throw new ArgumentNullException(nameof(walletService));
             _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
+        }
+
+        [HttpGet("oauth/authorize")]
+        public async Task<IActionResult> BeginAuthorization(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var response = await _yooMoneyRepository
+                    .AuthorizeAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+                return FormatResponse(response);
+            }
+            catch (Exception ex)
+            {
+                Response.StatusCode = StatusCodes.Status502BadGateway;
+                return Content(
+                    $"Не удалось отправить запрос авторизации в YooMoney: {ex.Message}",
+                    "text/plain",
+                    Encoding.UTF8);
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpGet("~/admin/yandexget")]
+        public async Task<IActionResult> CompleteAuthorization(
+            [FromQuery(Name = "code")] string? authorizationCode,
+            [FromQuery(Name = "error")] string? error,
+            [FromQuery(Name = "error_description")] string? errorDescription,
+            CancellationToken cancellationToken = default)
+        {
+            if (!string.IsNullOrWhiteSpace(error) || !string.IsNullOrWhiteSpace(errorDescription))
+            {
+                Response.StatusCode = StatusCodes.Status400BadRequest;
+                return Content(
+                    $"Авторизация YooMoney завершилась ошибкой: {errorDescription ?? error}",
+                    "text/plain",
+                    Encoding.UTF8);
+            }
+
+            if (string.IsNullOrWhiteSpace(authorizationCode))
+            {
+                Response.StatusCode = StatusCodes.Status400BadRequest;
+                return Content(
+                    "Отсутствует параметр 'code' в строке запроса.",
+                    "text/plain",
+                    Encoding.UTF8);
+            }
+
+            try
+            {
+                var response = await _yooMoneyRepository
+                    .ExchangeTokenAsync(authorizationCode, cancellationToken)
+                    .ConfigureAwait(false);
+
+                return FormatResponse(response);
+            }
+            catch (Exception ex)
+            {
+                Response.StatusCode = StatusCodes.Status502BadGateway;
+                return Content(
+                    $"Не удалось обменять код авторизации на токен YooMoney: {ex.Message}",
+                    "text/plain",
+                    Encoding.UTF8);
+            }
         }
 
         [HttpGet("operation-history")]
@@ -392,6 +459,38 @@ namespace YandexSpeech.Controllers
                 JTokenType.Undefined => null,
                 _ => (token as JValue)?.Value ?? token.ToString()
             };
+        }
+
+        private ContentResult FormatResponse(string payload)
+        {
+            if (string.IsNullOrEmpty(payload))
+            {
+                return Content(string.Empty, "text/plain", Encoding.UTF8);
+            }
+
+            if (TryFormatJson(payload, out var formattedJson))
+            {
+                return Content(formattedJson, "application/json", Encoding.UTF8);
+            }
+
+            return Content(payload, "text/plain", Encoding.UTF8);
+        }
+
+        private static bool TryFormatJson(string payload, out string formattedJson)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(payload);
+                formattedJson = JsonSerializer.Serialize(
+                    document.RootElement,
+                    new JsonSerializerOptions { WriteIndented = true });
+                return true;
+            }
+            catch (JsonException)
+            {
+                formattedJson = payload;
+                return false;
+            }
         }
 
         private sealed class PaymentPayload
