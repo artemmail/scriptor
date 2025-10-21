@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,6 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatListModule } from '@angular/material/list';
 import { Router } from '@angular/router';
+import { PLATFORM_ID } from '@angular/core';
 
 import { AccountService } from '../services/account.service';
 import { AuthService } from '../services/AuthService.service';
@@ -43,6 +44,8 @@ export class ProfileComponent implements OnInit {
   summaryLoading = false;
   summaryError = '';
   summary: SubscriptionSummary | null = null;
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly isBrowser = isPlatformBrowser(this.platformId);
 
   constructor(
     private readonly accountService: AccountService,
@@ -52,8 +55,10 @@ export class ProfileComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.fetchProfile();
-    this.fetchSummary();
+    if (this.isBrowser) {
+      this.fetchProfile();
+      this.fetchSummary();
+    }
   }
 
   get displayNameValue(): string {
@@ -80,6 +85,10 @@ export class ProfileComponent implements OnInit {
   }
 
   fetchSummary(): void {
+    if (!this.isBrowser) {
+      return;
+    }
+
     if (this.summaryLoading) {
       return;
     }

@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { HttpErrorResponse } from '@angular/common/http';
+import { PLATFORM_ID } from '@angular/core';
 
 import { SubtitleService } from '../services/subtitle.service';
 import { PaymentsService, SubscriptionSummary } from '../services/payments.service';
@@ -32,6 +33,8 @@ export class RecognitionControlComponent implements OnInit {
   summary: SubscriptionSummary | null = null;
   summaryLoading = false;
   summaryError: string | null = null;
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly isBrowser = isPlatformBrowser(this.platformId);
 
   constructor(
     private recognitionService: SubtitleService,
@@ -43,7 +46,9 @@ export class RecognitionControlComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadSubscriptionSummary();
+    if (this.isBrowser) {
+      this.loadSubscriptionSummary();
+    }
   }
 
   onStart(): void {
@@ -89,6 +94,10 @@ export class RecognitionControlComponent implements OnInit {
   }
 
   loadSubscriptionSummary(): void {
+    if (!this.isBrowser) {
+      return;
+    }
+
     this.summaryLoading = true;
     this.summaryError = null;
     this.paymentsService.getSubscriptionSummary().subscribe({
