@@ -45,6 +45,7 @@ namespace YandexSpeech.services.Telegram
         private readonly string? _globalOpenAiApiKey;
         private readonly TelegramUserStateStore _userStateStore;
         private readonly JsonSerializerOptions _integrationJsonOptions;
+        private readonly TimeSpan _integrationRequestTimeout = TimeSpan.FromSeconds(5);
 
         private const string DefaultOpenAiModel = "gpt-4.1";
         private const int DefaultSummaryThreshold = 70;
@@ -550,7 +551,6 @@ namespace YandexSpeech.services.Telegram
                 ? $"{baseUrl.TrimEnd('/')}/{telegramId}/calendar-status/refresh"
                 : $"{baseUrl.TrimEnd('/')}/{telegramId}/calendar-status";
 
-            var client = _httpClientFactory.CreateClient(nameof(TelegramTranscriptionBot) + ".Integration");
             using var request = new HttpRequestMessage(refresh ? HttpMethod.Post : HttpMethod.Get, endpoint);
             request.Headers.TryAddWithoutValidation(IntegrationApiAuthenticationDefaults.HeaderName, token);
 
@@ -561,7 +561,12 @@ namespace YandexSpeech.services.Telegram
 
             try
             {
-                using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                using var response = await SendIntegrationRequestAsync(request, cancellationToken).ConfigureAwait(false);
+                if (response is null)
+                {
+                    return null;
+                }
+
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger.LogWarning("Integration status request for {TelegramId} failed with {StatusCode}.", telegramId, response.StatusCode);
@@ -601,7 +606,6 @@ namespace YandexSpeech.services.Telegram
                 LanguageCode = user.LanguageCode
             };
 
-            var client = _httpClientFactory.CreateClient(nameof(TelegramTranscriptionBot) + ".Integration");
             using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
             {
                 Content = new StringContent(JsonSerializer.Serialize(payload, _integrationJsonOptions), Encoding.UTF8, "application/json")
@@ -610,7 +614,12 @@ namespace YandexSpeech.services.Telegram
 
             try
             {
-                using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                using var response = await SendIntegrationRequestAsync(request, cancellationToken).ConfigureAwait(false);
+                if (response is null)
+                {
+                    return null;
+                }
+
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger.LogWarning("Telegram link initiation failed with {StatusCode} for {TelegramId}.", response.StatusCode, user.Id);
@@ -623,6 +632,25 @@ namespace YandexSpeech.services.Telegram
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
                 _logger.LogError(ex, "Failed to initiate Telegram link for {TelegramId}.", user.Id);
+            }
+
+            return null;
+        }
+
+        private async Task<HttpResponseMessage?> SendIntegrationRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var client = _httpClientFactory.CreateClient(nameof(TelegramTranscriptionBot) + ".Integration");
+
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            linkedCts.CancelAfter(_integrationRequestTimeout);
+
+            try
+            {
+                return await client.SendAsync(request, linkedCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogWarning("Integration API request to {Url} timed out after {Timeout}.", request.RequestUri, _integrationRequestTimeout);
             }
 
             return null;
