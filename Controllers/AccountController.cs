@@ -120,7 +120,7 @@ namespace YandexSpeech.Controllers
 
             if (isGoogleProvider)
             {
-                await _signInManager.UpdateExternalAuthenticationTokens(info);
+                await _signInManager.UpdateExternalAuthenticationTokensAsync(info);
             }
 
             // уже есть привязка?
