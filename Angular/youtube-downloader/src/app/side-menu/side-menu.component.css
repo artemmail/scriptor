@@ -8,18 +8,21 @@ mat-nav-list {
 }
 
 a[mat-list-item] {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   font-size: 16px;
   text-decoration: none;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: 12px;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 a[mat-list-item]:hover {
   background-color: rgba(72, 119, 166, 0.12);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
 mat-icon[matListItemIcon] {
@@ -28,7 +31,22 @@ mat-icon[matListItemIcon] {
 }
 
 span[matListItemTitle] {
-  color: #2b2b2b;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+span[matListItemLine] {
+  color: #5f6c7b;
+  font-size: 0.85rem;
+}
+
+.profile-entry span[matListItemTitle] {
+  font-weight: 600;
+}
+
+.profile-entry .profile-hint {
+  color: #94a3b8;
+  font-size: 0.8rem;
 }
 
 a[mat-list-item].active span[matListItemTitle] {
@@ -38,4 +56,15 @@ a[mat-list-item].active span[matListItemTitle] {
 
 a[mat-list-item].active mat-icon[matListItemIcon] {
   color: #4877a6;
+}
+
+@media (max-width: 600px) {
+  a[mat-list-item] {
+    padding: 10px 12px;
+    font-size: 15px;
+  }
+
+  span[matListItemLine] {
+    font-size: 0.8rem;
+  }
 }

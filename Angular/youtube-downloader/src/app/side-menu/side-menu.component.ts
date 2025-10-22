@@ -35,10 +35,4 @@ export class SideMenuComponent {
   navigate(path: string) {
     this.router.navigate([path]).then(() => this.close.emit());
   }
-
-  onLogout() {
-    this.auth.logout().subscribe(() => {
-      this.router.navigate(['/']).then(() => this.close.emit());
-    });
-  }
 }

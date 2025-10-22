@@ -34,10 +34,6 @@
       <mat-icon matListItemIcon>article</mat-icon>
       <span matListItemTitle>Блоги</span>
     </a>
-    <a mat-list-item (click)="navigate('/profile')">
-      <mat-icon matListItemIcon>account_circle</mat-icon>
-      <span matListItemTitle>Профиль</span>
-    </a>
     <a mat-list-item (click)="navigate('/billing')">
       <mat-icon matListItemIcon>credit_card</mat-icon>
       <span matListItemTitle>Подписки и баланс</span>
@@ -59,9 +55,11 @@
       <span matListItemTitle>Новая тема</span>
     </a>
     <mat-divider></mat-divider>
-    <a mat-list-item (click)="onLogout()">
-      <mat-icon matListItemIcon>logout</mat-icon>
-      <span matListItemTitle>Выйти ({{ user.displayName || user.email }})</span>
+    <a mat-list-item class="profile-entry" (click)="navigate('/profile')">
+      <mat-icon matListItemIcon>account_circle</mat-icon>
+      <span matListItemTitle>Профиль</span>
+      <span matListItemLine>{{ user.displayName || user.email }}</span>
+      <span matListItemLine class="profile-hint">Управление аккаунтом и выход</span>
     </a>
   </ng-container>
   <ng-template #guestMenu>

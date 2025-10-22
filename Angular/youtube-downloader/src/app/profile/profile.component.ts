@@ -32,6 +32,10 @@ import { PaymentsService, SubscriptionSummary } from '../services/payments.servi
 })
 export class ProfileComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
+  private readonly accountService = inject(AccountService);
+  private readonly authService = inject(AuthService);
+  private readonly paymentsService = inject(PaymentsService);
+  private readonly router = inject(Router);
   readonly form = this.fb.nonNullable.group({
     displayName: ['', [Validators.required, Validators.maxLength(100)]]
   });
@@ -44,15 +48,11 @@ export class ProfileComponent implements OnInit {
   summaryLoading = false;
   summaryError = '';
   summary: SubscriptionSummary | null = null;
+  readonly user$ = this.authService.user$;
+  logoutInProgress = false;
+  logoutError = '';
   private readonly platformId = inject(PLATFORM_ID);
   private readonly isBrowser = isPlatformBrowser(this.platformId);
-
-  constructor(
-    private readonly accountService: AccountService,
-    private readonly authService: AuthService,
-    private readonly paymentsService: PaymentsService,
-    private readonly router: Router
-  ) {}
 
   ngOnInit(): void {
     if (this.isBrowser) {
@@ -234,5 +234,43 @@ export class ProfileComponent implements OnInit {
       hour: '2-digit',
       minute: '2-digit',
     }).format(date);
+  }
+
+  logout(): void {
+    if (this.logoutInProgress) {
+      return;
+    }
+
+    this.logoutError = '';
+    this.logoutInProgress = true;
+    this.authService.logout().subscribe({
+      next: () => {
+        this.logoutInProgress = false;
+        this.router.navigate(['/']).catch(() => {
+          this.logoutError = 'Не удалось открыть главную страницу. Обновите страницу вручную.';
+        });
+      },
+      error: () => {
+        this.logoutInProgress = false;
+        this.logoutError = 'Не удалось выйти из аккаунта. Попробуйте ещё раз.';
+      }
+    });
+  }
+
+  getInitials(value: string | null | undefined): string {
+    if (!value) {
+      return 'U';
+    }
+
+    const parts = value.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) {
+      return 'U';
+    }
+
+    if (parts.length === 1) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+
+    return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 }
