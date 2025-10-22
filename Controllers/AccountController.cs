@@ -17,7 +17,7 @@ using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 using Microsoft.AspNetCore.Http;
 using YandexSpeech.Extensions;
-using YandexSpeech.services.GoogleCalendar;
+using YandexSpeech.services.Google;
 
 namespace YandexSpeech.Controllers
 {
@@ -30,20 +30,20 @@ namespace YandexSpeech.Controllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IConfiguration _config;
         private readonly MyDbContext _dbContext;
-        private readonly IGoogleCalendarTokenService _googleCalendarTokenService;
+        private readonly IGoogleTokenService _googleTokenService;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             IConfiguration config,
             MyDbContext dbContext,
-            IGoogleCalendarTokenService googleCalendarTokenService)
+            IGoogleTokenService googleTokenService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _config = config;
             _dbContext = dbContext;
-            _googleCalendarTokenService = googleCalendarTokenService;
+            _googleTokenService = googleTokenService;
         }
 
         // ---------- EXTERNAL SIGN-IN ----------
@@ -179,10 +179,11 @@ namespace YandexSpeech.Controllers
 
             if (isGoogleProvider)
             {
-                var updateResult = await _googleCalendarTokenService.UpdateConsentAsync(
+                var updateResult = await _googleTokenService.EnsureAccessTokenAsync(
                     user,
                     calendarRequested,
-                    info.AuthenticationTokens);
+                    info.AuthenticationTokens,
+                    HttpContext.RequestAborted);
 
                 if (!updateResult.Succeeded)
                 {

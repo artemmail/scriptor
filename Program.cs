@@ -22,7 +22,7 @@ using YoutubeExplode;
 using System.IO;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.Http.Features;
-using YandexSpeech.services.GoogleCalendar;
+using YandexSpeech.services.Google;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -197,7 +197,7 @@ builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<IYandexDiskDownloadService, YandexDiskDownloadService>();
 builder.Services.AddScoped<IPaymentGatewayService, PaymentGatewayService>();
 builder.Services.AddScoped<ISubscriptionAccessService, SubscriptionAccessService>();
-builder.Services.AddScoped<IGoogleCalendarTokenService, GoogleCalendarTokenService>();
+builder.Services.AddScoped<IGoogleTokenService, GoogleTokenService>();
 
 builder.Services.Configure<YooMoneyOptions>(builder.Configuration.GetSection("YooMoney"));
 builder.Services.Configure<SubscriptionLimitsOptions>(builder.Configuration.GetSection("SubscriptionLimits"));
