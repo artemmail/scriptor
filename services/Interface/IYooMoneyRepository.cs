@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using YandexSpeech.services;
 
 namespace YandexSpeech.services.Interface
 {
@@ -13,5 +14,7 @@ namespace YandexSpeech.services.Interface
         Task<string> AuthorizeAsync(CancellationToken cancellationToken = default);
 
         Task<string> ExchangeTokenAsync(string code, CancellationToken cancellationToken = default);
+
+        Task<BillDetails?> GetBillDetailsAsync(string billId, CancellationToken cancellationToken = default);
     }
 }

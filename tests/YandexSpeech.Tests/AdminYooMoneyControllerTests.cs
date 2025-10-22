@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +15,7 @@ using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 using YandexSpeech.services;
 using YandexSpeech.services.Interface;
+using Newtonsoft.Json.Linq;
 
 namespace YandexSpeech.Tests
 {
@@ -92,6 +97,105 @@ namespace YandexSpeech.Tests
             Assert.Equal(subscription.Id, updatedUser.CurrentSubscriptionId);
         }
 
+        [Fact]
+        public async Task GetBillDetails_ReturnsConvertedDictionary()
+        {
+            var repository = new BillDetailsYooMoneyRepositoryStub
+            {
+                Result = new BillDetails
+                {
+                    Data = new Dictionary<string, JToken>
+                    {
+                        ["invoice_id"] = JToken.FromObject("inv-1"),
+                        ["amount"] = JToken.FromObject(42.5m),
+                        ["nested"] = JObject.FromObject(new { key = "value" }),
+                        ["items"] = JArray.FromObject(new[] { "a", "b" })
+                    }
+                }
+            };
+
+            var options = new DbContextOptionsBuilder<MyDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                .Options;
+
+            await using var dbContext = new MyDbContext(options);
+
+            var controller = new AdminYooMoneyController(
+                repository,
+                dbContext,
+                new PaymentGatewayService(dbContext, NullLogger<PaymentGatewayService>.Instance),
+                new WalletService(dbContext, NullLogger<WalletService>.Instance),
+                new SubscriptionService(dbContext, NullLogger<SubscriptionService>.Instance));
+
+            var result = await controller.GetBillDetails("bill-123");
+
+            Assert.Equal("bill-123", repository.LastBillId);
+
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var details = Assert.IsAssignableFrom<IDictionary<string, object?>>(okResult.Value);
+
+            Assert.Equal("inv-1", details["invoice_id"]);
+            Assert.Equal(42.5m, details["amount"]);
+
+            var nested = Assert.IsType<Dictionary<string, object?>>(details["nested"]);
+            Assert.Equal("value", nested["key"]);
+
+            var items = Assert.IsType<List<object?>>(details["items"]);
+            Assert.Contains("a", items);
+            Assert.Contains("b", items);
+        }
+
+        [Fact]
+        public async Task GetBillDetails_ReturnsNotFound_WhenRepositoryReturnsNull()
+        {
+            var repository = new BillDetailsYooMoneyRepositoryStub();
+
+            var options = new DbContextOptionsBuilder<MyDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                .Options;
+
+            await using var dbContext = new MyDbContext(options);
+
+            var controller = new AdminYooMoneyController(
+                repository,
+                dbContext,
+                new PaymentGatewayService(dbContext, NullLogger<PaymentGatewayService>.Instance),
+                new WalletService(dbContext, NullLogger<WalletService>.Instance),
+                new SubscriptionService(dbContext, NullLogger<SubscriptionService>.Instance));
+
+            var result = await controller.GetBillDetails("missing");
+
+            Assert.Equal("missing", repository.LastBillId);
+            Assert.IsType<NotFoundResult>(result.Result);
+        }
+
+        [Fact]
+        public async Task GetBillDetails_ReturnsNotFound_WhenRepositoryThrowsNotFound()
+        {
+            var repository = new BillDetailsYooMoneyRepositoryStub
+            {
+                ExceptionToThrow = new HttpRequestException("Not found", null, HttpStatusCode.NotFound)
+            };
+
+            var options = new DbContextOptionsBuilder<MyDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                .Options;
+
+            await using var dbContext = new MyDbContext(options);
+
+            var controller = new AdminYooMoneyController(
+                repository,
+                dbContext,
+                new PaymentGatewayService(dbContext, NullLogger<PaymentGatewayService>.Instance),
+                new WalletService(dbContext, NullLogger<WalletService>.Instance),
+                new SubscriptionService(dbContext, NullLogger<SubscriptionService>.Instance));
+
+            var result = await controller.GetBillDetails("missing");
+
+            Assert.Equal("missing", repository.LastBillId);
+            Assert.IsType<NotFoundResult>(result.Result);
+        }
+
         private sealed class YooMoneyRepositoryStub : IYooMoneyRepository
         {
             public Task<string> AuthorizeAsync(System.Threading.CancellationToken cancellationToken = default) => Task.FromResult(string.Empty);
@@ -102,6 +206,39 @@ namespace YandexSpeech.Tests
 
             public Task<IReadOnlyList<OperationHistory>?> GetOperationHistoryAsync(int from, int count, System.Threading.CancellationToken cancellationToken = default)
                 => Task.FromResult<IReadOnlyList<OperationHistory>?>(Array.Empty<OperationHistory>());
+
+            public Task<BillDetails?> GetBillDetailsAsync(string billId, System.Threading.CancellationToken cancellationToken = default)
+                => Task.FromResult<BillDetails?>(null);
+        }
+
+        private sealed class BillDetailsYooMoneyRepositoryStub : IYooMoneyRepository
+        {
+            public BillDetails? Result { get; set; }
+
+            public Exception? ExceptionToThrow { get; set; }
+
+            public string? LastBillId { get; private set; }
+
+            public Task<string> AuthorizeAsync(CancellationToken cancellationToken = default) => Task.FromResult(string.Empty);
+
+            public Task<string> ExchangeTokenAsync(string code, CancellationToken cancellationToken = default) => Task.FromResult(string.Empty);
+
+            public Task<OperationDetails?> GetOperationDetailsAsync(string operationId, CancellationToken cancellationToken = default) => Task.FromResult<OperationDetails?>(null);
+
+            public Task<IReadOnlyList<OperationHistory>?> GetOperationHistoryAsync(int from, int count, CancellationToken cancellationToken = default)
+                => Task.FromResult<IReadOnlyList<OperationHistory>?>(Array.Empty<OperationHistory>());
+
+            public Task<BillDetails?> GetBillDetailsAsync(string billId, CancellationToken cancellationToken = default)
+            {
+                LastBillId = billId;
+
+                if (ExceptionToThrow != null)
+                {
+                    throw ExceptionToThrow;
+                }
+
+                return Task.FromResult(Result);
+            }
         }
     }
 }
