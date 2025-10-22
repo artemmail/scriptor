@@ -21,4 +21,7 @@
   <data name="CalendarAuthorizationMissingDuringScenario" xml:space="preserve">
     <value>⚠️ Не могу добавить событие: нет доступа к Google Calendar. Откройте профиль и подтвердите интеграцию: {0}</value>
   </data>
+  <data name="TelegramIntegrationMisconfigured" xml:space="preserve">
+    <value>⚠️ Интеграция с календарём не настроена. Проверьте токен интеграции в настройках.</value>
+  </data>
 </root>

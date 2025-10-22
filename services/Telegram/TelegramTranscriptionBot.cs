@@ -51,6 +51,7 @@ namespace YandexSpeech.services.Telegram
         private const int DefaultSummaryThreshold = 70;
         private const string OpenAiEndpoint = "https://api.openai.com/v1/chat/completions";
         private const string DefaultTelegramApiBaseUrl = "https://api.telegram.org";
+        private const string IntegrationApiTokenPlaceholder = "changeme";
         private const string OpenAiSystemPrompt =
             """You are a meticulous editor for Telegram voice transcriptions. Fix punctuation, casing, and obvious ASR mistakes without adding content. Keep the input language. Output JSON with fields: polished, summary.""";
 
@@ -398,12 +399,27 @@ namespace YandexSpeech.services.Telegram
             }
 
             var reply = new ReplyParameters { MessageId = message.Id };
-            var status = await EnsureIntegrationStatusAsync(message.From, userState, forceRefresh: false, cancellationToken).ConfigureAwait(false);
+
+            if (!TryGetIntegrationConfiguration(out var baseUrl, out var token, out var errorResourceKey))
+            {
+                var errorMessage = GetBotString(errorResourceKey ?? "TelegramLinkError", culture);
+                await SendTextMessageAsync(message.Chat.Id, errorMessage, reply, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            var status = await EnsureIntegrationStatusAsync(
+                    message.From,
+                    userState,
+                    forceRefresh: false,
+                    baseUrl!,
+                    token!,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
             Uri? linkUrl = null;
             if (status == null || !status.Linked || status.State is TelegramIntegrationStates.Pending or TelegramIntegrationStates.Revoked)
             {
-                var linkResponse = await RequestLinkTokenFromApiAsync(message.From, cancellationToken).ConfigureAwait(false);
+                var linkResponse = await RequestLinkTokenFromApiAsync(message.From, baseUrl!, token!, cancellationToken).ConfigureAwait(false);
                 if (linkResponse?.Status is not null)
                 {
                     status = linkResponse.Status;
@@ -431,7 +447,15 @@ namespace YandexSpeech.services.Telegram
             }
 
             var reply = new ReplyParameters { MessageId = message.Id };
-            var linkResponse = await RequestLinkTokenFromApiAsync(message.From, cancellationToken).ConfigureAwait(false);
+
+            if (!TryGetIntegrationConfiguration(out var baseUrl, out var token, out var errorResourceKey))
+            {
+                var errorMessage = GetBotString(errorResourceKey ?? "TelegramLinkError", culture);
+                await SendTextMessageAsync(message.Chat.Id, errorMessage, reply, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            var linkResponse = await RequestLinkTokenFromApiAsync(message.From, baseUrl!, token!, cancellationToken).ConfigureAwait(false);
             if (linkResponse?.LinkUrl is null)
             {
                 var error = GetBotString("TelegramLinkError", culture);
@@ -458,7 +482,15 @@ namespace YandexSpeech.services.Telegram
 
             var replyParameters = new ReplyParameters { MessageId = message.Id };
             var refresh = args.Any(a => string.Equals(a, "refresh", StringComparison.OrdinalIgnoreCase));
-            var status = await EnsureIntegrationStatusAsync(message.From, userState, refresh, cancellationToken).ConfigureAwait(false);
+
+            if (!TryGetIntegrationConfiguration(out var baseUrl, out var token, out var errorResourceKey))
+            {
+                var errorMessage = GetBotString(errorResourceKey ?? "TelegramLinkError", culture);
+                await SendTextMessageAsync(message.Chat.Id, errorMessage, replyParameters, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            var status = await EnsureIntegrationStatusAsync(message.From, userState, refresh, baseUrl!, token!, cancellationToken).ConfigureAwait(false);
 
             if (status == null)
             {
@@ -473,7 +505,7 @@ namespace YandexSpeech.services.Telegram
                 {
                     userState.CalendarScenarioRequested = false;
                 }
-                var linkResponse = await RequestLinkTokenFromApiAsync(message.From!, cancellationToken).ConfigureAwait(false);
+                var linkResponse = await RequestLinkTokenFromApiAsync(message.From!, baseUrl!, token!, cancellationToken).ConfigureAwait(false);
                 var linkUrl = linkResponse?.LinkUrl?.ToString();
                 if (linkResponse?.Status is not null)
                 {
@@ -514,7 +546,13 @@ namespace YandexSpeech.services.Telegram
             await SendTextMessageAsync(message.Chat.Id, prompt, replyParameters, cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task<TelegramCalendarStatusDto?> EnsureIntegrationStatusAsync(User user, TelegramUserState? userState, bool forceRefresh, CancellationToken cancellationToken)
+        private async Task<TelegramCalendarStatusDto?> EnsureIntegrationStatusAsync(
+            User user,
+            TelegramUserState? userState,
+            bool forceRefresh,
+            string baseUrl,
+            string token,
+            CancellationToken cancellationToken)
         {
             var now = DateTime.UtcNow;
             if (!forceRefresh && userState is not null)
@@ -526,7 +564,7 @@ namespace YandexSpeech.services.Telegram
                 }
             }
 
-            var status = await FetchCalendarStatusFromApiAsync(user.Id, forceRefresh, cancellationToken).ConfigureAwait(false);
+            var status = await FetchCalendarStatusFromApiAsync(user.Id, forceRefresh, baseUrl, token, cancellationToken).ConfigureAwait(false);
             if (status != null)
             {
                 UpdateIntegrationState(user.Id, userState, status);
@@ -536,17 +574,13 @@ namespace YandexSpeech.services.Telegram
             return userState?.CalendarStatus;
         }
 
-        private async Task<TelegramCalendarStatusDto?> FetchCalendarStatusFromApiAsync(long telegramId, bool refresh, CancellationToken cancellationToken)
+        private async Task<TelegramCalendarStatusDto?> FetchCalendarStatusFromApiAsync(
+            long telegramId,
+            bool refresh,
+            string baseUrl,
+            string token,
+            CancellationToken cancellationToken)
         {
-            var baseUrl = _integrationApiBaseUrl ?? NormalizeIntegrationBaseUrl(_optionsMonitor.CurrentValue.IntegrationApiBaseUrl);
-            var token = _integrationApiToken ?? _optionsMonitor.CurrentValue.IntegrationApiToken;
-
-            if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(token))
-            {
-                _logger.LogWarning("Telegram integration API configuration is missing. BaseUrl: {BaseUrl}, TokenConfigured: {HasToken}", baseUrl, !string.IsNullOrWhiteSpace(token));
-                return null;
-            }
-
             var endpoint = refresh
                 ? $"{baseUrl.TrimEnd('/')}/{telegramId}/calendar-status/refresh"
                 : $"{baseUrl.TrimEnd('/')}/{telegramId}/calendar-status";
@@ -585,17 +619,12 @@ namespace YandexSpeech.services.Telegram
             return null;
         }
 
-        private async Task<TelegramLinkInitiateResponse?> RequestLinkTokenFromApiAsync(User user, CancellationToken cancellationToken)
+        private async Task<TelegramLinkInitiateResponse?> RequestLinkTokenFromApiAsync(
+            User user,
+            string baseUrl,
+            string token,
+            CancellationToken cancellationToken)
         {
-            var baseUrl = _integrationApiBaseUrl ?? NormalizeIntegrationBaseUrl(_optionsMonitor.CurrentValue.IntegrationApiBaseUrl);
-            var token = _integrationApiToken ?? _optionsMonitor.CurrentValue.IntegrationApiToken;
-
-            if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(token))
-            {
-                _logger.LogWarning("Cannot request Telegram link token because integration API configuration is missing.");
-                return null;
-            }
-
             var endpoint = $"{baseUrl.TrimEnd('/')}/link/initiate";
             var payload = new TelegramLinkInitiateRequest
             {
@@ -941,6 +970,36 @@ namespace YandexSpeech.services.Telegram
             return "https://teamlogs.ru/profile";
         }
 
+        private bool TryGetIntegrationConfiguration(out string? baseUrl, out string? token, out string? errorResourceKey)
+        {
+            baseUrl = _integrationApiBaseUrl ?? NormalizeIntegrationBaseUrl(_optionsMonitor.CurrentValue.IntegrationApiBaseUrl);
+            token = (_integrationApiToken ?? _optionsMonitor.CurrentValue.IntegrationApiToken)?.Trim();
+
+            if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(token))
+            {
+                _logger.LogWarning(
+                    "Telegram integration API configuration is missing. BaseUrl: {BaseUrl}, TokenConfigured: {HasToken}",
+                    baseUrl,
+                    !string.IsNullOrWhiteSpace(token));
+                errorResourceKey = "TelegramLinkError";
+                return false;
+            }
+
+            if (IsPlaceholderIntegrationToken(token))
+            {
+                _logger.LogWarning(
+                    "Telegram integration API token is using the placeholder value. Update Telegram:IntegrationApiToken configuration.");
+                errorResourceKey = "TelegramIntegrationMisconfigured";
+                return false;
+            }
+
+            errorResourceKey = null;
+            return true;
+        }
+
+        private static bool IsPlaceholderIntegrationToken(string token) =>
+            string.Equals(token, IntegrationApiTokenPlaceholder, StringComparison.OrdinalIgnoreCase);
+
         private static string? NormalizeIntegrationBaseUrl(string? baseUrl)
         {
             if (string.IsNullOrWhiteSpace(baseUrl))
@@ -991,6 +1050,7 @@ namespace YandexSpeech.services.Telegram
                 "TelegramLinkTokenExpired" => "⚠️ Доступ к Google Calendar истёк. Обновите разрешения в профиле: {0}",
                 "TelegramLinkScopeInsufficient" => "⚠️ Требуются дополнительные права Google Calendar. Подтвердите доступ в профиле: {0}",
                 "TelegramLinkRevoked" => "⚠️ Доступ к Google Calendar был отозван. Подключите интеграцию заново: {0}",
+                "TelegramIntegrationMisconfigured" => "⚠️ Интеграция с календарём не настроена. Проверьте токен интеграции в настройках.",
                 _ => key
             };
         }
