@@ -43,6 +43,12 @@ namespace YandexSpeech.models.DB
 
         public DateTime? GoogleAccessTokenExpiresAt { get; set; }
 
+        public DateTime? GoogleRefreshTokenExpiresAt { get; set; }
+
+        public DateTime? GoogleAccessTokenUpdatedAt { get; set; }
+
+        public DateTime? GoogleTokensRevokedAt { get; set; }
+
         /// <summary>
         /// Навигационное свойство для кошелька.
         /// </summary>

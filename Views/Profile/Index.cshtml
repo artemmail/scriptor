@@ -1,0 +1,176 @@
+@model YandexSpeech.models.DTO.Profile.ProfileIndexViewModel
+@{
+    ViewData["Title"] = "Профиль";
+    var successMessage = TempData["ProfileSuccess"] as string;
+    var infoMessage = TempData["ProfileInfo"] as string;
+    var errorMessage = TempData["ProfileError"] as string;
+
+    string FormatUtc(DateTime? value)
+        => value.HasValue ? value.Value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'") : "—";
+}
+
+<h1>Профиль</h1>
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success" role="alert">@successMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(infoMessage))
+{
+    <div class="alert alert-info" role="alert">@infoMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+<section class="profile-section">
+    <h2>Основная информация</h2>
+    <dl class="profile-dictionary">
+        <dt>Имя</dt>
+        <dd>@Model.DisplayName</dd>
+        <dt>Email</dt>
+        <dd>@Model.Email</dd>
+    </dl>
+</section>
+
+<section class="profile-section">
+    <h2>Google Calendar</h2>
+
+    @if (Model.GoogleCalendar.IsConnected)
+    {
+        <p class="integration-status integration-status--connected">
+            Интеграция с Google Calendar активна.
+        </p>
+    }
+    else if (Model.GoogleCalendar.TokensRevokedAt.HasValue)
+    {
+        <p class="integration-status integration-status--revoked">
+            Доступ к Google Calendar отключён @FormatUtc(Model.GoogleCalendar.TokensRevokedAt).
+        </p>
+    }
+    else
+    {
+        <p class="integration-status integration-status--idle">
+            Интеграция с Google Calendar не настроена.
+        </p>
+    }
+
+    <ul class="integration-details">
+        <li><strong>Согласие выдано:</strong> @FormatUtc(Model.GoogleCalendar.ConsentAt)</li>
+        <li><strong>Последнее обновление токенов:</strong> @FormatUtc(Model.GoogleCalendar.AccessTokenUpdatedAt)</li>
+        <li><strong>Access token действует до:</strong> @FormatUtc(Model.GoogleCalendar.AccessTokenExpiresAt)</li>
+        <li><strong>Refresh token:</strong> @(Model.GoogleCalendar.HasRefreshToken ? "получен" : "нет")</li>
+        <li><strong>Refresh token действует до:</strong> @FormatUtc(Model.GoogleCalendar.RefreshTokenExpiresAt)</li>
+        <li><strong>Последнее отключение:</strong> @FormatUtc(Model.GoogleCalendar.TokensRevokedAt)</li>
+    </ul>
+
+    <div class="integration-actions">
+        @if (Model.GoogleCalendar.IsConnected)
+        {
+            <form method="post" action="@Url.Action("DisconnectGoogleCalendar", "Profile")">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-danger">Отключить интеграцию</button>
+            </form>
+        }
+        else
+        {
+            <form method="post" action="@Url.Action("ConnectGoogleCalendar", "Profile")">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary">Подключить Google Calendar</button>
+            </form>
+        }
+    </div>
+
+    <p class="integration-hint">
+        При подключении откроется окно авторизации Google. После успешного подтверждения доступ
+        будет сохранён, а при отключении все токены будут удалены.
+    </p>
+</section>
+
+<style>
+    .profile-section {
+        margin-bottom: 2rem;
+        padding: 1.5rem;
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+        background-color: #fafafa;
+    }
+
+    .profile-dictionary {
+        display: grid;
+        grid-template-columns: minmax(120px, 200px) 1fr;
+        gap: 0.75rem 1.5rem;
+        margin: 0;
+    }
+
+    .profile-dictionary dt {
+        font-weight: 600;
+    }
+
+    .integration-status {
+        font-size: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .integration-status--connected {
+        color: #0f5132;
+    }
+
+    .integration-status--revoked {
+        color: #664d03;
+    }
+
+    .integration-status--idle {
+        color: #333333;
+    }
+
+    .integration-details {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 1.5rem 0;
+    }
+
+    .integration-details li {
+        margin-bottom: 0.5rem;
+    }
+
+    .integration-actions form {
+        display: inline-block;
+        margin-right: 1rem;
+    }
+
+    .integration-hint {
+        font-size: 0.9rem;
+        color: #555;
+        margin-top: 1rem;
+    }
+
+    .btn {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        font-size: 1rem;
+    }
+
+    .btn-primary {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+        color: #fff;
+    }
+
+    .btn-outline-danger {
+        background-color: transparent;
+        border-color: #dc3545;
+        color: #dc3545;
+    }
+
+    .btn-outline-danger:hover,
+    .btn-primary:hover {
+        opacity: 0.9;
+    }
+</style>

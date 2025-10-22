@@ -197,12 +197,21 @@ namespace YandexSpeech.Migrations
                     b.Property<DateTime?>("GoogleAccessTokenExpiresAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("GoogleAccessTokenUpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime?>("GoogleCalendarConsentAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("GoogleRefreshToken")
                         .HasMaxLength(4096)
                         .HasColumnType("nvarchar(4096)");
+
+                    b.Property<DateTime?>("GoogleRefreshTokenExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("GoogleTokensRevokedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("bit");

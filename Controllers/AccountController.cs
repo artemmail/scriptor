@@ -8,7 +8,6 @@ using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
@@ -18,6 +17,7 @@ using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 using Microsoft.AspNetCore.Http;
 using YandexSpeech.Extensions;
+using YandexSpeech.services.GoogleCalendar;
 
 namespace YandexSpeech.Controllers
 {
@@ -30,17 +30,20 @@ namespace YandexSpeech.Controllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IConfiguration _config;
         private readonly MyDbContext _dbContext;
+        private readonly IGoogleCalendarTokenService _googleCalendarTokenService;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             IConfiguration config,
-            MyDbContext dbContext)
+            MyDbContext dbContext,
+            IGoogleCalendarTokenService googleCalendarTokenService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _config = config;
             _dbContext = dbContext;
+            _googleCalendarTokenService = googleCalendarTokenService;
         }
 
         // ---------- EXTERNAL SIGN-IN ----------
@@ -176,7 +179,15 @@ namespace YandexSpeech.Controllers
 
             if (isGoogleProvider)
             {
-                await UpdateGoogleCalendarConsentAsync(user, calendarRequested, info.AuthenticationTokens);
+                var updateResult = await _googleCalendarTokenService.UpdateConsentAsync(
+                    user,
+                    calendarRequested,
+                    info.AuthenticationTokens);
+
+                if (!updateResult.Succeeded)
+                {
+                    Console.WriteLine($"Failed to update Google Calendar tokens: {updateResult.ErrorMessage}");
+                }
             }
 
             await EnsureDisplayNameAsync(user);
@@ -457,83 +468,6 @@ namespace YandexSpeech.Controllers
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        private async Task UpdateGoogleCalendarConsentAsync(ApplicationUser user, bool consentGranted, IEnumerable<AuthenticationToken>? tokens)
-        {
-            if (!consentGranted)
-            {
-                if (user.GoogleCalendarConsentAt == null &&
-                    string.IsNullOrWhiteSpace(user.GoogleAccessToken) &&
-                    string.IsNullOrWhiteSpace(user.GoogleRefreshToken) &&
-                    user.GoogleAccessTokenExpiresAt == null)
-                {
-                    return;
-                }
-
-                user.GoogleCalendarConsentAt = null;
-                user.GoogleAccessToken = null;
-                user.GoogleRefreshToken = null;
-                user.GoogleAccessTokenExpiresAt = null;
-
-                await TryUpdateUserAsync(user);
-                return;
-            }
-
-            var tokenList = tokens?.ToList() ?? new List<AuthenticationToken>();
-            var accessToken = tokenList.FirstOrDefault(t => string.Equals(t.Name, "access_token", StringComparison.OrdinalIgnoreCase))?.Value;
-            var refreshToken = tokenList.FirstOrDefault(t => string.Equals(t.Name, "refresh_token", StringComparison.OrdinalIgnoreCase))?.Value;
-            var expiresAtRaw = tokenList.FirstOrDefault(t => string.Equals(t.Name, "expires_at", StringComparison.OrdinalIgnoreCase))?.Value;
-
-            DateTime? expiresAt = null;
-            if (!string.IsNullOrWhiteSpace(expiresAtRaw) &&
-                DateTime.TryParse(expiresAtRaw, CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-                    out var parsedExpires))
-            {
-                expiresAt = DateTime.SpecifyKind(parsedExpires, DateTimeKind.Utc);
-            }
-
-            var now = DateTime.UtcNow;
-            var updated = false;
-
-            if (!user.GoogleCalendarConsentAt.HasValue || Math.Abs((now - user.GoogleCalendarConsentAt.Value).TotalSeconds) >= 1)
-            {
-                user.GoogleCalendarConsentAt = now;
-                updated = true;
-            }
-
-            if (!string.IsNullOrWhiteSpace(accessToken) && !string.Equals(user.GoogleAccessToken, accessToken, StringComparison.Ordinal))
-            {
-                user.GoogleAccessToken = accessToken;
-                updated = true;
-            }
-
-            if (!string.IsNullOrWhiteSpace(refreshToken) && !string.Equals(user.GoogleRefreshToken, refreshToken, StringComparison.Ordinal))
-            {
-                user.GoogleRefreshToken = refreshToken;
-                updated = true;
-            }
-
-            if (expiresAt.HasValue && (!user.GoogleAccessTokenExpiresAt.HasValue || user.GoogleAccessTokenExpiresAt.Value != expiresAt.Value))
-            {
-                user.GoogleAccessTokenExpiresAt = expiresAt.Value;
-                updated = true;
-            }
-
-            if (updated)
-            {
-                await TryUpdateUserAsync(user);
-            }
-        }
-
-        private async Task TryUpdateUserAsync(ApplicationUser user)
-        {
-            var updateResult = await _userManager.UpdateAsync(user);
-            if (!updateResult.Succeeded)
-            {
-                var errors = string.Join(", ", updateResult.Errors.Select(e => e.Description));
-                Console.WriteLine($"Failed to update user {user.Id}: {errors}");
-            }
-        }
 
         private async Task EnsureDisplayNameAsync(ApplicationUser user)
         {
