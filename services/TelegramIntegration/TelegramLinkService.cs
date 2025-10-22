@@ -1,10 +1,13 @@
 using System;
+using System.Data;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using YandexSpeech.models.DB;
@@ -47,6 +50,10 @@ namespace YandexSpeech.services.TelegramIntegration
 
             for (var attempt = 0; attempt < maxRetryCount; attempt++)
             {
+                await using var transaction = await _dbContext.Database
+                    .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+                    .ConfigureAwait(false);
+
                 try
                 {
                     var now = DateTime.UtcNow;
@@ -120,6 +127,8 @@ namespace YandexSpeech.services.TelegramIntegration
 
                     await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
+                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
                     var linkUrl = BuildLinkUrl(options, token);
                     var status = await MapStatusAsync(link, cancellationToken).ConfigureAwait(false);
 
@@ -133,6 +142,8 @@ namespace YandexSpeech.services.TelegramIntegration
                 }
                 catch (DbUpdateConcurrencyException ex)
                 {
+                    await RollbackSilentlyAsync(transaction, cancellationToken).ConfigureAwait(false);
+
                     if (cancellationToken.IsCancellationRequested || attempt == maxRetryCount - 1)
                     {
                         throw;
@@ -140,6 +151,20 @@ namespace YandexSpeech.services.TelegramIntegration
 
                     _logger.LogWarning(ex, "Concurrency conflict while creating Telegram link token for TelegramId {TelegramId}. Retrying (attempt {Attempt}/{MaxAttempts}).", context.TelegramId, attempt + 1, maxRetryCount);
                     _dbContext.ChangeTracker.Clear();
+                    continue;
+                }
+                catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+                {
+                    await RollbackSilentlyAsync(transaction, cancellationToken).ConfigureAwait(false);
+
+                    if (cancellationToken.IsCancellationRequested || attempt == maxRetryCount - 1)
+                    {
+                        throw new DbUpdateConcurrencyException("A unique constraint violation occurred while creating a telegram link token.", ex);
+                    }
+
+                    _logger.LogWarning(ex, "Unique constraint violation while creating Telegram link token for TelegramId {TelegramId}. Retrying (attempt {Attempt}/{MaxAttempts}).", context.TelegramId, attempt + 1, maxRetryCount);
+                    _dbContext.ChangeTracker.Clear();
+                    continue;
                 }
             }
 
@@ -353,6 +378,28 @@ namespace YandexSpeech.services.TelegramIntegration
             {
                 token.RevokedAt = now;
             }
+        }
+
+        private static async Task RollbackSilentlyAsync(IDbContextTransaction transaction, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                // ignored - rollback best effort only
+            }
+        }
+
+        private static bool IsUniqueConstraintViolation(DbUpdateException exception)
+        {
+            if (exception.InnerException is SqlException sqlException)
+            {
+                return sqlException.Number is 2601 or 2627;
+            }
+
+            return false;
         }
 
         private static string Truncate(string? value, int maxLength)
