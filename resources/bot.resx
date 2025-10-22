@@ -21,4 +21,7 @@
   <data name="CalendarAuthorizationMissingDuringScenario" xml:space="preserve">
     <value>⚠️ I cannot add the event because Google Calendar access is missing. Open your profile: {0}</value>
   </data>
+  <data name="TelegramIntegrationMisconfigured" xml:space="preserve">
+    <value>⚠️ Calendar integration is not configured. Update the integration token in your profile.</value>
+  </data>
 </root>
