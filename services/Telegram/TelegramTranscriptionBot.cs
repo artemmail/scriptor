@@ -1058,21 +1058,28 @@ namespace YandexSpeech.services.Telegram
 
         private string? ResolveIntegrationApiToken(TelegramBotOptions options)
         {
-            var configured = _integrationApiToken ?? options.IntegrationApiToken;
-            if (!string.IsNullOrWhiteSpace(configured))
-            {
-                return configured.Trim();
-            }
-
             var integrationToken = _integrationOptions.CurrentValue.IntegrationApiToken;
             if (!string.IsNullOrWhiteSpace(integrationToken))
             {
                 var trimmed = integrationToken.Trim();
-                _integrationApiToken = trimmed;
-                _logger.LogDebug("Using TelegramIntegration options token for Telegram bot integration API calls.");
+                if (!string.Equals(_integrationApiToken, trimmed, StringComparison.Ordinal))
+                {
+                    _integrationApiToken = trimmed;
+                    _logger.LogDebug("Using TelegramIntegration options token for Telegram bot integration API calls.");
+                }
+
                 return trimmed;
             }
 
+            var configured = options.IntegrationApiToken;
+            if (!string.IsNullOrWhiteSpace(configured))
+            {
+                var trimmed = configured.Trim();
+                _integrationApiToken = trimmed;
+                return trimmed;
+            }
+
+            _integrationApiToken = null;
             return null;
         }
 
