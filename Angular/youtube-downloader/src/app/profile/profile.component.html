@@ -92,6 +92,84 @@
     </section>
 
 
+    <section class="integrations">
+      <div class="section-header">
+        <h2>Интеграции</h2>
+        <p>
+          Подключите Google Calendar, чтобы добавлять встречи и поручения прямо из Scriptor и телеграм-бота.
+        </p>
+      </div>
+
+      <div class="integration-card">
+        <div class="integration-header">
+          <div class="integration-title">
+            <div class="integration-icon" aria-hidden="true">
+              <mat-icon>event</mat-icon>
+            </div>
+            <div>
+              <h3>Google Calendar</h3>
+              <p>Синхронизируйте задачи и встречи с вашим календарём Google.</p>
+            </div>
+          </div>
+          <span class="integration-chip" [ngClass]="calendarChipClass">
+            {{ calendarStatusMessage }}
+          </span>
+        </div>
+
+        <div class="integration-body">
+          <p class="integration-secondary" *ngIf="calendarSecondaryMessage">
+            {{ calendarSecondaryMessage }}
+          </p>
+
+          <div class="integration-notice" *ngIf="calendarNotification" [ngClass]="calendarNotification.type">
+            <mat-icon aria-hidden="true">
+              {{ calendarNotification.type === 'success' ? 'check_circle' : calendarNotification.type === 'info' ? 'info' : 'error_outline' }}
+            </mat-icon>
+            <span>{{ calendarNotification.text }}</span>
+          </div>
+
+          <p class="integration-warning" *ngIf="calendarBotWarning">
+            <mat-icon aria-hidden="true">info</mat-icon>
+            <span>{{ calendarBotWarning }}</span>
+          </p>
+
+          <p class="integration-feedback success" *ngIf="calendarActionSuccess">{{ calendarActionSuccess }}</p>
+          <p class="integration-feedback error" *ngIf="calendarActionError">{{ calendarActionError }}</p>
+
+          <div class="integration-actions">
+            <div class="integration-loading" *ngIf="calendarLoading">
+              <mat-progress-spinner mode="indeterminate" diameter="28"></mat-progress-spinner>
+              <span>Проверяем доступ…</span>
+            </div>
+
+            <ng-container *ngIf="!calendarLoading">
+              <button
+                class="btn btn-primary"
+                type="button"
+                *ngIf="showCalendarConnectButton"
+                (click)="connectGoogleCalendar()"
+                [disabled]="calendarActionInProgress"
+              >
+                <mat-icon>sync</mat-icon>
+                <span>Включить доступ</span>
+              </button>
+
+              <button
+                class="btn btn-secondary"
+                type="button"
+                *ngIf="showCalendarDisconnectButton"
+                (click)="disconnectGoogleCalendar()"
+                [disabled]="calendarActionInProgress"
+              >
+                <mat-icon>link_off</mat-icon>
+                <span>{{ calendarActionInProgress ? 'Отключаем…' : 'Отключить доступ' }}</span>
+              </button>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="profile-settings">
       <div class="section-header">
         <h2>Настройки профиля</h2>

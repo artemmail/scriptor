@@ -15,9 +15,12 @@ using System.Security.Cryptography;
 using System.Text;
 using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
+using YandexSpeech.models.DTO.Account;
 using Microsoft.AspNetCore.Http;
 using YandexSpeech.Extensions;
 using YandexSpeech.services.Google;
+using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace YandexSpeech.Controllers
 {
@@ -333,6 +336,179 @@ namespace YandexSpeech.Controllers
             });
         }
 
+        [HttpGet("google-calendar/status")]
+        public async Task<ActionResult<GoogleCalendarStatusDto>> GetGoogleCalendarStatus()
+        {
+            var userId = _userManager.GetUserId(User);
+            if (userId == null)
+            {
+                return Unauthorized();
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var logins = await _userManager.GetLoginsAsync(user);
+            var isGoogleAccount = logins.Any(l =>
+                string.Equals(l.LoginProvider, "Google", StringComparison.OrdinalIgnoreCase));
+
+            var token = await _dbContext.UserGoogleTokens
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    t => t.UserId == user.Id && t.TokenType == GoogleTokenTypes.Calendar,
+                    HttpContext.RequestAborted);
+
+            var status = BuildGoogleCalendarStatus(user, token, isGoogleAccount);
+            return Ok(status);
+        }
+
+        [HttpPost("google-calendar/disconnect")]
+        public async Task<IActionResult> DisconnectGoogleCalendar()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var result = await _googleTokenService.RevokeAsync(user, HttpContext.RequestAborted);
+            if (!result.Succeeded)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new
+                {
+                    success = false,
+                    updated = false,
+                    error = result.ErrorMessage ?? "Не удалось отключить интеграцию Google Calendar."
+                });
+            }
+
+            return Ok(new
+            {
+                success = true,
+                updated = result.Updated,
+                message = result.Updated
+                    ? "Доступ к Google Calendar отключён."
+                    : "Интеграция Google Calendar уже была отключена."
+            });
+        }
+
+        [HttpGet("google-calendar/connect")]
+        public async Task<IActionResult> ConnectGoogleCalendar([FromQuery] string? returnUrl = null)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var redirectUrl = Url.Action(nameof(GoogleCalendarCallback), "Account", new { returnUrl });
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties(
+                GoogleDefaults.AuthenticationScheme,
+                redirectUrl,
+                user.Id);
+
+            properties.Items[ServiceCollectionExtensions.CalendarAccessPropertyName] = bool.TrueString;
+            properties.Items[ServiceCollectionExtensions.PromptPropertyName] = "consent";
+
+            return Challenge(properties, GoogleDefaults.AuthenticationScheme);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("google-calendar/callback")]
+        public async Task<IActionResult> GoogleCalendarCallback(
+            string? returnUrl = null,
+            string? error = null,
+            string? error_description = null)
+        {
+            string status;
+            string? message = null;
+            string? errorMessage = null;
+
+            if (!string.IsNullOrEmpty(error))
+            {
+                status = "error";
+                errorMessage = error_description ?? error;
+                await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+                return Redirect(BuildGoogleCalendarRedirectUrl(returnUrl, status, message, errorMessage));
+            }
+
+            var info = await _signInManager.GetExternalLoginInfoAsync();
+            if (info == null)
+            {
+                status = "error";
+                errorMessage = "Не удалось получить данные от Google.";
+                await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+                return Redirect(BuildGoogleCalendarRedirectUrl(returnUrl, status, message, errorMessage));
+            }
+
+            var calendarRequested = info.AuthenticationProperties != null
+                && info.AuthenticationProperties.Items.TryGetValue(ServiceCollectionExtensions.CalendarAccessPropertyName, out var calendarValue)
+                && bool.TryParse(calendarValue, out var calendarFlag)
+                && calendarFlag;
+
+            if (!calendarRequested)
+            {
+                status = "error";
+                errorMessage = "Запрос доступа к календарю не был подтверждён.";
+                await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+                return Redirect(BuildGoogleCalendarRedirectUrl(returnUrl, status, message, errorMessage));
+            }
+
+            var userId = _userManager.GetUserId(User);
+            if (string.IsNullOrEmpty(userId) && info.AuthenticationProperties != null)
+            {
+                info.AuthenticationProperties.Items.TryGetValue("XsrfId", out userId);
+            }
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                status = "error";
+                errorMessage = "Не удалось определить пользователя.";
+                await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+                return Redirect(BuildGoogleCalendarRedirectUrl(returnUrl, status, message, errorMessage));
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                status = "error";
+                errorMessage = "Пользователь не найден.";
+                await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+                return Redirect(BuildGoogleCalendarRedirectUrl(returnUrl, status, message, errorMessage));
+            }
+
+            await _signInManager.UpdateExternalAuthenticationTokensAsync(info);
+
+            var updateResult = await _googleTokenService.EnsureAccessTokenAsync(
+                user,
+                consentGranted: true,
+                info.AuthenticationTokens,
+                HttpContext.RequestAborted);
+
+            if (!updateResult.Succeeded)
+            {
+                status = "error";
+                errorMessage = updateResult.ErrorMessage ?? "Не удалось подключить Google Calendar.";
+            }
+            else if (updateResult.Updated)
+            {
+                status = "connected";
+                message = "Google Calendar подключён.";
+            }
+            else
+            {
+                status = "unchanged";
+                message = "Права доступа уже были предоставлены ранее.";
+            }
+
+            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+
+            return Redirect(BuildGoogleCalendarRedirectUrl(returnUrl, status, message, errorMessage));
+        }
+
         // ---------- REFRESH ----------
 
         [HttpPost("refresh-token")]
@@ -384,6 +560,97 @@ namespace YandexSpeech.Controllers
         }
 
         // ---------- ВСПОМОГАТЕЛЬНЫЕ ----------
+
+        private GoogleCalendarStatusDto BuildGoogleCalendarStatus(
+            ApplicationUser user,
+            UserGoogleToken? token,
+            bool isGoogleAccount)
+        {
+            var revokedAfterConsent = token != null
+                && token.RevokedAt.HasValue
+                && (!token.ConsentGrantedAt.HasValue || token.RevokedAt.Value >= token.ConsentGrantedAt.Value);
+
+            var isConnected = token != null
+                && token.ConsentGrantedAt.HasValue
+                && !revokedAfterConsent
+                && !string.IsNullOrWhiteSpace(token.AccessToken);
+
+            return new GoogleCalendarStatusDto
+            {
+                IsGoogleAccount = isGoogleAccount,
+                IsConnected = isConnected,
+                HasRefreshToken = !string.IsNullOrWhiteSpace(token?.RefreshToken),
+                ConsentGrantedAt = token?.ConsentGrantedAt,
+                ConsentDeclinedAt = token?.ConsentDeclinedAt,
+                TokensRevokedAt = token?.RevokedAt,
+                AccessTokenUpdatedAt = token?.AccessTokenUpdatedAt,
+                AccessTokenExpiresAt = token?.AccessTokenExpiresAt,
+                RefreshTokenExpiresAt = token?.RefreshTokenExpiresAt
+            };
+        }
+
+        private string BuildGoogleCalendarRedirectUrl(
+            string? returnUrl,
+            string status,
+            string? message,
+            string? error)
+        {
+            var sanitized = SanitizeReturnUrl(returnUrl);
+            var query = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["calendarStatus"] = status
+            };
+
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                query["calendarMessage"] = message;
+            }
+
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                query["calendarError"] = error;
+            }
+
+            var target = QueryHelpers.AddQueryString(sanitized.BasePathWithQuery, query);
+            return string.Concat(target, sanitized.Fragment);
+        }
+
+        private (string BasePathWithQuery, string Fragment) SanitizeReturnUrl(string? returnUrl)
+        {
+            const string fallback = "/profile";
+            if (string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return (fallback, string.Empty);
+            }
+
+            var fragment = string.Empty;
+            var pathPart = returnUrl;
+
+            var hashIndex = returnUrl.IndexOf('#');
+            if (hashIndex >= 0)
+            {
+                fragment = returnUrl.Substring(hashIndex);
+                pathPart = returnUrl.Substring(0, hashIndex);
+            }
+
+            if (Uri.TryCreate(pathPart, UriKind.Absolute, out var absolute))
+            {
+                if (!string.Equals(absolute.Host, Request.Host.Host, StringComparison.OrdinalIgnoreCase))
+                {
+                    return (fallback, string.Empty);
+                }
+
+                var normalizedPath = absolute.PathAndQuery;
+                return (string.IsNullOrEmpty(normalizedPath) ? fallback : normalizedPath, fragment);
+            }
+
+            if (!Uri.TryCreate(pathPart, UriKind.Relative, out _) || !pathPart.StartsWith('/'))
+            {
+                return (fallback, string.Empty);
+            }
+
+            return (pathPart, fragment);
+        }
 
         private IActionResult InitiateExternalLogin(
             string provider,

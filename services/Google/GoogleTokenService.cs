@@ -319,6 +319,12 @@ namespace YandexSpeech.services.Google
                 updated = true;
             }
 
+            if (!string.IsNullOrWhiteSpace(tokenEntity.Scope))
+            {
+                tokenEntity.Scope = null;
+                updated = true;
+            }
+
             if (tokenEntity.AccessTokenExpiresAt.HasValue)
             {
                 tokenEntity.AccessTokenExpiresAt = null;
@@ -334,6 +340,18 @@ namespace YandexSpeech.services.Google
             if (tokenEntity.RefreshTokenExpiresAt.HasValue)
             {
                 tokenEntity.RefreshTokenExpiresAt = null;
+                updated = true;
+            }
+
+            if (tokenEntity.ConsentGrantedAt.HasValue)
+            {
+                tokenEntity.ConsentGrantedAt = null;
+                updated = true;
+            }
+
+            if (!tokenEntity.ConsentDeclinedAt.HasValue || (now - tokenEntity.ConsentDeclinedAt.Value).TotalSeconds >= 1)
+            {
+                tokenEntity.ConsentDeclinedAt = now;
                 updated = true;
             }
 
