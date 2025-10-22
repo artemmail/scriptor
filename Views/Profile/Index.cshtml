@@ -1,3 +1,4 @@
+@using YandexSpeech.models.DTO.Telegram
 @model YandexSpeech.models.DTO.Profile.ProfileIndexViewModel
 @{
     ViewData["Title"] = "Профиль";
@@ -7,6 +8,27 @@
 
     string FormatUtc(DateTime? value)
         => value.HasValue ? value.Value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'") : "—";
+
+    string DescribeTelegramState(string state) => state switch
+    {
+        TelegramIntegrationStates.Linked => "Привязан",
+        TelegramIntegrationStates.Pending => "Ожидает подтверждения",
+        TelegramIntegrationStates.Revoked => "Отключён",
+        TelegramIntegrationStates.Error => "Ошибка",
+        _ => "Не привязан"
+    };
+
+    string? DescribeTelegramDetail(string? detail) => detail switch
+    {
+        TelegramIntegrationDetails.AwaitingConfirmation => "Ожидается подтверждение привязки в профиле.",
+        TelegramIntegrationDetails.GoogleMissing => "Нужно подключить Google Calendar.",
+        TelegramIntegrationDetails.GoogleScopeInsufficient => "Не хватает прав доступа Google Calendar.",
+        TelegramIntegrationDetails.GoogleRevoked => "Доступ к Google Calendar был отозван.",
+        TelegramIntegrationDetails.TokenExpired => "Требуется обновить доступ к Google Calendar.",
+        TelegramIntegrationDetails.InternalError => "Произошла внутренняя ошибка интеграции.",
+        TelegramIntegrationDetails.LinkMissing => "Связка с Telegram ещё не настроена.",
+        _ => null
+    };
 }
 
 <h1>Профиль</h1>
@@ -90,6 +112,70 @@
     </p>
 </section>
 
+<section class="profile-section">
+    <h2>Telegram-бот</h2>
+
+    @{
+        var telegram = Model.Telegram;
+        var stateDescription = DescribeTelegramState(telegram.State);
+        var detailDescription = DescribeTelegramDetail(telegram.DetailCode);
+    }
+
+    @if (telegram.HasCalendarAccess)
+    {
+        <p class="integration-status integration-status--connected">
+            Telegram-бот привязан и доступ к Google Calendar активен.
+        </p>
+    }
+    else if (telegram.IsLinked)
+    {
+        <p class="integration-status integration-status--pending">
+            Telegram-бот привязан, но требуется подтвердить доступ к Google Calendar.
+        </p>
+    }
+    else
+    {
+        <p class="integration-status integration-status--idle">
+            Telegram-бот не привязан к аккаунту.
+        </p>
+    }
+
+    <ul class="integration-details">
+        <li><strong>Статус:</strong> @stateDescription</li>
+        <li><strong>Доступ к календарю:</strong> @(telegram.HasCalendarAccess ? "есть" : "нет")</li>
+        <li><strong>Авторизация Google:</strong> @(telegram.GoogleAuthorized ? "подтверждена" : "нет")</li>
+        <li><strong>Необходимые права:</strong> @(telegram.HasRequiredScope ? "выданы" : "не выданы")</li>
+        @if (telegram.AccessTokenExpired)
+        {
+            <li><strong>Токен доступа:</strong> истёк</li>
+        }
+        @if (!string.IsNullOrEmpty(detailDescription))
+        {
+            <li><strong>Подробности:</strong> @detailDescription</li>
+        }
+        else if (!string.IsNullOrEmpty(telegram.DetailCode))
+        {
+            <li><strong>Код детали:</strong> @telegram.DetailCode</li>
+        }
+        <li><strong>Привязан:</strong> @FormatUtc(telegram.LinkedAt)</li>
+        <li><strong>Активность:</strong> @FormatUtc(telegram.LastActivityAt)</li>
+        <li><strong>Проверка статуса:</strong> @FormatUtc(telegram.LastStatusCheckAt)</li>
+        @if (!string.IsNullOrWhiteSpace(telegram.PermissionScope))
+        {
+            <li><strong>Права Google:</strong> @telegram.PermissionScope</li>
+        }
+    </ul>
+
+    <div class="integration-actions">
+        <a class="btn btn-primary" href="@Url.Action("TelegramLink", "Profile")">Открыть страницу привязки</a>
+    </div>
+
+    <p class="integration-hint">
+        Выполните команду <code>/link</code> в Telegram-боте YouScriptor, чтобы получить одноразовую ссылку на страницу привязки.
+        После подтверждения проверьте, что интеграция с Google Calendar остаётся активной.
+    </p>
+</section>
+
 <style>
     .profile-section {
         margin-bottom: 2rem;
@@ -127,6 +213,10 @@
         color: #333333;
     }
 
+    .integration-status--pending {
+        color: #0d6efd;
+    }
+
     .integration-details {
         list-style: none;
         padding: 0;
@@ -140,6 +230,14 @@
     .integration-actions form {
         display: inline-block;
         margin-right: 1rem;
+    }
+
+    .integration-actions .btn {
+        margin-right: 1rem;
+    }
+
+    .integration-actions .btn:last-child {
+        margin-right: 0;
     }
 
     .integration-hint {
