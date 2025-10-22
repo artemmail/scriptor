@@ -76,4 +76,9 @@
                         <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
                 </None>
         </ItemGroup>
+
+        <ItemGroup>
+                <EmbeddedResource Include="resources\bot.resx" />
+                <EmbeddedResource Include="resources\bot.ru.resx" />
+        </ItemGroup>
 </Project>

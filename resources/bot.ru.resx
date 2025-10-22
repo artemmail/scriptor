@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="CalendarAuthorizationRequired" xml:space="preserve">
+    <value>🔐 Подключите Google Calendar в профиле: {0}</value>
+  </data>
+  <data name="CalendarScenarioPrompt" xml:space="preserve">
+    <value>✅ Доступ к Google Calendar есть. Отправьте голосовое или текстовое описание события — добавлю встречу в календарь.</value>
+  </data>
+  <data name="CalendarAuthorizationMissingDuringScenario" xml:space="preserve">
+    <value>⚠️ Не могу добавить событие: нет доступа к Google Calendar. Откройте профиль и подтвердите интеграцию: {0}</value>
+  </data>
+</root>

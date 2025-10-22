@@ -6,12 +6,14 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Resources;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using YandexSpeech.services.Interface;
 using YandexSpeech.services.Options;
 using YandexSpeech.services.Whisper;
+using YandexSpeech.services.TelegramTranscriptionBot.State;
 using IOFile = System.IO.File;
 using TGFile = Telegram.Bot.Types.TGFile;
 
@@ -37,6 +39,7 @@ namespace YandexSpeech.services.Telegram
         private readonly JsonSerializerOptions _logJsonOptions;
         private readonly object _logLock = new();
         private readonly string? _globalOpenAiApiKey;
+        private readonly TelegramUserStateStore _userStateStore;
 
         private const string DefaultOpenAiModel = "gpt-4.1";
         private const int DefaultSummaryThreshold = 70;
@@ -49,6 +52,8 @@ namespace YandexSpeech.services.Telegram
         {
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
+
+        private static readonly ResourceManager BotResourceManager = new("YandexSpeech.resources.bot", typeof(TelegramTranscriptionBot).Assembly);
 
         // ⬇️ Расширено: больше реальных аудио-расширений (часто прилетают с octet-stream)
         private static readonly HashSet<string> AudioFileExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -81,13 +86,15 @@ namespace YandexSpeech.services.Telegram
             IHttpClientFactory httpClientFactory,
             FasterWhisperQueueClient queueClient,
             ILogger<TelegramTranscriptionBot> logger,
-            IFfmpegService ffmpegService)
+            IFfmpegService ffmpegService,
+            TelegramUserStateStore userStateStore)
         {
             _optionsMonitor = optionsMonitor;
             _httpClientFactory = httpClientFactory;
             _queueClient = queueClient;
             _logger = logger;
             _ffmpegService = ffmpegService;
+            _userStateStore = userStateStore;
 
             var section = configuration.GetSection("FasterWhisper");
             _model = section.GetValue<string>("Model") ?? configuration.GetValue<string>("Whisper:Model") ?? "medium";
@@ -251,11 +258,14 @@ namespace YandexSpeech.services.Telegram
 
             try
             {
+                var userState = TryGetUserState(message.From);
+                var culture = ResolveUserCulture(message.From);
+
                 if (message.Text is string text)
                 {
                     if (text.StartsWith("/"))
                     {
-                        await HandleCommandAsync(message, text, cancellationToken).ConfigureAwait(false);
+                        await HandleCommandAsync(message, text, userState, culture, cancellationToken).ConfigureAwait(false);
                         return;
                     }
 
@@ -265,7 +275,7 @@ namespace YandexSpeech.services.Telegram
                 var audioPayload = FindAudioPayload(message);
                 if (audioPayload is not null)
                 {
-                    await HandleAudioAsync(message, audioPayload, cancellationToken).ConfigureAwait(false);
+                    await HandleAudioAsync(message, audioPayload, userState, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)
@@ -276,6 +286,16 @@ namespace YandexSpeech.services.Telegram
             {
                 _logger.LogError(ex, "Failed to process Telegram update {UpdateId}.", update.Id);
             }
+        }
+
+        private TelegramUserState? TryGetUserState(User? user)
+        {
+            if (user is null)
+            {
+                return null;
+            }
+
+            return _userStateStore.GetOrCreate(user.Id);
         }
 
         private async Task RunLongPollingAsync(CancellationToken stoppingToken)
@@ -321,7 +341,7 @@ namespace YandexSpeech.services.Telegram
             }
         }
 
-        private async Task HandleCommandAsync(Message message, string text, CancellationToken cancellationToken)
+        private async Task HandleCommandAsync(Message message, string text, TelegramUserState? userState, CultureInfo culture, CancellationToken cancellationToken)
         {
             if (_botClient is null)
             {
@@ -352,10 +372,53 @@ namespace YandexSpeech.services.Telegram
                             cancellationToken)
                         .ConfigureAwait(false);
                     break;
+                case "/calendar":
+                    await HandleCalendarCommandAsync(message, userState, culture, cancellationToken).ConfigureAwait(false);
+                    break;
             }
         }
 
-        private async Task HandleAudioAsync(Message triggerMessage, AudioPayload audioPayload, CancellationToken cancellationToken)
+        private async Task HandleCalendarCommandAsync(Message message, TelegramUserState? userState, CultureInfo culture, CancellationToken cancellationToken)
+        {
+            var replyParameters = new ReplyParameters { MessageId = message.Id };
+            var calendarUrl = GetCalendarConsentUrl();
+
+            if (userState?.HasCalendarConsent == true)
+            {
+                userState.CalendarScenarioRequested = true;
+                var template = GetBotString("CalendarScenarioPrompt", culture);
+                var response = string.IsNullOrWhiteSpace(template)
+                    ? "✅ Доступ к Google Calendar есть. Отправьте голосовое или текстовое описание события — добавлю встречу в календарь."
+                    : template;
+
+                await SendTextMessageAsync(
+                        message.Chat.Id,
+                        response,
+                        replyParameters,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                return;
+            }
+
+            if (userState is not null)
+            {
+                userState.CalendarScenarioRequested = false;
+            }
+
+            var requiredTemplate = GetBotString("CalendarAuthorizationRequired", culture);
+            var requiredMessage = FormatCalendarLinkMessage(requiredTemplate, culture, calendarUrl);
+
+            await SendTextMessageAsync(
+                    message.Chat.Id,
+                    requiredMessage,
+                    replyParameters,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            LogEvent("calendar_consent_required", message, requiredMessage, new { stage = "command" });
+        }
+
+        private async Task HandleAudioAsync(Message triggerMessage, AudioPayload audioPayload, TelegramUserState? userState, CancellationToken cancellationToken)
         {
             if (_botClient is null)
             {
@@ -458,6 +521,12 @@ namespace YandexSpeech.services.Telegram
                 });
 
                 LogEvent("transcript", triggerMessage, postProcessing.Text, transcriptLog);
+
+                if (userState is not null)
+                {
+                    await RunCalendarScenarioIfNeededAsync(triggerMessage, postProcessing, userState, cancellationToken)
+                        .ConfigureAwait(false);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -478,6 +547,153 @@ namespace YandexSpeech.services.Telegram
             {
                 TryDeleteDirectory(tempRoot);
             }
+        }
+
+        private async Task RunCalendarScenarioIfNeededAsync(
+            Message triggerMessage,
+            OpenAiPostProcessingResult _,
+            TelegramUserState userState,
+            CancellationToken cancellationToken)
+        {
+            if (!userState.CalendarScenarioRequested)
+            {
+                return;
+            }
+
+            var culture = ResolveUserCulture(triggerMessage.From);
+
+            if (!userState.HasCalendarConsent)
+            {
+                var template = GetBotString("CalendarAuthorizationMissingDuringScenario", culture);
+                var text = FormatCalendarLinkMessage(template, culture, GetCalendarConsentUrl());
+
+                await SendTextMessageAsync(
+                        triggerMessage.Chat.Id,
+                        text,
+                        new ReplyParameters { MessageId = triggerMessage.Id },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                LogEvent("calendar_consent_required", triggerMessage, text, new { stage = "scenario" });
+                userState.CalendarScenarioRequested = false;
+                return;
+            }
+
+            // Здесь позже будет логика создания события в календаре.
+            userState.CalendarScenarioRequested = false;
+        }
+
+        private static CultureInfo ResolveUserCulture(User? user)
+        {
+            if (!string.IsNullOrWhiteSpace(user?.LanguageCode))
+            {
+                var languageCode = user.LanguageCode;
+                try
+                {
+                    return CultureInfo.GetCultureInfo(languageCode);
+                }
+                catch (CultureNotFoundException)
+                {
+                    try
+                    {
+                        return new CultureInfo(languageCode);
+                    }
+                    catch (CultureNotFoundException)
+                    {
+                        // ignore and fallback below
+                    }
+                }
+            }
+
+            try
+            {
+                return CultureInfo.GetCultureInfo("ru-RU");
+            }
+            catch (CultureNotFoundException)
+            {
+                return CultureInfo.InvariantCulture;
+            }
+        }
+
+        private string GetCalendarConsentUrl()
+        {
+            var options = _optionsMonitor.CurrentValue;
+            if (!string.IsNullOrWhiteSpace(options.CalendarConsentUrl))
+            {
+                return options.CalendarConsentUrl!;
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.WebhookUrl)
+                && Uri.TryCreate(options.WebhookUrl, UriKind.Absolute, out var webhookUri))
+            {
+                try
+                {
+                    var builder = new UriBuilder
+                    {
+                        Scheme = webhookUri.Scheme,
+                        Host = webhookUri.Host,
+                        Port = webhookUri.IsDefaultPort ? -1 : webhookUri.Port,
+                        Path = "profile"
+                    };
+
+                    return builder.Uri.ToString();
+                }
+                catch
+                {
+                    // ignore and fallback below
+                }
+            }
+
+            return "https://teamlogs.ru/profile";
+        }
+
+        private string GetBotString(string key, CultureInfo culture)
+        {
+            try
+            {
+                var value = BotResourceManager.GetString(key, culture);
+                if (!string.IsNullOrEmpty(value))
+                {
+                    return value;
+                }
+            }
+            catch (MissingManifestResourceException)
+            {
+                // ignore
+            }
+
+            try
+            {
+                var fallback = BotResourceManager.GetString(key, CultureInfo.InvariantCulture);
+                if (!string.IsNullOrEmpty(fallback))
+                {
+                    return fallback;
+                }
+            }
+            catch (MissingManifestResourceException)
+            {
+                // ignore
+            }
+
+            return key switch
+            {
+                "CalendarAuthorizationRequired" => "🔐 Подключите Google Calendar в профиле: {0}",
+                "CalendarScenarioPrompt" => "✅ Доступ к Google Calendar есть. Отправьте голосовое или текстовое описание события — добавлю встречу в календарь.",
+                "CalendarAuthorizationMissingDuringScenario" => "⚠️ Не могу добавить событие: нет доступа к Google Calendar. Откройте профиль и подтвердите интеграцию: {0}",
+                _ => key
+            };
+        }
+
+        private string FormatCalendarLinkMessage(string template, CultureInfo culture, string calendarUrl)
+        {
+            if (string.IsNullOrWhiteSpace(template))
+            {
+                template = "🔐 Подключите Google Calendar в профиле: {0}";
+            }
+
+            return template.Contains("{0}", StringComparison.Ordinal)
+                ? string.Format(culture, template, calendarUrl)
+                : string.Join(' ', template.Trim(), calendarUrl).Trim();
         }
 
         private async Task<string?> DownloadMediaAsync(AudioPayload payload, string directory, CancellationToken cancellationToken)

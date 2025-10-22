@@ -16,6 +16,8 @@ namespace YandexSpeech.services.Options
 
         public bool UseLongPolling { get; set; }
 
+        public string? CalendarConsentUrl { get; set; }
+
         public string? LogFilePath { get; set; }
 
         public int MessageChunkLimit { get; set; } = 3900;

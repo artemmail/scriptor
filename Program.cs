@@ -13,6 +13,7 @@ using YandexSpeech.services;
 using YandexSpeech.services.Interface;
 using YandexSpeech.services.Options;
 using YandexSpeech.services.Telegram;
+using YandexSpeech.services.TelegramTranscriptionBot.State;
 using YandexSpeech.services.Whisper;
 using YandexSpeech.Services;
 using YandexSpeech.Extensions;
@@ -217,6 +218,7 @@ builder.Services.AddScoped<IYSubtitlesService, YSubtitlesService>();
 builder.Services.AddHostedService<RecognitionBackgroundService>();
 builder.Services.AddHostedService<AudioRecognitionBackgroundService>();
 builder.Services.AddHostedService<SubscriptionExpirationHostedService>();
+builder.Services.AddSingleton<TelegramUserStateStore>();
 builder.Services.AddSingleton<TelegramTranscriptionBot>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<TelegramTranscriptionBot>());
 
