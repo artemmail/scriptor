@@ -22,6 +22,10 @@ namespace YandexSpeech.services.Google
             ApplicationUser user,
             CancellationToken cancellationToken = default);
 
+        Task RecordCalendarDeclinedAsync(
+            ApplicationUser user,
+            CancellationToken cancellationToken = default);
+
         Task<GoogleTokenOperationResult> RevokeAsync(
             ApplicationUser user,
             CancellationToken cancellationToken = default);

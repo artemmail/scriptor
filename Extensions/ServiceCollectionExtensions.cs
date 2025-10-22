@@ -14,6 +14,7 @@ namespace YandexSpeech.Extensions
     public static class ServiceCollectionExtensions
     {
         public const string CalendarAccessPropertyName = "google:calendar_access";
+        public const string CalendarDeclinedPropertyName = "google:calendar_declined";
         public const string PromptPropertyName = "google:prompt";
 
         public static AuthenticationBuilder AddGoogleOAuthConfigurations(

@@ -1072,6 +1072,9 @@ namespace YandexSpeech.Migrations
                     b.Property<DateTime?>("ConsentGrantedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("ConsentDeclinedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
