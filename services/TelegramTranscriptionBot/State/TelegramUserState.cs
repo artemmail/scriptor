@@ -9,7 +9,7 @@ namespace YandexSpeech.services.TelegramTranscriptionBot.State
         private volatile bool _hasCalendarConsent;
         private volatile bool _calendarScenarioRequested;
         private TelegramCalendarStatusDto _calendarStatus = TelegramCalendarStatusDto.NotLinked();
-        private DateTime _statusFetchedAt = DateTime.MinValue;
+        private long _statusFetchedAtBinary = DateTime.MinValue.ToBinary();
 
         public bool HasCalendarConsent
         {
@@ -31,8 +31,8 @@ namespace YandexSpeech.services.TelegramTranscriptionBot.State
 
         public DateTime StatusFetchedAt
         {
-            get => Volatile.Read(ref _statusFetchedAt);
-            set => Volatile.Write(ref _statusFetchedAt, value);
+            get => DateTime.FromBinary(Volatile.Read(ref _statusFetchedAtBinary));
+            set => Volatile.Write(ref _statusFetchedAtBinary, value.ToBinary());
         }
     }
 }
