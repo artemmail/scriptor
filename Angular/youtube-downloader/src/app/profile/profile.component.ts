@@ -7,10 +7,12 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatListModule } from '@angular/material/list';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { PLATFORM_ID } from '@angular/core';
 
-import { AccountService } from '../services/account.service';
+import { take } from 'rxjs/operators';
+
+import { AccountService, GoogleCalendarOperationResponse, GoogleCalendarStatus } from '../services/account.service';
 import { AuthService } from '../services/AuthService.service';
 import { PaymentsService, SubscriptionSummary } from '../services/payments.service';
 
@@ -36,6 +38,7 @@ export class ProfileComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly paymentsService = inject(PaymentsService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   readonly form = this.fb.nonNullable.group({
     displayName: ['', [Validators.required, Validators.maxLength(100)]]
   });
@@ -51,13 +54,22 @@ export class ProfileComponent implements OnInit {
   readonly user$ = this.authService.user$;
   logoutInProgress = false;
   logoutError = '';
+  calendarLoading = false;
+  calendarError = '';
+  calendarStatus: GoogleCalendarStatus | null = null;
+  calendarActionInProgress = false;
+  calendarActionError = '';
+  calendarActionSuccess = '';
+  calendarNotification: { type: 'success' | 'info' | 'error'; text: string } | null = null;
   private readonly platformId = inject(PLATFORM_ID);
   private readonly isBrowser = isPlatformBrowser(this.platformId);
 
   ngOnInit(): void {
     if (this.isBrowser) {
+      this.handleCalendarQueryParams();
       this.fetchProfile();
       this.fetchSummary();
+      this.fetchCalendarStatus();
     }
   }
 
@@ -107,6 +119,84 @@ export class ProfileComponent implements OnInit {
     });
   }
 
+  fetchCalendarStatus(): void {
+    if (!this.isBrowser || this.calendarLoading) {
+      return;
+    }
+
+    this.calendarLoading = true;
+    this.calendarError = '';
+
+    this.accountService.getGoogleCalendarStatus().subscribe({
+      next: (status) => {
+        this.calendarStatus = status;
+        this.calendarLoading = false;
+      },
+      error: (error) => {
+        this.calendarLoading = false;
+        this.calendarStatus = null;
+        this.calendarError = this.extractCalendarError(error) ??
+          'Не удалось получить статус интеграции Google Calendar.';
+      }
+    });
+  }
+
+  private handleCalendarQueryParams(): void {
+    if (!this.isBrowser) {
+      return;
+    }
+
+    this.route.queryParamMap.pipe(take(1)).subscribe(params => {
+      const status = params.get('calendarStatus');
+      const message = params.get('calendarMessage');
+      const error = params.get('calendarError');
+
+      if (!status && !message && !error) {
+        return;
+      }
+
+      if (status === 'connected') {
+        this.calendarNotification = {
+          type: 'success',
+          text: message || 'Google Calendar подключён.'
+        };
+      } else if (status === 'unchanged') {
+        this.calendarNotification = {
+          type: 'info',
+          text: message || 'Права доступа уже были предоставлены ранее.'
+        };
+      } else if (status === 'error') {
+        this.calendarNotification = {
+          type: 'error',
+          text: error || message || 'Не удалось обновить доступ к Google Calendar.'
+        };
+      } else if (message) {
+        this.calendarNotification = { type: 'info', text: message };
+      }
+
+      if (error && status !== 'error') {
+        this.calendarNotification = { type: 'error', text: error };
+      }
+
+      this.clearCalendarQueryParams();
+    });
+  }
+
+  private clearCalendarQueryParams(): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        calendarStatus: null,
+        calendarMessage: null,
+        calendarError: null
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true
+    }).catch(() => {
+      // ignore navigation errors when cleaning up the url
+    });
+  }
+
   submit(): void {
     if (this.form.invalid || this.saving) {
       this.form.markAllAsTouched();
@@ -134,6 +224,141 @@ export class ProfileComponent implements OnInit {
         this.saving = false;
       }
     });
+  }
+
+  connectGoogleCalendar(): void {
+    if (!this.isBrowser) {
+      return;
+    }
+
+    this.calendarActionError = '';
+    this.calendarActionSuccess = '';
+    this.calendarNotification = null;
+
+    const returnUrl = `${window.location.origin}/profile`;
+    const url = `/api/account/google-calendar/connect?returnUrl=${encodeURIComponent(returnUrl)}`;
+    window.location.href = url;
+  }
+
+  disconnectGoogleCalendar(): void {
+    if (this.calendarActionInProgress) {
+      return;
+    }
+
+    this.calendarActionInProgress = true;
+    this.calendarActionError = '';
+    this.calendarActionSuccess = '';
+    this.calendarNotification = null;
+
+    this.accountService.disconnectGoogleCalendar().subscribe({
+      next: (response: GoogleCalendarOperationResponse) => {
+        this.calendarActionInProgress = false;
+        if (response.success) {
+          this.calendarActionSuccess = response.message
+            || 'Интеграция Google Calendar отключена.';
+        } else {
+          this.calendarActionError = response.error
+            || 'Не удалось отключить интеграцию Google Calendar.';
+        }
+        this.fetchCalendarStatus();
+      },
+      error: (error) => {
+        this.calendarActionInProgress = false;
+        this.calendarActionError = this.extractCalendarError(error)
+          || 'Не удалось отключить интеграцию Google Calendar.';
+      }
+    });
+  }
+
+  get calendarChipClass(): string {
+    if (this.calendarLoading) {
+      return 'status-neutral';
+    }
+
+    if (this.calendarError) {
+      return 'status-trial';
+    }
+
+    const status = this.calendarStatus;
+    if (!status) {
+      return 'status-neutral';
+    }
+
+    if (status.isConnected) {
+      return 'status-success';
+    }
+
+    if (status.tokensRevokedAt || status.consentDeclinedAt || !status.isGoogleAccount) {
+      return 'status-trial';
+    }
+
+    return 'status-neutral';
+  }
+
+  get calendarStatusMessage(): string {
+    if (this.calendarLoading) {
+      return 'Проверяем доступ…';
+    }
+
+    if (this.calendarError) {
+      return this.calendarError;
+    }
+
+    const status = this.calendarStatus;
+    if (!status) {
+      return 'Статус интеграции недоступен.';
+    }
+
+    if (status.isConnected) {
+      return 'Доступ к Google Calendar разрешён.';
+    }
+
+    if (status.tokensRevokedAt) {
+      return 'Доступ к Google Calendar отключён.';
+    }
+
+    if (status.consentDeclinedAt) {
+      return 'Доступ к Google Calendar не подтверждён.';
+    }
+
+    return 'Доступ к Google Calendar не подключён.';
+  }
+
+  get calendarSecondaryMessage(): string | null {
+    const status = this.calendarStatus;
+    if (!status) {
+      return null;
+    }
+
+    if (status.isConnected && status.consentGrantedAt) {
+      return `Доступ подтверждён ${this.formatDate(status.consentGrantedAt)}`;
+    }
+
+    if (status.tokensRevokedAt) {
+      return `Доступ отключён ${this.formatDate(status.tokensRevokedAt)}`;
+    }
+
+    if (status.consentDeclinedAt && !status.isConnected) {
+      return `Последний отказ: ${this.formatDate(status.consentDeclinedAt)}`;
+    }
+
+    return null;
+  }
+
+  get showCalendarConnectButton(): boolean {
+    return !this.calendarLoading && !!this.calendarStatus && !this.calendarStatus.isConnected;
+  }
+
+  get showCalendarDisconnectButton(): boolean {
+    return !this.calendarLoading && !!this.calendarStatus?.isConnected;
+  }
+
+  get calendarBotWarning(): string | null {
+    if (this.calendarStatus && !this.calendarStatus.isGoogleAccount) {
+      return 'Управление календарём из бота недоступно для этого аккаунта. Войдите через Google, чтобы активировать интеграцию.';
+    }
+
+    return null;
   }
 
   get subscriptionChipClass(): string {
@@ -189,6 +414,35 @@ export class ProfileComponent implements OnInit {
     }
 
     this.router.navigateByUrl(url);
+  }
+
+  private extractCalendarError(error: unknown): string | null {
+    if (!error || typeof error !== 'object') {
+      return null;
+    }
+
+    const anyError = error as { error?: unknown; message?: string };
+    const payload = anyError.error;
+
+    if (typeof payload === 'string') {
+      return payload;
+    }
+
+    if (payload && typeof payload === 'object') {
+      const data = payload as { message?: string; error?: string };
+      if (typeof data.error === 'string' && data.error.trim()) {
+        return data.error;
+      }
+      if (typeof data.message === 'string' && data.message.trim()) {
+        return data.message;
+      }
+    }
+
+    if (typeof anyError.message === 'string' && anyError.message.trim()) {
+      return anyError.message;
+    }
+
+    return null;
   }
 
   formatAmount(amount: number, currency: string): string {
