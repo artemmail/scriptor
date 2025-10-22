@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using YandexSpeech;
 using YandexSpeech.models.DB;
 using YandexSpeech.services;
@@ -57,7 +59,15 @@ builder.Services.AddCors(opts =>
 });
 
 // 2. Контроллеры
-builder.Services.AddControllersWithViews();
+builder.Services
+    .AddControllersWithViews()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    });
 
 // Общий HttpClient для внешних запросов
 builder.Services.AddHttpClient();
