@@ -1,0 +1,54 @@
+@using YandexSpeech.models.DTO.Telegram
+@{
+    ViewData["Title"] = "Привязка Telegram";
+    var token = ViewData["TelegramLinkToken"] as string ?? string.Empty;
+    var status = ViewData["TelegramLinkStatus"] as TelegramCalendarStatusDto;
+}
+
+<section class="profile-telegram-link">
+    <h2>Привязка Telegram</h2>
+
+    @if (!string.IsNullOrEmpty(TempData["ProfileError"] as string))
+    {
+        <div class="alert alert-danger">@TempData["ProfileError"]</div>
+    }
+    else if (!string.IsNullOrEmpty(TempData["ProfileSuccess"] as string))
+    {
+        <div class="alert alert-success">@TempData["ProfileSuccess"]</div>
+    }
+
+    <p>
+        Используйте эту страницу, чтобы подтвердить связку Telegram-бота с вашим аккаунтом и убедиться, что доступ к Google Calendar активен.
+    </p>
+
+    @if (status is not null)
+    {
+        <div class="integration-status">
+            <h3>Текущий статус</h3>
+            <ul>
+                <li>Связка с Telegram: @(status.Linked ? "✅" : "⚠️")</li>
+                <li>Google Calendar: @(status.HasCalendarAccess ? "✅" : status.GoogleAuthorized ? "⚠️" : "❌")</li>
+                @if (!string.IsNullOrEmpty(status.DetailCode))
+                {
+                    <li>Подробности: @status.DetailCode</li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(token))
+    {
+        <form asp-action="ConfirmTelegramLink" asp-controller="Profile" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="Token" value="@token" />
+            <p>Нажмите кнопку ниже, чтобы завершить привязку Telegram.</p>
+            <button type="submit" class="btn btn-primary">Подтвердить привязку</button>
+        </form>
+    }
+    else
+    {
+        <p>
+            Откройте Telegram-бота YouScriptor и выполните команду <code>/link</code>, чтобы получить одноразовую ссылку на эту страницу.
+        </p>
+    }
+</section>

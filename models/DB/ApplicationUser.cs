@@ -42,6 +42,11 @@ namespace YandexSpeech.models.DB
         /// </summary>
         public virtual UserWallet? Wallet { get; set; }
 
+        /// <summary>
+        /// Телеграм-привязки, оформленные пользователем.
+        /// </summary>
+        public ICollection<TelegramAccountLink> TelegramLinks { get; set; } = new List<TelegramAccountLink>();
+
         public ICollection<UserSubscription> Subscriptions { get; set; } = new List<UserSubscription>();
 
         public ICollection<WalletTransaction> WalletTransactions { get; set; } = new List<WalletTransaction>();

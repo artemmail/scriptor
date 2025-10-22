@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using YandexSpeech.models.DTO.Telegram;
 
 namespace YandexSpeech.services.TelegramTranscriptionBot.State
 {
@@ -22,6 +23,14 @@ namespace YandexSpeech.services.TelegramTranscriptionBot.State
         {
             var state = _states.GetOrAdd(userId, static _ => new TelegramUserState());
             state.HasCalendarConsent = hasConsent;
+        }
+
+        public void UpdateCalendarStatus(long userId, TelegramCalendarStatusDto status, DateTime fetchedAt)
+        {
+            var state = _states.GetOrAdd(userId, static _ => new TelegramUserState());
+            state.CalendarStatus = status;
+            state.StatusFetchedAt = fetchedAt;
+            state.HasCalendarConsent = status.HasCalendarAccess;
         }
     }
 }

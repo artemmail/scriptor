@@ -12,6 +12,7 @@ using YandexSpeech.models.DB;
 using YandexSpeech.services;
 using YandexSpeech.services.Interface;
 using YandexSpeech.services.Options;
+using YandexSpeech.services.Authentication;
 using YandexSpeech.services.Telegram;
 using YandexSpeech.services.TelegramTranscriptionBot.State;
 using YandexSpeech.services.Whisper;
@@ -24,6 +25,7 @@ using System.IO;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.Http.Features;
 using YandexSpeech.services.Google;
+using YandexSpeech.services.TelegramIntegration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +61,8 @@ builder.Services.AddControllersWithViews();
 // Общий HttpClient для внешних запросов
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient(nameof(TelegramTranscriptionBot));
+builder.Services.AddHttpClient(nameof(TelegramTranscriptionBot) + ".Integration");
+builder.Services.AddHttpClient(nameof(TelegramIntegrationNotifier));
 
 builder.Services.AddSingleton<IFfmpegService, FfmpegService>();
 
@@ -101,6 +105,10 @@ authBuilder.AddJwtBearer(o =>
         ClockSkew = TimeSpan.Zero
     };
 });
+
+authBuilder.AddScheme<AuthenticationSchemeOptions, IntegrationApiAuthenticationHandler>(
+    IntegrationApiAuthenticationDefaults.AuthenticationScheme,
+    _ => { });
 
 authBuilder.AddGoogleOAuthConfigurations(builder.Configuration, opts =>
 {
@@ -171,6 +179,7 @@ builder.Services.AddScoped<IAudioFileService, AudioFileService>();
 
 builder.Services.Configure<EventBusOptions>(builder.Configuration.GetSection("EventBus"));
 builder.Services.Configure<TelegramBotOptions>(builder.Configuration.GetSection("Telegram"));
+builder.Services.Configure<TelegramIntegrationOptions>(builder.Configuration.GetSection("TelegramIntegration"));
 builder.Services.AddSingleton<FasterWhisperQueueClient>();
 
 var whisperProvider = builder.Configuration.GetValue<string>("Whisper:Provider");
@@ -221,6 +230,8 @@ builder.Services.AddHostedService<SubscriptionExpirationHostedService>();
 builder.Services.AddSingleton<TelegramUserStateStore>();
 builder.Services.AddSingleton<TelegramTranscriptionBot>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<TelegramTranscriptionBot>());
+builder.Services.AddSingleton<ITelegramIntegrationNotifier, TelegramIntegrationNotifier>();
+builder.Services.AddScoped<ITelegramLinkService, TelegramLinkService>();
 
 
 

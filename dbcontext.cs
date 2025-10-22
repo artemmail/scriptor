@@ -57,6 +57,8 @@ namespace YandexSpeech
         public DbSet<WalletTransaction> WalletTransactions { get; set; }
         public DbSet<PaymentOperation> PaymentOperations { get; set; }
         public DbSet<RecognitionUsage> RecognitionUsage { get; set; }
+        public DbSet<TelegramAccountLink> TelegramAccountLinks { get; set; }
+        public DbSet<TelegramLinkToken> TelegramLinkTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -188,6 +190,36 @@ namespace YandexSpeech
             builder.Entity<ApplicationUser>()
                 .Property(u => u.CreatedAt)
                 .HasDefaultValueSql("GETUTCDATE()");
+
+            builder.Entity<TelegramAccountLink>(entity =>
+            {
+                entity.ToTable("TelegramAccountLinks");
+                entity.HasKey(link => link.Id);
+                entity.HasIndex(link => link.TelegramId).IsUnique();
+                entity.Property(link => link.Status)
+                    .HasConversion<int>();
+                entity.Property(link => link.CreatedAt)
+                    .HasDefaultValueSql("GETUTCDATE()");
+                entity.HasOne(link => link.User)
+                    .WithMany(user => user.TelegramLinks)
+                    .HasForeignKey(link => link.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            builder.Entity<TelegramLinkToken>(entity =>
+            {
+                entity.ToTable("TelegramLinkTokens");
+                entity.HasKey(token => token.Id);
+                entity.HasIndex(token => token.TokenHash).IsUnique();
+                entity.Property(token => token.CreatedAt)
+                    .HasDefaultValueSql("GETUTCDATE()");
+                entity.Property(token => token.Purpose)
+                    .HasMaxLength(64);
+                entity.HasOne(token => token.Link)
+                    .WithMany(link => link.Tokens)
+                    .HasForeignKey(token => token.LinkId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
         }
 
     }
