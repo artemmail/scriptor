@@ -15,7 +15,7 @@ using YandexSpeech.models.DTO.Telegram;
 
 namespace YandexSpeech.Controllers
 {
-    [Authorize]
+    [Authorize(AuthenticationSchemes = IdentityConstants.ApplicationScheme)]
     [Route("profile")]
     public class ProfileController : Controller
     {
