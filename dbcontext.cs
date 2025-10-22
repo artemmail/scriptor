@@ -52,6 +52,7 @@ namespace YandexSpeech
         public DbSet<UserSubscription> UserSubscriptions { get; set; }
         public DbSet<SubscriptionInvoice> SubscriptionInvoices { get; set; }
         public DbSet<UserFeatureFlag> UserFeatureFlags { get; set; }
+        public DbSet<UserGoogleToken> UserGoogleTokens { get; set; }
         public DbSet<UserWallet> UserWallets { get; set; }
         public DbSet<WalletTransaction> WalletTransactions { get; set; }
         public DbSet<PaymentOperation> PaymentOperations { get; set; }
@@ -156,6 +157,27 @@ namespace YandexSpeech
                 .WithMany()
                 .HasForeignKey(r => r.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<UserGoogleToken>(entity =>
+            {
+                entity.ToTable("UserGoogleTokens");
+                entity.HasKey(t => t.UserId);
+                entity.Property(t => t.TokenType)
+                    .HasMaxLength(64)
+                    .HasDefaultValue(GoogleTokenTypes.Calendar);
+                entity.Property(t => t.Scope)
+                    .HasMaxLength(1024);
+                entity.Property(t => t.AccessToken)
+                    .HasMaxLength(4096);
+                entity.Property(t => t.RefreshToken)
+                    .HasMaxLength(4096);
+                entity.Property(t => t.CreatedAt)
+                    .HasDefaultValueSql("GETUTCDATE()");
+                entity.HasOne(t => t.User)
+                    .WithOne(u => u.GoogleToken)
+                    .HasForeignKey<UserGoogleToken>(t => t.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
 
             builder.Entity<ApplicationUser>()
                 .HasOne(u => u.CurrentSubscription)

@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace YandexSpeech.models.DB
-
 {
     public class ApplicationUser : IdentityUser
     {
@@ -33,21 +32,10 @@ namespace YandexSpeech.models.DB
         /// </summary>
         public ICollection<UserFeatureFlag> FeatureFlags { get; set; } = new List<UserFeatureFlag>();
 
-        public DateTime? GoogleCalendarConsentAt { get; set; }
-
-        [MaxLength(4096)]
-        public string? GoogleAccessToken { get; set; }
-
-        [MaxLength(4096)]
-        public string? GoogleRefreshToken { get; set; }
-
-        public DateTime? GoogleAccessTokenExpiresAt { get; set; }
-
-        public DateTime? GoogleRefreshTokenExpiresAt { get; set; }
-
-        public DateTime? GoogleAccessTokenUpdatedAt { get; set; }
-
-        public DateTime? GoogleTokensRevokedAt { get; set; }
+        /// <summary>
+        /// OAuth-токены Google, связанные с пользователем.
+        /// </summary>
+        public virtual UserGoogleToken? GoogleToken { get; set; }
 
         /// <summary>
         /// Навигационное свойство для кошелька.

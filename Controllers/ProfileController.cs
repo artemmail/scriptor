@@ -5,10 +5,11 @@ using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using YandexSpeech.Extensions;
 using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO.Profile;
-using YandexSpeech.services.GoogleCalendar;
+using YandexSpeech.services.Google;
 
 namespace YandexSpeech.Controllers
 {
@@ -18,16 +19,19 @@ namespace YandexSpeech.Controllers
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly IGoogleCalendarTokenService _googleCalendarTokenService;
+        private readonly MyDbContext _dbContext;
+        private readonly IGoogleTokenService _googleTokenService;
 
         public ProfileController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
-            IGoogleCalendarTokenService googleCalendarTokenService)
+            MyDbContext dbContext,
+            IGoogleTokenService googleTokenService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
-            _googleCalendarTokenService = googleCalendarTokenService;
+            _dbContext = dbContext;
+            _googleTokenService = googleTokenService;
         }
 
         [HttpGet("")]
@@ -39,7 +43,11 @@ namespace YandexSpeech.Controllers
                 return RedirectToAction("Login", "Account");
             }
 
-            var model = BuildViewModel(user);
+            var token = await _dbContext.UserGoogleTokens
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.UserId == user.Id && t.TokenType == GoogleTokenTypes.Calendar, HttpContext.RequestAborted);
+
+            var model = BuildViewModel(user, token);
             return View("Index", model);
         }
 
@@ -121,7 +129,11 @@ namespace YandexSpeech.Controllers
 
             await _signInManager.UpdateExternalAuthenticationTokens(info);
 
-            var updateResult = await _googleCalendarTokenService.UpdateConsentAsync(user, true, info.AuthenticationTokens);
+            var updateResult = await _googleTokenService.EnsureAccessTokenAsync(
+                user,
+                consentGranted: true,
+                info.AuthenticationTokens,
+                HttpContext.RequestAborted);
             if (!updateResult.Succeeded)
             {
                 TempData["ProfileError"] = updateResult.ErrorMessage ?? "Не удалось подключить Google Calendar.";
@@ -151,7 +163,7 @@ namespace YandexSpeech.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            var updateResult = await _googleCalendarTokenService.UpdateConsentAsync(user, false, null);
+            var updateResult = await _googleTokenService.RevokeAsync(user, HttpContext.RequestAborted);
             if (!updateResult.Succeeded)
             {
                 TempData["ProfileError"] = updateResult.ErrorMessage ?? "Не удалось отключить интеграцию Google Calendar.";
@@ -168,15 +180,16 @@ namespace YandexSpeech.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        private static ProfileIndexViewModel BuildViewModel(ApplicationUser user)
+        private static ProfileIndexViewModel BuildViewModel(ApplicationUser user, UserGoogleToken? token)
         {
-            var revokedAfterConsent = user.GoogleTokensRevokedAt.HasValue
-                && (!user.GoogleCalendarConsentAt.HasValue
-                    || user.GoogleTokensRevokedAt.Value >= user.GoogleCalendarConsentAt.Value);
+            var revokedAfterConsent = token != null
+                && token.RevokedAt.HasValue
+                && (!token.ConsentGrantedAt.HasValue || token.RevokedAt.Value >= token.ConsentGrantedAt.Value);
 
-            var isConnected = user.GoogleCalendarConsentAt.HasValue
+            var isConnected = token != null
+                && token.ConsentGrantedAt.HasValue
                 && !revokedAfterConsent
-                && !string.IsNullOrWhiteSpace(user.GoogleAccessToken);
+                && !string.IsNullOrWhiteSpace(token.AccessToken);
 
             return new ProfileIndexViewModel
             {
@@ -185,12 +198,12 @@ namespace YandexSpeech.Controllers
                 GoogleCalendar = new GoogleCalendarStatusViewModel
                 {
                     IsConnected = isConnected,
-                    HasRefreshToken = !string.IsNullOrWhiteSpace(user.GoogleRefreshToken),
-                    ConsentAt = user.GoogleCalendarConsentAt,
-                    AccessTokenUpdatedAt = user.GoogleAccessTokenUpdatedAt,
-                    AccessTokenExpiresAt = user.GoogleAccessTokenExpiresAt,
-                    RefreshTokenExpiresAt = user.GoogleRefreshTokenExpiresAt,
-                    TokensRevokedAt = user.GoogleTokensRevokedAt
+                    HasRefreshToken = !string.IsNullOrWhiteSpace(token?.RefreshToken),
+                    ConsentAt = token?.ConsentGrantedAt,
+                    AccessTokenUpdatedAt = token?.AccessTokenUpdatedAt,
+                    AccessTokenExpiresAt = token?.AccessTokenExpiresAt,
+                    RefreshTokenExpiresAt = token?.RefreshTokenExpiresAt,
+                    TokensRevokedAt = token?.RevokedAt
                 }
             };
         }
