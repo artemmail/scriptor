@@ -67,20 +67,21 @@ namespace YandexSpeech.Controllers
             [FromQuery] string provider,
             [FromQuery] string? returnUrl = null,
             [FromQuery] bool calendar = false,
-            [FromQuery] string? prompt = null)
+            [FromQuery] string? prompt = null,
+            [FromQuery] bool calendarDeclined = false)
         {
             if (string.IsNullOrWhiteSpace(provider))
             {
                 return BadRequest("Provider is required.");
             }
 
-            return InitiateExternalLogin(provider, returnUrl, calendar, prompt);
+            return InitiateExternalLogin(provider, returnUrl, calendar, prompt, calendarDeclined);
         }
 
         [AllowAnonymous]
         [HttpGet("signin-google")]
-        public IActionResult SignInWithGoogle(string? returnUrl = null, bool calendar = false, string? prompt = null)
-            => InitiateExternalLogin("Google", returnUrl, calendar, prompt);
+        public IActionResult SignInWithGoogle(string? returnUrl = null, bool calendar = false, string? prompt = null, bool calendarDeclined = false)
+            => InitiateExternalLogin("Google", returnUrl, calendar, prompt, calendarDeclined);
 
         [AllowAnonymous]
         [HttpGet("signin-yandex")]
@@ -110,12 +111,20 @@ namespace YandexSpeech.Controllers
 
             var isGoogleProvider = string.Equals(info.LoginProvider, "Google", StringComparison.OrdinalIgnoreCase);
             var calendarRequested = false;
+            var calendarDeclined = false;
 
             if (isGoogleProvider && info.AuthenticationProperties != null &&
                 info.AuthenticationProperties.Items.TryGetValue(ServiceCollectionExtensions.CalendarAccessPropertyName, out var calendarValue) &&
                 bool.TryParse(calendarValue, out var calendarFlag))
             {
                 calendarRequested = calendarFlag;
+            }
+
+            if (isGoogleProvider && info.AuthenticationProperties != null &&
+                info.AuthenticationProperties.Items.TryGetValue(ServiceCollectionExtensions.CalendarDeclinedPropertyName, out var calendarDeclinedValue) &&
+                bool.TryParse(calendarDeclinedValue, out var calendarDeclinedFlag))
+            {
+                calendarDeclined = calendarDeclinedFlag;
             }
 
             if (isGoogleProvider)
@@ -179,13 +188,20 @@ namespace YandexSpeech.Controllers
 
             if (isGoogleProvider)
             {
+                if (calendarDeclined)
+                {
+                    await _googleTokenService.RecordCalendarDeclinedAsync(
+                        user,
+                        HttpContext.RequestAborted);
+                }
+
                 var updateResult = await _googleTokenService.EnsureAccessTokenAsync(
                     user,
                     calendarRequested,
                     info.AuthenticationTokens,
                     HttpContext.RequestAborted);
 
-                if (!updateResult.Succeeded)
+                if (calendarRequested && !updateResult.Succeeded)
                 {
                     Console.WriteLine($"Failed to update Google Calendar tokens: {updateResult.ErrorMessage}");
                 }
@@ -369,7 +385,12 @@ namespace YandexSpeech.Controllers
 
         // ---------- ВСПОМОГАТЕЛЬНЫЕ ----------
 
-        private IActionResult InitiateExternalLogin(string provider, string? returnUrl, bool calendarAccess = false, string? prompt = null)
+        private IActionResult InitiateExternalLogin(
+            string provider,
+            string? returnUrl,
+            bool calendarAccess = false,
+            string? prompt = null,
+            bool calendarDeclined = false)
         {
             var redirectUrl = Url.Action(nameof(ExternalLoginCallback), "Account", new { returnUrl });
             var props = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
@@ -377,6 +398,10 @@ namespace YandexSpeech.Controllers
             if (string.Equals(provider, "Google", StringComparison.OrdinalIgnoreCase))
             {
                 props.Items[ServiceCollectionExtensions.CalendarAccessPropertyName] = calendarAccess.ToString();
+                if (calendarDeclined)
+                {
+                    props.Items[ServiceCollectionExtensions.CalendarDeclinedPropertyName] = bool.TrueString;
+                }
                 var promptValue = !string.IsNullOrWhiteSpace(prompt) ? prompt : (calendarAccess ? "consent" : string.Empty);
 
                 if (!string.IsNullOrWhiteSpace(promptValue))

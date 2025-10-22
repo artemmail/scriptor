@@ -130,11 +130,19 @@ namespace YandexSpeech.services.Google
             var now = DateTime.UtcNow;
             var scopes = ExtractScopes(tokenList);
             var hasCalendarScope = scopes.Overlaps(_calendarScopes);
-            var shouldPersist = hasCalendarScope || consentGranted || tokenEntity != null;
+            var shouldPersist = hasCalendarScope || consentGranted;
+            var hasStoredTokens = tokenEntity != null && (
+                !string.IsNullOrWhiteSpace(tokenEntity.AccessToken) ||
+                !string.IsNullOrWhiteSpace(tokenEntity.RefreshToken));
 
             if (!shouldPersist)
             {
-                return new GoogleTokenOperationResult(true, false, tokenEntity?.AccessToken, tokenEntity, null);
+                if (!hasStoredTokens)
+                {
+                    return new GoogleTokenOperationResult(true, false, tokenEntity?.AccessToken, tokenEntity, null);
+                }
+
+                return await EnsureValidAccessTokenAsync(tokenEntity!, cancellationToken);
             }
 
             var created = false;
@@ -224,6 +232,12 @@ namespace YandexSpeech.services.Google
                 updated = true;
             }
 
+            if ((consentGranted || hasCalendarScope) && tokenEntity.ConsentDeclinedAt.HasValue)
+            {
+                tokenEntity.ConsentDeclinedAt = null;
+                updated = true;
+            }
+
             if (updated)
             {
                 tokenEntity.UpdatedAt = now;
@@ -232,6 +246,43 @@ namespace YandexSpeech.services.Google
             await _dbContext.SaveChangesAsync(cancellationToken);
 
             return new GoogleTokenOperationResult(true, updated, tokenEntity.AccessToken, tokenEntity, null);
+        }
+
+        public async Task RecordCalendarDeclinedAsync(
+            ApplicationUser user,
+            CancellationToken cancellationToken = default)
+        {
+            if (user == null)
+            {
+                throw new ArgumentNullException(nameof(user));
+            }
+
+            var tokenEntity = await _dbContext.UserGoogleTokens
+                .FirstOrDefaultAsync(
+                    t => t.UserId == user.Id && t.TokenType == GoogleTokenTypes.Calendar,
+                    cancellationToken);
+
+            var now = DateTime.UtcNow;
+
+            if (tokenEntity == null)
+            {
+                tokenEntity = new UserGoogleToken
+                {
+                    UserId = user.Id,
+                    TokenType = GoogleTokenTypes.Calendar,
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                    ConsentDeclinedAt = now
+                };
+                _dbContext.UserGoogleTokens.Add(tokenEntity);
+            }
+            else
+            {
+                tokenEntity.ConsentDeclinedAt = now;
+                tokenEntity.UpdatedAt = now;
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
         public async Task<GoogleTokenOperationResult> RevokeAsync(

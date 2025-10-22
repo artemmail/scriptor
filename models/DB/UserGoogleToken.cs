@@ -29,6 +29,8 @@ namespace YandexSpeech.models.DB
 
         public DateTime? ConsentGrantedAt { get; set; }
 
+        public DateTime? ConsentDeclinedAt { get; set; }
+
         public DateTime? RevokedAt { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
