@@ -1,5 +1,6 @@
 ﻿// Program.cs
 using AspNet.Security.OAuth.Yandex;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.Identity;
