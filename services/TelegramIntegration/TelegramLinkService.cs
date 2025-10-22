@@ -43,87 +43,107 @@ namespace YandexSpeech.services.TelegramIntegration
             var options = _optionsMonitor.CurrentValue;
             options.Validate();
 
-            var now = DateTime.UtcNow;
-            var link = await _dbContext.TelegramAccountLinks
-                .Include(l => l.Tokens)
-                .FirstOrDefaultAsync(l => l.TelegramId == context.TelegramId, cancellationToken)
-                .ConfigureAwait(false);
+            const int maxRetryCount = 3;
 
-            if (link == null)
+            for (var attempt = 0; attempt < maxRetryCount; attempt++)
             {
-                link = new TelegramAccountLink
+                try
                 {
-                    Id = Guid.NewGuid(),
-                    TelegramId = context.TelegramId,
-                    Username = Truncate(context.Username, 255),
-                    FirstName = Truncate(context.FirstName, 255),
-                    LastName = Truncate(context.LastName, 255),
-                    LanguageCode = Truncate(context.LanguageCode, 10),
-                    CreatedAt = now,
-                    Status = TelegramAccountLinkStatus.Pending
-                };
+                    var now = DateTime.UtcNow;
+                    var link = await _dbContext.TelegramAccountLinks
+                        .Include(l => l.Tokens)
+                        .FirstOrDefaultAsync(l => l.TelegramId == context.TelegramId, cancellationToken)
+                        .ConfigureAwait(false);
 
-                _dbContext.TelegramAccountLinks.Add(link);
-            }
-            else
-            {
-                if (link.UserId == null && link.Status != TelegramAccountLinkStatus.Pending)
-                {
-                    link.Status = TelegramAccountLinkStatus.Pending;
-                    link.RevokedAt = null;
+                    if (link == null)
+                    {
+                        link = new TelegramAccountLink
+                        {
+                            Id = Guid.NewGuid(),
+                            TelegramId = context.TelegramId,
+                            Username = Truncate(context.Username, 255),
+                            FirstName = Truncate(context.FirstName, 255),
+                            LastName = Truncate(context.LastName, 255),
+                            LanguageCode = Truncate(context.LanguageCode, 10),
+                            CreatedAt = now,
+                            Status = TelegramAccountLinkStatus.Pending
+                        };
+
+                        _dbContext.TelegramAccountLinks.Add(link);
+                    }
+                    else
+                    {
+                        if (link.UserId == null && link.Status != TelegramAccountLinkStatus.Pending)
+                        {
+                            link.Status = TelegramAccountLinkStatus.Pending;
+                            link.RevokedAt = null;
+                        }
+
+                        if (HasProfileUpdates(link, context))
+                        {
+                            link.Username = Truncate(context.Username, 255);
+                            link.FirstName = Truncate(context.FirstName, 255);
+                            link.LastName = Truncate(context.LastName, 255);
+                            link.LanguageCode = Truncate(context.LanguageCode, 10);
+                        }
+
+                        link.LastActivityAt = now;
+                    }
+
+                    CleanExpiredTokens(link, now);
+
+                    if (link.Tokens.Count(t => t.RevokedAt == null && t.ConsumedAt == null && t.ExpiresAt > now) >= options.MaxActiveTokensPerLink)
+                    {
+                        var oldest = link.Tokens
+                            .Where(t => t.RevokedAt == null && t.ConsumedAt == null && t.ExpiresAt > now)
+                            .OrderBy(t => t.CreatedAt)
+                            .First();
+                        oldest.RevokedAt = now;
+                    }
+
+                    var token = GenerateToken();
+                    var hash = HashToken(token, options.TokenSigningKey);
+
+                    var tokenEntity = new TelegramLinkToken
+                    {
+                        Id = Guid.NewGuid(),
+                        Link = link,
+                        TokenHash = hash,
+                        CreatedAt = now,
+                        ExpiresAt = now + options.TokenLifetime,
+                        Purpose = TelegramLinkTokenPurposes.Link,
+                        IsOneTime = true
+                    };
+
+                    link.Tokens.Add(tokenEntity);
+                    link.LastActivityAt = now;
+
+                    await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+                    var linkUrl = BuildLinkUrl(options, token);
+                    var status = await MapStatusAsync(link, cancellationToken).ConfigureAwait(false);
+
+                    return new TelegramLinkInitiationResult
+                    {
+                        Token = token,
+                        LinkUrl = linkUrl,
+                        ExpiresAt = tokenEntity.ExpiresAt,
+                        Status = status
+                    };
                 }
-
-                if (HasProfileUpdates(link, context))
+                catch (DbUpdateConcurrencyException ex)
                 {
-                    link.Username = Truncate(context.Username, 255);
-                    link.FirstName = Truncate(context.FirstName, 255);
-                    link.LastName = Truncate(context.LastName, 255);
-                    link.LanguageCode = Truncate(context.LanguageCode, 10);
+                    if (cancellationToken.IsCancellationRequested || attempt == maxRetryCount - 1)
+                    {
+                        throw;
+                    }
+
+                    _logger.LogWarning(ex, "Concurrency conflict while creating Telegram link token for TelegramId {TelegramId}. Retrying (attempt {Attempt}/{MaxAttempts}).", context.TelegramId, attempt + 1, maxRetryCount);
+                    _dbContext.ChangeTracker.Clear();
                 }
-
-                link.LastActivityAt = now;
             }
 
-            CleanExpiredTokens(link, now);
-
-            if (link.Tokens.Count(t => t.RevokedAt == null && t.ConsumedAt == null && t.ExpiresAt > now) >= options.MaxActiveTokensPerLink)
-            {
-                var oldest = link.Tokens
-                    .Where(t => t.RevokedAt == null && t.ConsumedAt == null && t.ExpiresAt > now)
-                    .OrderBy(t => t.CreatedAt)
-                    .First();
-                oldest.RevokedAt = now;
-            }
-
-            var token = GenerateToken();
-            var hash = HashToken(token, options.TokenSigningKey);
-
-            var tokenEntity = new TelegramLinkToken
-            {
-                Id = Guid.NewGuid(),
-                Link = link,
-                TokenHash = hash,
-                CreatedAt = now,
-                ExpiresAt = now + options.TokenLifetime,
-                Purpose = TelegramLinkTokenPurposes.Link,
-                IsOneTime = true
-            };
-
-            link.Tokens.Add(tokenEntity);
-            link.LastActivityAt = now;
-
-            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-            var linkUrl = BuildLinkUrl(options, token);
-            var status = await MapStatusAsync(link, cancellationToken).ConfigureAwait(false);
-
-            return new TelegramLinkInitiationResult
-            {
-                Token = token,
-                LinkUrl = linkUrl,
-                ExpiresAt = tokenEntity.ExpiresAt,
-                Status = status
-            };
+            throw new InvalidOperationException($"Unable to create Telegram link token for TelegramId {context.TelegramId} due to repeated concurrency conflicts.");
         }
 
         public async Task<TelegramLinkConfirmationResult> ConfirmLinkAsync(
