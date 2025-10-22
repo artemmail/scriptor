@@ -27,6 +27,7 @@ namespace YandexSpeech.services.Telegram
     {
         private readonly ILogger<TelegramTranscriptionBot> _logger;
         private readonly IOptionsMonitor<TelegramBotOptions> _optionsMonitor;
+        private readonly IOptionsMonitor<TelegramIntegrationOptions> _integrationOptions;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly FasterWhisperQueueClient _queueClient;
         private readonly string _model;
@@ -92,6 +93,7 @@ namespace YandexSpeech.services.Telegram
 
         public TelegramTranscriptionBot(
             IOptionsMonitor<TelegramBotOptions> optionsMonitor,
+            IOptionsMonitor<TelegramIntegrationOptions> integrationOptions,
             IConfiguration configuration,
             IHttpClientFactory httpClientFactory,
             FasterWhisperQueueClient queueClient,
@@ -100,6 +102,7 @@ namespace YandexSpeech.services.Telegram
             TelegramUserStateStore userStateStore)
         {
             _optionsMonitor = optionsMonitor;
+            _integrationOptions = integrationOptions;
             _httpClientFactory = httpClientFactory;
             _queueClient = queueClient;
             _logger = logger;
@@ -998,8 +1001,10 @@ namespace YandexSpeech.services.Telegram
 
         private bool TryGetIntegrationConfiguration(out string? baseUrl, out string? token, out string? errorResourceKey)
         {
-            baseUrl = _integrationApiBaseUrl ?? NormalizeIntegrationBaseUrl(_optionsMonitor.CurrentValue.IntegrationApiBaseUrl);
-            token = (_integrationApiToken ?? _optionsMonitor.CurrentValue.IntegrationApiToken)?.Trim();
+            var botOptions = _optionsMonitor.CurrentValue;
+
+            baseUrl = ResolveIntegrationApiBaseUrl(botOptions);
+            token = ResolveIntegrationApiToken(botOptions);
 
             if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(token))
             {
@@ -1023,6 +1028,54 @@ namespace YandexSpeech.services.Telegram
             return true;
         }
 
+        private string? ResolveIntegrationApiBaseUrl(TelegramBotOptions options)
+        {
+            var configured = _integrationApiBaseUrl ?? NormalizeIntegrationBaseUrl(options.IntegrationApiBaseUrl);
+            if (!string.IsNullOrWhiteSpace(configured))
+            {
+                return configured;
+            }
+
+            var fromWebhook = NormalizeIntegrationBaseUrl(DeriveIntegrationApiBaseUrlFromWebhook(options.WebhookUrl));
+            if (!string.IsNullOrWhiteSpace(fromWebhook))
+            {
+                _integrationApiBaseUrl = fromWebhook;
+                _logger.LogDebug("Derived Telegram integration API base URL from webhook URL: {BaseUrl}.", fromWebhook);
+                return fromWebhook;
+            }
+
+            var integrationOptions = _integrationOptions.CurrentValue;
+            var fromLink = NormalizeIntegrationBaseUrl(DeriveIntegrationApiBaseUrlFromLink(integrationOptions.LinkBaseUrl));
+            if (!string.IsNullOrWhiteSpace(fromLink))
+            {
+                _integrationApiBaseUrl = fromLink;
+                _logger.LogDebug("Derived Telegram integration API base URL from link base URL: {BaseUrl}.", fromLink);
+                return fromLink;
+            }
+
+            return null;
+        }
+
+        private string? ResolveIntegrationApiToken(TelegramBotOptions options)
+        {
+            var configured = _integrationApiToken ?? options.IntegrationApiToken;
+            if (!string.IsNullOrWhiteSpace(configured))
+            {
+                return configured.Trim();
+            }
+
+            var integrationToken = _integrationOptions.CurrentValue.IntegrationApiToken;
+            if (!string.IsNullOrWhiteSpace(integrationToken))
+            {
+                var trimmed = integrationToken.Trim();
+                _integrationApiToken = trimmed;
+                _logger.LogDebug("Using TelegramIntegration options token for Telegram bot integration API calls.");
+                return trimmed;
+            }
+
+            return null;
+        }
+
         private static bool IsPlaceholderIntegrationToken(string token) =>
             string.Equals(token, IntegrationApiTokenPlaceholder, StringComparison.OrdinalIgnoreCase);
 
@@ -1036,6 +1089,56 @@ namespace YandexSpeech.services.Telegram
             return Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri)
                 ? uri.ToString().TrimEnd('/')
                 : null;
+        }
+
+        private static string? DeriveIntegrationApiBaseUrlFromWebhook(string? webhookUrl)
+        {
+            if (string.IsNullOrWhiteSpace(webhookUrl)
+                || !Uri.TryCreate(webhookUrl, UriKind.Absolute, out var webhookUri))
+            {
+                return null;
+            }
+
+            var segments = webhookUri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 0 || !string.Equals(segments[^1], "webhook", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var builder = new UriBuilder(webhookUri)
+            {
+                Query = string.Empty,
+                Fragment = string.Empty
+            };
+
+            if (segments.Length == 1)
+            {
+                builder.Path = "/";
+            }
+            else
+            {
+                builder.Path = "/" + string.Join('/', segments[..^1]);
+            }
+
+            return builder.Uri.ToString();
+        }
+
+        private static string? DeriveIntegrationApiBaseUrlFromLink(string? linkBaseUrl)
+        {
+            if (string.IsNullOrWhiteSpace(linkBaseUrl)
+                || !Uri.TryCreate(linkBaseUrl, UriKind.Absolute, out var linkUri))
+            {
+                return null;
+            }
+
+            var builder = new UriBuilder(linkUri)
+            {
+                Path = "/api/telegram",
+                Query = string.Empty,
+                Fragment = string.Empty
+            };
+
+            return builder.Uri.ToString();
         }
 
         private string GetBotString(string key, CultureInfo culture)
