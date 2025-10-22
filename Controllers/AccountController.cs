@@ -189,6 +189,9 @@ namespace YandexSpeech.Controllers
                 await _userManager.AddToRoleAsync(user, "Free");
             }
 
+            await _signInManager.SignInAsync(user, isPersistent: false);
+            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+
             if (isGoogleProvider)
             {
                 if (calendarDeclined)
