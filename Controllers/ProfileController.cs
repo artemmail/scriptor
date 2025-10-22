@@ -127,7 +127,7 @@ namespace YandexSpeech.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            await _signInManager.UpdateExternalAuthenticationTokens(info);
+            await _signInManager.UpdateExternalAuthenticationTokensAsync(info);
 
             var updateResult = await _googleTokenService.EnsureAccessTokenAsync(
                 user,

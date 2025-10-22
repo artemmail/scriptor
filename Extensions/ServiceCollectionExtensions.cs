@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.OAuth;
+using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -67,6 +69,8 @@ namespace YandexSpeech.Extensions
                         && bool.TryParse(calendarValue, out var calendarRequested)
                         && calendarRequested;
 
+                    var queryUpdates = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+
                     if (hasCalendarRequest)
                     {
                         foreach (var scope in calendarScopes)
@@ -86,27 +90,22 @@ namespace YandexSpeech.Extensions
 
                         if (!string.IsNullOrWhiteSpace(promptValue))
                         {
-                            context.ProtocolMessage.SetParameter("prompt", promptValue);
+                            queryUpdates["prompt"] = promptValue;
                         }
 
-                        if (!string.IsNullOrWhiteSpace(calendarAccessType))
-                        {
-                            context.ProtocolMessage.SetParameter("access_type", calendarAccessType);
-                        }
-                        else
-                        {
-                            context.ProtocolMessage.SetParameter("access_type", "offline");
-                        }
-
-                        context.ProtocolMessage.SetParameter("include_granted_scopes", "true");
+                        var accessType = !string.IsNullOrWhiteSpace(calendarAccessType) ? calendarAccessType : "offline";
+                        queryUpdates["access_type"] = accessType;
+                        queryUpdates["include_granted_scopes"] = "true";
                     }
                     else if (context.Properties.Items.TryGetValue(PromptPropertyName, out var prompt)
                         && !string.IsNullOrWhiteSpace(prompt))
                     {
-                        context.ProtocolMessage.SetParameter("prompt", prompt);
+                        queryUpdates["prompt"] = prompt;
                     }
 
-                    context.ProtocolMessage.Scope = string.Join(" ", scopeSet);
+                    queryUpdates["scope"] = string.Join(" ", scopeSet);
+
+                    ApplyRedirectQueryParameters(context, queryUpdates);
 
                     if (previousOnRedirect != null)
                     {
@@ -119,6 +118,50 @@ namespace YandexSpeech.Extensions
             });
 
             return builder;
+        }
+
+        private static void ApplyRedirectQueryParameters(
+            RedirectContext<OAuthOptions> context,
+            IDictionary<string, string?> updates)
+        {
+            if (updates.Count == 0)
+            {
+                return;
+            }
+
+            var uriBuilder = new UriBuilder(context.RedirectUri);
+            var existingQuery = uriBuilder.Query;
+            var queryToParse = string.IsNullOrEmpty(existingQuery)
+                ? string.Empty
+                : existingQuery.StartsWith("?") ? existingQuery : $"?{existingQuery}";
+            var parsedQuery = QueryHelpers.ParseQuery(queryToParse);
+
+            var queryBuilder = new QueryBuilder();
+
+            foreach (var pair in parsedQuery)
+            {
+                if (updates.ContainsKey(pair.Key))
+                {
+                    continue;
+                }
+
+                foreach (var value in pair.Value)
+                {
+                    queryBuilder.Add(pair.Key, value);
+                }
+            }
+
+            foreach (var update in updates)
+            {
+                if (!string.IsNullOrEmpty(update.Value))
+                {
+                    queryBuilder.Add(update.Key, update.Value);
+                }
+            }
+
+            var queryString = queryBuilder.ToQueryString().Value;
+            uriBuilder.Query = string.IsNullOrEmpty(queryString) ? string.Empty : queryString.TrimStart('?');
+            context.RedirectUri = uriBuilder.Uri.ToString();
         }
     }
 }
