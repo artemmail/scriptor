@@ -244,6 +244,111 @@ namespace YandexSpeech.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("YandexSpeech.models.DB.TelegramAccountLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("FirstName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("LanguageCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime?>("LastActivityAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastStatusCheckAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTime?>("LinkedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<long>("TelegramId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TelegramId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("TelegramAccountLinks");
+                });
+
+            modelBuilder.Entity("YandexSpeech.models.DB.TelegramLinkToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsOneTime")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("LinkId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("TelegramLinkTokens");
+                });
+
             modelBuilder.Entity("YandexSpeech.models.DB.AudioFile", b =>
                 {
                     b.Property<string>("Id")
@@ -1165,6 +1270,27 @@ namespace YandexSpeech.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("YandexSpeech.models.DB.TelegramAccountLink", b =>
+                {
+                    b.HasOne("YandexSpeech.models.DB.ApplicationUser", "User")
+                        .WithMany("TelegramLinks")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("YandexSpeech.models.DB.TelegramLinkToken", b =>
+                {
+                    b.HasOne("YandexSpeech.models.DB.TelegramAccountLink", "Link")
+                        .WithMany("Tokens")
+                        .HasForeignKey("LinkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Link");
+                });
+
             modelBuilder.Entity("YandexSpeech.models.DB.UserWallet", b =>
                 {
                     b.Property<string>("UserId")
@@ -1778,11 +1904,18 @@ namespace YandexSpeech.Migrations
 
                     b.Navigation("GoogleToken");
 
+                    b.Navigation("TelegramLinks");
+
                     b.Navigation("Subscriptions");
 
                     b.Navigation("Wallet");
 
                     b.Navigation("WalletTransactions");
+                });
+
+            modelBuilder.Entity("YandexSpeech.models.DB.TelegramAccountLink", b =>
+                {
+                    b.Navigation("Tokens");
                 });
 
             modelBuilder.Entity("YandexSpeech.models.DB.AudioWorkflowTask", b =>

@@ -10,6 +10,8 @@ using YandexSpeech.Extensions;
 using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO.Profile;
 using YandexSpeech.services.Google;
+using YandexSpeech.services.TelegramIntegration;
+using YandexSpeech.models.DTO.Telegram;
 
 namespace YandexSpeech.Controllers
 {
@@ -21,17 +23,20 @@ namespace YandexSpeech.Controllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly MyDbContext _dbContext;
         private readonly IGoogleTokenService _googleTokenService;
+        private readonly ITelegramLinkService _telegramLinkService;
 
         public ProfileController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             MyDbContext dbContext,
-            IGoogleTokenService googleTokenService)
+            IGoogleTokenService googleTokenService,
+            ITelegramLinkService telegramLinkService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _dbContext = dbContext;
             _googleTokenService = googleTokenService;
+            _telegramLinkService = telegramLinkService;
         }
 
         [HttpGet("")]
@@ -177,6 +182,54 @@ namespace YandexSpeech.Controllers
                 TempData["ProfileInfo"] = "Интеграция Google Calendar уже была отключена.";
             }
 
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpGet("telegram-link")]
+        public async Task<IActionResult> TelegramLink(string? token)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return RedirectToAction("Login", "Account", new { returnUrl = Url.Action(nameof(TelegramLink), "Profile", new { token }) });
+            }
+
+            ViewData["TelegramLinkToken"] = token ?? string.Empty;
+
+            var link = await _telegramLinkService.FindLinkByUserAsync(user.Id, HttpContext.RequestAborted);
+            if (link != null)
+            {
+                var status = await _telegramLinkService.GetCalendarStatusAsync(link.TelegramId, HttpContext.RequestAborted);
+                ViewData["TelegramLinkStatus"] = status;
+            }
+
+            return View("TelegramLink");
+        }
+
+        [HttpPost("telegram-link/confirm")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ConfirmTelegramLink([FromForm] TelegramLinkConfirmationRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                TempData["ProfileError"] = "Некорректный запрос на привязку Telegram.";
+                return RedirectToAction(nameof(TelegramLink), new { token = request.Token });
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return RedirectToAction("Login", "Account", new { returnUrl = Url.Action(nameof(TelegramLink), "Profile", new { token = request.Token }) });
+            }
+
+            var result = await _telegramLinkService.ConfirmLinkAsync(request.Token, user.Id, HttpContext.RequestAborted);
+            if (!result.Success)
+            {
+                TempData["ProfileError"] = result.Error ?? "Не удалось привязать Telegram.";
+                return RedirectToAction(nameof(TelegramLink));
+            }
+
+            TempData["ProfileSuccess"] = "Telegram-аккаунт привязан.";
             return RedirectToAction(nameof(Index));
         }
 

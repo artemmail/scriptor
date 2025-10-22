@@ -22,6 +22,12 @@ namespace YandexSpeech.services.Options
 
         public int MessageChunkLimit { get; set; } = 3900;
 
+        public string? IntegrationApiBaseUrl { get; set; }
+
+        public string? IntegrationApiToken { get; set; }
+
+        public int IntegrationStatusCacheSeconds { get; set; } = 30;
+
         public string? FfmpegExecutable { get; set; }
 
         public bool EnableOpenAiPostProcessing { get; set; }
