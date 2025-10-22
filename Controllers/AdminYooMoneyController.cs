@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -164,6 +166,36 @@ namespace YandexSpeech.Controllers
 
             var dto = MapOperationDetails(operationDetails);
             return Ok(dto);
+        }
+
+        [HttpGet("bill-details/{billId}")]
+        public async Task<ActionResult<IDictionary<string, object?>>> GetBillDetails(
+            string billId,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(billId))
+            {
+                return BadRequest("billId is required.");
+            }
+
+            try
+            {
+                var billDetails = await _yooMoneyRepository
+                    .GetBillDetailsAsync(billId, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (billDetails == null)
+                {
+                    return NotFound();
+                }
+
+                var converted = ConvertAdditionalData(billDetails.Data);
+                return Ok(converted ?? new Dictionary<string, object?>());
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+            {
+                return NotFound();
+            }
         }
 
         [HttpGet("payment-operations/{operationId}")]

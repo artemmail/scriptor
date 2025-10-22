@@ -6,6 +6,12 @@ using Newtonsoft.Json.Linq;
 
 namespace YandexSpeech.services
 {
+    public class BillDetails
+    {
+        [JsonExtensionData]
+        public IDictionary<string, JToken>? Data { get; set; }
+    }
+
     public class OperationDetails
     {
         [JsonProperty("operation_id")]
