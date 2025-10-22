@@ -52,7 +52,14 @@ namespace YandexSpeech.Controllers
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.UserId == user.Id && t.TokenType == GoogleTokenTypes.Calendar, HttpContext.RequestAborted);
 
-            var model = BuildViewModel(user, token);
+            TelegramCalendarStatusDto? telegramStatus = null;
+            var telegramLink = await _telegramLinkService.FindLinkByUserAsync(user.Id, HttpContext.RequestAborted);
+            if (telegramLink != null)
+            {
+                telegramStatus = await _telegramLinkService.GetCalendarStatusAsync(telegramLink.TelegramId, HttpContext.RequestAborted);
+            }
+
+            var model = BuildViewModel(user, token, telegramStatus);
             return View("Index", model);
         }
 
@@ -233,7 +240,7 @@ namespace YandexSpeech.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        private static ProfileIndexViewModel BuildViewModel(ApplicationUser user, UserGoogleToken? token)
+        private static ProfileIndexViewModel BuildViewModel(ApplicationUser user, UserGoogleToken? token, TelegramCalendarStatusDto? telegramStatus)
         {
             var revokedAfterConsent = token != null
                 && token.RevokedAt.HasValue
@@ -243,6 +250,8 @@ namespace YandexSpeech.Controllers
                 && token.ConsentGrantedAt.HasValue
                 && !revokedAfterConsent
                 && !string.IsNullOrWhiteSpace(token.AccessToken);
+
+            var resolvedTelegramStatus = telegramStatus ?? TelegramCalendarStatusDto.NotLinked();
 
             return new ProfileIndexViewModel
             {
@@ -257,6 +266,20 @@ namespace YandexSpeech.Controllers
                     AccessTokenExpiresAt = token?.AccessTokenExpiresAt,
                     RefreshTokenExpiresAt = token?.RefreshTokenExpiresAt,
                     TokensRevokedAt = token?.RevokedAt
+                },
+                Telegram = new TelegramStatusViewModel
+                {
+                    IsLinked = resolvedTelegramStatus.Linked,
+                    HasCalendarAccess = resolvedTelegramStatus.HasCalendarAccess,
+                    GoogleAuthorized = resolvedTelegramStatus.GoogleAuthorized,
+                    AccessTokenExpired = resolvedTelegramStatus.AccessTokenExpired,
+                    HasRequiredScope = resolvedTelegramStatus.HasRequiredScope,
+                    State = resolvedTelegramStatus.State,
+                    DetailCode = resolvedTelegramStatus.DetailCode,
+                    PermissionScope = resolvedTelegramStatus.PermissionScope,
+                    LinkedAt = resolvedTelegramStatus.LinkedAt,
+                    LastActivityAt = resolvedTelegramStatus.LastActivityAt,
+                    LastStatusCheckAt = resolvedTelegramStatus.LastStatusCheckAt
                 }
             };
         }
