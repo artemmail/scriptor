@@ -1,6 +1,30 @@
 <div class="profile-page">
   <main class="page-content">
 
+    <header class="page-header" *ngIf="user$ | async as user">
+      <div class="identity">
+        <div class="avatar" aria-hidden="true">{{ getInitials(user.displayName || user.email) }}</div>
+        <div class="identity-text">
+          <h1>Здравствуйте, {{ user.displayName || user.email }}!</h1>
+          <p>
+            Управляйте подпиской, настройками и безопасностью аккаунта. Здесь собраны быстрые ссылки и актуальная
+            информация.
+          </p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-secondary" type="button" (click)="navigateToBilling()">
+          <mat-icon>credit_card</mat-icon>
+          <span>Тарифы и оплата</span>
+        </button>
+        <button class="btn btn-logout" type="button" (click)="logout()" [disabled]="logoutInProgress">
+          <mat-icon>logout</mat-icon>
+          <span>{{ logoutInProgress ? 'Выходим…' : 'Выйти из аккаунта' }}</span>
+        </button>
+      </div>
+      <p class="logout-error" *ngIf="logoutError">{{ logoutError }}</p>
+    </header>
+
     <section class="subscription-overview">
       <div class="section-header">
         <h2>Подписка и доступ</h2>
