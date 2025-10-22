@@ -33,6 +33,16 @@ namespace YandexSpeech.models.DB
         /// </summary>
         public ICollection<UserFeatureFlag> FeatureFlags { get; set; } = new List<UserFeatureFlag>();
 
+        public DateTime? GoogleCalendarConsentAt { get; set; }
+
+        [MaxLength(4096)]
+        public string? GoogleAccessToken { get; set; }
+
+        [MaxLength(4096)]
+        public string? GoogleRefreshToken { get; set; }
+
+        public DateTime? GoogleAccessTokenExpiresAt { get; set; }
+
         /// <summary>
         /// Навигационное свойство для кошелька.
         /// </summary>

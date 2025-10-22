@@ -15,6 +15,7 @@ using YandexSpeech.services.Options;
 using YandexSpeech.services.Telegram;
 using YandexSpeech.services.Whisper;
 using YandexSpeech.Services;
+using YandexSpeech.Extensions;
 using YoutubeDownload.Managers;
 using YoutubeDownload.Services;
 using YoutubeExplode;
@@ -51,7 +52,7 @@ builder.Services.AddCors(opts =>
 });
 
 // 2. Контроллеры
-builder.Services.AddControllers();
+builder.Services.AddControllersWithViews();
 
 // Общий HttpClient для внешних запросов
 builder.Services.AddHttpClient();
@@ -99,42 +100,32 @@ authBuilder.AddJwtBearer(o =>
     };
 });
 
-var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
-var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
-if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
+authBuilder.AddGoogleOAuthConfigurations(builder.Configuration, opts =>
 {
-    authBuilder.AddGoogle(opts =>
+    opts.Events.OnRemoteFailure = ctx =>
     {
-        opts.ClientId = googleClientId;
-        opts.ClientSecret = googleClientSecret;
-
-        // Перехватываем ошибку silent-входа и возвращаем корректный HTML с postMessage
-        opts.Events.OnRemoteFailure = ctx =>
+        var silent = ctx.Request.Query.TryGetValue("silent", out var s) && s == "true";
+        if (silent)
         {
-            var silent = ctx.Request.Query.TryGetValue("silent", out var s) && s == "true";
-            if (silent)
-            {
-                var origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
-                var html = $@"<!doctype html>
+            var origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+            var html = $@"<!doctype html>
 <html><head><meta charset=""utf-8""></head><body>
 <script>
   window.parent.postMessage(JSON.stringify({{ type:'silent_login', status:'failed' }}), '{origin}');
 </script>
 </body></html>";
-                ctx.Response.ContentType = "text/html; charset=utf-8";
-                ctx.Response.Headers["Cache-Control"] = "no-store";
-                ctx.HandleResponse();
-                return ctx.Response.WriteAsync(html);
-            }
-
-            // Для обычного (не-silent) входа — редиректим на callback с ошибкой
-            var redirect = $"/api/account/externallogincallback?remoteError={Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error")}";
-            ctx.Response.Redirect(redirect);
+            ctx.Response.ContentType = "text/html; charset=utf-8";
+            ctx.Response.Headers["Cache-Control"] = "no-store";
             ctx.HandleResponse();
-            return Task.CompletedTask;
-        };
-    });
-}
+            return ctx.Response.WriteAsync(html);
+        }
+
+        var redirect = $"/api/account/externallogincallback?remoteError={Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error")}";
+        ctx.Response.Redirect(redirect);
+        ctx.HandleResponse();
+        return Task.CompletedTask;
+    };
+});
 
 var yandexClientId = builder.Configuration["Authentication:Yandex:ClientId"];
 var yandexClientSecret = builder.Configuration["Authentication:Yandex:ClientSecret"];
