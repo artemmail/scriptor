@@ -30,4 +30,24 @@
   <data name="TelegramIntegrationMisconfigured" xml:space="preserve">
     <value>⚠️ Интеграция с календарём не настроена. Проверьте токен интеграции в настройках.</value>
   </data>
+  <data name="CalendarScenarioConfirmation" xml:space="preserve">
+    <value>🗓 Событие: «{0}».
+📅 Когда: {1}.
+Добавить в календарь? Ответьте «Да» или «Нет».</value>
+  </data>
+  <data name="CalendarScenarioNotRecognized" xml:space="preserve">
+    <value>⚠️ Не распознал запрос на добавление в календарь. Пожалуйста, опишите встречу с датой и временем.</value>
+  </data>
+  <data name="CalendarScenarioMissingDate" xml:space="preserve">
+    <value>⚠️ Не смог определить дату и время. Повторите, пожалуйста, с конкретными данными.</value>
+  </data>
+  <data name="CalendarScenarioCancelled" xml:space="preserve">
+    <value>❎ Хорошо, не добавляю событие.</value>
+  </data>
+  <data name="CalendarScenarioEventCreated" xml:space="preserve">
+    <value>✅ Добавил событие «{0}» на {1}.</value>
+  </data>
+  <data name="CalendarScenarioEventFailed" xml:space="preserve">
+    <value>❌ Не удалось создать событие: {0}</value>
+  </data>
 </root>

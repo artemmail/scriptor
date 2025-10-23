@@ -370,6 +370,175 @@ namespace YandexSpeech.services.TelegramIntegration
             return await MapStatusAsync(link, cancellationToken).ConfigureAwait(false);
         }
 
+        public async Task<TelegramCalendarEventResult> CreateEventAsync(long telegramId, TelegramCalendarEventRequest request, CancellationToken cancellationToken = default)
+        {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            var link = await _dbContext.TelegramAccountLinks
+                .Include(l => l.User)
+                .ThenInclude(u => u.GoogleToken)
+                .FirstOrDefaultAsync(l => l.TelegramId == telegramId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (link == null || link.Status != TelegramAccountLinkStatus.Linked || string.IsNullOrWhiteSpace(link.UserId) || link.User == null)
+            {
+                return TelegramCalendarEventResult.Failure("Telegram account is not linked.");
+            }
+
+            if (link.User.GoogleToken == null || link.User.GoogleToken.RevokedAt.HasValue)
+            {
+                return TelegramCalendarEventResult.Failure("Google Calendar access is not available.");
+            }
+
+            if (request.StartsAt is null)
+            {
+                return TelegramCalendarEventResult.Failure("start_time_missing");
+            }
+
+            var tokenResult = await _googleTokenService.EnsureAccessTokenAsync(link.User, cancellationToken).ConfigureAwait(false);
+            if (!tokenResult.Succeeded || string.IsNullOrWhiteSpace(tokenResult.AccessToken))
+            {
+                var error = tokenResult.ErrorMessage ?? "Unable to obtain Google access token.";
+                return TelegramCalendarEventResult.Failure(error);
+            }
+
+            try
+            {
+                var credential = GoogleCredential.FromAccessToken(tokenResult.AccessToken);
+                using var calendarService = new CalendarService(new BaseClientService.Initializer
+                {
+                    HttpClientInitializer = credential,
+                    ApplicationName = "Scriptor Telegram Integration"
+                });
+
+                CalendarListEntry calendar;
+                try
+                {
+                    calendar = await calendarService.CalendarList.Get("primary").ExecuteAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (GoogleApiException ex)
+                {
+                    _logger.LogError(ex, "Failed to fetch calendar metadata for TelegramId {TelegramId}.", telegramId);
+                    return TelegramCalendarEventResult.Failure(ex.Message);
+                }
+
+                var googleTimeZone = string.IsNullOrWhiteSpace(request.TimeZone)
+                    ? calendar.TimeZone
+                    : request.TimeZone;
+                if (string.IsNullOrWhiteSpace(googleTimeZone))
+                {
+                    googleTimeZone = "UTC";
+                }
+
+                var calculationTimeZoneId = googleTimeZone;
+                if (OperatingSystem.IsWindows())
+                {
+                    try
+                    {
+                        calculationTimeZoneId = TZConvert.IanaToWindows(calculationTimeZoneId);
+                    }
+                    catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException or ArgumentException)
+                    {
+                        _logger.LogWarning(ex, "Failed to convert IANA timezone {TimeZone} to Windows id. Falling back to UTC.", googleTimeZone);
+                        calculationTimeZoneId = "UTC";
+                        googleTimeZone = "UTC";
+                    }
+                }
+
+                TimeZoneInfo timeZone;
+                try
+                {
+                    timeZone = TimeZoneInfo.FindSystemTimeZoneById(calculationTimeZoneId);
+                }
+                catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+                {
+                    _logger.LogWarning(ex, "Time zone {TimeZone} is not available on this system. Falling back to UTC.", calculationTimeZoneId);
+                    googleTimeZone = "UTC";
+                    timeZone = TimeZoneInfo.Utc;
+                }
+
+                var startUtc = request.StartsAt.Value.UtcDateTime;
+                var startLocal = TimeZoneInfo.ConvertTimeFromUtc(startUtc, timeZone);
+
+                DateTime endLocal;
+                if (request.EndsAt is DateTimeOffset endOffset)
+                {
+                    endLocal = TimeZoneInfo.ConvertTimeFromUtc(endOffset.UtcDateTime, timeZone);
+                    if (endLocal <= startLocal)
+                    {
+                        endLocal = startLocal.AddHours(1);
+                    }
+                }
+                else
+                {
+                    endLocal = startLocal.AddHours(1);
+                }
+
+                var startOffset = new DateTimeOffset(startLocal, timeZone.GetUtcOffset(startLocal));
+                var finishOffset = new DateTimeOffset(endLocal, timeZone.GetUtcOffset(endLocal));
+
+                var summary = string.IsNullOrWhiteSpace(request.Title)
+                    ? BuildEventSummaryFallback(request.Description, request.SourceText)
+                    : request.Title!.Trim();
+
+                var description = string.IsNullOrWhiteSpace(request.Description)
+                    ? request.SourceText
+                    : request.Description;
+
+                var calendarEvent = new Event
+                {
+                    Summary = summary,
+                    Description = description,
+                    Start = new EventDateTime
+                    {
+                        DateTime = startLocal,
+                        TimeZone = googleTimeZone
+                    },
+                    End = new EventDateTime
+                    {
+                        DateTime = endLocal,
+                        TimeZone = googleTimeZone
+                    }
+                };
+
+                Event createdEvent;
+                try
+                {
+                    createdEvent = await calendarService.Events.Insert(calendarEvent, "primary").ExecuteAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (GoogleApiException ex)
+                {
+                    _logger.LogError(ex, "Google API error while creating calendar event for TelegramId {TelegramId}.", telegramId);
+                    return TelegramCalendarEventResult.Failure(ex.Message);
+                }
+
+                link.LastActivityAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+                return new TelegramCalendarEventResult
+                {
+                    Success = true,
+                    EventId = createdEvent.Id,
+                    HtmlLink = createdEvent.HtmlLink,
+                    StartsAt = startOffset,
+                    EndsAt = finishOffset,
+                    TimeZone = googleTimeZone
+                };
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error while creating calendar event for TelegramId {TelegramId}.", telegramId);
+                return TelegramCalendarEventResult.Failure(ex.Message);
+            }
+        }
+
         public async Task<TelegramCalendarEventResult> CreateTestEventAsync(long telegramId, CancellationToken cancellationToken = default)
         {
             var link = await _dbContext.TelegramAccountLinks
@@ -625,6 +794,18 @@ namespace YandexSpeech.services.TelegramIntegration
             }
 
             return false;
+        }
+
+        private static string BuildEventSummaryFallback(string? description, string? source)
+        {
+            var candidate = string.IsNullOrWhiteSpace(description) ? source : description;
+            if (string.IsNullOrWhiteSpace(candidate))
+            {
+                return "Telegram voice note";
+            }
+
+            var normalized = candidate.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            return normalized.Length > 200 ? normalized[..200] + "…" : normalized;
         }
 
         private static string Truncate(string? value, int maxLength)

@@ -30,4 +30,24 @@
   <data name="TelegramIntegrationMisconfigured" xml:space="preserve">
     <value>⚠️ Calendar integration is not configured. Update the integration token in your profile.</value>
   </data>
+  <data name="CalendarScenarioConfirmation" xml:space="preserve">
+    <value>🗓 Event: "{0}".
+📅 When: {1}.
+Add to calendar? Reply with Yes or No.</value>
+  </data>
+  <data name="CalendarScenarioNotRecognized" xml:space="preserve">
+    <value>⚠️ I didn&apos;t detect a calendar request. Please describe the meeting with date and time.</value>
+  </data>
+  <data name="CalendarScenarioMissingDate" xml:space="preserve">
+    <value>⚠️ I couldn&apos;t find the date and time. Please repeat with specific details.</value>
+  </data>
+  <data name="CalendarScenarioCancelled" xml:space="preserve">
+    <value>❎ Got it, not adding the event.</value>
+  </data>
+  <data name="CalendarScenarioEventCreated" xml:space="preserve">
+    <value>✅ Created event "{0}" for {1}.</value>
+  </data>
+  <data name="CalendarScenarioEventFailed" xml:space="preserve">
+    <value>❌ Failed to create the event: {0}</value>
+  </data>
 </root>

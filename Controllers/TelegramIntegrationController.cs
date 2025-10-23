@@ -173,6 +173,50 @@ namespace YandexSpeech.Controllers
             }
         }
 
+        [Authorize(AuthenticationSchemes = IntegrationApiAuthenticationDefaults.AuthenticationScheme)]
+        [HttpPost("{telegramId:long}/calendar-events")]
+        public async Task<ActionResult<TelegramCalendarEventResponse>> CreateCalendarEventAsync(
+            long telegramId,
+            [FromBody] TelegramCalendarEventRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            try
+            {
+                var result = await _linkService.CreateEventAsync(telegramId, request, cancellationToken).ConfigureAwait(false);
+                var response = new TelegramCalendarEventResponse
+                {
+                    Success = result.Success,
+                    EventId = result.EventId,
+                    HtmlLink = result.HtmlLink,
+                    StartsAt = result.StartsAt,
+                    EndsAt = result.EndsAt,
+                    TimeZone = result.TimeZone,
+                    Error = result.Error
+                };
+
+                if (result.Success)
+                {
+                    return Ok(response);
+                }
+
+                return BadRequest(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create Telegram calendar event for {TelegramId}.", telegramId);
+                return StatusCode(500, new TelegramCalendarEventResponse
+                {
+                    Success = false,
+                    Error = "integration_failed"
+                });
+            }
+        }
+
         [Authorize]
         [HttpPost("link/unlink")]
         [ValidateAntiForgeryToken]

@@ -70,6 +70,22 @@ namespace YandexSpeech.models.DTO.Telegram
         public string? Error { get; set; }
     }
 
+    public sealed class TelegramCalendarEventRequest
+    {
+        public string? Title { get; set; }
+
+        public string? Description { get; set; }
+
+        public string? SourceText { get; set; }
+
+        [Required]
+        public DateTimeOffset? StartsAt { get; set; }
+
+        public DateTimeOffset? EndsAt { get; set; }
+
+        public string? TimeZone { get; set; }
+    }
+
     public sealed class TelegramCalendarStatusDto
     {
         public bool Linked { get; init; }

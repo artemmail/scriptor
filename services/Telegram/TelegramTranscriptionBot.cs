@@ -54,7 +54,12 @@ namespace YandexSpeech.services.Telegram
         private const string DefaultTelegramApiBaseUrl = "https://api.telegram.org";
         private const string IntegrationApiTokenPlaceholder = "changeme";
         private const string OpenAiSystemPrompt =
-            """You are a meticulous editor for Telegram voice transcriptions. Fix punctuation, casing, and obvious ASR mistakes without adding content. Keep the input language. Output JSON with fields: polished, summary.""";
+            """You are a meticulous editor for Telegram voice transcriptions. Fix punctuation, casing, and obvious ASR mistakes without adding content. Keep the input language.
+Always respond with JSON that has the fields: polished, summary, calendar.
+- polished: cleaned transcription string in the source language.
+- summary: optional concise summary in the same language. Provide only when NEED_SUMMARY=yes.
+- calendar: object with keys should_add (boolean), event (string or null), date_time (ISO 8601 start date-time with offset or null), end_time (ISO 8601 end date-time with offset or null), time_zone (IANA time zone identifier or null).
+If there is no intent to create a calendar event, set calendar.should_add to false and leave the other calendar fields null.""";
 
         private static readonly JsonSerializerOptions OpenAiRequestJsonOptions = new()
         {
@@ -89,7 +94,15 @@ namespace YandexSpeech.services.Telegram
             string? Summary,
             string? Model,
             string? Error,
-            bool Attempted);
+            bool Attempted,
+            CalendarIntentSuggestion? Calendar);
+
+        private readonly record struct CalendarIntentSuggestion(
+            bool ShouldAdd,
+            DateTimeOffset? StartsAt,
+            DateTimeOffset? EndsAt,
+            string? TimeZone,
+            string? EventTitle);
 
         public TelegramTranscriptionBot(
             IOptionsMonitor<TelegramBotOptions> optionsMonitor,
@@ -287,6 +300,12 @@ namespace YandexSpeech.services.Telegram
                     }
 
                     LogEvent("text", message, text, extra: null);
+
+                    if (userState is not null)
+                    {
+                        await HandlePendingCalendarConfirmationAsync(message, text, userState, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
                 }
 
                 var audioPayload = FindAudioPayload(message);
@@ -528,6 +547,7 @@ namespace YandexSpeech.services.Telegram
                     if (userState is not null)
                     {
                         userState.CalendarScenarioRequested = false;
+                        userState.PendingCalendarEvent = null;
                     }
                     var linkResponse = await RequestLinkTokenFromApiAsync(message.From!, baseUrl!, token!, cancellationToken).ConfigureAwait(false);
                     var linkUrl = linkResponse?.LinkUrl?.ToString();
@@ -548,6 +568,7 @@ namespace YandexSpeech.services.Telegram
                     if (userState is not null)
                     {
                         userState.CalendarScenarioRequested = false;
+                        userState.PendingCalendarEvent = null;
                     }
                     string templateKey = status.GoogleAuthorized
                         ? status.AccessTokenExpired
@@ -564,6 +585,7 @@ namespace YandexSpeech.services.Telegram
                 if (userState is not null)
                 {
                     userState.CalendarScenarioRequested = true;
+                    userState.PendingCalendarEvent = null;
                 }
 
                 var prompt = GetBotString("CalendarScenarioPrompt", culture);
@@ -862,6 +884,61 @@ namespace YandexSpeech.services.Telegram
             }
         }
 
+        private async Task<TelegramCalendarEventResponse?> RequestCalendarEventAsync(
+            long telegramId,
+            string baseUrl,
+            string token,
+            TelegramCalendarEventRequest payload,
+            CancellationToken cancellationToken)
+        {
+            var endpoint = $"{baseUrl.TrimEnd('/')}/{telegramId}/calendar-events";
+            var json = JsonSerializer.Serialize(payload, _integrationJsonOptions);
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+
+            request.Headers.TryAddWithoutValidation(IntegrationApiAuthenticationDefaults.HeaderName, token);
+
+            try
+            {
+                using var response = await SendIntegrationRequestAsync(request, cancellationToken).ConfigureAwait(false);
+                if (response is null)
+                {
+                    return null;
+                }
+
+                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                var result = await JsonSerializer.DeserializeAsync<TelegramCalendarEventResponse>(stream, _integrationJsonOptions, cancellationToken: cancellationToken)
+                             ?? new TelegramCalendarEventResponse();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    result.Success = false;
+                    if (string.IsNullOrWhiteSpace(result.Error))
+                    {
+                        result.Error = $"integration_http_{(int)response.StatusCode}";
+                    }
+                }
+                else
+                {
+                    result.Success = true;
+                }
+
+                return result;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogError(ex, "Failed to create calendar event via integration API for {TelegramId}.", telegramId);
+                throw;
+            }
+        }
+
         private async Task<HttpResponseMessage?> SendIntegrationRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var client = _httpClientFactory.CreateClient(nameof(TelegramTranscriptionBot) + ".Integration");
@@ -1045,6 +1122,9 @@ namespace YandexSpeech.services.Telegram
                 {
                     await RunCalendarScenarioIfNeededAsync(triggerMessage, postProcessing, userState, cancellationToken)
                         .ConfigureAwait(false);
+
+                    await HandlePendingCalendarConfirmationAsync(triggerMessage, postProcessing.Text, userState, cancellationToken)
+                        .ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)
@@ -1070,7 +1150,7 @@ namespace YandexSpeech.services.Telegram
 
         private async Task RunCalendarScenarioIfNeededAsync(
             Message triggerMessage,
-            OpenAiPostProcessingResult _,
+            OpenAiPostProcessingResult postProcessing,
             TelegramUserState userState,
             CancellationToken cancellationToken)
         {
@@ -1095,11 +1175,431 @@ namespace YandexSpeech.services.Telegram
 
                 LogEvent("calendar_consent_required", triggerMessage, text, new { stage = "scenario" });
                 userState.CalendarScenarioRequested = false;
+                userState.PendingCalendarEvent = null;
                 return;
             }
 
-            // Здесь позже будет логика создания события в календаре.
+            var calendarIntent = postProcessing.Calendar;
+            if (calendarIntent is null || !calendarIntent.Value.ShouldAdd)
+            {
+                var fallback = GetBotString("CalendarScenarioNotRecognized", culture);
+                if (!string.IsNullOrWhiteSpace(fallback))
+                {
+                    await SendTextMessageAsync(
+                            triggerMessage.Chat.Id,
+                            fallback,
+                            new ReplyParameters { MessageId = triggerMessage.Id },
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+
+                LogEvent("calendar_not_detected", triggerMessage, postProcessing.Text, new { stage = "scenario" });
+                return;
+            }
+
+            if (calendarIntent.Value.StartsAt is null)
+            {
+                var prompt = GetBotString("CalendarScenarioMissingDate", culture);
+                if (!string.IsNullOrWhiteSpace(prompt))
+                {
+                    await SendTextMessageAsync(
+                            triggerMessage.Chat.Id,
+                            prompt,
+                            new ReplyParameters { MessageId = triggerMessage.Id },
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+
+                LogEvent("calendar_missing_time", triggerMessage, postProcessing.Text, new { stage = "scenario" });
+                return;
+            }
+
+            var start = calendarIntent.Value.StartsAt.Value;
+            var rawEnd = calendarIntent.Value.EndsAt;
+            var end = NormalizeEventEnd(start, rawEnd);
+            var title = BuildEventTitle(calendarIntent.Value.EventTitle, postProcessing.Text);
+            var candidate = new TelegramCalendarEventCandidate
+            {
+                Title = title,
+                Description = postProcessing.Summary ?? postProcessing.Text,
+                SourceText = postProcessing.Text,
+                StartsAt = start,
+                EndsAt = end,
+                TimeZone = NormalizeTimeZone(calendarIntent.Value.TimeZone),
+                SourceMessageId = triggerMessage.Id
+            };
+
+            userState.PendingCalendarEvent = candidate;
             userState.CalendarScenarioRequested = false;
+
+            var confirmationTemplate = GetBotString("CalendarScenarioConfirmation", culture);
+            var schedule = BuildEventScheduleText(candidate.StartsAt, candidate.EndsAt, candidate.TimeZone, culture);
+            var confirmation = string.IsNullOrWhiteSpace(confirmationTemplate)
+                ? $"🗓 Событие: {candidate.Title}.\n📅 Когда: {schedule}.\nДобавить в календарь?"
+                : string.Format(culture, confirmationTemplate, candidate.Title, schedule);
+
+            await SendTextMessageAsync(
+                    triggerMessage.Chat.Id,
+                    confirmation,
+                    new ReplyParameters { MessageId = triggerMessage.Id },
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            LogEvent("calendar_candidate", triggerMessage, postProcessing.Text, new
+            {
+                candidate.Title,
+                candidate.StartsAt,
+                candidate.EndsAt,
+                candidate.TimeZone
+            });
+        }
+
+        private async Task HandlePendingCalendarConfirmationAsync(
+            Message message,
+            string text,
+            TelegramUserState userState,
+            CancellationToken cancellationToken)
+        {
+            if (message.From is null)
+            {
+                return;
+            }
+
+            var candidate = userState.PendingCalendarEvent;
+            if (candidate is null || string.IsNullOrWhiteSpace(text) || candidate.SourceMessageId == message.Id)
+            {
+                return;
+            }
+
+            var normalized = NormalizeConfirmationInput(text);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return;
+            }
+
+            var culture = ResolveUserCulture(message.From);
+
+            if (IsPositiveConfirmation(normalized))
+            {
+                await ConfirmCalendarEventAsync(message, userState, candidate, culture, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            else if (IsNegativeConfirmation(normalized))
+            {
+                var template = GetBotString("CalendarScenarioCancelled", culture);
+                var response = string.IsNullOrWhiteSpace(template)
+                    ? "❎ Не добавляю событие."
+                    : template;
+
+                await SendTextMessageAsync(
+                        message.Chat.Id,
+                        response,
+                        new ReplyParameters { MessageId = message.Id },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                userState.PendingCalendarEvent = null;
+                userState.CalendarScenarioRequested = false;
+
+                LogEvent("calendar_cancelled", message, text, new
+                {
+                    candidate.Title,
+                    candidate.StartsAt,
+                    candidate.EndsAt,
+                    candidate.TimeZone
+                });
+            }
+        }
+
+        private async Task ConfirmCalendarEventAsync(
+            Message message,
+            TelegramUserState userState,
+            TelegramCalendarEventCandidate candidate,
+            CultureInfo culture,
+            CancellationToken cancellationToken)
+        {
+            if (message.From is null)
+            {
+                return;
+            }
+
+            if (!TryGetIntegrationConfiguration(out var baseUrl, out var token, out var errorResourceKey))
+            {
+                var error = GetBotString(errorResourceKey ?? "TelegramLinkError", culture);
+                await SendTextMessageAsync(
+                        message.Chat.Id,
+                        error,
+                        new ReplyParameters { MessageId = message.Id },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                return;
+            }
+
+            if (!userState.HasCalendarConsent)
+            {
+                var template = GetBotString("CalendarAuthorizationMissingDuringScenario", culture);
+                var text = FormatCalendarLinkMessage(template, culture, GetCalendarConsentUrl());
+                await SendTextMessageAsync(
+                        message.Chat.Id,
+                        text,
+                        new ReplyParameters { MessageId = message.Id },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                return;
+            }
+
+            var request = new TelegramCalendarEventRequest
+            {
+                Title = candidate.Title,
+                Description = candidate.Description,
+                SourceText = candidate.SourceText,
+                StartsAt = candidate.StartsAt,
+                EndsAt = candidate.EndsAt,
+                TimeZone = candidate.TimeZone
+            };
+
+            TelegramCalendarEventResponse? response;
+            try
+            {
+                response = await RequestCalendarEventAsync(message.From.Id, baseUrl!, token!, request, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                var failureTemplate = GetBotString("CalendarScenarioEventFailed", culture);
+                var normalized = NormalizeIntegrationError(ex.Message, culture);
+                var failureText = string.Format(culture, failureTemplate, normalized);
+                await SendTextMessageAsync(
+                        message.Chat.Id,
+                        failureText,
+                        new ReplyParameters { MessageId = message.Id },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                LogEvent("calendar_event_error", message, ex.Message, new
+                {
+                    candidate.Title,
+                    candidate.StartsAt,
+                    candidate.EndsAt,
+                    candidate.TimeZone
+                });
+                return;
+            }
+
+            if (response is null)
+            {
+                var template = GetBotString("CalendarScenarioEventFailed", culture);
+                var failure = string.Format(culture, template, GetBotString("TelegramLinkError", culture));
+                await SendTextMessageAsync(
+                        message.Chat.Id,
+                        failure,
+                        new ReplyParameters { MessageId = message.Id },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                return;
+            }
+
+            if (response.Success)
+            {
+                var actualStart = response.StartsAt ?? candidate.StartsAt;
+                var actualEnd = response.EndsAt ?? candidate.EndsAt;
+                var actualTimeZone = NormalizeTimeZone(response.TimeZone) ?? candidate.TimeZone;
+                var schedule = BuildEventScheduleText(actualStart, actualEnd, actualTimeZone, culture);
+                var template = GetBotString("CalendarScenarioEventCreated", culture);
+                var success = string.IsNullOrWhiteSpace(template)
+                    ? $"✅ Добавил событие \"{candidate.Title}\" на {schedule}."
+                    : string.Format(culture, template, candidate.Title, schedule);
+
+                if (!string.IsNullOrWhiteSpace(response.HtmlLink))
+                {
+                    success = string.Join('\n', success, response.HtmlLink);
+                }
+
+                await SendTextMessageAsync(
+                        message.Chat.Id,
+                        success,
+                        new ReplyParameters { MessageId = message.Id },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                userState.PendingCalendarEvent = null;
+                userState.CalendarScenarioRequested = false;
+
+                LogEvent("calendar_event_created", message, candidate.SourceText, new
+                {
+                    response.EventId,
+                    response.HtmlLink,
+                    response.StartsAt,
+                    response.EndsAt,
+                    response.TimeZone
+                });
+                return;
+            }
+
+            var errorText = NormalizeIntegrationError(response.Error, culture);
+            var failureTemplate = GetBotString("CalendarScenarioEventFailed", culture);
+            var messageText = string.Format(culture, failureTemplate, errorText);
+
+            await SendTextMessageAsync(
+                    message.Chat.Id,
+                    messageText,
+                    new ReplyParameters { MessageId = message.Id },
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            LogEvent("calendar_event_failed", message, response.Error ?? string.Empty, new
+            {
+                candidate.Title,
+                candidate.StartsAt,
+                candidate.EndsAt,
+                candidate.TimeZone
+            });
+        }
+
+        private static string NormalizeConfirmationInput(string text)
+        {
+            var lower = text.ToLowerInvariant();
+            lower = Regex.Replace(lower, "[\\p{P}\\p{S}]", " ");
+            lower = Regex.Replace(lower, "\\s+", " ").Trim();
+            return lower;
+        }
+
+        private static bool IsPositiveConfirmation(string normalized)
+        {
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return false;
+            }
+
+            var phrases = new[]
+            {
+                "да",
+                "давай",
+                "добавь",
+                "ага",
+                "ок",
+                "окей",
+                "хорошо",
+                "конечно",
+                "подтверждаю",
+                "yes",
+                "yeah",
+                "yep",
+                "sure",
+                "confirm",
+                "add"
+            };
+
+            foreach (var phrase in phrases)
+            {
+                if (normalized.Equals(phrase, StringComparison.Ordinal)
+                    || normalized.StartsWith(phrase + " ", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsNegativeConfirmation(string normalized)
+        {
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return false;
+            }
+
+            var phrases = new[]
+            {
+                "нет",
+                "не",
+                "не надо",
+                "не добавляй",
+                "отмена",
+                "стоп",
+                "no",
+                "nope",
+                "cancel"
+            };
+
+            foreach (var phrase in phrases)
+            {
+                if (normalized.Equals(phrase, StringComparison.Ordinal)
+                    || normalized.StartsWith(phrase + " ", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static DateTimeOffset? NormalizeEventEnd(DateTimeOffset start, DateTimeOffset? proposedEnd)
+        {
+            if (proposedEnd is null)
+            {
+                return start.AddHours(1);
+            }
+
+            var end = proposedEnd.Value;
+            if (end <= start)
+            {
+                return start.AddHours(1);
+            }
+
+            return end;
+        }
+
+        private static string BuildEventTitle(string? title, string fallback)
+        {
+            var candidate = string.IsNullOrWhiteSpace(title) ? fallback : title!;
+            candidate = candidate.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            if (candidate.Length > 200)
+            {
+                candidate = candidate[..200] + "…";
+            }
+
+            return candidate;
+        }
+
+        private static string? NormalizeTimeZone(string? timeZone)
+        {
+            return string.IsNullOrWhiteSpace(timeZone) ? null : timeZone.Trim();
+        }
+
+        private string BuildEventScheduleText(DateTimeOffset start, DateTimeOffset? end, string? timeZone, CultureInfo culture)
+        {
+            var label = BuildTimeZoneLabel(timeZone, start);
+            var startText = FormatEventTime(start, label, culture);
+            if (end is null)
+            {
+                return startText;
+            }
+
+            var alignedEnd = end.Value.ToOffset(start.Offset);
+            var endText = alignedEnd.ToString("t", culture);
+            return string.Join(' ', startText, "–", endText);
+        }
+
+        private static string? BuildTimeZoneLabel(string? timeZone, DateTimeOffset? dateTime)
+        {
+            if (!string.IsNullOrWhiteSpace(timeZone))
+            {
+                return timeZone.Trim();
+            }
+
+            if (dateTime is DateTimeOffset dto)
+            {
+                var offset = dto.Offset;
+                var sign = offset >= TimeSpan.Zero ? "+" : "-";
+                return $"UTC{sign}{offset:hh\\:mm}";
+            }
+
+            return null;
         }
 
         private static CultureInfo ResolveUserCulture(User? user)
@@ -1492,7 +1992,7 @@ namespace YandexSpeech.services.Telegram
 
             if (!options.EnableOpenAiPostProcessing)
             {
-                return new OpenAiPostProcessingResult(text, null, null, "OpenAI post-processing is disabled.", false);
+                return new OpenAiPostProcessingResult(text, null, null, "OpenAI post-processing is disabled.", false, null);
             }
 
             var apiKey = !string.IsNullOrWhiteSpace(options.OpenAiApiKey)
@@ -1501,7 +2001,7 @@ namespace YandexSpeech.services.Telegram
 
             if (string.IsNullOrWhiteSpace(apiKey))
             {
-                return new OpenAiPostProcessingResult(text, null, null, "OpenAI API key is not configured.", false);
+                return new OpenAiPostProcessingResult(text, null, null, "OpenAI API key is not configured.", false, null);
             }
 
             var model = string.IsNullOrWhiteSpace(options.OpenAiModel)
@@ -1549,7 +2049,7 @@ namespace YandexSpeech.services.Telegram
                 if (!response.IsSuccessStatusCode)
                 {
                     var message = $"OpenAI HTTP {(int)response.StatusCode}: {response.ReasonPhrase?.Trim() ?? "Unknown"}. {Truncate(responseBody, 400)}";
-                    return new OpenAiPostProcessingResult(text, null, null, message, true);
+                    return new OpenAiPostProcessingResult(text, null, null, message, true, null);
                 }
 
                 using var responseJson = JsonDocument.Parse(responseBody);
@@ -1557,19 +2057,19 @@ namespace YandexSpeech.services.Telegram
                     || choices.ValueKind != JsonValueKind.Array
                     || choices.GetArrayLength() == 0)
                 {
-                    return new OpenAiPostProcessingResult(text, null, null, "OpenAI response did not contain choices.", true);
+                    return new OpenAiPostProcessingResult(text, null, null, "OpenAI response did not contain choices.", true, null);
                 }
 
                 var content = choices[0].GetProperty("message").GetProperty("content").GetString();
                 if (string.IsNullOrWhiteSpace(content))
                 {
-                    return new OpenAiPostProcessingResult(text, null, null, "OpenAI response content is empty.", true);
+                    return new OpenAiPostProcessingResult(text, null, null, "OpenAI response content is empty.", true, null);
                 }
 
                 using var payloadJson = TryParseJsonDocument(content!);
                 if (payloadJson is null)
                 {
-                    return new OpenAiPostProcessingResult(text, null, null, "OpenAI response content is not valid JSON.", true);
+                    return new OpenAiPostProcessingResult(text, null, null, "OpenAI response content is not valid JSON.", true, null);
                 }
 
                 var root = payloadJson.RootElement;
@@ -1591,7 +2091,9 @@ namespace YandexSpeech.services.Telegram
                     }
                 }
 
-                return new OpenAiPostProcessingResult(finalText, summary, model, null, true);
+                var calendar = ParseCalendarIntent(root);
+
+                return new OpenAiPostProcessingResult(finalText, summary, model, null, true, calendar);
             }
             catch (OperationCanceledException)
             {
@@ -1599,8 +2101,119 @@ namespace YandexSpeech.services.Telegram
             }
             catch (Exception ex)
             {
-                return new OpenAiPostProcessingResult(text, null, null, $"{ex.GetType().Name}: {ex.Message}", true);
+                return new OpenAiPostProcessingResult(text, null, null, $"{ex.GetType().Name}: {ex.Message}", true, null);
             }
+        }
+
+        private static CalendarIntentSuggestion? ParseCalendarIntent(JsonElement root)
+        {
+            if (!root.TryGetProperty("calendar", out var calendarElement)
+                || calendarElement.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            var shouldAdd = ExtractBoolean(calendarElement, "should_add", "shouldAdd", "add_to_calendar", "addToCalendar") ?? false;
+            var title = ExtractString(calendarElement, "event", "title", "summary");
+            var start = ExtractDateTime(calendarElement, "date_time", "datetime", "starts_at", "start", "start_time");
+            var end = ExtractDateTime(calendarElement, "end_time", "ends_at", "end");
+            var timeZone = ExtractString(calendarElement, "time_zone", "timeZone", "timezone", "tz");
+
+            if (!shouldAdd && title is null && start is null && end is null && string.IsNullOrWhiteSpace(timeZone))
+            {
+                return null;
+            }
+
+            return new CalendarIntentSuggestion(shouldAdd, start, end, timeZone, title);
+        }
+
+        private static bool? ExtractBoolean(JsonElement element, params string[] propertyNames)
+        {
+            foreach (var property in propertyNames)
+            {
+                if (!element.TryGetProperty(property, out var value))
+                {
+                    continue;
+                }
+
+                if (value.ValueKind == JsonValueKind.True)
+                {
+                    return true;
+                }
+
+                if (value.ValueKind == JsonValueKind.False)
+                {
+                    return false;
+                }
+
+                if (value.ValueKind == JsonValueKind.String)
+                {
+                    var raw = value.GetString();
+                    if (!string.IsNullOrWhiteSpace(raw) && bool.TryParse(raw.Trim(), out var parsed))
+                    {
+                        return parsed;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static string? ExtractString(JsonElement element, params string[] propertyNames)
+        {
+            foreach (var property in propertyNames)
+            {
+                if (!element.TryGetProperty(property, out var value) || value.ValueKind != JsonValueKind.String)
+                {
+                    continue;
+                }
+
+                var raw = value.GetString();
+                if (!string.IsNullOrWhiteSpace(raw))
+                {
+                    return raw.Trim();
+                }
+            }
+
+            return null;
+        }
+
+        private static DateTimeOffset? ExtractDateTime(JsonElement element, params string[] propertyNames)
+        {
+            foreach (var property in propertyNames)
+            {
+                if (!element.TryGetProperty(property, out var value))
+                {
+                    continue;
+                }
+
+                if (value.ValueKind == JsonValueKind.String)
+                {
+                    var raw = value.GetString();
+                    if (TryParseDateTimeOffset(raw, out var parsed))
+                    {
+                        return parsed;
+                    }
+                }
+                else if (value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var seconds))
+                {
+                    return DateTimeOffset.FromUnixTimeSeconds(seconds);
+                }
+            }
+
+            return null;
+        }
+
+        private static bool TryParseDateTimeOffset(string? input, out DateTimeOffset result)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                result = default;
+                return false;
+            }
+
+            var cleaned = input.Trim();
+            return DateTimeOffset.TryParse(cleaned, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeUniversal, out result);
         }
 
         private async Task SendTranscriptAsync(Message originalMessage, string text, string workingDirectory, CancellationToken cancellationToken)
