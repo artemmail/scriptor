@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -100,13 +101,17 @@ namespace YandexSpeech.services.TelegramIntegration
 
                     CleanExpiredTokens(link, now);
 
-                    if (link.Tokens.Count(t => t.RevokedAt == null && t.ConsumedAt == null && t.ExpiresAt > now) >= options.MaxActiveTokensPerLink)
+                    if (options.MaxActiveTokensPerLink > 0
+                        && link.Tokens.Count(t => t.RevokedAt == null && t.ConsumedAt == null && t.ExpiresAt > now) >= options.MaxActiveTokensPerLink)
                     {
                         var oldest = link.Tokens
                             .Where(t => t.RevokedAt == null && t.ConsumedAt == null && t.ExpiresAt > now)
                             .OrderBy(t => t.CreatedAt)
-                            .First();
-                        oldest.RevokedAt = now;
+                            .FirstOrDefault();
+                        if (oldest != null)
+                        {
+                            oldest.RevokedAt = now;
+                        }
                     }
 
                     var token = GenerateToken();
@@ -154,6 +159,18 @@ namespace YandexSpeech.services.TelegramIntegration
 
                     _logger.LogWarning(ex, "Concurrency conflict while creating Telegram link token for TelegramId {TelegramId}. Retrying (attempt {Attempt}/{MaxAttempts}).", context.TelegramId, attempt + 1, maxRetryCount);
                     _dbContext.ChangeTracker.Clear();
+                    var backoff = TimeSpan.FromMilliseconds(50 * (attempt + 1));
+                    if (backoff > TimeSpan.Zero)
+                    {
+                        try
+                        {
+                            await Task.Delay(backoff, cancellationToken).ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
+                    }
                     continue;
                 }
                 catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
@@ -196,7 +213,9 @@ namespace YandexSpeech.services.TelegramIntegration
 
             var tokenEntity = await _dbContext.TelegramLinkTokens
                 .Include(t => t.Link)
-                .ThenInclude(l => l.User)
+                    .ThenInclude(l => l.User)
+                .Include(t => t.Link)
+                    .ThenInclude(l => l.Tokens)
                 .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken)
                 .ConfigureAwait(false);
 
@@ -384,7 +403,25 @@ namespace YandexSpeech.services.TelegramIntegration
                     .Where(property => property.Metadata.IsPrimaryKey())
                     .ToDictionary(property => property.Metadata.Name, property => property.CurrentValue);
 
-                var databaseValues = await entry.GetDatabaseValuesAsync(cancellationToken).ConfigureAwait(false);
+                PropertyValues? databaseValues;
+
+                try
+                {
+                    databaseValues = await entry.GetDatabaseValuesAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception logException)
+                {
+                    _logger.LogWarning(
+                        logException,
+                        "Concurrency conflict detected for entity {EntityType} with key {KeyValues}, but database values could not be retrieved.",
+                        entityType,
+                        keyValues);
+                    continue;
+                }
 
                 if (databaseValues == null)
                 {
@@ -401,7 +438,9 @@ namespace YandexSpeech.services.TelegramIntegration
 
         private void CleanExpiredTokens(TelegramAccountLink link, DateTime now)
         {
-            foreach (var token in link.Tokens.Where(t => t.RevokedAt == null && t.ConsumedAt == null && t.ExpiresAt <= now))
+            foreach (var token in link.Tokens
+                         .Where(t => t.RevokedAt == null && t.ConsumedAt == null && t.ExpiresAt <= now)
+                         .ToList())
             {
                 token.RevokedAt = now;
             }
