@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
@@ -47,6 +48,48 @@ public sealed class TelegramLinkServiceTests
         Assert.Equal(2, link.Tokens.Count);
     }
 
+    [Fact]
+    public async Task CreateLinkTokenAsync_WithExistingLinkWithoutTokens_CreatesToken()
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<MyDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString());
+
+        await using var dbContext = new MyDbContext(optionsBuilder.Options);
+
+        var link = new TelegramAccountLink
+        {
+            Id = Guid.NewGuid(),
+            TelegramId = 654321,
+            Username = "another_user",
+            FirstName = "Another",
+            LastName = "User",
+            LanguageCode = "en",
+            CreatedAt = DateTime.UtcNow,
+            Status = TelegramAccountLinkStatus.Pending
+        };
+
+        dbContext.TelegramAccountLinks.Add(link);
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+
+        var context = new TelegramLinkInitiationContext(
+            link.TelegramId,
+            link.Username,
+            link.FirstName,
+            link.LastName,
+            link.LanguageCode);
+
+        var result = await service.CreateLinkTokenAsync(context, CancellationToken.None);
+
+        Assert.False(string.IsNullOrWhiteSpace(result.Token));
+
+        var tokens = await dbContext.TelegramLinkTokens
+            .Where(t => t.LinkId == link.Id)
+            .ToListAsync();
+
+        Assert.Single(tokens);
+    }
     private static TelegramLinkService CreateService(MyDbContext dbContext)
     {
         var optionsMonitor = new TestOptionsMonitor(new TelegramIntegrationOptions
