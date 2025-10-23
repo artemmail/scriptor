@@ -121,12 +121,15 @@ namespace YandexSpeech.services.TelegramIntegration
                     {
                         Id = Guid.NewGuid(),
                         Link = link,
+                        LinkId = link.Id,
                         TokenHash = hash,
                         CreatedAt = now,
                         ExpiresAt = now + options.TokenLifetime,
                         Purpose = TelegramLinkTokenPurposes.Link,
                         IsOneTime = true
                     };
+
+                    link.Tokens ??= new List<TelegramLinkToken>();
 
                     link.Tokens.Add(tokenEntity);
                     link.LastActivityAt = now;
