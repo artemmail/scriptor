@@ -203,7 +203,7 @@ namespace YandexSpeech
                 entity.HasOne(link => link.User)
                     .WithMany(user => user.TelegramLinks)
                     .HasForeignKey(link => link.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             builder.Entity<TelegramLinkToken>(entity =>

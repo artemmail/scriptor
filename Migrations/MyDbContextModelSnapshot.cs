@@ -1275,7 +1275,7 @@ namespace YandexSpeech.Migrations
                     b.HasOne("YandexSpeech.models.DB.ApplicationUser", "User")
                         .WithMany("TelegramLinks")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
                 });
