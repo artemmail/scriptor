@@ -58,6 +58,7 @@ COMMAND_QUEUE = os.getenv("EVENTBUS_COMMAND_QUEUE_NAME", "w.ds_development_cmd")
 RESPONSE_QUEUE = os.getenv("EVENTBUS_QUEUE_NAME", "w.ds_develqqqqopmjшшj1")
 RETRY_COUNT = int(os.getenv("EVENTBUS_RETRY_COUNT", "10"))
 RETRY_DELAY_SECONDS = float(os.getenv("EVENTBUS_RETRY_DELAY", "5"))
+CONSUMER_TIMEOUT_MS = int(os.getenv("EVENTBUS_CONSUMER_TIMEOUT_MS", "7200000"))
 
 MODEL_CACHE: Dict[Tuple[str, str, str], WhisperModel] = {}
 
@@ -373,7 +374,11 @@ def main() -> None:
             channel.queue_declare(queue=COMMAND_QUEUE, durable=True)
             channel.queue_declare(queue=RESPONSE_QUEUE, durable=True)
             channel.basic_qos(prefetch_count=1)
-            channel.basic_consume(queue=COMMAND_QUEUE, on_message_callback=_on_message)
+            channel.basic_consume(
+                queue=COMMAND_QUEUE,
+                on_message_callback=_on_message,
+                arguments={"x-consumer-timeout": CONSUMER_TIMEOUT_MS},
+            )
 
             LOGGER.info(
                 "fw_runner ready. broker=%s host=%s command_queue=%s response_queue=%s",
