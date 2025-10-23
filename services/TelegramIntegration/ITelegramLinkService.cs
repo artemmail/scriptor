@@ -25,6 +25,11 @@ namespace YandexSpeech.services.TelegramIntegration
             long telegramId,
             CancellationToken cancellationToken = default);
 
+        Task<TelegramCalendarEventResult> CreateEventAsync(
+            long telegramId,
+            TelegramCalendarEventRequest request,
+            CancellationToken cancellationToken = default);
+
         Task<TelegramCalendarEventResult> CreateTestEventAsync(
             long telegramId,
             CancellationToken cancellationToken = default);
