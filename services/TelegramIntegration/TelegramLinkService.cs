@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Security.Cryptography;
@@ -143,6 +144,8 @@ namespace YandexSpeech.services.TelegramIntegration
                 catch (DbUpdateConcurrencyException ex)
                 {
                     await RollbackSilentlyAsync(transaction, cancellationToken).ConfigureAwait(false);
+
+                    await LogConcurrencyConflictAsync(ex, cancellationToken).ConfigureAwait(false);
 
                     if (cancellationToken.IsCancellationRequested || attempt == maxRetryCount - 1)
                     {
@@ -370,6 +373,30 @@ namespace YandexSpeech.services.TelegramIntegration
                    || !string.Equals(link.FirstName, context.FirstName, StringComparison.Ordinal)
                    || !string.Equals(link.LastName, context.LastName, StringComparison.Ordinal)
                    || !string.Equals(link.LanguageCode, context.LanguageCode, StringComparison.Ordinal);
+        }
+
+        private async Task LogConcurrencyConflictAsync(DbUpdateConcurrencyException exception, CancellationToken cancellationToken)
+        {
+            foreach (var entry in exception.Entries)
+            {
+                var entityType = entry.Metadata.ClrType.Name;
+                var keyValues = entry.Properties
+                    .Where(property => property.Metadata.IsPrimaryKey())
+                    .ToDictionary(property => property.Metadata.Name, property => property.CurrentValue);
+
+                var databaseValues = await entry.GetDatabaseValuesAsync(cancellationToken).ConfigureAwait(false);
+
+                if (databaseValues == null)
+                {
+                    _logger.LogWarning("Concurrency conflict detected for entity {EntityType} with key {KeyValues}: the record was deleted from the database.", entityType, keyValues);
+                    continue;
+                }
+
+                var databaseSnapshot = databaseValues.Properties
+                    .ToDictionary(property => property.Name, property => databaseValues[property]);
+
+                _logger.LogWarning("Concurrency conflict detected for entity {EntityType} with key {KeyValues}. Database snapshot: {@DatabaseValues}.", entityType, keyValues, databaseSnapshot);
+            }
         }
 
         private void CleanExpiredTokens(TelegramAccountLink link, DateTime now)
