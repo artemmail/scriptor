@@ -38,7 +38,7 @@
 
     @if (!string.IsNullOrEmpty(token))
     {
-        <form asp-action="ConfirmTelegramLink" asp-controller="Profile" method="post">
+        <form method="post" action="@Url.Action("ConfirmTelegramLink", "Profile")">
             @Html.AntiForgeryToken()
             <input type="hidden" name="Token" value="@token" />
             <p>Нажмите кнопку ниже, чтобы завершить привязку Telegram.</p>
