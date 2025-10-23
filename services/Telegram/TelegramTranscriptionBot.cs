@@ -54,12 +54,12 @@ namespace YandexSpeech.services.Telegram
         private const string DefaultTelegramApiBaseUrl = "https://api.telegram.org";
         private const string IntegrationApiTokenPlaceholder = "changeme";
         private const string OpenAiSystemPrompt =
-            """You are a meticulous editor for Telegram voice transcriptions. Fix punctuation, casing, and obvious ASR mistakes without adding content. Keep the input language.
+            @"You are a meticulous editor for Telegram voice transcriptions. Fix punctuation, casing, and obvious ASR mistakes without adding content. Keep the input language.
 Always respond with JSON that has the fields: polished, summary, calendar.
 - polished: cleaned transcription string in the source language.
 - summary: optional concise summary in the same language. Provide only when NEED_SUMMARY=yes.
 - calendar: object with keys should_add (boolean), event (string or null), date_time (ISO 8601 start date-time with offset or null), end_time (ISO 8601 end date-time with offset or null), time_zone (IANA time zone identifier or null).
-If there is no intent to create a calendar event, set calendar.should_add to false and leave the other calendar fields null.""";
+If there is no intent to create a calendar event, set calendar.should_add to false and leave the other calendar fields null.";
 
         private static readonly JsonSerializerOptions OpenAiRequestJsonOptions = new()
         {
