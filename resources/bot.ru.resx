@@ -18,6 +18,12 @@
   <data name="CalendarScenarioPrompt" xml:space="preserve">
     <value>✅ Доступ к Google Calendar есть. Отправьте голосовое или текстовое описание события — добавлю встречу в календарь.</value>
   </data>
+  <data name="CalendarTestEventSuccess" xml:space="preserve">
+    <value>✅ Создал тестовое событие на {0}.</value>
+  </data>
+  <data name="CalendarTestEventFailure" xml:space="preserve">
+    <value>❌ Не удалось создать тестовое событие: {0}</value>
+  </data>
   <data name="CalendarAuthorizationMissingDuringScenario" xml:space="preserve">
     <value>⚠️ Не могу добавить событие: нет доступа к Google Calendar. Откройте профиль и подтвердите интеграцию: {0}</value>
   </data>

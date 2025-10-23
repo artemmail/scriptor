@@ -391,6 +391,9 @@ namespace YandexSpeech.services.Telegram
                 case "/calendar":
                     await HandleCalendarCommandAsync(message, userState, culture, args, cancellationToken).ConfigureAwait(false);
                     break;
+                case "/testevent":
+                    await HandleCalendarTestCommandAsync(message, userState, culture, cancellationToken).ConfigureAwait(false);
+                    break;
             }
         }
 
@@ -573,6 +576,122 @@ namespace YandexSpeech.services.Telegram
             }
         }
 
+        private async Task HandleCalendarTestCommandAsync(
+            Message message,
+            TelegramUserState? userState,
+            CultureInfo culture,
+            CancellationToken cancellationToken)
+        {
+            if (message.From is null)
+            {
+                return;
+            }
+
+            var replyParameters = new ReplyParameters { MessageId = message.Id };
+
+            if (!TryGetIntegrationConfiguration(out var baseUrl, out var token, out var errorResourceKey))
+            {
+                var errorMessage = GetBotString(errorResourceKey ?? "TelegramLinkError", culture);
+                await SendTextMessageAsync(message.Chat.Id, errorMessage, replyParameters, cancellationToken).ConfigureAwait(false);
+                LogEvent("calendar_test_event_error", message, errorMessage, new { stage = "configuration" });
+                return;
+            }
+
+            try
+            {
+                var status = await EnsureIntegrationStatusAsync(message.From, userState, true, baseUrl!, token!, cancellationToken).ConfigureAwait(false);
+                if (status == null)
+                {
+                    var error = GetBotString("TelegramLinkError", culture);
+                    await SendTextMessageAsync(message.Chat.Id, error, replyParameters, cancellationToken).ConfigureAwait(false);
+                    LogEvent("calendar_test_event_error", message, error, new { stage = "status_unavailable" });
+                    return;
+                }
+
+                if (!status.Linked)
+                {
+                    var linkResponse = await RequestLinkTokenFromApiAsync(message.From, baseUrl!, token!, cancellationToken).ConfigureAwait(false);
+                    if (linkResponse?.Status is not null)
+                    {
+                        status = linkResponse.Status;
+                        UpdateIntegrationState(message.From.Id, userState, status);
+                    }
+
+                    var linkUrl = linkResponse?.LinkUrl?.ToString() ?? GetCalendarConsentUrl();
+                    var template = GetBotString("TelegramLinkPrompt", culture);
+                    var messageText = FormatCalendarLinkMessage(template, culture, linkUrl);
+                    await SendTextMessageAsync(message.Chat.Id, messageText, replyParameters, cancellationToken).ConfigureAwait(false);
+                    LogEvent("calendar_test_event_error", message, messageText, new { stage = "link_required" });
+                    return;
+                }
+
+                if (!status.HasCalendarAccess)
+                {
+                    var templateKey = status.GoogleAuthorized
+                        ? status.AccessTokenExpired
+                            ? "TelegramLinkTokenExpired"
+                            : "TelegramLinkScopeInsufficient"
+                        : "CalendarAuthorizationRequired";
+                    var template = GetBotString(templateKey, culture);
+                    var messageText = FormatCalendarLinkMessage(template, culture, GetCalendarConsentUrl());
+                    await SendTextMessageAsync(message.Chat.Id, messageText, replyParameters, cancellationToken).ConfigureAwait(false);
+                    LogEvent("calendar_test_event_error", message, messageText, new { stage = "consent_required", detail = status.DetailCode });
+                    return;
+                }
+
+                var eventResponse = await RequestTestCalendarEventAsync(message.From.Id, baseUrl!, token!, cancellationToken).ConfigureAwait(false);
+                if (eventResponse == null)
+                {
+                    var error = GetBotString("TelegramLinkError", culture);
+                    await SendTextMessageAsync(message.Chat.Id, error, replyParameters, cancellationToken).ConfigureAwait(false);
+                    LogEvent("calendar_test_event_error", message, error, new { stage = "request_failed" });
+                    return;
+                }
+
+                if (eventResponse.Success)
+                {
+                    var displayTime = FormatEventTime(eventResponse.StartsAt, eventResponse.TimeZone, culture);
+                    var template = GetBotString("CalendarTestEventSuccess", culture);
+                    var text = string.Format(culture, template, displayTime);
+                    if (!string.IsNullOrWhiteSpace(eventResponse.HtmlLink))
+                    {
+                        text = string.Join('\n', text, eventResponse.HtmlLink);
+                    }
+
+                    await SendTextMessageAsync(message.Chat.Id, text, replyParameters, cancellationToken).ConfigureAwait(false);
+
+                    LogEvent("calendar_test_event", message, text, new
+                    {
+                        event_id = eventResponse.EventId,
+                        starts_at = eventResponse.StartsAt?.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture),
+                        time_zone = eventResponse.TimeZone
+                    });
+
+                    return;
+                }
+
+                var normalizedError = NormalizeIntegrationError(eventResponse.Error, culture);
+                var failureTemplate = GetBotString("CalendarTestEventFailure", culture);
+                var failureText = string.Format(culture, failureTemplate, normalizedError);
+                await SendTextMessageAsync(message.Chat.Id, failureText, replyParameters, cancellationToken).ConfigureAwait(false);
+
+                LogEvent("calendar_test_event_error", message, failureText, new
+                {
+                    event_id = eventResponse.EventId,
+                    error = normalizedError,
+                    time_zone = eventResponse.TimeZone
+                });
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                var normalizedError = NormalizeIntegrationError(ex.Message, culture);
+                var template = GetBotString("CalendarTestEventFailure", culture);
+                var text = string.Format(culture, template, normalizedError);
+                await SendTextMessageAsync(message.Chat.Id, text, replyParameters, cancellationToken).ConfigureAwait(false);
+                LogEvent("calendar_test_event_error", message, text, new { exception = ex.ToString() });
+            }
+        }
+
         private async Task<TelegramCalendarStatusDto?> EnsureIntegrationStatusAsync(
             User user,
             TelegramUserState? userState,
@@ -693,6 +812,54 @@ namespace YandexSpeech.services.Telegram
             }
 
             return null;
+        }
+
+        private async Task<TelegramCalendarEventResponse?> RequestTestCalendarEventAsync(
+            long telegramId,
+            string baseUrl,
+            string token,
+            CancellationToken cancellationToken)
+        {
+            var endpoint = $"{baseUrl.TrimEnd('/')}/{telegramId}/calendar-events/test";
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+            {
+                Content = new StringContent("{}", Encoding.UTF8, "application/json")
+            };
+            request.Headers.TryAddWithoutValidation(IntegrationApiAuthenticationDefaults.HeaderName, token);
+
+            try
+            {
+                using var response = await SendIntegrationRequestAsync(request, cancellationToken).ConfigureAwait(false);
+                if (response is null)
+                {
+                    return null;
+                }
+
+                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                var result = await JsonSerializer.DeserializeAsync<TelegramCalendarEventResponse>(stream, _integrationJsonOptions, cancellationToken: cancellationToken).ConfigureAwait(false)
+                             ?? new TelegramCalendarEventResponse();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    result.Success = false;
+                    if (string.IsNullOrWhiteSpace(result.Error))
+                    {
+                        result.Error = $"integration_http_{(int)response.StatusCode}";
+                    }
+                }
+                else
+                {
+                    result.Success = true;
+                }
+
+                return result;
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogError(ex, "Failed to create test calendar event via integration API for {TelegramId}.", telegramId);
+                throw;
+            }
         }
 
         private async Task<HttpResponseMessage?> SendIntegrationRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -1187,6 +1354,8 @@ namespace YandexSpeech.services.Telegram
                 "TelegramLinkScopeInsufficient" => "⚠️ Требуются дополнительные права Google Calendar. Подтвердите доступ в профиле: {0}",
                 "TelegramLinkRevoked" => "⚠️ Доступ к Google Calendar был отозван. Подключите интеграцию заново: {0}",
                 "TelegramIntegrationMisconfigured" => "⚠️ Интеграция с календарём не настроена. Проверьте токен интеграции в настройках.",
+                "CalendarTestEventSuccess" => "✅ Создал тестовое событие.",
+                "CalendarTestEventFailure" => "❌ Не удалось создать тестовое событие: {0}",
                 _ => key
             };
         }
@@ -1201,6 +1370,40 @@ namespace YandexSpeech.services.Telegram
             return template.Contains("{0}", StringComparison.Ordinal)
                 ? string.Format(culture, template, calendarUrl)
                 : string.Join(' ', template.Trim(), calendarUrl).Trim();
+        }
+
+        private string NormalizeIntegrationError(string? error, CultureInfo culture)
+        {
+            if (string.IsNullOrWhiteSpace(error))
+            {
+                return GetBotString("TelegramLinkError", culture);
+            }
+
+            var sanitized = error.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            if (string.IsNullOrWhiteSpace(sanitized))
+            {
+                return GetBotString("TelegramLinkError", culture);
+            }
+
+            return sanitized.Length > 300 ? sanitized[..300] + "…" : sanitized;
+        }
+
+        private string FormatEventTime(DateTimeOffset? dateTime, string? timeZone, CultureInfo culture)
+        {
+            if (dateTime is null)
+            {
+                return string.Equals(culture.TwoLetterISOLanguageName, "ru", StringComparison.OrdinalIgnoreCase)
+                    ? "следующий понедельник в 09:00"
+                    : "next Monday at 09:00";
+            }
+
+            var formatted = dateTime.Value.ToString("f", culture);
+            if (!string.IsNullOrWhiteSpace(timeZone))
+            {
+                formatted = string.Join(" ", formatted, $"({timeZone})");
+            }
+
+            return formatted;
         }
 
         private static string BuildIntegrationExceptionMessage(Exception exception)

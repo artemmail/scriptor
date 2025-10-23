@@ -18,6 +18,12 @@
   <data name="CalendarScenarioPrompt" xml:space="preserve">
     <value>✅ Google Calendar is connected. Send a voice or text description of the event and I will add it to the calendar.</value>
   </data>
+  <data name="CalendarTestEventSuccess" xml:space="preserve">
+    <value>✅ Test event created for {0}.</value>
+  </data>
+  <data name="CalendarTestEventFailure" xml:space="preserve">
+    <value>❌ Failed to create a test event: {0}</value>
+  </data>
   <data name="CalendarAuthorizationMissingDuringScenario" xml:space="preserve">
     <value>⚠️ I cannot add the event because Google Calendar access is missing. Open your profile: {0}</value>
   </data>
