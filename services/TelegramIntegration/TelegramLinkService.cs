@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using TimeZoneConverter;
 using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO.Telegram;
 using YandexSpeech.services.Google;
@@ -421,7 +422,7 @@ namespace YandexSpeech.services.TelegramIntegration
                 {
                     try
                     {
-                        calculationTimeZoneId = TimeZoneInfo.ConvertIanaIdToWindowsId(calculationTimeZoneId);
+                        calculationTimeZoneId = TZConvert.IanaToWindows(calculationTimeZoneId);
                     }
                     catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException or ArgumentException)
                     {
