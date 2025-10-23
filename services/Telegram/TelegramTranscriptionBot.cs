@@ -1441,8 +1441,8 @@ If there is no intent to create a calendar event, set calendar.should_add to fal
             }
 
             var errorText = NormalizeIntegrationError(response.Error, culture);
-            var failureTemplate = GetBotString("CalendarScenarioEventFailed", culture);
-            var messageText = string.Format(culture, failureTemplate, errorText);
+            var failureMessageTemplate = GetBotString("CalendarScenarioEventFailed", culture);
+            var messageText = string.Format(culture, failureMessageTemplate, errorText);
 
             await SendTextMessageAsync(
                     message.Chat.Id,
