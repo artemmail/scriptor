@@ -53,6 +53,23 @@ namespace YandexSpeech.models.DTO.Telegram
         public bool Refreshed { get; set; }
     }
 
+    public sealed class TelegramCalendarEventResponse
+    {
+        public bool Success { get; set; }
+
+        public string? EventId { get; set; }
+
+        public string? HtmlLink { get; set; }
+
+        public DateTimeOffset? StartsAt { get; set; }
+
+        public DateTimeOffset? EndsAt { get; set; }
+
+        public string? TimeZone { get; set; }
+
+        public string? Error { get; set; }
+    }
+
     public sealed class TelegramCalendarStatusDto
     {
         public bool Linked { get; init; }
@@ -89,6 +106,29 @@ namespace YandexSpeech.models.DTO.Telegram
             PermissionScope = null,
             State = TelegramIntegrationStates.NotLinked,
             DetailCode = TelegramIntegrationDetails.LinkMissing
+        };
+    }
+
+    public sealed class TelegramCalendarEventResult
+    {
+        public bool Success { get; init; }
+
+        public string? EventId { get; init; }
+
+        public string? HtmlLink { get; init; }
+
+        public DateTimeOffset? StartsAt { get; init; }
+
+        public DateTimeOffset? EndsAt { get; init; }
+
+        public string? TimeZone { get; init; }
+
+        public string? Error { get; init; }
+
+        public static TelegramCalendarEventResult Failure(string error) => new()
+        {
+            Success = false,
+            Error = error
         };
     }
 
