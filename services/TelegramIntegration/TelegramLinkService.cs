@@ -60,9 +60,10 @@ namespace YandexSpeech.services.TelegramIntegration
                 {
                     var now = DateTime.UtcNow;
                     var link = await _dbContext.TelegramAccountLinks
-                        .Include(l => l.Tokens)
                         .FirstOrDefaultAsync(l => l.TelegramId == context.TelegramId, cancellationToken)
                         .ConfigureAwait(false);
+
+                    List<TelegramLinkToken> tokens;
 
                     if (link == null)
                     {
@@ -78,10 +79,21 @@ namespace YandexSpeech.services.TelegramIntegration
                             Status = TelegramAccountLinkStatus.Pending
                         };
 
+                        tokens = new List<TelegramLinkToken>();
+                        link.Tokens = tokens;
+
                         _dbContext.TelegramAccountLinks.Add(link);
                     }
                     else
                     {
+                        tokens = await _dbContext.TelegramLinkTokens
+                            .Where(t => t.LinkId == link.Id)
+                            .AsTracking()
+                            .ToListAsync(cancellationToken)
+                            .ConfigureAwait(false);
+
+                        link.Tokens = tokens;
+
                         if (link.UserId == null && link.Status != TelegramAccountLinkStatus.Pending)
                         {
                             link.Status = TelegramAccountLinkStatus.Pending;
@@ -99,12 +111,12 @@ namespace YandexSpeech.services.TelegramIntegration
                         link.LastActivityAt = now;
                     }
 
-                    CleanExpiredTokens(link, now);
+                    CleanExpiredTokens(tokens, now);
 
                     if (options.MaxActiveTokensPerLink > 0
-                        && link.Tokens.Count(t => t.RevokedAt == null && t.ConsumedAt == null && t.ExpiresAt > now) >= options.MaxActiveTokensPerLink)
+                        && tokens.Count(t => t.RevokedAt == null && t.ConsumedAt == null && t.ExpiresAt > now) >= options.MaxActiveTokensPerLink)
                     {
-                        var oldest = link.Tokens
+                        var oldest = tokens
                             .Where(t => t.RevokedAt == null && t.ConsumedAt == null && t.ExpiresAt > now)
                             .OrderBy(t => t.CreatedAt)
                             .FirstOrDefault();
@@ -121,6 +133,7 @@ namespace YandexSpeech.services.TelegramIntegration
                     {
                         Id = Guid.NewGuid(),
                         Link = link,
+                        LinkId = link.Id,
                         TokenHash = hash,
                         CreatedAt = now,
                         ExpiresAt = now + options.TokenLifetime,
@@ -128,7 +141,8 @@ namespace YandexSpeech.services.TelegramIntegration
                         IsOneTime = true
                     };
 
-                    link.Tokens.Add(tokenEntity);
+                    _dbContext.TelegramLinkTokens.Add(tokenEntity);
+                    tokens.Add(tokenEntity);
                     link.LastActivityAt = now;
 
                     await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -436,9 +450,9 @@ namespace YandexSpeech.services.TelegramIntegration
             }
         }
 
-        private void CleanExpiredTokens(TelegramAccountLink link, DateTime now)
+        private static void CleanExpiredTokens(ICollection<TelegramLinkToken> tokens, DateTime now)
         {
-            foreach (var token in link.Tokens
+            foreach (var token in tokens
                          .Where(t => t.RevokedAt == null && t.ConsumedAt == null && t.ExpiresAt <= now)
                          .ToList())
             {
