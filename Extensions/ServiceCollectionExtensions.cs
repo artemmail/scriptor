@@ -39,6 +39,14 @@ namespace YandexSpeech.Extensions
 
             var calendarSection = configuration.GetSection("Authentication:GoogleCalendar");
             var calendarScopes = calendarSection.GetSection("Scopes").Get<string[]>() ?? Array.Empty<string>();
+            if (calendarScopes.Length == 0)
+            {
+                calendarScopes = new[]
+                {
+                    "https://www.googleapis.com/auth/calendar.events",
+                    "https://www.googleapis.com/auth/calendar"
+                };
+            }
             var calendarPrompt = calendarSection["Prompt"];
             var calendarAccessType = calendarSection["AccessType"];
 
