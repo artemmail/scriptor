@@ -17,8 +17,8 @@ using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 using YandexSpeech.services;
 using YandexSpeech.services.Interface;
-using System.Security.Claims;
 using YandexSpeech.services.Options;
+using YandexSpeech.Extensions;
 
 namespace YandexSpeech.Controllers
 {
@@ -448,7 +448,7 @@ namespace YandexSpeech.Controllers
 
         private string? TryGetUserId()
         {
-            return User.FindFirstValue(ClaimTypes.NameIdentifier);
+            return User.GetUserId();
         }
 
         private bool ValidateSignature(YooMoneyNotification notification)
