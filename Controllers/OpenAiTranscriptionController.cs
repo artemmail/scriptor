@@ -229,7 +229,7 @@ namespace YandexSpeech.Controllers
                 join user in _dbContext.Users.AsNoTracking()
                     on task.CreatedBy equals user.Id into users
                 from creator in users.DefaultIfEmpty()
-                orderby task.CreatedAt descending
+                orderby task.ModifiedAt descending, task.CreatedAt descending
                 select new
                 {
                     task.Id,
