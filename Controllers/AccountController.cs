@@ -15,6 +15,7 @@ using System.Text;
 using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 
 namespace YandexSpeech.Controllers
 {
@@ -383,11 +384,13 @@ namespace YandexSpeech.Controllers
             var roles = await _userManager.GetRolesAsync(user);
             claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
 
+            var expireMinutes = _config.GetValue<int?>("Jwt:ExpireMinutes") ?? 60;
+
             var token = new JwtSecurityToken(
                 _config["Jwt:Issuer"],
                 _config["Jwt:Audience"],
                 claims,
-                expires: DateTime.UtcNow.AddMinutes(60),
+                expires: DateTime.UtcNow.AddMinutes(expireMinutes),
                 signingCredentials: creds);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
