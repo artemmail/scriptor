@@ -1,17 +1,23 @@
 using Microsoft.Extensions.Options;
 using System.Globalization;
+using System.Linq;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Resources;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using YandexSpeech.services.Interface;
 using YandexSpeech.services.Options;
 using YandexSpeech.services.Whisper;
+using YandexSpeech.services.TelegramTranscriptionBot.State;
+using YandexSpeech.models.DTO.Telegram;
+using YandexSpeech.services.Authentication;
 using IOFile = System.IO.File;
 using TGFile = Telegram.Bot.Types.TGFile;
 
@@ -21,6 +27,7 @@ namespace YandexSpeech.services.Telegram
     {
         private readonly ILogger<TelegramTranscriptionBot> _logger;
         private readonly IOptionsMonitor<TelegramBotOptions> _optionsMonitor;
+        private readonly IOptionsMonitor<TelegramIntegrationOptions> _integrationOptions;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly FasterWhisperQueueClient _queueClient;
         private readonly string _model;
@@ -37,11 +44,15 @@ namespace YandexSpeech.services.Telegram
         private readonly JsonSerializerOptions _logJsonOptions;
         private readonly object _logLock = new();
         private readonly string? _globalOpenAiApiKey;
+        private readonly TelegramUserStateStore _userStateStore;
+        private readonly JsonSerializerOptions _integrationJsonOptions;
+        private readonly TimeSpan _integrationRequestTimeout = TimeSpan.FromSeconds(5);
 
         private const string DefaultOpenAiModel = "gpt-4.1";
         private const int DefaultSummaryThreshold = 70;
         private const string OpenAiEndpoint = "https://api.openai.com/v1/chat/completions";
         private const string DefaultTelegramApiBaseUrl = "https://api.telegram.org";
+        private const string IntegrationApiTokenPlaceholder = "changeme";
         private const string OpenAiSystemPrompt =
             """You are a meticulous editor for Telegram voice transcriptions. Fix punctuation, casing, and obvious ASR mistakes without adding content. Keep the input language. Output JSON with fields: polished, summary.""";
 
@@ -49,6 +60,8 @@ namespace YandexSpeech.services.Telegram
         {
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
+
+        private static readonly ResourceManager BotResourceManager = new("YandexSpeech.resources.bot", typeof(TelegramTranscriptionBot).Assembly);
 
         // ⬇️ Расширено: больше реальных аудио-расширений (часто прилетают с octet-stream)
         private static readonly HashSet<string> AudioFileExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -67,6 +80,9 @@ namespace YandexSpeech.services.Telegram
         private ITelegramBotClient? _botClient;
         private string? _botToken;
         private string _apiBaseUrl = DefaultTelegramApiBaseUrl;
+        private string? _integrationApiBaseUrl;
+        private string? _integrationApiToken;
+        private TimeSpan _integrationStatusCache = TimeSpan.FromSeconds(30);
 
         private readonly record struct OpenAiPostProcessingResult(
             string Text,
@@ -77,17 +93,21 @@ namespace YandexSpeech.services.Telegram
 
         public TelegramTranscriptionBot(
             IOptionsMonitor<TelegramBotOptions> optionsMonitor,
+            IOptionsMonitor<TelegramIntegrationOptions> integrationOptions,
             IConfiguration configuration,
             IHttpClientFactory httpClientFactory,
             FasterWhisperQueueClient queueClient,
             ILogger<TelegramTranscriptionBot> logger,
-            IFfmpegService ffmpegService)
+            IFfmpegService ffmpegService,
+            TelegramUserStateStore userStateStore)
         {
             _optionsMonitor = optionsMonitor;
+            _integrationOptions = integrationOptions;
             _httpClientFactory = httpClientFactory;
             _queueClient = queueClient;
             _logger = logger;
             _ffmpegService = ffmpegService;
+            _userStateStore = userStateStore;
 
             var section = configuration.GetSection("FasterWhisper");
             _model = section.GetValue<string>("Model") ?? configuration.GetValue<string>("Whisper:Model") ?? "medium";
@@ -115,6 +135,7 @@ namespace YandexSpeech.services.Telegram
             };
 
             _globalOpenAiApiKey = configuration["OpenAI:ApiKey"];
+            _integrationJsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -140,6 +161,9 @@ namespace YandexSpeech.services.Telegram
             _apiBaseUrl = string.IsNullOrWhiteSpace(options.ApiBaseUrl)
                 ? DefaultTelegramApiBaseUrl
                 : NormalizeApiBaseUrl(options.ApiBaseUrl);
+            _integrationApiBaseUrl = NormalizeIntegrationBaseUrl(options.IntegrationApiBaseUrl);
+            _integrationApiToken = options.IntegrationApiToken;
+            _integrationStatusCache = TimeSpan.FromSeconds(Math.Max(5, options.IntegrationStatusCacheSeconds));
 
             var botOptions = string.IsNullOrWhiteSpace(options.ApiBaseUrl)
                 ? new TelegramBotClientOptions(options.BotToken)
@@ -251,11 +275,14 @@ namespace YandexSpeech.services.Telegram
 
             try
             {
+                var userState = TryGetUserState(message.From);
+                var culture = ResolveUserCulture(message.From);
+
                 if (message.Text is string text)
                 {
                     if (text.StartsWith("/"))
                     {
-                        await HandleCommandAsync(message, text, cancellationToken).ConfigureAwait(false);
+                        await HandleCommandAsync(message, text, userState, culture, cancellationToken).ConfigureAwait(false);
                         return;
                     }
 
@@ -265,7 +292,7 @@ namespace YandexSpeech.services.Telegram
                 var audioPayload = FindAudioPayload(message);
                 if (audioPayload is not null)
                 {
-                    await HandleAudioAsync(message, audioPayload, cancellationToken).ConfigureAwait(false);
+                    await HandleAudioAsync(message, audioPayload, userState, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)
@@ -276,6 +303,16 @@ namespace YandexSpeech.services.Telegram
             {
                 _logger.LogError(ex, "Failed to process Telegram update {UpdateId}.", update.Id);
             }
+        }
+
+        private TelegramUserState? TryGetUserState(User? user)
+        {
+            if (user is null)
+            {
+                return null;
+            }
+
+            return _userStateStore.GetOrCreate(user.Id);
         }
 
         private async Task RunLongPollingAsync(CancellationToken stoppingToken)
@@ -321,27 +358,26 @@ namespace YandexSpeech.services.Telegram
             }
         }
 
-        private async Task HandleCommandAsync(Message message, string text, CancellationToken cancellationToken)
+        private async Task HandleCommandAsync(Message message, string text, TelegramUserState? userState, CultureInfo culture, CancellationToken cancellationToken)
         {
             if (_botClient is null)
             {
                 return;
             }
 
-            var rawCommand = text.Split(new[] { ' ', '\t', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()
-                              ?? text;
+            var segments = text.Split(new[] { ' ', '\t', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var rawCommand = segments.FirstOrDefault() ?? text;
             var command = rawCommand.Split('@')[0];
+            var args = segments.Skip(1).ToArray();
 
             LogEvent("command", message, rawCommand, new { command });
             switch (command)
             {
                 case "/start":
-                    await SendTextMessageAsync(
-                            message.Chat.Id,
-                            "Пришлите voice или аудиофайл — распознаю локально (GPU).",
-                            new ReplyParameters { MessageId = message.Id },
-                            cancellationToken)
-                        .ConfigureAwait(false);
+                    await HandleStartCommandAsync(message, userState, culture, cancellationToken).ConfigureAwait(false);
+                    break;
+                case "/link":
+                    await HandleLinkCommandAsync(message, userState, culture, cancellationToken).ConfigureAwait(false);
                     break;
                 case "/model":
                     var info = $"faster-whisper: {_model} | device: {_device} | dtype: {NormalizeCt2(_device, _computeType)}\nVAD: off";
@@ -352,10 +388,389 @@ namespace YandexSpeech.services.Telegram
                             cancellationToken)
                         .ConfigureAwait(false);
                     break;
+                case "/calendar":
+                    await HandleCalendarCommandAsync(message, userState, culture, args, cancellationToken).ConfigureAwait(false);
+                    break;
             }
         }
 
-        private async Task HandleAudioAsync(Message triggerMessage, AudioPayload audioPayload, CancellationToken cancellationToken)
+        private async Task HandleStartCommandAsync(Message message, TelegramUserState? userState, CultureInfo culture, CancellationToken cancellationToken)
+        {
+            if (message.From is null)
+            {
+                return;
+            }
+
+            var reply = new ReplyParameters { MessageId = message.Id };
+
+            if (!TryGetIntegrationConfiguration(out var baseUrl, out var token, out var errorResourceKey))
+            {
+                var errorMessage = GetBotString(errorResourceKey ?? "TelegramLinkError", culture);
+                await SendTextMessageAsync(message.Chat.Id, errorMessage, reply, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            try
+            {
+                var status = await EnsureIntegrationStatusAsync(
+                        message.From,
+                        userState,
+                        forceRefresh: false,
+                        baseUrl!,
+                        token!,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                Uri? linkUrl = null;
+                if (status == null || !status.Linked || status.State is TelegramIntegrationStates.Pending or TelegramIntegrationStates.Revoked)
+                {
+                    var linkResponse = await RequestLinkTokenFromApiAsync(message.From, baseUrl!, token!, cancellationToken).ConfigureAwait(false);
+                    if (linkResponse?.Status is not null)
+                    {
+                        status = linkResponse.Status;
+                        UpdateIntegrationState(message.From.Id, userState, status);
+                    }
+                    linkUrl = linkResponse?.LinkUrl;
+                }
+
+                if (status is null)
+                {
+                    var fallback = GetBotString("TelegramLinkError", culture);
+                    await SendTextMessageAsync(message.Chat.Id, fallback, reply, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
+
+                var messageText = BuildIntegrationStatusMessage(status, culture, linkUrl?.ToString());
+                await SendTextMessageAsync(message.Chat.Id, messageText, reply, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                var errorDetails = BuildIntegrationExceptionMessage(ex);
+                await SendTextMessageAsync(message.Chat.Id, errorDetails, reply, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        private async Task HandleLinkCommandAsync(Message message, TelegramUserState? userState, CultureInfo culture, CancellationToken cancellationToken)
+        {
+            if (message.From is null)
+            {
+                return;
+            }
+
+            var reply = new ReplyParameters { MessageId = message.Id };
+
+            if (!TryGetIntegrationConfiguration(out var baseUrl, out var token, out var errorResourceKey))
+            {
+                var errorMessage = GetBotString(errorResourceKey ?? "TelegramLinkError", culture);
+                await SendTextMessageAsync(message.Chat.Id, errorMessage, reply, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            try
+            {
+                var linkResponse = await RequestLinkTokenFromApiAsync(message.From, baseUrl!, token!, cancellationToken).ConfigureAwait(false);
+                if (linkResponse?.LinkUrl is null)
+                {
+                    var error = GetBotString("TelegramLinkError", culture);
+                    await SendTextMessageAsync(message.Chat.Id, error, reply, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
+
+                if (linkResponse.Status is not null)
+                {
+                    UpdateIntegrationState(message.From.Id, userState, linkResponse.Status);
+                }
+
+                var promptTemplate = GetBotString("TelegramLinkPrompt", culture);
+                var text = FormatCalendarLinkMessage(promptTemplate, culture, linkResponse.LinkUrl.ToString());
+                await SendTextMessageAsync(message.Chat.Id, text, reply, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                var errorDetails = BuildIntegrationExceptionMessage(ex);
+                await SendTextMessageAsync(message.Chat.Id, errorDetails, reply, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        private async Task HandleCalendarCommandAsync(Message message, TelegramUserState? userState, CultureInfo culture, string[] args, CancellationToken cancellationToken)
+        {
+            if (message.From is null)
+            {
+                return;
+            }
+
+            var replyParameters = new ReplyParameters { MessageId = message.Id };
+            var refresh = args.Any(a => string.Equals(a, "refresh", StringComparison.OrdinalIgnoreCase));
+
+            if (!TryGetIntegrationConfiguration(out var baseUrl, out var token, out var errorResourceKey))
+            {
+                var errorMessage = GetBotString(errorResourceKey ?? "TelegramLinkError", culture);
+                await SendTextMessageAsync(message.Chat.Id, errorMessage, replyParameters, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            try
+            {
+                var status = await EnsureIntegrationStatusAsync(message.From, userState, refresh, baseUrl!, token!, cancellationToken).ConfigureAwait(false);
+
+                if (status == null)
+                {
+                    var error = GetBotString("TelegramLinkError", culture);
+                    await SendTextMessageAsync(message.Chat.Id, error, replyParameters, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
+
+                if (!status.Linked)
+                {
+                    if (userState is not null)
+                    {
+                        userState.CalendarScenarioRequested = false;
+                    }
+                    var linkResponse = await RequestLinkTokenFromApiAsync(message.From!, baseUrl!, token!, cancellationToken).ConfigureAwait(false);
+                    var linkUrl = linkResponse?.LinkUrl?.ToString();
+                    if (linkResponse?.Status is not null)
+                    {
+                        status = linkResponse.Status;
+                    }
+
+                    var template = GetBotString("TelegramLinkPrompt", culture);
+                    var messageText = FormatCalendarLinkMessage(template, culture, linkUrl ?? GetCalendarConsentUrl());
+                    await SendTextMessageAsync(message.Chat.Id, messageText, replyParameters, cancellationToken).ConfigureAwait(false);
+                    LogEvent("calendar_consent_required", message, messageText, new { stage = "command" });
+                    return;
+                }
+
+                if (!status.GoogleAuthorized || !status.HasRequiredScope || status.AccessTokenExpired)
+                {
+                    if (userState is not null)
+                    {
+                        userState.CalendarScenarioRequested = false;
+                    }
+                    string templateKey = status.GoogleAuthorized
+                        ? status.AccessTokenExpired
+                            ? "TelegramLinkTokenExpired"
+                            : "TelegramLinkScopeInsufficient"
+                        : "CalendarAuthorizationRequired";
+                    var template = GetBotString(templateKey, culture);
+                    var messageText = FormatCalendarLinkMessage(template, culture, GetCalendarConsentUrl());
+                    await SendTextMessageAsync(message.Chat.Id, messageText, replyParameters, cancellationToken).ConfigureAwait(false);
+                    LogEvent("calendar_consent_required", message, messageText, new { stage = "command", detail = status.DetailCode });
+                    return;
+                }
+
+                if (userState is not null)
+                {
+                    userState.CalendarScenarioRequested = true;
+                }
+
+                var prompt = GetBotString("CalendarScenarioPrompt", culture);
+                await SendTextMessageAsync(message.Chat.Id, prompt, replyParameters, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                var errorDetails = BuildIntegrationExceptionMessage(ex);
+                await SendTextMessageAsync(message.Chat.Id, errorDetails, replyParameters, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        private async Task<TelegramCalendarStatusDto?> EnsureIntegrationStatusAsync(
+            User user,
+            TelegramUserState? userState,
+            bool forceRefresh,
+            string baseUrl,
+            string token,
+            CancellationToken cancellationToken)
+        {
+            var now = DateTime.UtcNow;
+            if (!forceRefresh && userState is not null)
+            {
+                var age = now - userState.StatusFetchedAt;
+                if (age <= _integrationStatusCache && userState.CalendarStatus is not null)
+                {
+                    return userState.CalendarStatus;
+                }
+            }
+
+            var status = await FetchCalendarStatusFromApiAsync(user.Id, forceRefresh, baseUrl, token, cancellationToken).ConfigureAwait(false);
+            if (status != null)
+            {
+                UpdateIntegrationState(user.Id, userState, status);
+                return status;
+            }
+
+            return userState?.CalendarStatus;
+        }
+
+        private async Task<TelegramCalendarStatusDto?> FetchCalendarStatusFromApiAsync(
+            long telegramId,
+            bool refresh,
+            string baseUrl,
+            string token,
+            CancellationToken cancellationToken)
+        {
+            var endpoint = refresh
+                ? $"{baseUrl.TrimEnd('/')}/{telegramId}/calendar-status/refresh"
+                : $"{baseUrl.TrimEnd('/')}/{telegramId}/calendar-status";
+
+            using var request = new HttpRequestMessage(refresh ? HttpMethod.Post : HttpMethod.Get, endpoint);
+            request.Headers.TryAddWithoutValidation(IntegrationApiAuthenticationDefaults.HeaderName, token);
+
+            if (refresh)
+            {
+                request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
+            }
+
+            try
+            {
+                using var response = await SendIntegrationRequestAsync(request, cancellationToken).ConfigureAwait(false);
+                if (response is null)
+                {
+                    return null;
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Integration status request for {TelegramId} failed with {StatusCode}.", telegramId, response.StatusCode);
+                    return null;
+                }
+
+                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                var envelope = await JsonSerializer.DeserializeAsync<TelegramCalendarStatusResponse>(stream, _integrationJsonOptions, cancellationToken: cancellationToken).ConfigureAwait(false);
+                return envelope?.Status;
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogError(ex, "Failed to request Telegram integration status for {TelegramId}.", telegramId);
+                throw;
+            }
+
+            return null;
+        }
+
+        private async Task<TelegramLinkInitiateResponse?> RequestLinkTokenFromApiAsync(
+            User user,
+            string baseUrl,
+            string token,
+            CancellationToken cancellationToken)
+        {
+            var endpoint = $"{baseUrl.TrimEnd('/')}/link/initiate";
+            var payload = new TelegramLinkInitiateRequest
+            {
+                TelegramId = user.Id,
+                Username = user.Username,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                LanguageCode = user.LanguageCode
+            };
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(payload, _integrationJsonOptions), Encoding.UTF8, "application/json")
+            };
+            request.Headers.TryAddWithoutValidation(IntegrationApiAuthenticationDefaults.HeaderName, token);
+
+            try
+            {
+                using var response = await SendIntegrationRequestAsync(request, cancellationToken).ConfigureAwait(false);
+                if (response is null)
+                {
+                    return null;
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Telegram link initiation failed with {StatusCode} for {TelegramId}.", response.StatusCode, user.Id);
+                    return null;
+                }
+
+                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                return await JsonSerializer.DeserializeAsync<TelegramLinkInitiateResponse>(stream, _integrationJsonOptions, cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogError(ex, "Failed to initiate Telegram link for {TelegramId}.", user.Id);
+                throw;
+            }
+
+            return null;
+        }
+
+        private async Task<HttpResponseMessage?> SendIntegrationRequestAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var client = _httpClientFactory.CreateClient(nameof(TelegramTranscriptionBot) + ".Integration");
+
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            linkedCts.CancelAfter(_integrationRequestTimeout);
+
+            try
+            {
+                return await client.SendAsync(request, linkedCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogWarning("Integration API request to {Url} timed out after {Timeout}.", request.RequestUri, _integrationRequestTimeout);
+            }
+
+            return null;
+        }
+
+        private void UpdateIntegrationState(long telegramId, TelegramUserState? userState, TelegramCalendarStatusDto status)
+        {
+            var now = DateTime.UtcNow;
+            _userStateStore.UpdateCalendarStatus(telegramId, status, now);
+            if (userState is not null)
+            {
+                userState.CalendarStatus = status;
+                userState.StatusFetchedAt = now;
+                userState.HasCalendarConsent = status.HasCalendarAccess;
+            }
+        }
+
+        private string BuildIntegrationStatusMessage(TelegramCalendarStatusDto status, CultureInfo culture, string? linkUrl)
+        {
+            if (status.HasCalendarAccess)
+            {
+                var template = GetBotString("CalendarScenarioPrompt", culture);
+                return string.IsNullOrWhiteSpace(template)
+                    ? "✅ Доступ к Google Calendar есть. Отправьте голосовое или текстовое описание события — добавлю встречу в календарь."
+                    : template;
+            }
+
+            if (!status.Linked || status.State is TelegramIntegrationStates.Pending or TelegramIntegrationStates.Revoked)
+            {
+                var template = GetBotString("TelegramLinkPrompt", culture);
+                var url = linkUrl ?? GetCalendarConsentUrl();
+                return FormatCalendarLinkMessage(template, culture, url);
+            }
+
+            if (!status.GoogleAuthorized)
+            {
+                var template = GetBotString("CalendarAuthorizationRequired", culture);
+                return FormatCalendarLinkMessage(template, culture, GetCalendarConsentUrl());
+            }
+
+            if (status.AccessTokenExpired)
+            {
+                var template = GetBotString("TelegramLinkTokenExpired", culture);
+                return FormatCalendarLinkMessage(template, culture, GetCalendarConsentUrl());
+            }
+
+            if (!status.HasRequiredScope)
+            {
+                var template = GetBotString("TelegramLinkScopeInsufficient", culture);
+                return FormatCalendarLinkMessage(template, culture, GetCalendarConsentUrl());
+            }
+
+            if (string.Equals(status.DetailCode, TelegramIntegrationDetails.GoogleRevoked, StringComparison.Ordinal))
+            {
+                var template = GetBotString("TelegramLinkRevoked", culture);
+                return FormatCalendarLinkMessage(template, culture, GetCalendarConsentUrl());
+            }
+
+            return GetBotString("TelegramLinkError", culture);
+        }
+
+        private async Task HandleAudioAsync(Message triggerMessage, AudioPayload audioPayload, TelegramUserState? userState, CancellationToken cancellationToken)
         {
             if (_botClient is null)
             {
@@ -458,6 +873,12 @@ namespace YandexSpeech.services.Telegram
                 });
 
                 LogEvent("transcript", triggerMessage, postProcessing.Text, transcriptLog);
+
+                if (userState is not null)
+                {
+                    await RunCalendarScenarioIfNeededAsync(triggerMessage, postProcessing, userState, cancellationToken)
+                        .ConfigureAwait(false);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -478,6 +899,316 @@ namespace YandexSpeech.services.Telegram
             {
                 TryDeleteDirectory(tempRoot);
             }
+        }
+
+        private async Task RunCalendarScenarioIfNeededAsync(
+            Message triggerMessage,
+            OpenAiPostProcessingResult _,
+            TelegramUserState userState,
+            CancellationToken cancellationToken)
+        {
+            if (!userState.CalendarScenarioRequested)
+            {
+                return;
+            }
+
+            var culture = ResolveUserCulture(triggerMessage.From);
+
+            if (!userState.HasCalendarConsent)
+            {
+                var template = GetBotString("CalendarAuthorizationMissingDuringScenario", culture);
+                var text = FormatCalendarLinkMessage(template, culture, GetCalendarConsentUrl());
+
+                await SendTextMessageAsync(
+                        triggerMessage.Chat.Id,
+                        text,
+                        new ReplyParameters { MessageId = triggerMessage.Id },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                LogEvent("calendar_consent_required", triggerMessage, text, new { stage = "scenario" });
+                userState.CalendarScenarioRequested = false;
+                return;
+            }
+
+            // Здесь позже будет логика создания события в календаре.
+            userState.CalendarScenarioRequested = false;
+        }
+
+        private static CultureInfo ResolveUserCulture(User? user)
+        {
+            if (!string.IsNullOrWhiteSpace(user?.LanguageCode))
+            {
+                var languageCode = user.LanguageCode;
+                try
+                {
+                    return CultureInfo.GetCultureInfo(languageCode);
+                }
+                catch (CultureNotFoundException)
+                {
+                    try
+                    {
+                        return new CultureInfo(languageCode);
+                    }
+                    catch (CultureNotFoundException)
+                    {
+                        // ignore and fallback below
+                    }
+                }
+            }
+
+            try
+            {
+                return CultureInfo.GetCultureInfo("ru-RU");
+            }
+            catch (CultureNotFoundException)
+            {
+                return CultureInfo.InvariantCulture;
+            }
+        }
+
+        private string GetCalendarConsentUrl()
+        {
+            var options = _optionsMonitor.CurrentValue;
+            if (!string.IsNullOrWhiteSpace(options.CalendarConsentUrl))
+            {
+                return options.CalendarConsentUrl!;
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.WebhookUrl)
+                && Uri.TryCreate(options.WebhookUrl, UriKind.Absolute, out var webhookUri))
+            {
+                try
+                {
+                    var builder = new UriBuilder
+                    {
+                        Scheme = webhookUri.Scheme,
+                        Host = webhookUri.Host,
+                        Port = webhookUri.IsDefaultPort ? -1 : webhookUri.Port,
+                        Path = "profile"
+                    };
+
+                    return builder.Uri.ToString();
+                }
+                catch
+                {
+                    // ignore and fallback below
+                }
+            }
+
+            return "https://teamlogs.ru/profile";
+        }
+
+        private bool TryGetIntegrationConfiguration(out string? baseUrl, out string? token, out string? errorResourceKey)
+        {
+            var botOptions = _optionsMonitor.CurrentValue;
+
+            baseUrl = ResolveIntegrationApiBaseUrl(botOptions);
+            token = ResolveIntegrationApiToken(botOptions);
+
+            if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(token))
+            {
+                _logger.LogWarning(
+                    "Telegram integration API configuration is missing. BaseUrl: {BaseUrl}, TokenConfigured: {HasToken}",
+                    baseUrl,
+                    !string.IsNullOrWhiteSpace(token));
+                errorResourceKey = "TelegramLinkError";
+                return false;
+            }
+
+            if (IsPlaceholderIntegrationToken(token))
+            {
+                _logger.LogWarning(
+                    "Telegram integration API token is using the placeholder value. Update Telegram:IntegrationApiToken configuration.");
+                errorResourceKey = "TelegramIntegrationMisconfigured";
+                return false;
+            }
+
+            errorResourceKey = null;
+            return true;
+        }
+
+        private string? ResolveIntegrationApiBaseUrl(TelegramBotOptions options)
+        {
+            var configured = _integrationApiBaseUrl ?? NormalizeIntegrationBaseUrl(options.IntegrationApiBaseUrl);
+            if (!string.IsNullOrWhiteSpace(configured))
+            {
+                return configured;
+            }
+
+            var fromWebhook = NormalizeIntegrationBaseUrl(DeriveIntegrationApiBaseUrlFromWebhook(options.WebhookUrl));
+            if (!string.IsNullOrWhiteSpace(fromWebhook))
+            {
+                _integrationApiBaseUrl = fromWebhook;
+                _logger.LogDebug("Derived Telegram integration API base URL from webhook URL: {BaseUrl}.", fromWebhook);
+                return fromWebhook;
+            }
+
+            var integrationOptions = _integrationOptions.CurrentValue;
+            var fromLink = NormalizeIntegrationBaseUrl(DeriveIntegrationApiBaseUrlFromLink(integrationOptions.LinkBaseUrl));
+            if (!string.IsNullOrWhiteSpace(fromLink))
+            {
+                _integrationApiBaseUrl = fromLink;
+                _logger.LogDebug("Derived Telegram integration API base URL from link base URL: {BaseUrl}.", fromLink);
+                return fromLink;
+            }
+
+            return null;
+        }
+
+        private string? ResolveIntegrationApiToken(TelegramBotOptions options)
+        {
+            var integrationToken = _integrationOptions.CurrentValue.IntegrationApiToken;
+            if (!string.IsNullOrWhiteSpace(integrationToken))
+            {
+                var trimmed = integrationToken.Trim();
+                if (!string.Equals(_integrationApiToken, trimmed, StringComparison.Ordinal))
+                {
+                    _integrationApiToken = trimmed;
+                    _logger.LogDebug("Using TelegramIntegration options token for Telegram bot integration API calls.");
+                }
+
+                return trimmed;
+            }
+
+            var configured = options.IntegrationApiToken;
+            if (!string.IsNullOrWhiteSpace(configured))
+            {
+                var trimmed = configured.Trim();
+                _integrationApiToken = trimmed;
+                return trimmed;
+            }
+
+            _integrationApiToken = null;
+            return null;
+        }
+
+        private static bool IsPlaceholderIntegrationToken(string token) =>
+            string.Equals(token, IntegrationApiTokenPlaceholder, StringComparison.OrdinalIgnoreCase);
+
+        private static string? NormalizeIntegrationBaseUrl(string? baseUrl)
+        {
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                return null;
+            }
+
+            return Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri)
+                ? uri.ToString().TrimEnd('/')
+                : null;
+        }
+
+        private static string? DeriveIntegrationApiBaseUrlFromWebhook(string? webhookUrl)
+        {
+            if (string.IsNullOrWhiteSpace(webhookUrl)
+                || !Uri.TryCreate(webhookUrl, UriKind.Absolute, out var webhookUri))
+            {
+                return null;
+            }
+
+            var segments = webhookUri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 0 || !string.Equals(segments[^1], "webhook", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var builder = new UriBuilder(webhookUri)
+            {
+                Query = string.Empty,
+                Fragment = string.Empty
+            };
+
+            if (segments.Length == 1)
+            {
+                builder.Path = "/";
+            }
+            else
+            {
+                builder.Path = "/" + string.Join('/', segments[..^1]);
+            }
+
+            return builder.Uri.ToString();
+        }
+
+        private static string? DeriveIntegrationApiBaseUrlFromLink(string? linkBaseUrl)
+        {
+            if (string.IsNullOrWhiteSpace(linkBaseUrl)
+                || !Uri.TryCreate(linkBaseUrl, UriKind.Absolute, out var linkUri))
+            {
+                return null;
+            }
+
+            var builder = new UriBuilder(linkUri)
+            {
+                Path = "/api/telegram",
+                Query = string.Empty,
+                Fragment = string.Empty
+            };
+
+            return builder.Uri.ToString();
+        }
+
+        private string GetBotString(string key, CultureInfo culture)
+        {
+            try
+            {
+                var value = BotResourceManager.GetString(key, culture);
+                if (!string.IsNullOrEmpty(value))
+                {
+                    return value;
+                }
+            }
+            catch (MissingManifestResourceException)
+            {
+                // ignore
+            }
+
+            try
+            {
+                var fallback = BotResourceManager.GetString(key, CultureInfo.InvariantCulture);
+                if (!string.IsNullOrEmpty(fallback))
+                {
+                    return fallback;
+                }
+            }
+            catch (MissingManifestResourceException)
+            {
+                // ignore
+            }
+
+            return key switch
+            {
+                "CalendarAuthorizationRequired" => "🔐 Подключите Google Calendar в профиле: {0}",
+                "CalendarScenarioPrompt" => "✅ Доступ к Google Calendar есть. Отправьте голосовое или текстовое описание события — добавлю встречу в календарь.",
+                "CalendarAuthorizationMissingDuringScenario" => "⚠️ Не могу добавить событие: нет доступа к Google Calendar. Откройте профиль и подтвердите интеграцию: {0}",
+                "TelegramLinkPrompt" => "⚠️ Привяжите Telegram к профилю: {0}",
+                "TelegramLinkError" => "❌ Не удалось получить статус интеграции. Попробуйте позже.",
+                "TelegramLinkTokenExpired" => "⚠️ Доступ к Google Calendar истёк. Обновите разрешения в профиле: {0}",
+                "TelegramLinkScopeInsufficient" => "⚠️ Требуются дополнительные права Google Calendar. Подтвердите доступ в профиле: {0}",
+                "TelegramLinkRevoked" => "⚠️ Доступ к Google Calendar был отозван. Подключите интеграцию заново: {0}",
+                "TelegramIntegrationMisconfigured" => "⚠️ Интеграция с календарём не настроена. Проверьте токен интеграции в настройках.",
+                _ => key
+            };
+        }
+
+        private string FormatCalendarLinkMessage(string template, CultureInfo culture, string calendarUrl)
+        {
+            if (string.IsNullOrWhiteSpace(template))
+            {
+                template = "🔐 Подключите Google Calendar в профиле: {0}";
+            }
+
+            return template.Contains("{0}", StringComparison.Ordinal)
+                ? string.Format(culture, template, calendarUrl)
+                : string.Join(' ', template.Trim(), calendarUrl).Trim();
+        }
+
+        private static string BuildIntegrationExceptionMessage(Exception exception)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("❌ Ошибка интеграции:");
+            builder.AppendLine(exception.ToString());
+            return builder.ToString();
         }
 
         private async Task<string?> DownloadMediaAsync(AudioPayload payload, string directory, CancellationToken cancellationToken)

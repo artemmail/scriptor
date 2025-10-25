@@ -97,6 +97,24 @@ namespace YandexSpeech.services
             return response?.Operations;
         }
 
+        public async Task<BillDetails?> GetBillDetailsAsync(string billId, CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(billId);
+
+            var responseJson = await PostAsync(
+                "api/bill-details",
+                new[] { new KeyValuePair<string, string>("bill_id", billId) },
+                includeToken: true,
+                cancellationToken).ConfigureAwait(false);
+
+            if (string.IsNullOrWhiteSpace(responseJson))
+            {
+                return null;
+            }
+
+            return JsonConvert.DeserializeObject<BillDetails>(responseJson);
+        }
+
         public Task<string> AuthorizeAsync(CancellationToken cancellationToken = default)
         {
             var payload = new[]

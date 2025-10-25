@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
@@ -14,7 +15,12 @@ using System.Security.Cryptography;
 using System.Text;
 using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
+using YandexSpeech.models.DTO.Account;
 using Microsoft.AspNetCore.Http;
+using YandexSpeech.Extensions;
+using YandexSpeech.services.Google;
+using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace YandexSpeech.Controllers
 {
@@ -27,30 +33,63 @@ namespace YandexSpeech.Controllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IConfiguration _config;
         private readonly MyDbContext _dbContext;
+        private readonly IGoogleTokenService _googleTokenService;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             IConfiguration config,
-            MyDbContext dbContext)
+            MyDbContext dbContext,
+            IGoogleTokenService googleTokenService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _config = config;
             _dbContext = dbContext;
+            _googleTokenService = googleTokenService;
         }
 
         // ---------- EXTERNAL SIGN-IN ----------
 
         [AllowAnonymous]
+        [HttpGet("login")]
+        public IActionResult Login([FromQuery] string? returnUrl = null, [FromQuery] bool calendar = false)
+        {
+            var model = new ExternalLoginViewModel
+            {
+                ReturnUrl = returnUrl,
+                RequestCalendarAccess = calendar
+            };
+
+            return View("Login", model);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("externallogin")]
+        public IActionResult ExternalLogin(
+            [FromQuery] string provider,
+            [FromQuery] string? returnUrl = null,
+            [FromQuery] bool calendar = false,
+            [FromQuery] string? prompt = null,
+            [FromQuery] bool calendarDeclined = false)
+        {
+            if (string.IsNullOrWhiteSpace(provider))
+            {
+                return BadRequest("Provider is required.");
+            }
+
+            return InitiateExternalLogin(provider, returnUrl, calendar, prompt, calendarDeclined);
+        }
+
+        [AllowAnonymous]
         [HttpGet("signin-google")]
-        public IActionResult SignInWithGoogle(string? returnUrl = null)
-            => SignInWithProvider("Google", returnUrl);
+        public IActionResult SignInWithGoogle(string? returnUrl = null, bool calendar = false, string? prompt = null, bool calendarDeclined = false)
+            => InitiateExternalLogin("Google", returnUrl, calendar, prompt, calendarDeclined);
 
         [AllowAnonymous]
         [HttpGet("signin-yandex")]
         public IActionResult SignInWithYandex(string? returnUrl = null)
-            => SignInWithProvider("Yandex", returnUrl);
+            => InitiateExternalLogin("Yandex", returnUrl);
 
         [AllowAnonymous]
         [HttpGet("externallogincallback")]
@@ -71,6 +110,29 @@ namespace YandexSpeech.Controllers
             {
                 Console.WriteLine("ExternalLoginCallback: NoExternalLoginInfo");
                 return Redirect($"{GetAngularRedirectUrl()}?error=NoExternalLoginInfo");
+            }
+
+            var isGoogleProvider = string.Equals(info.LoginProvider, "Google", StringComparison.OrdinalIgnoreCase);
+            var calendarRequested = false;
+            var calendarDeclined = false;
+
+            if (isGoogleProvider && info.AuthenticationProperties != null &&
+                info.AuthenticationProperties.Items.TryGetValue(ServiceCollectionExtensions.CalendarAccessPropertyName, out var calendarValue) &&
+                bool.TryParse(calendarValue, out var calendarFlag))
+            {
+                calendarRequested = calendarFlag;
+            }
+
+            if (isGoogleProvider && info.AuthenticationProperties != null &&
+                info.AuthenticationProperties.Items.TryGetValue(ServiceCollectionExtensions.CalendarDeclinedPropertyName, out var calendarDeclinedValue) &&
+                bool.TryParse(calendarDeclinedValue, out var calendarDeclinedFlag))
+            {
+                calendarDeclined = calendarDeclinedFlag;
+            }
+
+            if (isGoogleProvider)
+            {
+                await _signInManager.UpdateExternalAuthenticationTokensAsync(info);
             }
 
             // уже есть привязка?
@@ -125,6 +187,30 @@ namespace YandexSpeech.Controllers
                 }
 
                 await _userManager.AddToRoleAsync(user, "Free");
+            }
+
+            await _signInManager.SignInAsync(user, isPersistent: false);
+            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+
+            if (isGoogleProvider)
+            {
+                if (calendarDeclined)
+                {
+                    await _googleTokenService.RecordCalendarDeclinedAsync(
+                        user,
+                        HttpContext.RequestAborted);
+                }
+
+                var updateResult = await _googleTokenService.EnsureAccessTokenAsync(
+                    user,
+                    calendarRequested,
+                    info.AuthenticationTokens,
+                    HttpContext.RequestAborted);
+
+                if (calendarRequested && !updateResult.Succeeded)
+                {
+                    Console.WriteLine($"Failed to update Google Calendar tokens: {updateResult.ErrorMessage}");
+                }
             }
 
             await EnsureDisplayNameAsync(user);
@@ -253,6 +339,179 @@ namespace YandexSpeech.Controllers
             });
         }
 
+        [HttpGet("google-calendar/status")]
+        public async Task<ActionResult<GoogleCalendarStatusDto>> GetGoogleCalendarStatus()
+        {
+            var userId = _userManager.GetUserId(User);
+            if (userId == null)
+            {
+                return Unauthorized();
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var logins = await _userManager.GetLoginsAsync(user);
+            var isGoogleAccount = logins.Any(l =>
+                string.Equals(l.LoginProvider, "Google", StringComparison.OrdinalIgnoreCase));
+
+            var token = await _dbContext.UserGoogleTokens
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    t => t.UserId == user.Id && t.TokenType == GoogleTokenTypes.Calendar,
+                    HttpContext.RequestAborted);
+
+            var status = BuildGoogleCalendarStatus(user, token, isGoogleAccount);
+            return Ok(status);
+        }
+
+        [HttpPost("google-calendar/disconnect")]
+        public async Task<IActionResult> DisconnectGoogleCalendar()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var result = await _googleTokenService.RevokeAsync(user, HttpContext.RequestAborted);
+            if (!result.Succeeded)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new
+                {
+                    success = false,
+                    updated = false,
+                    error = result.ErrorMessage ?? "Не удалось отключить интеграцию Google Calendar."
+                });
+            }
+
+            return Ok(new
+            {
+                success = true,
+                updated = result.Updated,
+                message = result.Updated
+                    ? "Доступ к Google Calendar отключён."
+                    : "Интеграция Google Calendar уже была отключена."
+            });
+        }
+
+        [HttpGet("google-calendar/connect")]
+        public async Task<IActionResult> ConnectGoogleCalendar([FromQuery] string? returnUrl = null)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var redirectUrl = Url.Action(nameof(GoogleCalendarCallback), "Account", new { returnUrl });
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties(
+                GoogleDefaults.AuthenticationScheme,
+                redirectUrl,
+                user.Id);
+
+            properties.Items[ServiceCollectionExtensions.CalendarAccessPropertyName] = bool.TrueString;
+            properties.Items[ServiceCollectionExtensions.PromptPropertyName] = "consent";
+
+            return Challenge(properties, GoogleDefaults.AuthenticationScheme);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("google-calendar/callback")]
+        public async Task<IActionResult> GoogleCalendarCallback(
+            string? returnUrl = null,
+            string? error = null,
+            string? error_description = null)
+        {
+            string status;
+            string? message = null;
+            string? errorMessage = null;
+
+            if (!string.IsNullOrEmpty(error))
+            {
+                status = "error";
+                errorMessage = error_description ?? error;
+                await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+                return Redirect(BuildGoogleCalendarRedirectUrl(returnUrl, status, message, errorMessage));
+            }
+
+            var info = await _signInManager.GetExternalLoginInfoAsync();
+            if (info == null)
+            {
+                status = "error";
+                errorMessage = "Не удалось получить данные от Google.";
+                await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+                return Redirect(BuildGoogleCalendarRedirectUrl(returnUrl, status, message, errorMessage));
+            }
+
+            var calendarRequested = info.AuthenticationProperties != null
+                && info.AuthenticationProperties.Items.TryGetValue(ServiceCollectionExtensions.CalendarAccessPropertyName, out var calendarValue)
+                && bool.TryParse(calendarValue, out var calendarFlag)
+                && calendarFlag;
+
+            if (!calendarRequested)
+            {
+                status = "error";
+                errorMessage = "Запрос доступа к календарю не был подтверждён.";
+                await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+                return Redirect(BuildGoogleCalendarRedirectUrl(returnUrl, status, message, errorMessage));
+            }
+
+            var userId = _userManager.GetUserId(User);
+            if (string.IsNullOrEmpty(userId) && info.AuthenticationProperties != null)
+            {
+                info.AuthenticationProperties.Items.TryGetValue("XsrfId", out userId);
+            }
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                status = "error";
+                errorMessage = "Не удалось определить пользователя.";
+                await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+                return Redirect(BuildGoogleCalendarRedirectUrl(returnUrl, status, message, errorMessage));
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                status = "error";
+                errorMessage = "Пользователь не найден.";
+                await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+                return Redirect(BuildGoogleCalendarRedirectUrl(returnUrl, status, message, errorMessage));
+            }
+
+            await _signInManager.UpdateExternalAuthenticationTokensAsync(info);
+
+            var updateResult = await _googleTokenService.EnsureAccessTokenAsync(
+                user,
+                consentGranted: true,
+                info.AuthenticationTokens,
+                HttpContext.RequestAborted);
+
+            if (!updateResult.Succeeded)
+            {
+                status = "error";
+                errorMessage = updateResult.ErrorMessage ?? "Не удалось подключить Google Calendar.";
+            }
+            else if (updateResult.Updated)
+            {
+                status = "connected";
+                message = "Google Calendar подключён.";
+            }
+            else
+            {
+                status = "unchanged";
+                message = "Права доступа уже были предоставлены ранее.";
+            }
+
+            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+
+            return Redirect(BuildGoogleCalendarRedirectUrl(returnUrl, status, message, errorMessage));
+        }
+
         // ---------- REFRESH ----------
 
         [HttpPost("refresh-token")]
@@ -305,10 +564,122 @@ namespace YandexSpeech.Controllers
 
         // ---------- ВСПОМОГАТЕЛЬНЫЕ ----------
 
-        private IActionResult SignInWithProvider(string provider, string? returnUrl)
+        private GoogleCalendarStatusDto BuildGoogleCalendarStatus(
+            ApplicationUser user,
+            UserGoogleToken? token,
+            bool isGoogleAccount)
+        {
+            var revokedAfterConsent = token != null
+                && token.RevokedAt.HasValue
+                && (!token.ConsentGrantedAt.HasValue || token.RevokedAt.Value >= token.ConsentGrantedAt.Value);
+
+            var isConnected = token != null
+                && token.ConsentGrantedAt.HasValue
+                && !revokedAfterConsent
+                && !string.IsNullOrWhiteSpace(token.AccessToken);
+
+            return new GoogleCalendarStatusDto
+            {
+                IsGoogleAccount = isGoogleAccount,
+                IsConnected = isConnected,
+                HasRefreshToken = !string.IsNullOrWhiteSpace(token?.RefreshToken),
+                ConsentGrantedAt = token?.ConsentGrantedAt,
+                ConsentDeclinedAt = token?.ConsentDeclinedAt,
+                TokensRevokedAt = token?.RevokedAt,
+                AccessTokenUpdatedAt = token?.AccessTokenUpdatedAt,
+                AccessTokenExpiresAt = token?.AccessTokenExpiresAt,
+                RefreshTokenExpiresAt = token?.RefreshTokenExpiresAt
+            };
+        }
+
+        private string BuildGoogleCalendarRedirectUrl(
+            string? returnUrl,
+            string status,
+            string? message,
+            string? error)
+        {
+            var sanitized = SanitizeReturnUrl(returnUrl);
+            var query = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["calendarStatus"] = status
+            };
+
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                query["calendarMessage"] = message;
+            }
+
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                query["calendarError"] = error;
+            }
+
+            var target = QueryHelpers.AddQueryString(sanitized.BasePathWithQuery, query);
+            return string.Concat(target, sanitized.Fragment);
+        }
+
+        private (string BasePathWithQuery, string Fragment) SanitizeReturnUrl(string? returnUrl)
+        {
+            const string fallback = "/profile";
+            if (string.IsNullOrWhiteSpace(returnUrl))
+            {
+                return (fallback, string.Empty);
+            }
+
+            var fragment = string.Empty;
+            var pathPart = returnUrl;
+
+            var hashIndex = returnUrl.IndexOf('#');
+            if (hashIndex >= 0)
+            {
+                fragment = returnUrl.Substring(hashIndex);
+                pathPart = returnUrl.Substring(0, hashIndex);
+            }
+
+            if (Uri.TryCreate(pathPart, UriKind.Absolute, out var absolute))
+            {
+                if (!string.Equals(absolute.Host, Request.Host.Host, StringComparison.OrdinalIgnoreCase))
+                {
+                    return (fallback, string.Empty);
+                }
+
+                var normalizedPath = absolute.PathAndQuery;
+                return (string.IsNullOrEmpty(normalizedPath) ? fallback : normalizedPath, fragment);
+            }
+
+            if (!Uri.TryCreate(pathPart, UriKind.Relative, out _) || !pathPart.StartsWith('/'))
+            {
+                return (fallback, string.Empty);
+            }
+
+            return (pathPart, fragment);
+        }
+
+        private IActionResult InitiateExternalLogin(
+            string provider,
+            string? returnUrl,
+            bool calendarAccess = false,
+            string? prompt = null,
+            bool calendarDeclined = false)
         {
             var redirectUrl = Url.Action(nameof(ExternalLoginCallback), "Account", new { returnUrl });
             var props = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+
+            if (string.Equals(provider, "Google", StringComparison.OrdinalIgnoreCase))
+            {
+                props.Items[ServiceCollectionExtensions.CalendarAccessPropertyName] = calendarAccess.ToString();
+                if (calendarDeclined)
+                {
+                    props.Items[ServiceCollectionExtensions.CalendarDeclinedPropertyName] = bool.TrueString;
+                }
+                var promptValue = !string.IsNullOrWhiteSpace(prompt) ? prompt : (calendarAccess ? "consent" : string.Empty);
+
+                if (!string.IsNullOrWhiteSpace(promptValue))
+                {
+                    props.Items[ServiceCollectionExtensions.PromptPropertyName] = promptValue;
+                }
+            }
+
             return Challenge(props, provider);
         }
 
@@ -392,6 +763,7 @@ namespace YandexSpeech.Controllers
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
 
         private async Task EnsureDisplayNameAsync(ApplicationUser user)
         {

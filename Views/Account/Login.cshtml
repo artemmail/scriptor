@@ -1,0 +1,51 @@
+@model YandexSpeech.models.DTO.ExternalLoginViewModel
+@{
+    ViewData["Title"] = "Вход";
+    var returnUrl = Model.ReturnUrl ?? string.Empty;
+}
+
+<h1>Вход</h1>
+
+<section>
+    <form method="get" action="/api/account/externallogin" id="google-login-form">
+        <input type="hidden" name="provider" value="Google" />
+        <input type="hidden" name="returnUrl" value="@returnUrl" />
+        <input type="hidden" name="prompt" id="google-prompt" value="@(Model.RequestCalendarAccess ? "consent" : string.Empty)" />
+
+        <label class="google-calendar-option">
+            <input type="checkbox"
+                   id="google-calendar-checkbox"
+                   name="calendar"
+                   value="true"
+                   @(Model.RequestCalendarAccess ? "checked=\"checked\"" : string.Empty) />
+            Запросить доступ к календарю Google
+        </label>
+
+        <button type="submit">Войти через Google</button>
+    </form>
+</section>
+
+<section>
+    <form method="get" action="/api/account/signin-yandex">
+        <input type="hidden" name="returnUrl" value="@returnUrl" />
+        <button type="submit">Войти через Yandex</button>
+    </form>
+</section>
+
+<script>
+    (function () {
+        var checkbox = document.getElementById('google-calendar-checkbox');
+        var promptInput = document.getElementById('google-prompt');
+        if (!checkbox || !promptInput) {
+            return;
+        }
+
+        checkbox.addEventListener('change', function () {
+            if (checkbox.checked) {
+                promptInput.value = 'consent';
+            } else {
+                promptInput.value = '';
+            }
+        });
+    })();
+</script>

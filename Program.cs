@@ -1,5 +1,6 @@
 ﻿// Program.cs
 using AspNet.Security.OAuth.Yandex;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.Identity;
@@ -7,20 +8,27 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using YandexSpeech;
 using YandexSpeech.models.DB;
 using YandexSpeech.services;
 using YandexSpeech.services.Interface;
 using YandexSpeech.services.Options;
+using YandexSpeech.services.Authentication;
 using YandexSpeech.services.Telegram;
+using YandexSpeech.services.TelegramTranscriptionBot.State;
 using YandexSpeech.services.Whisper;
 using YandexSpeech.Services;
+using YandexSpeech.Extensions;
 using YoutubeDownload.Managers;
 using YoutubeDownload.Services;
 using YoutubeExplode;
 using System.IO;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.Http.Features;
+using YandexSpeech.services.Google;
+using YandexSpeech.services.TelegramIntegration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,11 +59,21 @@ builder.Services.AddCors(opts =>
 });
 
 // 2. Контроллеры
-builder.Services.AddControllers();
+builder.Services
+    .AddControllersWithViews()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    });
 
 // Общий HttpClient для внешних запросов
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient(nameof(TelegramTranscriptionBot));
+builder.Services.AddHttpClient(nameof(TelegramTranscriptionBot) + ".Integration");
+builder.Services.AddHttpClient(nameof(TelegramIntegrationNotifier));
 
 builder.Services.AddSingleton<IFfmpegService, FfmpegService>();
 
@@ -68,6 +86,12 @@ builder.Services.AddDbContext<MyDbContext>(opts => opts.UseSqlServer(conn));
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<MyDbContext>()
     .AddDefaultTokenProviders();
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/api/account/login";
+    options.AccessDeniedPath = "/api/account/login";
+});
 
 // 5. JWT-настройки
 var jwtSection = builder.Configuration.GetSection("Jwt");
@@ -99,42 +123,36 @@ authBuilder.AddJwtBearer(o =>
     };
 });
 
-var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
-var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
-if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
-{
-    authBuilder.AddGoogle(opts =>
-    {
-        opts.ClientId = googleClientId;
-        opts.ClientSecret = googleClientSecret;
+authBuilder.AddScheme<AuthenticationSchemeOptions, IntegrationApiAuthenticationHandler>(
+    IntegrationApiAuthenticationDefaults.AuthenticationScheme,
+    _ => { });
 
-        // Перехватываем ошибку silent-входа и возвращаем корректный HTML с postMessage
-        opts.Events.OnRemoteFailure = ctx =>
+authBuilder.AddGoogleOAuthConfigurations(builder.Configuration, opts =>
+{
+    opts.Events.OnRemoteFailure = ctx =>
+    {
+        var silent = ctx.Request.Query.TryGetValue("silent", out var s) && s == "true";
+        if (silent)
         {
-            var silent = ctx.Request.Query.TryGetValue("silent", out var s) && s == "true";
-            if (silent)
-            {
-                var origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
-                var html = $@"<!doctype html>
+            var origin = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+            var html = $@"<!doctype html>
 <html><head><meta charset=""utf-8""></head><body>
 <script>
   window.parent.postMessage(JSON.stringify({{ type:'silent_login', status:'failed' }}), '{origin}');
 </script>
 </body></html>";
-                ctx.Response.ContentType = "text/html; charset=utf-8";
-                ctx.Response.Headers["Cache-Control"] = "no-store";
-                ctx.HandleResponse();
-                return ctx.Response.WriteAsync(html);
-            }
-
-            // Для обычного (не-silent) входа — редиректим на callback с ошибкой
-            var redirect = $"/api/account/externallogincallback?remoteError={Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error")}";
-            ctx.Response.Redirect(redirect);
+            ctx.Response.ContentType = "text/html; charset=utf-8";
+            ctx.Response.Headers["Cache-Control"] = "no-store";
             ctx.HandleResponse();
-            return Task.CompletedTask;
-        };
-    });
-}
+            return ctx.Response.WriteAsync(html);
+        }
+
+        var redirect = $"/api/account/externallogincallback?remoteError={Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error")}";
+        ctx.Response.Redirect(redirect);
+        ctx.HandleResponse();
+        return Task.CompletedTask;
+    };
+});
 
 var yandexClientId = builder.Configuration["Authentication:Yandex:ClientId"];
 var yandexClientSecret = builder.Configuration["Authentication:Yandex:ClientSecret"];
@@ -178,6 +196,7 @@ builder.Services.AddScoped<IAudioFileService, AudioFileService>();
 
 builder.Services.Configure<EventBusOptions>(builder.Configuration.GetSection("EventBus"));
 builder.Services.Configure<TelegramBotOptions>(builder.Configuration.GetSection("Telegram"));
+builder.Services.Configure<TelegramIntegrationOptions>(builder.Configuration.GetSection("TelegramIntegration"));
 builder.Services.AddSingleton<FasterWhisperQueueClient>();
 
 var whisperProvider = builder.Configuration.GetValue<string>("Whisper:Provider");
@@ -205,6 +224,7 @@ builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<IYandexDiskDownloadService, YandexDiskDownloadService>();
 builder.Services.AddScoped<IPaymentGatewayService, PaymentGatewayService>();
 builder.Services.AddScoped<ISubscriptionAccessService, SubscriptionAccessService>();
+builder.Services.AddScoped<IGoogleTokenService, GoogleTokenService>();
 
 builder.Services.Configure<YooMoneyOptions>(builder.Configuration.GetSection("YooMoney"));
 builder.Services.Configure<SubscriptionLimitsOptions>(builder.Configuration.GetSection("SubscriptionLimits"));
@@ -224,8 +244,11 @@ builder.Services.AddScoped<IYSubtitlesService, YSubtitlesService>();
 builder.Services.AddHostedService<RecognitionBackgroundService>();
 builder.Services.AddHostedService<AudioRecognitionBackgroundService>();
 builder.Services.AddHostedService<SubscriptionExpirationHostedService>();
+builder.Services.AddSingleton<TelegramUserStateStore>();
 builder.Services.AddSingleton<TelegramTranscriptionBot>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<TelegramTranscriptionBot>());
+builder.Services.AddSingleton<ITelegramIntegrationNotifier, TelegramIntegrationNotifier>();
+builder.Services.AddScoped<ITelegramLinkService, TelegramLinkService>();
 
 
 

@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace YandexSpeech.models.DB
-
 {
     public class ApplicationUser : IdentityUser
     {
@@ -34,9 +33,19 @@ namespace YandexSpeech.models.DB
         public ICollection<UserFeatureFlag> FeatureFlags { get; set; } = new List<UserFeatureFlag>();
 
         /// <summary>
+        /// OAuth-токены Google, связанные с пользователем.
+        /// </summary>
+        public virtual UserGoogleToken? GoogleToken { get; set; }
+
+        /// <summary>
         /// Навигационное свойство для кошелька.
         /// </summary>
         public virtual UserWallet? Wallet { get; set; }
+
+        /// <summary>
+        /// Телеграм-привязки, оформленные пользователем.
+        /// </summary>
+        public ICollection<TelegramAccountLink> TelegramLinks { get; set; } = new List<TelegramAccountLink>();
 
         public ICollection<UserSubscription> Subscriptions { get; set; } = new List<UserSubscription>();
 

@@ -52,10 +52,13 @@ namespace YandexSpeech
         public DbSet<UserSubscription> UserSubscriptions { get; set; }
         public DbSet<SubscriptionInvoice> SubscriptionInvoices { get; set; }
         public DbSet<UserFeatureFlag> UserFeatureFlags { get; set; }
+        public DbSet<UserGoogleToken> UserGoogleTokens { get; set; }
         public DbSet<UserWallet> UserWallets { get; set; }
         public DbSet<WalletTransaction> WalletTransactions { get; set; }
         public DbSet<PaymentOperation> PaymentOperations { get; set; }
         public DbSet<RecognitionUsage> RecognitionUsage { get; set; }
+        public DbSet<TelegramAccountLink> TelegramAccountLinks { get; set; }
+        public DbSet<TelegramLinkToken> TelegramLinkTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -157,6 +160,27 @@ namespace YandexSpeech
                 .HasForeignKey(r => r.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            builder.Entity<UserGoogleToken>(entity =>
+            {
+                entity.ToTable("UserGoogleTokens");
+                entity.HasKey(t => t.UserId);
+                entity.Property(t => t.TokenType)
+                    .HasMaxLength(64)
+                    .HasDefaultValue(GoogleTokenTypes.Calendar);
+                entity.Property(t => t.Scope)
+                    .HasMaxLength(1024);
+                entity.Property(t => t.AccessToken)
+                    .HasMaxLength(4096);
+                entity.Property(t => t.RefreshToken)
+                    .HasMaxLength(4096);
+                entity.Property(t => t.CreatedAt)
+                    .HasDefaultValueSql("GETUTCDATE()");
+                entity.HasOne(t => t.User)
+                    .WithOne(u => u.GoogleToken)
+                    .HasForeignKey<UserGoogleToken>(t => t.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
             builder.Entity<ApplicationUser>()
                 .HasOne(u => u.CurrentSubscription)
                 .WithMany()
@@ -166,6 +190,36 @@ namespace YandexSpeech
             builder.Entity<ApplicationUser>()
                 .Property(u => u.CreatedAt)
                 .HasDefaultValueSql("GETUTCDATE()");
+
+            builder.Entity<TelegramAccountLink>(entity =>
+            {
+                entity.ToTable("TelegramAccountLinks");
+                entity.HasKey(link => link.Id);
+                entity.HasIndex(link => link.TelegramId).IsUnique();
+                entity.Property(link => link.Status)
+                    .HasConversion<int>();
+                entity.Property(link => link.CreatedAt)
+                    .HasDefaultValueSql("GETUTCDATE()");
+                entity.HasOne(link => link.User)
+                    .WithMany(user => user.TelegramLinks)
+                    .HasForeignKey(link => link.UserId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            builder.Entity<TelegramLinkToken>(entity =>
+            {
+                entity.ToTable("TelegramLinkTokens");
+                entity.HasKey(token => token.Id);
+                entity.HasIndex(token => token.TokenHash).IsUnique();
+                entity.Property(token => token.CreatedAt)
+                    .HasDefaultValueSql("GETUTCDATE()");
+                entity.Property(token => token.Purpose)
+                    .HasMaxLength(64);
+                entity.HasOne(token => token.Link)
+                    .WithMany(link => link.Tokens)
+                    .HasForeignKey(token => token.LinkId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
         }
 
     }

@@ -12,6 +12,16 @@ import { AuthService } from '../services/AuthService.service';
       <h2>Login</h2>
 
       <div class="d-flex flex-column gap-2 mt-3 w-100" style="max-width: 320px;">
+        <label class="d-flex gap-2 align-items-start text-start">
+          <input
+            type="checkbox"
+            class="form-check-input mt-1"
+            [checked]="allowCalendarManagement"
+            (change)="toggleCalendarConsent($event)"
+          />
+          <span>Разрешить управление календарём из бота</span>
+        </label>
+
         <button
           class="btn btn-primary"
           (click)="loginWithGoogle()">
@@ -35,6 +45,7 @@ import { AuthService } from '../services/AuthService.service';
 export class LoginComponent implements OnInit {
   authError = false;
   authErrorMessage = '';
+  allowCalendarManagement = false;
 
   constructor(
     private zone: NgZone,
@@ -60,15 +71,36 @@ export class LoginComponent implements OnInit {
 
   /** интерактивный вход по кнопке */
   loginWithGoogle(): void {
-    this.redirectToProvider('google');
+    this.redirectToProvider('google', {
+      calendar: this.allowCalendarManagement,
+      declined: !this.allowCalendarManagement
+    });
   }
 
   loginWithYandex(): void {
     this.redirectToProvider('yandex');
   }
 
-  private redirectToProvider(provider: 'google' | 'yandex'): void {
+  toggleCalendarConsent(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.allowCalendarManagement = !!target?.checked;
+  }
+
+  private redirectToProvider(
+    provider: 'google' | 'yandex',
+    options?: { calendar?: boolean; declined?: boolean }
+  ): void {
     const redirect = encodeURIComponent(`${window.location.origin}/auth/callback`);
-    window.location.href = `/api/account/signin-${provider}?returnUrl=${redirect}`;
+    const params = new URLSearchParams({ returnUrl: redirect });
+
+    if (provider === 'google' && options) {
+      if (options.calendar) {
+        params.set('calendar', 'true');
+      } else if (options.declined) {
+        params.set('calendarDeclined', 'true');
+      }
+    }
+
+    window.location.href = `/api/account/signin-${provider}?${params.toString()}`;
   }
 }
