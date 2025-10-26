@@ -72,6 +72,14 @@
     </div>
 
     <mat-menu #downloadMenu="matMenu" actionMenuPanel>
+      <button mat-menu-item (click)="downloadAsMd()" [disabled]="isDownloading || !hasResultText">
+        <mat-icon>article</mat-icon>
+        <span>Markdown (.md)</span>
+      </button>
+      <button mat-menu-item (click)="downloadAsTxt()" [disabled]="isDownloading || !hasResultText">
+        <mat-icon>notes</mat-icon>
+        <span>Текст (.txt)</span>
+      </button>
       <button mat-menu-item (click)="downloadAsPdf()" [disabled]="isDownloading || !canDownloadFromServer">
         <mat-icon>picture_as_pdf</mat-icon>
         <span>PDF</span>
@@ -83,14 +91,6 @@
       <button mat-menu-item (click)="downloadAsSrt()" [disabled]="isDownloading || !canDownloadFromServer">
         <mat-icon>subtitles</mat-icon>
         <span>SRT субтитры</span>
-      </button>
-      <button mat-menu-item (click)="downloadAsMd()" [disabled]="isDownloading || !hasResultText">
-        <mat-icon>article</mat-icon>
-        <span>Markdown (.md)</span>
-      </button>
-      <button mat-menu-item (click)="downloadAsHtml()" [disabled]="isDownloading || !hasResultText">
-        <mat-icon>language</mat-icon>
-        <span>HTML</span>
       </button>
     </mat-menu>
 
