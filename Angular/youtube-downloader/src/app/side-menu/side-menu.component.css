@@ -36,6 +36,7 @@ span[matListItemTitle] {
   display: block;
   white-space: normal;
   line-height: 1.25;
+  word-break: break-word;
 }
 
 span[matListItemLine] {
@@ -61,17 +62,47 @@ a[mat-list-item].active mat-icon[matListItemIcon] {
   color: #4877a6;
 }
 
-.submenu-title {
-  padding: 16px 14px 6px;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #6b7280;
+.submenu-accordion {
+  margin: 4px 0 12px;
+}
+
+.submenu-panel {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 12px;
+}
+
+.submenu-panel:not(.mat-expanded) .submenu-header {
+  border-radius: 12px;
+}
+
+.submenu-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  min-height: 48px;
+  border-radius: 12px 12px 0 0;
+}
+
+.submenu-icon {
+  color: #4877a6;
+}
+
+.submenu-title-text {
+  font-size: 0.85rem;
   font-weight: 600;
+  color: #1f2937;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.submenu-content {
+  padding: 0 0 8px 0;
 }
 
 a[mat-list-item].submenu-item {
-  margin-left: 12px;
+  margin-left: 20px;
   padding-left: 12px;
   gap: 10px;
 }
