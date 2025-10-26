@@ -95,13 +95,25 @@
     </mat-menu>
 
     <mat-menu #copyMenu="matMenu" actionMenuPanel>
-      <button mat-menu-item (click)="copyToClipboard()" [disabled]="isCopying || !hasResultText">
+      <button mat-menu-item (click)="copyPlainTextToClipboard()" [disabled]="isCopying || !canCopyPlainText">
         <mat-icon>notes</mat-icon>
         <span>Текст (plain)</span>
       </button>
-      <button mat-menu-item (click)="copyHtmlToClipboard()" [disabled]="isCopying || !hasResultText">
+      <button mat-menu-item (click)="copyMarkdownToClipboard()" [disabled]="isCopying || !canCopyMarkdown">
         <mat-icon>code</mat-icon>
+        <span>Markdown</span>
+      </button>
+      <button mat-menu-item (click)="copyHtmlToClipboard()" [disabled]="isCopying || !canCopyHtml">
+        <mat-icon>language</mat-icon>
         <span>HTML</span>
+      </button>
+      <button mat-menu-item (click)="copyBbcodeToClipboard()" [disabled]="isCopying || !canCopyBbcode">
+        <mat-icon>format_quote</mat-icon>
+        <span>BBCode</span>
+      </button>
+      <button mat-menu-item (click)="copySrtToClipboard()" [disabled]="isCopying || !canCopySrt">
+        <mat-icon>subtitles</mat-icon>
+        <span>SRT субтитры</span>
       </button>
     </mat-menu>
 

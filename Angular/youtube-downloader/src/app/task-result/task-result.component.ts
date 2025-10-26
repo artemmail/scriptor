@@ -82,7 +82,33 @@ export class TaskResultComponent implements OnDestroy {
   }
 
   get hasAnyCopyOption(): boolean {
+    return (
+      this.canCopyPlainText ||
+      this.canCopyMarkdown ||
+      this.canCopyHtml ||
+      this.canCopyBbcode ||
+      this.canCopySrt
+    );
+  }
+
+  get canCopyPlainText(): boolean {
     return this.hasResultText;
+  }
+
+  get canCopyMarkdown(): boolean {
+    return this.hasResultText;
+  }
+
+  get canCopyHtml(): boolean {
+    return this.hasResultText;
+  }
+
+  get canCopyBbcode(): boolean {
+    return this.hasResultText && this.canDownloadFromServer;
+  }
+
+  get canCopySrt(): boolean {
+    return this.canDownloadFromServer;
   }
 
   private hasCyrillic(text: string): boolean {
@@ -154,25 +180,101 @@ export class TaskResultComponent implements OnDestroy {
     this.isDownloading = false;
   }
 
-  copyToClipboard(): void {
-    if (this.isCopying || !this.youtubeTask?.result) return;
+  copyPlainTextToClipboard(): void {
+    if (this.isCopying || !this.youtubeTask?.result) {
+      return;
+    }
+
+    const plainText = this.stripMarkdown(this.youtubeTask.result);
+    if (!plainText.trim()) {
+      return;
+    }
+
     this.isCopying = true;
-    navigator.clipboard.writeText(this.youtubeTask.result)
-      .then(() => {
-        this.snackBar.open('Copied to clipboard', '', { duration: 2000 });
-      })
-      .finally(() => {
-        this.isCopying = false;
-      });
+    this.copyTextToClipboard(plainText, 'Текст скопирован в буфер обмена');
+  }
+
+  copyMarkdownToClipboard(): void {
+    const markdown = this.youtubeTask?.result;
+    if (this.isCopying || !markdown?.trim()) {
+      return;
+    }
+
+    this.isCopying = true;
+    this.copyTextToClipboard(markdown, 'Markdown скопирован в буфер обмена');
   }
 
   copyHtmlToClipboard(): void {
-    if (this.isCopying || !this.youtubeTask?.result) return;
+    if (this.isCopying || !this.youtubeTask?.result) {
+      return;
+    }
+
+    const html = this.markdownContentRef?.nativeElement?.innerHTML ?? '';
+    const target = html.trim().length ? html : this.youtubeTask.result;
+    if (!target?.trim()) {
+      return;
+    }
+
     this.isCopying = true;
-    const html = this.markdownContentRef?.nativeElement?.innerHTML?.trim() ?? '';
-    const target = html || this.youtubeTask.result;
-    navigator.clipboard.writeText(target)
-      .finally(() => (this.isCopying = false));
+    this.copyTextToClipboard(target, 'HTML скопирован в буфер обмена');
+  }
+
+  copyBbcodeToClipboard(): void {
+    if (this.isCopying || !this.youtubeTask?.id || !this.youtubeTask.result?.trim()) {
+      return;
+    }
+
+    this.isCopying = true;
+    this.subtitleService.generateBbcodeFromMarkdown(this.youtubeTask.id, this.youtubeTask.result).subscribe({
+      next: (blob) => {
+        blob.text().then((text) => {
+          if (!text.trim()) {
+            this.isCopying = false;
+            this.snackBar.open('BBCode недоступен.', 'OK', { duration: 3000 });
+            return;
+          }
+          this.copyTextToClipboard(text, 'BBCode скопирован в буфер обмена');
+        }).catch((error) => {
+          console.error('Blob read error', error);
+          this.isCopying = false;
+          this.snackBar.open('Не удалось подготовить BBCode.', 'OK', { duration: 3000 });
+        });
+      },
+      error: (error) => {
+        console.error('BBCode export error', error);
+        this.isCopying = false;
+        this.snackBar.open('Не удалось подготовить BBCode.', 'OK', { duration: 3000 });
+      }
+    });
+  }
+
+  copySrtToClipboard(): void {
+    if (this.isCopying || !this.youtubeTask?.id) {
+      return;
+    }
+
+    this.isCopying = true;
+    this.subtitleService.generateSrt(this.youtubeTask.id).subscribe({
+      next: (blob) => {
+        blob.text().then((text) => {
+          if (!text.trim()) {
+            this.isCopying = false;
+            this.snackBar.open('SRT недоступен.', 'OK', { duration: 3000 });
+            return;
+          }
+          this.copyTextToClipboard(text, 'SRT скопирован в буфер обмена');
+        }).catch((error) => {
+          console.error('Blob read error', error);
+          this.isCopying = false;
+          this.snackBar.open('Не удалось подготовить SRT.', 'OK', { duration: 3000 });
+        });
+      },
+      error: (error) => {
+        console.error('SRT export error', error);
+        this.isCopying = false;
+        this.snackBar.open('Не удалось подготовить SRT.', 'OK', { duration: 3000 });
+      }
+    });
   }
 
   toggleFullscreen(): void {
@@ -212,6 +314,24 @@ export class TaskResultComponent implements OnDestroy {
     a.download = filename;
     a.click();
     window.URL.revokeObjectURL(url);
+  }
+
+  private copyTextToClipboard(
+    text: string,
+    successMessage: string,
+    errorMessage = 'Не удалось скопировать в буфер обмена'
+  ): void {
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        this.snackBar.open(successMessage, '', { duration: 2000 });
+      })
+      .catch((error) => {
+        console.error('Clipboard copy error', error);
+        this.snackBar.open(errorMessage, 'OK', { duration: 3000 });
+      })
+      .finally(() => {
+        this.isCopying = false;
+      });
   }
 
   private stripMarkdown(content: string): string {
