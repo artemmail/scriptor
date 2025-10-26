@@ -10,6 +10,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Subject, takeUntil } from 'rxjs';
+import { Title } from '@angular/platform-browser';
 import {
   PaymentsService,
   SubscriptionPlan,
@@ -76,8 +77,11 @@ export class BillingComponent implements OnInit, OnDestroy {
   constructor(
     private readonly paymentsService: PaymentsService,
     private readonly snackBar: MatSnackBar,
-    private readonly route: ActivatedRoute
-  ) {}
+    private readonly route: ActivatedRoute,
+    private readonly titleService: Title
+  ) {
+    this.titleService.setTitle('Подписки и баланс — YouScriptor');
+  }
 
   ngOnInit(): void {
     this.loadPlans();

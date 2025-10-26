@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
+import { Title } from '@angular/platform-browser';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { SubtitleService } from '../services/subtitle.service';
 import { PaymentsService, SubscriptionSummary } from '../services/payments.service';
@@ -80,7 +81,10 @@ export class About3Component implements OnInit, OnDestroy {
     private readonly router: Router,
     private readonly paymentsService: PaymentsService,
     private readonly authService: AuthService,
-  ) {}
+    private readonly titleService: Title,
+  ) {
+    this.titleService.setTitle('YouScriptor — сервис транскрибации аудио и видео');
+  }
 
   readonly uploadRoute: RouterCommand = '/transcriptions';
   readonly trialRoute: RouterCommand = '/billing';

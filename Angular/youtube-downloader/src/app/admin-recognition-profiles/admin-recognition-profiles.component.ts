@@ -12,6 +12,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { finalize } from 'rxjs/operators';
 import { RecognitionProfile, RecognitionProfileInput } from '../models/recognition-profile.model';
 import { RecognitionProfilesService } from '../services/recognition-profiles.service';
+import { Title } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-admin-recognition-profiles',
@@ -35,6 +36,7 @@ export class AdminRecognitionProfilesComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly service = inject(RecognitionProfilesService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly titleService = inject(Title);
 
   profiles: RecognitionProfile[] = [];
   displayedColumns = ['id', 'name', 'displayedName', 'hint', 'openAiModel', 'segmentBlockSize', 'request', 'actions'];
@@ -57,6 +59,7 @@ export class AdminRecognitionProfilesComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.titleService.setTitle('Админка — профили распознавания');
     this.loadProfiles();
   }
 

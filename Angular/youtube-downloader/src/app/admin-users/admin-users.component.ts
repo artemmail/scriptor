@@ -13,6 +13,7 @@ import { InfiniteScrollModule } from 'ngx-infinite-scroll';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule, MatSortable, Sort, SortDirection } from '@angular/material/sort';
 import { AdminUsersService } from '../services/admin-users.service';
+import { Title } from '@angular/platform-browser';
 import { AdminUserListItem } from '../models/admin-user.model';
 import { AdminUserRoleDialogComponent } from './admin-user-role-dialog.component';
 
@@ -56,8 +57,11 @@ export class AdminUsersComponent implements OnInit, AfterViewInit {
   constructor(
     private readonly adminUsersService: AdminUsersService,
     private readonly dialog: MatDialog,
-    private readonly router: Router
-  ) {}
+    private readonly router: Router,
+    private readonly titleService: Title
+  ) {
+    this.titleService.setTitle('Админка — пользователи YouScriptor');
+  }
 
   ngOnInit(): void {
     this.loadRoles();

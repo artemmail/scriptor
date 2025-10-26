@@ -14,6 +14,7 @@ import { MatTableModule }       from '@angular/material/table';
 import { MatCheckboxModule }    from '@angular/material/checkbox';
 import { RouterModule }         from '@angular/router';
 
+import { Title } from '@angular/platform-browser';
 import { MergedVideoDto, YoutubeService } from '../services/youtube.service';
 import { StreamDto } from '../models/stream-dto';
 import { BitratePipe, FileSizePipe } from '../pipe/local-time.pipe';
@@ -102,8 +103,11 @@ export class YoutubeDownloaderComponent implements OnInit, OnDestroy {
 
   constructor(
     private youtubeService: YoutubeService,
-    @Inject(DOCUMENT) private document: Document | null
-  ) {}
+    @Inject(DOCUMENT) private document: Document | null,
+    private readonly titleService: Title
+  ) {
+    this.titleService.setTitle('YouTube Downloader — загрузка роликов YouScriptor');
+  }
 
   ngOnInit(): void {
     this.loadMergedVideos();

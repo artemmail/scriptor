@@ -25,7 +25,7 @@ import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
 })
 export class RecognitionControlComponent implements OnInit {
   inputValue: string = '';
-  title = 'YouScriptor Транскрибация лекций в документ с разметкой (word/pdf)';
+  title = 'YouScriptor — Расшифровка YouTube и встреч';
   isStarting = false;
   startError: string | null = null;
   limitResponse: UsageLimitResponse | null = null;

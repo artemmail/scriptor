@@ -13,6 +13,7 @@ import { SubtitleService } from '../services/subtitle.service';
 import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
 import { v4 as uuidv4 } from 'uuid';
 import { YoutubeCaptionTaskDto } from '../services/subtitle.service';
+import { Title } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-markdown-converter',
@@ -51,9 +52,11 @@ export class MarkdownConverterComponent implements OnInit {
     private subtitleService: SubtitleService,
     private snackBar: MatSnackBar,
     private mk: MarkdownRendererService1,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private readonly titleService: Title
   ) {
     this.renderWithMath = this.renderWithMath.bind(this);
+    this.titleService.setTitle('Конвертер Markdown — YouScriptor');
   }
 
   ngOnInit(): void {

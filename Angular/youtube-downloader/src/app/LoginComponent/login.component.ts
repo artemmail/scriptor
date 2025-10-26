@@ -2,6 +2,7 @@ import { Component, OnInit, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../services/AuthService.service';
+import { Title } from '@angular/platform-browser';
 
 @Component({
   standalone: true,
@@ -40,8 +41,11 @@ export class LoginComponent implements OnInit {
     private zone: NgZone,
     private auth: AuthService,
     private route: ActivatedRoute,
-    private router: Router
-  ) {}
+    private router: Router,
+    private readonly titleService: Title
+  ) {
+    this.titleService.setTitle('Вход в YouScriptor');
+  }
 
   ngOnInit(): void {
     // Обработка error из query-params
