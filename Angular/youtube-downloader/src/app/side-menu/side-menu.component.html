@@ -1,71 +1,99 @@
 <!-- side-menu.component.html -->
 <mat-nav-list>
   <ng-container *ngIf="user$ | async as user; else guestMenu">
-     <a mat-list-item (click)="navigate('/')">
-      <mat-icon matListItemIcon>home</mat-icon>
+    <a mat-list-item (click)="navigate('/')">
+      <mat-icon matListItemIcon>dashboard</mat-icon>
       <span matListItemTitle>Главная</span>
     </a>
-     <a mat-list-item (click)="navigate('/transcriptions')">
-      <mat-icon matListItemIcon>record_voice_over</mat-icon>
-      <span matListItemTitle>Транскрибация аудио в pdf</span>
+    <a mat-list-item (click)="navigate('/transcriptions')">
+      <mat-icon matListItemIcon>lyrics</mat-icon>
+      <span matListItemTitle>Транскрибация аудио в PDF</span>
     </a>
 
     <a mat-list-item (click)="navigate('/recognition')">
-      <mat-icon matListItemIcon>home</mat-icon>
-      <span matListItemTitle>YouTube → pdf/docx</span>
+      <mat-icon matListItemIcon>auto_stories</mat-icon>
+      <span matListItemTitle>YouTube → PDF/DOCX</span>
     </a>
 
-    
+
     <a mat-list-item (click)="navigate('/down')">
-      <mat-icon matListItemIcon>download-icons</mat-icon>
-      <span matListItemTitle>YouTube → mp3/mp4</span>
+      <mat-icon matListItemIcon>library_music</mat-icon>
+      <span matListItemTitle>YouTube → MP3/MP4</span>
     </a>
 
 
     <a mat-list-item (click)="navigate('/Scriptorium')">
-      <mat-icon matListItemIcon>library_books</mat-icon>
-      <span matListItemTitle>Скрипторий (распознанные документы)  </span>
+      <mat-icon matListItemIcon>inventory_2</mat-icon>
+      <span matListItemTitle>Скрипторий (распознанные документы)</span>
     </a>
 
 
-    <div matSubheader class="submenu-title">Утилиты</div>
-    <a mat-list-item class="submenu-item" (click)="navigate('/markdown-converter')">
-      <mat-icon matListItemIcon>code</mat-icon>
-      <span matListItemTitle>Конвертер Markdown</span>
-    </a>
-    <a mat-list-item class="submenu-item" (click)="navigate('/png-to-webp')">
-      <mat-icon matListItemIcon>compare</mat-icon>
-      <span matListItemTitle>PNG → WebP</span>
-    </a>
-    
-   
+    <mat-accordion class="submenu-accordion" [multi]="true">
+      <mat-expansion-panel class="submenu-panel">
+        <mat-expansion-panel-header class="submenu-header">
+          <mat-icon class="submenu-icon">build_circle</mat-icon>
+          <span class="submenu-title-text">Утилиты</span>
+        </mat-expansion-panel-header>
+        <div class="submenu-content">
+          <a mat-list-item class="submenu-item" (click)="navigate('/markdown-converter')">
+            <mat-icon matListItemIcon>code</mat-icon>
+            <span matListItemTitle>Конвертер Markdown</span>
+          </a>
+          <a mat-list-item class="submenu-item" (click)="navigate('/png-to-webp')">
+            <mat-icon matListItemIcon>image</mat-icon>
+            <span matListItemTitle>PNG → WebP</span>
+          </a>
+        </div>
+      </mat-expansion-panel>
+    </mat-accordion>
+
+
     <a mat-list-item (click)="navigate('/blog')">
-      <mat-icon matListItemIcon>article</mat-icon>
+      <mat-icon matListItemIcon>rss_feed</mat-icon>
       <span matListItemTitle>Новости ресурса</span>
     </a>
     <a mat-list-item (click)="navigate('/billing')">
-      <mat-icon matListItemIcon>credit_card</mat-icon>
+      <mat-icon matListItemIcon>account_balance_wallet</mat-icon>
       <span matListItemTitle>Подписки и баланс</span>
     </a>
-    <a mat-list-item *ngIf="hasRole(user, 'Admin')" (click)="navigate('/admin/users')">
-      <mat-icon matListItemIcon>group</mat-icon>
-      <span matListItemTitle>Пользователи</span>
-    </a>
-    <a mat-list-item *ngIf="hasRole(user, 'Admin')" (click)="navigate('/admin/payments')">
-      <mat-icon matListItemIcon>receipt_long</mat-icon>
-      <span matListItemTitle>Платежи YooMoney</span>
-    </a>
-    <a mat-list-item *ngIf="hasRole(user, 'Admin')" (click)="navigate('/admin/recognition-profiles')">
-      <mat-icon matListItemIcon>tune</mat-icon>
-      <span matListItemTitle>Профили распознавания</span>
-    </a>
-    <a mat-list-item *ngIf="hasRole(user, 'Moderator')" (click)="navigate('/blog/new')">
-      <mat-icon matListItemIcon>post_add</mat-icon>
-      <span matListItemTitle>Новая тема</span>
-    </a>
+    <mat-accordion
+      class="submenu-accordion"
+      *ngIf="hasRole(user, 'Admin') || hasRole(user, 'Moderator')"
+      [multi]="true"
+    >
+      <mat-expansion-panel class="submenu-panel">
+        <mat-expansion-panel-header class="submenu-header">
+          <mat-icon class="submenu-icon">admin_panel_settings</mat-icon>
+          <span class="submenu-title-text">Администрирование</span>
+        </mat-expansion-panel-header>
+        <div class="submenu-content">
+          <a mat-list-item class="submenu-item" *ngIf="hasRole(user, 'Admin')" (click)="navigate('/admin/users')">
+            <mat-icon matListItemIcon>people_alt</mat-icon>
+            <span matListItemTitle>Пользователи</span>
+          </a>
+          <a mat-list-item class="submenu-item" *ngIf="hasRole(user, 'Admin')" (click)="navigate('/admin/payments')">
+            <mat-icon matListItemIcon>payments</mat-icon>
+            <span matListItemTitle>Платежи YooMoney</span>
+          </a>
+          <a
+            mat-list-item
+            class="submenu-item"
+            *ngIf="hasRole(user, 'Admin')"
+            (click)="navigate('/admin/recognition-profiles')"
+          >
+            <mat-icon matListItemIcon>tune</mat-icon>
+            <span matListItemTitle>Профили распознавания</span>
+          </a>
+          <a mat-list-item class="submenu-item" *ngIf="hasRole(user, 'Moderator')" (click)="navigate('/blog/new')">
+            <mat-icon matListItemIcon>note_add</mat-icon>
+            <span matListItemTitle>Новая тема</span>
+          </a>
+        </div>
+      </mat-expansion-panel>
+    </mat-accordion>
     <mat-divider></mat-divider>
     <a mat-list-item class="profile-entry" (click)="navigate('/profile')">
-      <mat-icon matListItemIcon>account_circle</mat-icon>
+      <mat-icon matListItemIcon>person</mat-icon>
       <span matListItemTitle>Профиль</span>
       <span matListItemLine>{{ user.displayName || user.email }}</span>
       <span matListItemLine class="profile-hint">Управление аккаунтом и выход</span>
@@ -73,28 +101,37 @@
   </ng-container>
   <ng-template #guestMenu>
     <a mat-list-item (click)="navigate('/recognition')">
-      <mat-icon matListItemIcon>home</mat-icon>
+      <mat-icon matListItemIcon>auto_stories</mat-icon>
       <span matListItemTitle>Conspect YouTube</span>
     </a>
     <a mat-list-item (click)="navigate('/Scriptorium')">
-      <mat-icon matListItemIcon>library_books</mat-icon>
+      <mat-icon matListItemIcon>inventory_2</mat-icon>
       <span matListItemTitle>Scriptorium</span>
     </a>
     <a mat-list-item (click)="navigate('/transcriptions')">
-      <mat-icon matListItemIcon>record_voice_over</mat-icon>
+      <mat-icon matListItemIcon>lyrics</mat-icon>
       <span matListItemTitle>Протокол совещаний</span>
     </a>
-    <div matSubheader class="submenu-title">Утилиты</div>
-    <a mat-list-item class="submenu-item" (click)="navigate('/markdown-converter')">
-      <mat-icon matListItemIcon>code</mat-icon>
-      <span matListItemTitle>Конвертер Markdown</span>
-    </a>
-    <a mat-list-item class="submenu-item" (click)="navigate('/png-to-webp')">
-      <mat-icon matListItemIcon>compare</mat-icon>
-      <span matListItemTitle>PNG → WebP</span>
-    </a>
+    <mat-accordion class="submenu-accordion" [multi]="true">
+      <mat-expansion-panel class="submenu-panel">
+        <mat-expansion-panel-header class="submenu-header">
+          <mat-icon class="submenu-icon">build_circle</mat-icon>
+          <span class="submenu-title-text">Утилиты</span>
+        </mat-expansion-panel-header>
+        <div class="submenu-content">
+          <a mat-list-item class="submenu-item" (click)="navigate('/markdown-converter')">
+            <mat-icon matListItemIcon>code</mat-icon>
+            <span matListItemTitle>Конвертер Markdown</span>
+          </a>
+          <a mat-list-item class="submenu-item" (click)="navigate('/png-to-webp')">
+            <mat-icon matListItemIcon>image</mat-icon>
+            <span matListItemTitle>PNG → WebP</span>
+          </a>
+        </div>
+      </mat-expansion-panel>
+    </mat-accordion>
     <a mat-list-item (click)="navigate('/blog')">
-      <mat-icon matListItemIcon>article</mat-icon>
+      <mat-icon matListItemIcon>rss_feed</mat-icon>
       <span matListItemTitle>Блоги</span>
     </a>
     <mat-divider></mat-divider>

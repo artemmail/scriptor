@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { RouterModule, Router } from '@angular/router';
 import { Observable } from 'rxjs';
 import { AuthService, UserInfo } from '../services/AuthService.service';
@@ -15,6 +16,7 @@ import { AuthService, UserInfo } from '../services/AuthService.service';
     MatListModule,
     MatIconModule,
     MatDividerModule,
+    MatExpansionModule,
     RouterModule
   ],
   templateUrl: './side-menu.component.html',
