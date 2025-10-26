@@ -33,6 +33,9 @@ mat-icon[matListItemIcon] {
 span[matListItemTitle] {
   color: #1f2937;
   font-weight: 500;
+  display: block;
+  white-space: normal;
+  line-height: 1.25;
 }
 
 span[matListItemLine] {
@@ -56,6 +59,25 @@ a[mat-list-item].active span[matListItemTitle] {
 
 a[mat-list-item].active mat-icon[matListItemIcon] {
   color: #4877a6;
+}
+
+.submenu-title {
+  padding: 16px 14px 6px;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+a[mat-list-item].submenu-item {
+  margin-left: 12px;
+  padding-left: 12px;
+  gap: 10px;
+}
+
+a[mat-list-item].submenu-item mat-icon[matListItemIcon] {
+  color: #556987;
 }
 
 @media (max-width: 600px) {

@@ -28,12 +28,13 @@
     </a>
 
 
-    <a mat-list-item (click)="navigate('/markdown-converter')">
-      <mat-icon matListItemIcon>sync_alt</mat-icon>
-      <span matListItemTitle>Конвертер Markdown </span>
+    <div matSubheader class="submenu-title">Утилиты</div>
+    <a mat-list-item class="submenu-item" (click)="navigate('/markdown-converter')">
+      <mat-icon matListItemIcon>code</mat-icon>
+      <span matListItemTitle>Конвертер Markdown</span>
     </a>
-    <a mat-list-item (click)="navigate('/png-to-webp')">
-      <mat-icon matListItemIcon>image</mat-icon>
+    <a mat-list-item class="submenu-item" (click)="navigate('/png-to-webp')">
+      <mat-icon matListItemIcon>compare</mat-icon>
       <span matListItemTitle>PNG → WebP</span>
     </a>
     
@@ -83,12 +84,13 @@
       <mat-icon matListItemIcon>record_voice_over</mat-icon>
       <span matListItemTitle>Протокол совещаний</span>
     </a>
-    <a mat-list-item (click)="navigate('/markdown-converter')">
-      <mat-icon matListItemIcon>sync_alt</mat-icon>
+    <div matSubheader class="submenu-title">Утилиты</div>
+    <a mat-list-item class="submenu-item" (click)="navigate('/markdown-converter')">
+      <mat-icon matListItemIcon>code</mat-icon>
       <span matListItemTitle>Конвертер Markdown</span>
     </a>
-    <a mat-list-item (click)="navigate('/png-to-webp')">
-      <mat-icon matListItemIcon>image</mat-icon>
+    <a mat-list-item class="submenu-item" (click)="navigate('/png-to-webp')">
+      <mat-icon matListItemIcon>compare</mat-icon>
       <span matListItemTitle>PNG → WebP</span>
     </a>
     <a mat-list-item (click)="navigate('/blog')">
