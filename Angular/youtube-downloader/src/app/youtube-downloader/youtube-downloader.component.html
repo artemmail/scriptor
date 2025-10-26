@@ -73,12 +73,19 @@
             </p>
 
             <form (submit)="fetchStreams(); $event.preventDefault()" class="stream-form">
-              <mat-form-field appearance="outline">
-                <mat-label>Ссылка на YouTube-видео</mat-label>
-                <input matInput [formControl]="videoUrlControl" placeholder="https://youtube.com/..." />
-                <mat-error *ngIf="videoUrlControl.invalid">Неверный URL.</mat-error>
-              </mat-form-field>
-              <button mat-flat-button color="primary" type="submit" [disabled]="isLoading">Загрузить потоки</button>
+              <label class="stream-form-label" for="downloader-input">Введите идентификатор или ссылку YouTube</label>
+              <div class="stream-form-field">
+                <input
+                  id="downloader-input"
+                  type="text"
+                  [formControl]="videoUrlControl"
+                  placeholder="https://youtube.com/..."
+                  autocomplete="off"
+                />
+                <button class="btn btn-primary" type="submit" [disabled]="isLoading">
+                  {{ isLoading ? 'Загружаем…' : 'Загрузить потоки' }}
+                </button>
+              </div>
             </form>
 
             <mat-progress-bar *ngIf="isLoading" mode="indeterminate"></mat-progress-bar>
