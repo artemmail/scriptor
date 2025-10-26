@@ -2,9 +2,15 @@
 <mat-nav-list>
   <ng-container *ngIf="user$ | async as user; else guestMenu">
     <a mat-list-item (click)="navigate('/')">
-      <mat-icon matListItemIcon>dashboard</mat-icon>
+      <mat-icon matListItemIcon>home</mat-icon>
       <span matListItemTitle>Главная</span>
     </a>
+
+        <a mat-list-item (click)="navigate('/blog')">
+      <mat-icon matListItemIcon>rss_feed</mat-icon>
+      <span matListItemTitle>Новости ресурса</span>
+    </a>
+
     <a mat-list-item (click)="navigate('/transcriptions')">
       <mat-icon matListItemIcon>lyrics</mat-icon>
       <span matListItemTitle>Транскрибация аудио в PDF</span>
@@ -25,6 +31,11 @@
     <a mat-list-item (click)="navigate('/Scriptorium')">
       <mat-icon matListItemIcon>inventory_2</mat-icon>
       <span matListItemTitle>Скрипторий (распознанные документы)</span>
+    </a>
+
+        <a mat-list-item (click)="navigate('/billing')">
+      <mat-icon matListItemIcon>account_balance_wallet</mat-icon>
+      <span matListItemTitle>Тарифы</span>
     </a>
 
 
@@ -48,14 +59,8 @@
     </mat-accordion>
 
 
-    <a mat-list-item (click)="navigate('/blog')">
-      <mat-icon matListItemIcon>rss_feed</mat-icon>
-      <span matListItemTitle>Новости ресурса</span>
-    </a>
-    <a mat-list-item (click)="navigate('/billing')">
-      <mat-icon matListItemIcon>account_balance_wallet</mat-icon>
-      <span matListItemTitle>Подписки и баланс</span>
-    </a>
+
+
     <mat-accordion
       class="submenu-accordion"
       *ngIf="hasRole(user, 'Admin') || hasRole(user, 'Moderator')"
