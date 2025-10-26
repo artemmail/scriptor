@@ -1,22 +1,33 @@
 <!-- side-menu.component.html -->
 <mat-nav-list>
   <ng-container *ngIf="user$ | async as user; else guestMenu">
+     <a mat-list-item (click)="navigate('/')">
+      <mat-icon matListItemIcon>home</mat-icon>
+      <span matListItemTitle>Главная</span>
+    </a>
+     <a mat-list-item (click)="navigate('/transcriptions')">
+      <mat-icon matListItemIcon>record_voice_over</mat-icon>
+      <span matListItemTitle>Транскрибация аудио в pdf</span>
+    </a>
+
     <a mat-list-item (click)="navigate('/recognition')">
       <mat-icon matListItemIcon>home</mat-icon>
-      <span matListItemTitle>Conspect YouTube</span>
+      <span matListItemTitle>YouTube → pdf/docx</span>
     </a>
-    <a mat-list-item (click)="navigate('/Scriptorium')">
-      <mat-icon matListItemIcon>library_books</mat-icon>
-      <span matListItemTitle>Scriptorium</span>
-    </a>
-    <a mat-list-item (click)="navigate('/transcriptions')">
-      <mat-icon matListItemIcon>record_voice_over</mat-icon>
-      <span matListItemTitle>Протокол совещаний</span>
-    </a>
+
+    
     <a mat-list-item (click)="navigate('/down')">
       <mat-icon matListItemIcon>download-icons</mat-icon>
-      <span matListItemTitle>YouTube downloader</span>
+      <span matListItemTitle>YouTube → mp3/mp4</span>
     </a>
+
+
+    <a mat-list-item (click)="navigate('/Scriptorium')">
+      <mat-icon matListItemIcon>library_books</mat-icon>
+      <span matListItemTitle>Скрипторий (распознанные документы)  </span>
+    </a>
+
+
     <a mat-list-item (click)="navigate('/markdown-converter')">
       <mat-icon matListItemIcon>sync_alt</mat-icon>
       <span matListItemTitle>Конвертер Markdown </span>
@@ -26,13 +37,10 @@
       <span matListItemTitle>PNG → WebP</span>
     </a>
     
-    <a mat-list-item (click)="navigate('/')">
-      <mat-icon matListItemIcon>info</mat-icon>
-      <span matListItemTitle>Лендинг</span>
-    </a>
+   
     <a mat-list-item (click)="navigate('/blog')">
       <mat-icon matListItemIcon>article</mat-icon>
-      <span matListItemTitle>Блоги</span>
+      <span matListItemTitle>Новости ресурса</span>
     </a>
     <a mat-list-item (click)="navigate('/billing')">
       <mat-icon matListItemIcon>credit_card</mat-icon>
