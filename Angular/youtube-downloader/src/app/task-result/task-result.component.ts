@@ -145,12 +145,12 @@ export class TaskResultComponent implements OnDestroy {
     this.isDownloading = false;
   }
 
-  downloadAsHtml(): void {
+  downloadAsTxt(): void {
     if (this.isDownloading || !this.youtubeTask?.result) return;
     this.isDownloading = true;
-    const content = this.renderMath(this.youtubeTask.result);
     const base = this.getFileBaseName();
-    this.downloadText(content, 'text/html', `${base}.html`);
+    const plainText = this.stripMarkdown(this.youtubeTask.result);
+    this.downloadText(plainText, 'text/plain', `${base}.txt`);
     this.isDownloading = false;
   }
 
@@ -212,6 +212,19 @@ export class TaskResultComponent implements OnDestroy {
     a.download = filename;
     a.click();
     window.URL.revokeObjectURL(url);
+  }
+
+  private stripMarkdown(content: string): string {
+    return content
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/\[(.*?)\]\((.*?)\)/g, '$1')
+      .replace(/^#+\s*(.*)$/gm, '$1')
+      .replace(/^>\s?(.*)$/gm, '$1')
+      .replace(/^[\-*+]\s+(.*)$/gm, '$1')
+      .replace(/\r?\n{3,}/g, '\n\n');
   }
 
 downloadAsSrt(lang?: string): void {
