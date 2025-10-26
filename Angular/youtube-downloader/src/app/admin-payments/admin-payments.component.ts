@@ -10,6 +10,7 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AdminYooMoneyOperation } from '../models/admin-payments.model';
 import { AdminPaymentsService } from '../services/admin-payments.service';
+import { Title } from '@angular/platform-browser';
 import {
   AdminPaymentDetailsDialogComponent,
   AdminPaymentDetailsDialogData
@@ -85,8 +86,11 @@ export class AdminPaymentsComponent implements OnInit {
 
   constructor(
     private readonly adminPaymentsService: AdminPaymentsService,
-    private readonly dialog: MatDialog
-  ) {}
+    private readonly dialog: MatDialog,
+    private readonly titleService: Title
+  ) {
+    this.titleService.setTitle('Админка — платежи YooMoney');
+  }
 
   ngOnInit(): void {
     this.loadOperations();

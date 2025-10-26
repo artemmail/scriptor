@@ -11,6 +11,7 @@ import { MatSliderModule } from '@angular/material/slider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { ImageEditorDialogComponent, ImageEditorDialogResult } from './image-editor-dialog.component';
+import { Title } from '@angular/platform-browser';
 
 interface ConversionResult {
   previewUrl: string;
@@ -84,7 +85,13 @@ export class PngToWebpComponent implements OnDestroy {
     this.editedImageUrl() ?? this.originalUrl(),
   );
 
-  constructor(private snackBar: MatSnackBar, private dialog: MatDialog) {}
+  constructor(
+    private snackBar: MatSnackBar,
+    private dialog: MatDialog,
+    private readonly titleService: Title
+  ) {
+    this.titleService.setTitle('PNG → WebP — конвертер изображений YouScriptor');
+  }
 
   @HostListener('window:paste', ['$event'])
   async onPaste(event: ClipboardEvent): Promise<void> {

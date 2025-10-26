@@ -89,7 +89,7 @@ export class SubtitlesTasksComponent implements OnInit {
     private authService: AuthService,
     private destroyRef: DestroyRef
   ) {
-    this.titleService.setTitle('Transcription Queue');
+    this.titleService.setTitle('Scriptorium — очередь расшифровок');
 
     this.breakpointObserver
       .observe([Breakpoints.Handset])

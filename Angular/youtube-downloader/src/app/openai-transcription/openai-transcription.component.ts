@@ -8,7 +8,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { Router, RouterModule } from '@angular/router';
 import { Subscription, timer } from 'rxjs';
 import { exhaustMap } from 'rxjs/operators';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer, SafeHtml, Title } from '@angular/platform-browser';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import {
@@ -130,9 +130,11 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     private readonly snackBar: MatSnackBar,
     private readonly paymentsService: PaymentsService,
     private readonly authService: AuthService,
+    private readonly titleService: Title,
     @Inject(PLATFORM_ID) platformId: Object,
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
+    this.titleService.setTitle('Протокол совещаний — расшифровки YouScriptor');
   }
 
   ngOnInit(): void {

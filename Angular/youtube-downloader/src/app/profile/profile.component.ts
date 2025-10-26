@@ -8,6 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatListModule } from '@angular/material/list';
 import { Router } from '@angular/router';
+import { Title } from '@angular/platform-browser';
 import { PLATFORM_ID } from '@angular/core';
 
 import { AccountService } from '../services/account.service';
@@ -36,6 +37,7 @@ export class ProfileComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly paymentsService = inject(PaymentsService);
   private readonly router = inject(Router);
+  private readonly titleService = inject(Title);
   readonly form = this.fb.nonNullable.group({
     displayName: ['', [Validators.required, Validators.maxLength(100)]]
   });
@@ -56,6 +58,7 @@ export class ProfileComponent implements OnInit {
 
   ngOnInit(): void {
     if (this.isBrowser) {
+      this.titleService.setTitle('Профиль — YouScriptor');
       this.fetchProfile();
       this.fetchSummary();
     }

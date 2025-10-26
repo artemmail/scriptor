@@ -9,6 +9,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs/operators';
 import { BlogService } from '../services/blog.service';
 import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
+import { Title } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-blog-topic-create',
@@ -56,12 +57,14 @@ export class BlogTopicCreateComponent implements OnInit {
     private readonly route: ActivatedRoute,
     private readonly snackBar: MatSnackBar,
     private readonly markdownRenderer: MarkdownRendererService1,
-    private readonly destroyRef: DestroyRef
+    private readonly destroyRef: DestroyRef,
+    private readonly titleService: Title
   ) {
     this.topicForm = this.fb.group({
       title: ['', [Validators.required, Validators.maxLength(this.titleMaxLength)]],
       text: ['', [Validators.required]]
     });
+    this.titleService.setTitle('Новая тема блога — YouScriptor');
   }
 
   ngOnInit(): void {
@@ -72,6 +75,7 @@ export class BlogTopicCreateComponent implements OnInit {
         if (slug) {
           this.mode = 'edit';
           this.topicSlug = slug;
+          this.updatePageTitle();
           this.fetchTopic(slug);
         } else {
           this.mode = 'create';
@@ -81,6 +85,7 @@ export class BlogTopicCreateComponent implements OnInit {
           this.loadingTopic = false;
           this.topicForm.enable();
           this.topicForm.reset({ title: '', text: '' });
+          this.updatePageTitle();
         }
       });
   }
@@ -181,11 +186,27 @@ export class BlogTopicCreateComponent implements OnInit {
           this.topicId = topic.id;
           this.topicSlug = topic.slug;
           this.topicForm.setValue({ title: topic.header, text: topic.text });
+          this.updatePageTitle(topic.header);
         },
         error: () => {
           this.loadError = 'Не удалось загрузить тему для редактирования.';
           this.topicForm.reset({ title: '', text: '' });
+          this.updatePageTitle();
         }
       });
+  }
+
+  private updatePageTitle(currentTitle?: string): void {
+    if (this.isEditMode) {
+      const header = (currentTitle ?? this.topicForm.value.title ?? '').trim();
+      if (header) {
+        this.titleService.setTitle(`Редактирование: ${header} — блог YouScriptor`);
+      } else {
+        this.titleService.setTitle('Редактирование темы блога — YouScriptor');
+      }
+      return;
+    }
+
+    this.titleService.setTitle('Новая тема блога — YouScriptor');
   }
 }

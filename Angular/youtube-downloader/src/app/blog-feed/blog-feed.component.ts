@@ -8,6 +8,7 @@ import { InfiniteScrollModule } from 'ngx-infinite-scroll';
 import { AuthService } from '../services/AuthService.service';
 import { Router, RouterModule } from '@angular/router';
 import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
+import { Title } from '@angular/platform-browser';
 
 interface BlogTopicViewModel extends BlogTopic {
   collapsed: boolean;
@@ -60,7 +61,8 @@ export class BlogFeedComponent implements OnInit {
     private readonly authService: AuthService,
     private readonly destroyRef: DestroyRef,
     private readonly router: Router,
-    private readonly markdownRenderer: MarkdownRendererService1
+    private readonly markdownRenderer: MarkdownRendererService1,
+    private readonly titleService: Title
   ) {
     this.authService.user$
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -69,6 +71,7 @@ export class BlogFeedComponent implements OnInit {
         this.isModerator = roles.some(r => r.toLowerCase() === 'moderator');
         this.canCreateTopics = this.isModerator;
       });
+    this.titleService.setTitle('Блог YouScriptor — новости и руководства');
   }
 
   ngOnInit(): void {
