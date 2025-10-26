@@ -13,6 +13,7 @@ using YoutubeDownload.Models;    // StreamDto, YoutubeStreamCache
 using YandexSpeech;
 using YandexSpeech.models.DB;             // MyDbContext
 using YandexSpeech.services.Interface;
+using Xabe.FFmpeg.Enums;
 
 namespace YandexSpeech.services
 {
@@ -50,6 +51,48 @@ namespace YandexSpeech.services
             _youtubeClient = new YoutubeClient();
             _dbContext = dbContext;
             _ffmpegService = ffmpegService;
+        }
+
+        public async Task ConvertAudioToMp3Async(string sourcePath, string outputPath)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath))
+                throw new ArgumentException("Source path must be provided.", nameof(sourcePath));
+            if (string.IsNullOrWhiteSpace(outputPath))
+                throw new ArgumentException("Output path must be provided.", nameof(outputPath));
+
+            var outputDir = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrWhiteSpace(outputDir) && !Directory.Exists(outputDir))
+            {
+                Directory.CreateDirectory(outputDir);
+            }
+
+            var ffmpegDirectory = _ffmpegService.ResolveFfmpegDirectory();
+            if (!string.IsNullOrWhiteSpace(ffmpegDirectory))
+            {
+                FFmpeg.SetExecutablesPath(ffmpegDirectory);
+            }
+
+            var mediaInfo = await FFmpeg.GetMediaInfo(sourcePath);
+            var audioStream = mediaInfo.AudioStreams.FirstOrDefault()
+                ?? throw new InvalidOperationException($"В файле '{sourcePath}' не найдена аудиодорожка для конвертации в mp3.");
+
+            var conversion = FFmpeg.Conversions.New();
+            conversion.AddStream(audioStream.SetCodec(AudioCodec.mp3));
+            conversion.SetOutput(outputPath);
+
+            await conversion.Start();
+
+            if (!File.Exists(outputPath))
+            {
+                throw new InvalidOperationException($"FFmpeg conversion did not produce an output file at '{outputPath}'.");
+            }
+
+            var sourceFull = Path.GetFullPath(sourcePath);
+            var outputFull = Path.GetFullPath(outputPath);
+            if (!string.Equals(sourceFull, outputFull, StringComparison.OrdinalIgnoreCase) && File.Exists(sourcePath))
+            {
+                File.Delete(sourcePath);
+            }
         }
 
         /// <summary>

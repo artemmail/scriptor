@@ -221,9 +221,26 @@ namespace YoutubeDownload.Services
                 .Where(f => f.TaskId == task.Id)
                 .ToListAsync();
 
+            var baseTitle = MakeSafeFileName(task.Title ?? task.VideoId);
+
             if (files.Count == 1)
             {
-                task.MergedFilePath = files[0].FilePath;
+                var single = files[0];
+                var path = single.FilePath;
+                if (!string.IsNullOrWhiteSpace(path)
+                    && string.Equals(single.StreamType, "audio", StringComparison.OrdinalIgnoreCase))
+                {
+                    var extension = Path.GetExtension(path);
+                    if (!string.Equals(extension, ".mp3", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var mp3Name = $"{baseTitle}.mp3";
+                        var mp3Path = EnsureUniquePath(Path.Combine(_defaultSaveDir, mp3Name));
+                        await _youtubeStreamService.ConvertAudioToMp3Async(path, mp3Path);
+                        path = mp3Path;
+                    }
+                }
+
+                task.MergedFilePath = path;
                 await _dbContext.SaveChangesAsync();
                 return;
             }
@@ -235,7 +252,19 @@ namespace YoutubeDownload.Services
             {
                 if (audioFiles.Count > 0)
                 {
-                    task.MergedFilePath = audioFiles[0].FilePath;
+                    var audioPath = audioFiles[0].FilePath;
+                    if (!string.IsNullOrWhiteSpace(audioPath))
+                    {
+                        if (!string.Equals(Path.GetExtension(audioPath), ".mp3", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var mp3Name = $"{baseTitle}.mp3";
+                            var mp3Path = EnsureUniquePath(Path.Combine(_defaultSaveDir, mp3Name));
+                            await _youtubeStreamService.ConvertAudioToMp3Async(audioPath, mp3Path);
+                            audioPath = mp3Path;
+                        }
+
+                        task.MergedFilePath = audioPath;
+                    }
                     await _dbContext.SaveChangesAsync();
                 }
                 return;
@@ -261,7 +290,6 @@ namespace YoutubeDownload.Services
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .ToList();
 
-            var baseTitle = MakeSafeFileName(task.Title ?? task.VideoId);
             var mergedName = $"{baseTitle}.mp4";
             var mergedPath = Path.Combine(_defaultSaveDir, mergedName);
             mergedPath = EnsureUniquePath(mergedPath);

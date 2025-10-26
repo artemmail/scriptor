@@ -198,7 +198,8 @@ namespace YourNamespace.Controllers
 
             var data = await System.IO.File.ReadAllBytesAsync(task.MergedFilePath);
             var name = Path.GetFileName(task.MergedFilePath);
-            return File(data, "video/mp4", name);
+            var contentType = GetContentTypeByExtension(Path.GetExtension(name));
+            return File(data, contentType, name);
         }
 
         /// <summary>
@@ -232,6 +233,20 @@ namespace YourNamespace.Controllers
 
 
 
+
+        private static string GetContentTypeByExtension(string? extension)
+        {
+            return extension?.ToLowerInvariant() switch
+            {
+                ".mp3" => "audio/mpeg",
+                ".m4a" => "audio/mp4",
+                ".webm" => "audio/webm",
+                ".wav" => "audio/wav",
+                ".mp4" => "video/mp4",
+                ".mkv" => "video/x-matroska",
+                _ => "application/octet-stream"
+            };
+        }
 
     }
 }
