@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnDestroy, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnDestroy, OnInit, Output, SimpleChanges } from '@angular/core';
 import { Subscription, timer } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import {
@@ -31,7 +31,7 @@ import { YandexAdComponent } from "../ydx-ad/yandex-ad.component";
   templateUrl: './task-progress.component.html',
   styleUrls: ['./task-progress.component.css']
 })
-export class TaskProgressComponent implements OnInit, OnDestroy {
+export class TaskProgressComponent implements OnInit, OnDestroy, OnChanges {
   @Input() taskId!: string;
   @Output() taskLoaded = new EventEmitter<YoutubeCaptionTaskDto>();
   @Output() taskError = new EventEmitter<string>();
@@ -46,6 +46,12 @@ export class TaskProgressComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadTask();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['taskId'] && !changes['taskId'].firstChange) {
+      this.loadTask();
+    }
   }
 
   ngOnDestroy(): void {
