@@ -21,6 +21,7 @@ namespace YandexSpeech.services
         public DateTime? ModifiedAt { get; set; }
         public DateTime? CreatedAt { get; set; }
         public DateTime? UploadDate { get; set; }
+        public string? Slug { get; set; }
     }
 
     // -------------  INTERFACE -------------
@@ -109,16 +110,20 @@ namespace YandexSpeech.services
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
 
-            YoutubeCaptionTask? task =
-                taskId.Length == 11
-                    ? await db.YoutubeCaptionTasks.FindAsync(taskId)
-                    : await db.YoutubeCaptionTasks.FirstOrDefaultAsync(t => t.Slug == taskId);
+            YoutubeCaptionTask? task = await db.YoutubeCaptionTasks
+                .FirstOrDefaultAsync(t => t.Slug == taskId);
+
+            if (task is null)
+            {
+                task = await db.YoutubeCaptionTasks.FindAsync(taskId);
+            }
 
             if (task is null) return null;
 
             return new YoutubeCaptionTaskDto
             {
                 Id = task.Id,
+                Slug = task.Slug ?? task.Id,
                 Title = task.Title,
                 UploadDate = task.UploadDate,
                 ChannelName = task.ChannelName,
@@ -139,11 +144,14 @@ namespace YandexSpeech.services
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
 
-            // Поиск задачи по ID (length==11) или по Slug
-            YoutubeCaptionTask? task =
-                taskId.Length == 11
-                    ? await db.YoutubeCaptionTasks.FindAsync(taskId)
-                    : await db.YoutubeCaptionTasks.FirstOrDefaultAsync(t => t.Slug == taskId);
+            // Поиск задачи по Slug с последующим падением к ID
+            YoutubeCaptionTask? task = await db.YoutubeCaptionTasks
+                .FirstOrDefaultAsync(t => t.Slug == taskId);
+
+            if (task is null)
+            {
+                task = await db.YoutubeCaptionTasks.FindAsync(taskId);
+            }
 
             if (task is null)
                 return false; // Задача не найдена
@@ -175,11 +183,14 @@ namespace YandexSpeech.services
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
 
-            // Поиск задачи по ID (length==11) или по Slug
-            YoutubeCaptionTask? task =
-                taskId.Length == 11
-                    ? await db.YoutubeCaptionTasks.FindAsync(taskId)
-                    : await db.YoutubeCaptionTasks.FirstOrDefaultAsync(t => t.Slug == taskId);
+            // Поиск задачи по Slug с последующим падением к ID
+            YoutubeCaptionTask? task = await db.YoutubeCaptionTasks
+                .FirstOrDefaultAsync(t => t.Slug == taskId);
+
+            if (task is null)
+            {
+                task = await db.YoutubeCaptionTasks.FindAsync(taskId);
+            }
 
             if (task is null)
                 return false; // Задача не найдена

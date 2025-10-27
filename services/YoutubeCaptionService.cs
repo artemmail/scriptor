@@ -335,7 +335,7 @@ namespace YandexSpeech.services
             task.ModifiedAt = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
 
-            await _slugService.NotifyYandexAsync("ru-ticker.com", "f59e3d2c25e394fb", task.Slug);
+            await _slugService.NotifyYandexAsync("youscriptor.com", "f59e3d2c25e394fb", task.Slug);
         }
 
         private async Task<int?> GetSegmentBlockSizeAsync(string profileName)

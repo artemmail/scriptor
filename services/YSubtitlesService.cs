@@ -146,16 +146,19 @@ namespace YandexSpeech.services
 
         public async Task<bool> NotifyYandexAsync(string domain, string key, string slug)
         {
+            if (string.IsNullOrWhiteSpace(slug))
+            {
+                return false;
+            }
+
             string baseUrl = "https://yandex.com/indexnow";
-            string url = $"https://{domain}/Recognized/{slug}";
-            
+            string url = $"https://{domain}/recognized/{slug}";
 
             // Формируем полный URL с параметрами
-            string fullUrl = $"{baseUrl}?url={url}&key={key}";
+            string fullUrl = $"{baseUrl}?url={Uri.EscapeDataString(url)}&key={Uri.EscapeDataString(key)}";
 
             using (HttpClient client = new HttpClient())
             {
-
                 try
                 {
                     HttpResponseMessage response = await client.GetAsync(fullUrl);

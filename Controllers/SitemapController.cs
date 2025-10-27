@@ -39,14 +39,18 @@ namespace YandexSpeech.Controllers
             // Получаем базовый URL из запроса
             var baseUrl = $"{Request.Scheme}://{Request.Host}";
 
-            // Извлекаем все необходимые Id из таблицы YoutubeCaptionTasks
-            var ids = await _dbContext.YoutubeCaptionTasks
-                .Where(t => t.Status == RecognizeStatus.Done) // Например, только завершенные задачи
-                .Select(t => t.Slug)
+            // Извлекаем все необходимые Slug из таблицы YoutubeCaptionTasks
+            var tasks = await _dbContext.YoutubeCaptionTasks
+                .Where(t => t.Status == RecognizeStatus.Done && !string.IsNullOrEmpty(t.Slug)) // Например, только завершенные задачи
+                .Select(t => new { t.Slug, t.ModifiedAt, t.CreatedAt })
                 .ToListAsync();
 
             // Формируем список URL
-            var urls = ids.Select(id => $"{baseUrl}/recognized/{id}").ToList();
+            var urls = tasks.Select(task => new
+            {
+                Url = $"{baseUrl}/recognized/{task.Slug}",
+                LastModified = task.ModifiedAt ?? task.CreatedAt ?? DateTime.UtcNow
+            }).ToList();
 
             // Создаем XML документ
             XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
@@ -55,8 +59,8 @@ namespace YandexSpeech.Controllers
                 new XElement(ns + "urlset",
                     from url in urls
                     select new XElement(ns + "url",
-                        new XElement(ns + "loc", url),
-                        new XElement(ns + "lastmod", DateTime.UtcNow.ToString("yyyy-MM-dd")),
+                        new XElement(ns + "loc", url.Url),
+                        new XElement(ns + "lastmod", url.LastModified.ToString("yyyy-MM-dd")),
                         new XElement(ns + "changefreq", "weekly"),
                         new XElement(ns + "priority", "0.8")
                     )

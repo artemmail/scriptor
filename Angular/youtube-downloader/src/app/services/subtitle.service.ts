@@ -25,6 +25,7 @@ export enum YoutubeCaptionVisibility {
 
 export interface YoutubeCaptionTaskDto {
   id: string;
+  slug: string | null;
   title: string | null;
   channelName: string | null;
   channelId: string | null;

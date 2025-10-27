@@ -21,6 +21,7 @@ using YoutubeExplode;
 using System.IO;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -248,6 +249,41 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseRouting();
+
+app.Use(async (context, next) =>
+{
+    if ((HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)) &&
+        context.Request.Path.StartsWithSegments("/recognized", out var remaining))
+    {
+        var remainder = remaining.Value;
+        if (!string.IsNullOrEmpty(remainder) && !remainder.Contains('/'))
+        {
+            var candidate = remainder.Trim('/');
+            if (!string.IsNullOrEmpty(candidate))
+            {
+                await using var scope = context.RequestServices.CreateAsyncScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+                var slug = await dbContext.YoutubeCaptionTasks
+                    .Where(t => t.Id == candidate && !string.IsNullOrEmpty(t.Slug))
+                    .Select(t => t.Slug)
+                    .FirstOrDefaultAsync();
+
+                if (!string.IsNullOrEmpty(slug) &&
+                    !string.Equals(slug, candidate, StringComparison.OrdinalIgnoreCase))
+                {
+                    var destination = context.Request.QueryString.HasValue
+                        ? $"/recognized/{slug}{context.Request.QueryString}"
+                        : $"/recognized/{slug}";
+
+                    context.Response.Redirect(destination, permanent: true);
+                    return;
+                }
+            }
+        }
+    }
+
+    await next();
+});
 app.UseCors("AllowAngularApp");
 app.UseAuthentication();
 app.UseAuthorization();
