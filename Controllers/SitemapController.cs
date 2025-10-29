@@ -45,12 +45,23 @@ namespace YandexSpeech.Controllers
                 .Select(t => new { t.Slug, t.ModifiedAt, t.CreatedAt })
                 .ToListAsync();
 
+            // Извлекаем опубликованные темы блога
+            var blogTopics = await _dbContext.BlogTopics
+                .Select(t => new { t.Slug, t.CreatedAt })
+                .ToListAsync();
+
             // Формируем список URL
             var urls = tasks.Select(task => new
             {
                 Url = $"{baseUrl}/recognized/{task.Slug}",
                 LastModified = task.ModifiedAt ?? task.CreatedAt ?? DateTime.UtcNow
             }).ToList();
+
+            urls.AddRange(blogTopics.Select(topic => new
+            {
+                Url = $"{baseUrl}/blog/{topic.Slug}",
+                LastModified = topic.CreatedAt
+            }));
 
             // Создаем XML документ
             XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";

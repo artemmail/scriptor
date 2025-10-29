@@ -7,6 +7,8 @@ import { finalize } from 'rxjs/operators';
 
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
+import { Title } from '@angular/platform-browser';
+
 import { BlogService, BlogTopic, BlogComment } from '../services/blog.service';
 import { MarkdownRendererService1 } from '../task-result/markdown-renderer.service';
 import { AuthService, UserInfo } from '../services/AuthService.service';
@@ -54,7 +56,8 @@ export class BlogTopicDetailComponent implements OnInit {
     private readonly markdownRenderer: MarkdownRendererService1,
     private readonly authService: AuthService,
     private readonly destroyRef: DestroyRef,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly titleService: Title
   ) {
     this.authService.user$
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -73,6 +76,7 @@ export class BlogTopicDetailComponent implements OnInit {
         if (!slug) {
           this.topic = null;
           this.loadError = 'Публикация не найдена.';
+          this.updatePageTitle(null, true);
           return;
         }
 
@@ -250,6 +254,7 @@ export class BlogTopicDetailComponent implements OnInit {
     this.loading = true;
     this.loadError = '';
     this.topic = null;
+    this.updatePageTitle();
 
     this.blogService
       .getTopicBySlug(slug)
@@ -261,9 +266,11 @@ export class BlogTopicDetailComponent implements OnInit {
       .subscribe({
         next: topic => {
           this.topic = this.mapTopic(topic);
+          this.updatePageTitle(this.topic);
         },
         error: () => {
           this.loadError = 'Не удалось загрузить публикацию. Попробуйте позже.';
+          this.updatePageTitle(null, true);
         }
       });
   }
@@ -310,5 +317,22 @@ export class BlogTopicDetailComponent implements OnInit {
         commentUser === normalize(this.currentUser.displayName) ||
         commentUser === normalize(this.currentUser.name))
     );
+  }
+
+  private updatePageTitle(topic?: BlogTopicDetailViewModel | null, hasError = false): void {
+    if (topic) {
+      const header = (topic.header ?? '').trim();
+      if (header) {
+        this.titleService.setTitle(`${header} — блог YouScriptor`);
+        return;
+      }
+    }
+
+    if (hasError) {
+      this.titleService.setTitle('Публикация недоступна — блог YouScriptor');
+      return;
+    }
+
+    this.titleService.setTitle('Блог YouScriptor — публикация');
   }
 }
