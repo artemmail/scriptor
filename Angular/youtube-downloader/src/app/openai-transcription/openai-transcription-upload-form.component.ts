@@ -39,6 +39,23 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
   @Output() limit = new EventEmitter<UsageLimitResponse>();
   @Output() uploadingChange = new EventEmitter<boolean>();
 
+  private static readonly supportedFileExtensions = new Set([
+    '.aac',
+    '.aiff',
+    '.flac',
+    '.m4a',
+    '.m4v',
+    '.mkv',
+    '.mov',
+    '.mp3',
+    '.mp4',
+    '.oga',
+    '.ogg',
+    '.wav',
+    '.webm',
+    '.wma',
+  ]);
+
   readonly layouts = {
     dialog: 'dialog' as UploadLayout,
     card: 'card' as UploadLayout,
@@ -81,10 +98,9 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
 
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
-    this.selectedFile = input.files && input.files.length > 0 ? input.files[0] : null;
-    if (this.selectedFile) {
-      this.fileUrl = '';
-    }
+    const file = input.files && input.files.length > 0 ? input.files[0] : null;
+    this.handleSelectedFile(file);
+    input.value = '';
   }
 
   onDrop(event: DragEvent): void {
@@ -99,9 +115,7 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
       return;
     }
 
-    this.selectedFile = files[0];
-    this.fileUrl = '';
-    this.selectedTab = 0;
+    this.handleSelectedFile(files[0]);
     this.dragOver = false;
   }
 
@@ -252,6 +266,48 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
     }
 
     this.uploadError = this.extractError(error) ?? fallback;
+  }
+
+  private handleSelectedFile(file: File | null): void {
+    this.resetErrors();
+
+    if (!file) {
+      this.selectedFile = null;
+      return;
+    }
+
+    const validationError = this.validateSelectedFile(file);
+    if (validationError) {
+      this.selectedFile = null;
+      this.uploadError = validationError;
+      return;
+    }
+
+    this.selectedFile = file;
+    this.fileUrl = '';
+    this.selectedTab = 0;
+  }
+
+  private resetErrors(): void {
+    this.uploadError = null;
+    this.limitResponse = null;
+  }
+
+  private validateSelectedFile(file: File): string | null {
+    const mimeType = (file.type || '').toLowerCase();
+    if (mimeType.startsWith('audio/') || mimeType.startsWith('video/')) {
+      return null;
+    }
+
+    const extensionMatch = /\.([^.]+)$/.exec(file.name);
+    if (extensionMatch) {
+      const extension = `.${extensionMatch[1].toLowerCase()}`;
+      if (OpenAiTranscriptionUploadFormComponent.supportedFileExtensions.has(extension)) {
+        return null;
+      }
+    }
+
+    return 'Поддерживаются только аудио и видео файлы.';
   }
 
   private extractError(error: unknown): string | null {

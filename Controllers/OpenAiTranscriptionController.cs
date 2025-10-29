@@ -71,22 +71,22 @@ namespace YandexSpeech.Controllers
 
             if (file != null && file.Length == 0)
             {
-                return BadRequest("Uploaded file is empty.");
+                return BadRequest(ErrorResponse.FromMessage("Uploaded file is empty."));
             }
 
             if (!hasFile && !hasUrl)
             {
-                return BadRequest("Either a file or a file URL must be provided.");
+                return BadRequest(ErrorResponse.FromMessage("Either a file or a file URL must be provided."));
             }
 
-            if (hasFile && file!.Length <= OpenAiTranscriptionFileHelper.HtmlDetectionMaxFileSize)
+            if (hasFile)
             {
-                await using var detectionStream = file.OpenReadStream();
-                if (await HtmlFileDetector
-                        .IsHtmlAsync(detectionStream, cancellationToken)
+                await using var detectionStream = file!.OpenReadStream();
+                if (await OpenAiTranscriptionFileHelper
+                        .ContainsHtmlAsync(detectionStream, file.Length, cancellationToken)
                         .ConfigureAwait(false))
                 {
-                    return BadRequest(OpenAiTranscriptionFileHelper.HtmlFileNotSupportedMessage);
+                    return BadRequest(ErrorResponse.FromMessage(OpenAiTranscriptionFileHelper.HtmlFileNotSupportedMessage));
                 }
             }
 
@@ -129,7 +129,7 @@ namespace YandexSpeech.Controllers
                 var validationResult = await ValidateExternalFileUrlAsync(normalizedUrl!);
                 if (!validationResult.Success)
                 {
-                    return BadRequest(validationResult.ErrorMessage ?? "Unable to download file from the provided URL.");
+                    return BadRequest(ErrorResponse.FromMessage(validationResult.ErrorMessage ?? "Unable to download file from the provided URL."));
                 }
 
                 var sanitizedName = OpenAiTranscriptionFileHelper.SanitizeFileName(validationResult.FileName);
@@ -153,7 +153,7 @@ namespace YandexSpeech.Controllers
 
                 if (profile == null)
                 {
-                    return BadRequest("Указанный профиль распознавания не найден.");
+                    return BadRequest(ErrorResponse.FromMessage("Указанный профиль распознавания не найден."));
                 }
             }
             else
@@ -163,7 +163,7 @@ namespace YandexSpeech.Controllers
 
                 if (profile == null)
                 {
-                    return BadRequest("Профиль распознавания по умолчанию не найден.");
+                    return BadRequest(ErrorResponse.FromMessage("Профиль распознавания по умолчанию не найден."));
                 }
             }
 
@@ -383,7 +383,7 @@ namespace YandexSpeech.Controllers
         {
             if (request == null || !request.RecognitionProfileId.HasValue)
             {
-                return BadRequest("Не выбран профиль распознавания.");
+                return BadRequest(ErrorResponse.FromMessage("Не выбран профиль распознавания."));
             }
 
             var userId = User.GetUserId();
@@ -420,7 +420,7 @@ namespace YandexSpeech.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(ErrorResponse.FromMessage(ex.Message));
             }
         }
 
@@ -429,7 +429,7 @@ namespace YandexSpeech.Controllers
         {
             if (request == null || string.IsNullOrWhiteSpace(request.Markdown))
             {
-                return BadRequest("Markdown must be provided.");
+                return BadRequest(ErrorResponse.FromMessage("Markdown must be provided."));
             }
 
             var userId = User.GetUserId();
@@ -519,7 +519,7 @@ namespace YandexSpeech.Controllers
 
             if (string.IsNullOrWhiteSpace(task.SegmentsJson))
             {
-                return BadRequest("Task does not contain transcription segments.");
+                return BadRequest(ErrorResponse.FromMessage("Task does not contain transcription segments."));
             }
 
             WhisperTranscriptionResponse? parsed;
@@ -541,7 +541,7 @@ namespace YandexSpeech.Controllers
 
             if (parsed == null || parsed.Segments == null || parsed.Segments.Count == 0)
             {
-                return BadRequest("Task does not contain transcription segments.");
+                return BadRequest(ErrorResponse.FromMessage("Task does not contain transcription segments."));
             }
 
             var entries = BuildSrtEntriesFromWhisper(parsed);
@@ -549,7 +549,7 @@ namespace YandexSpeech.Controllers
 
             if (string.IsNullOrWhiteSpace(srtContent))
             {
-                return BadRequest("Task does not contain transcription segments.");
+                return BadRequest(ErrorResponse.FromMessage("Task does not contain transcription segments."));
             }
 
             var fileName = CreateExportFileName(task, "srt");
@@ -1002,7 +1002,7 @@ namespace YandexSpeech.Controllers
             var markdown = ResolveMarkdownContent(task);
             if (string.IsNullOrWhiteSpace(markdown))
             {
-                return BadRequest("Task does not contain formatted Markdown.");
+                return BadRequest(ErrorResponse.FromMessage("Task does not contain formatted Markdown."));
             }
 
             return (task, markdown);

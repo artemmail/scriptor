@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace YandexSpeech.services
 {
@@ -35,6 +37,31 @@ namespace YandexSpeech.services
             return string.IsNullOrEmpty(extension)
                 ? nameWithoutExtension
                 : $"{nameWithoutExtension}{extension}";
+        }
+
+        public static async Task<bool> ContainsHtmlAsync(
+            Stream stream,
+            long length,
+            CancellationToken cancellationToken = default)
+        {
+            if (stream is null)
+            {
+                throw new ArgumentNullException(nameof(stream));
+            }
+
+            if (length > HtmlDetectionMaxFileSize)
+            {
+                if (stream.CanSeek)
+                {
+                    stream.Seek(0, SeekOrigin.Begin);
+                }
+
+                return false;
+            }
+
+            return await HtmlFileDetector
+                .IsHtmlAsync(stream, cancellationToken)
+                .ConfigureAwait(false);
         }
     }
 }
