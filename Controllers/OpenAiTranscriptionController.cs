@@ -79,6 +79,17 @@ namespace YandexSpeech.Controllers
                 return BadRequest("Either a file or a file URL must be provided.");
             }
 
+            if (hasFile && file!.Length <= OpenAiTranscriptionFileHelper.HtmlDetectionMaxFileSize)
+            {
+                await using var detectionStream = file.OpenReadStream();
+                if (await HtmlFileDetector
+                        .IsHtmlAsync(detectionStream, cancellationToken)
+                        .ConfigureAwait(false))
+                {
+                    return BadRequest(OpenAiTranscriptionFileHelper.HtmlFileNotSupportedMessage);
+                }
+            }
+
             var userId = User.GetUserId();
             if (string.IsNullOrEmpty(userId))
             {

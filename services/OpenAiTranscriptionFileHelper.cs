@@ -6,6 +6,9 @@ namespace YandexSpeech.services
 {
     internal static class OpenAiTranscriptionFileHelper
     {
+        public const long HtmlDetectionMaxFileSize = 2 * 1024 * 1024;
+        public const string HtmlFileNotSupportedMessage = "вы пытаетесь загрузить html файл, необходимо аудио или видео";
+
         public static string GenerateStoredFilePath(string uploadsDirectory, string sanitizedName)
         {
             var storedFileName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}__{sanitizedName}";
