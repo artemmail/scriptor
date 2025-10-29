@@ -389,10 +389,12 @@ namespace YandexSpeech.services
                 var outputPath = Path.GetFullPath(Path.Combine(_workingDirectory, $"{task.Id}.wav"));
 
                 var sourceInfo = new FileInfo(sourcePath);
-                if (sourceInfo.Exists && sourceInfo.Length <= OpenAiTranscriptionFileHelper.HtmlDetectionMaxFileSize)
+                if (sourceInfo.Exists)
                 {
                     await using var sourceStream = File.OpenRead(sourcePath);
-                    if (await HtmlFileDetector.IsHtmlAsync(sourceStream).ConfigureAwait(false))
+                    if (await OpenAiTranscriptionFileHelper
+                            .ContainsHtmlAsync(sourceStream, sourceInfo.Length)
+                            .ConfigureAwait(false))
                     {
                         throw new InvalidOperationException(OpenAiTranscriptionFileHelper.HtmlFileNotSupportedMessage);
                     }
