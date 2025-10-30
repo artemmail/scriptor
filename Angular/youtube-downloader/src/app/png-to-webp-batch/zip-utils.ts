@@ -59,7 +59,7 @@ export async function createZipBlob(files: { name: string; blob: Blob }[]): Prom
     const localView = new DataView(localHeader.buffer);
     localView.setUint32(0, 0x04034b50, true);
     localView.setUint16(4, 20, true);
-    localView.setUint16(6, 0, true);
+    localView.setUint16(6, 0x0800, true);
     localView.setUint16(8, 0, true);
     localView.setUint16(10, time, true);
     localView.setUint16(12, date, true);
@@ -77,7 +77,7 @@ export async function createZipBlob(files: { name: string; blob: Blob }[]): Prom
     centralView.setUint32(0, 0x02014b50, true);
     centralView.setUint16(4, 20, true);
     centralView.setUint16(6, 20, true);
-    centralView.setUint16(8, 0, true);
+    centralView.setUint16(8, 0x0800, true);
     centralView.setUint16(10, 0, true);
     centralView.setUint16(12, time, true);
     centralView.setUint16(14, date, true);
