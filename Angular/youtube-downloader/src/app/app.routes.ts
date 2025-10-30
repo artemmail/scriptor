@@ -4,6 +4,7 @@ import { RecognitionTasksComponent } from './recognition-tasks/recognition-tasks
 import { SubtitlesTasksComponent } from './subtitles-task/subtitles-tasks.component';
 import { MarkdownConverterComponent } from './Markdown-converter/markdown-converter.component';
 import { PngToWebpComponent } from './png-to-webp/png-to-webp.component';
+import { PngToWebpBatchComponent } from './png-to-webp-batch/png-to-webp-batch.component';
 import { OpenAiTranscriptionComponent } from './openai-transcription/openai-transcription.component';
 import { BillingComponent } from './billing/billing.component';
 import { AuthGuard } from './services/auth.guard';
@@ -46,6 +47,7 @@ export const appRoutes: Routes = [
   { path: 'recognized/:id', component: TaskPageComponent },
   { path: 'markdown-converter/:id', component: MarkdownConverterComponent },
   { path: 'markdown-converter', component: MarkdownConverterComponent },
+  { path: 'png-to-webp/batch', component: PngToWebpBatchComponent },
   { path: 'png-to-webp', component: PngToWebpComponent },
   { path: 'edit/:id', component: EditorPageComponent },
   { path: 'ServiceNews/Content/:id', component: TaskPageComponent },
