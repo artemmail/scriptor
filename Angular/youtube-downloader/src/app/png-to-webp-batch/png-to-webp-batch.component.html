@@ -1,0 +1,115 @@
+<mat-card class="converter-card">
+  <mat-card-header>
+    <div mat-card-avatar class="card-icon">
+      <mat-icon>collections</mat-icon>
+    </div>
+    <mat-card-title>Пакетный конвертер PNG → WebP</mat-card-title>
+    <mat-card-subtitle>
+      Загружайте PNG, JPEG и другие изображения, настройте качество и получите WebP в одном архиве
+    </mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div class="top-controls">
+      <div class="quality-control">
+        <label for="quality-slider">Качество WebP: <strong>{{ (quality() * 100) | number: '1.0-0' }}%</strong></label>
+        <mat-slider
+          id="quality-slider"
+          min="0.1"
+          max="1"
+          step="0.01"
+          [value]="quality()"
+          (input)="onQualityInput($any($event).value)"
+          (change)="onQualityInput($any($event).value)"
+        ></mat-slider>
+      </div>
+      <div class="action-buttons">
+        <button mat-flat-button color="primary" (click)="convertAll()" [disabled]="!items().length || converting()">
+          <mat-icon>play_arrow</mat-icon>
+          Конвертировать всё
+        </button>
+        <button mat-stroked-button color="primary" (click)="downloadAll()" [disabled]="!convertedReady()">
+          <mat-icon>download</mat-icon>
+          Скачать ZIP
+        </button>
+        <button mat-button color="warn" (click)="clearAll()" [disabled]="!items().length">
+          <mat-icon>clear_all</mat-icon>
+          Очистить список
+        </button>
+      </div>
+    </div>
+
+    <div
+      class="dropzone"
+      [class.dropzone--active]="dragOver()"
+      (dragover)="onDragOver($event)"
+      (dragleave)="onDragLeave($event)"
+      (drop)="onDrop($event)"
+    >
+      <div class="dropzone__content">
+        <mat-icon>cloud_upload</mat-icon>
+        <p>Перетащите изображения сюда или выберите их вручную</p>
+        <button mat-stroked-button color="primary" type="button" (click)="fileInput.click()">
+          <mat-icon>add_photo_alternate</mat-icon>
+          Выбрать файлы
+        </button>
+        <input #fileInput type="file" accept="image/*" multiple hidden (change)="onFileInput($event)" />
+      </div>
+    </div>
+
+    <mat-progress-bar *ngIf="converting()" mode="determinate" [value]="overallProgress()"></mat-progress-bar>
+
+    <div class="summary" *ngIf="items().length">
+      <span>Всего: {{ totalCount() }}</span>
+      <span>Готово: {{ completedCount() }}</span>
+      <span *ngIf="errorCount()">Ошибок: {{ errorCount() }}</span>
+    </div>
+
+    <mat-divider *ngIf="items().length"></mat-divider>
+
+    <mat-list *ngIf="items().length" class="file-list">
+      <mat-list-item *ngFor="let item of items(); trackBy: trackById" [class.file-list-item--done]="item.status === 'done'" [class.file-list-item--error]="item.status === 'error'">
+        <div matListItemIcon class="file-preview" *ngIf="item.previewUrl">
+          <img [src]="item.previewUrl" [alt]="item.name" loading="lazy" />
+        </div>
+        <div matListItemTitle class="file-info">
+          <div class="file-name">{{ item.name }}</div>
+          <div class="file-meta">
+            <span>Исходный размер: {{ formatBytes(item.size) }}</span>
+            <span *ngIf="item.resultSize">WebP: {{ formatBytes(item.resultSize) }}</span>
+            <span *ngIf="item.durationMs">{{ item.durationMs | number: '1.0-0' }} мс</span>
+          </div>
+        </div>
+        <div matListItemLine class="file-status">
+          <ng-container [ngSwitch]="item.status">
+            <span *ngSwitchCase="'pending'" class="status-label">Ожидает</span>
+            <span *ngSwitchCase="'processing'" class="status-label status-label--processing">
+              <mat-icon>hourglass_top</mat-icon>
+              Обработка…
+            </span>
+            <span *ngSwitchCase="'done'" class="status-label status-label--done">
+              <mat-icon>check_circle</mat-icon>
+              Готово
+            </span>
+            <span *ngSwitchCase="'error'" class="status-label status-label--error">
+              <mat-icon>error</mat-icon>
+              Ошибка
+            </span>
+          </ng-container>
+          <div class="error-text" *ngIf="item.error">{{ item.error }}</div>
+        </div>
+        <div class="item-actions">
+          <button mat-icon-button color="primary" (click)="convertSingle(item)" [disabled]="converting() || item.status === 'processing'">
+            <mat-icon>play_arrow</mat-icon>
+          </button>
+          <button mat-icon-button color="primary" (click)="downloadSingle(item)" [disabled]="item.status !== 'done'">
+            <mat-icon>download</mat-icon>
+          </button>
+          <button mat-icon-button color="warn" (click)="removeItem(item.id)">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+      </mat-list-item>
+    </mat-list>
+  </mat-card-content>
+</mat-card>
