@@ -10,6 +10,7 @@ namespace YandexSpeech.services.Options
         public string QueueName { get; set; } = string.Empty;
         public string CommandQueueName { get; set; } = string.Empty;
         public string ExchangeType { get; set; } = string.Empty;
+        public int? ConsumerTimeoutMs { get; set; }
         public EventBusAccessOptions BusAccess { get; set; } = new();
 
         public void Validate()
@@ -22,6 +23,9 @@ namespace YandexSpeech.services.Options
 
             if (string.IsNullOrWhiteSpace(CommandQueueName))
                 throw new InvalidOperationException("Event bus CommandQueueName must be configured.");
+
+            if (ConsumerTimeoutMs is { } timeout && timeout < 0)
+                throw new InvalidOperationException("Event bus ConsumerTimeoutMs must be non-negative.");
         }
     }
 

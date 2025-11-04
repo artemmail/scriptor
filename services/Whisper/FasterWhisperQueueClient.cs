@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -22,8 +23,18 @@ namespace YandexSpeech.services.Whisper
         private readonly IConnection _connection;
         private readonly IChannel _channel;
 
-        // Один семафор для всех операций с каналом (publish/get/ack).
-        private readonly SemaphoreSlim _channelSync = new(1, 1);
+            _channel.QueueDeclareAsync(
+                _options.CommandQueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: CreateQueueArguments(_options.ConsumerTimeoutMs)).Wait();
+            _channel.QueueDeclareAsync(
+                _options.QueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: CreateQueueArguments(_options.ConsumerTimeoutMs)).Wait();
 
         private readonly CancellationTokenSource _receiverCts = new();
         private readonly Task _receiverTask;
@@ -40,7 +51,7 @@ namespace YandexSpeech.services.Whisper
             _connection = CreateConnection(factory);
             _channel = _connection.CreateChannelAsync().Result;
 
-            // Декларации и QoS (синхронно дожидаемся, т.к. конструктор не async)
+            // Г„ГҐГЄГ«Г Г°Г Г¶ГЁГЁ ГЁ QoS (Г±ГЁГ­ГµГ°Г®Г­Г­Г® Г¤Г®Г¦ГЁГ¤Г ГҐГ¬Г±Гї, ГІ.ГЄ. ГЄГ®Г­Г±ГІГ°ГіГЄГІГ®Г° Г­ГҐ async)
             _channel.QueueDeclareAsync(_options.CommandQueueName, durable: true, exclusive: false, autoDelete: false, arguments: null).Wait();
             _channel.QueueDeclareAsync(_options.QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null).Wait();
             _channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false).Wait();
@@ -61,10 +72,10 @@ namespace YandexSpeech.services.Whisper
             var correlationId = Guid.NewGuid().ToString("N");
             var body = JsonSerializer.SerializeToUtf8Bytes(request, JsonOptions);
 
-            // v7: больше нет IChannel.CreateBasicProperties() — создаём напрямую BasicProperties
+            // v7: ГЎГ®Г«ГјГёГҐ Г­ГҐГІ IChannel.CreateBasicProperties() вЂ” Г±Г®Г§Г¤Г ВёГ¬ Г­Г ГЇГ°ГїГ¬ГіГѕ BasicProperties
             var props = new BasicProperties
             {
-                Persistent = true,               // или props.DeliveryMode = DeliveryModes.Persistent;
+                Persistent = true,               // ГЁГ«ГЁ props.DeliveryMode = DeliveryModes.Persistent;
                 CorrelationId = correlationId,
                 ReplyTo = _options.QueueName,
                 ContentType = "application/json"
@@ -76,7 +87,7 @@ namespace YandexSpeech.services.Whisper
 
             try
             {
-                // Канал нельзя шарить конкурентно — защищаем publish семафором и ожидаем внутри
+                // ГЉГ Г­Г Г« Г­ГҐГ«ГјГ§Гї ГёГ Г°ГЁГІГј ГЄГ®Г­ГЄГіГ°ГҐГ­ГІГ­Г® вЂ” Г§Г Г№ГЁГ№Г ГҐГ¬ publish Г±ГҐГ¬Г ГґГ®Г°Г®Г¬ ГЁ Г®Г¦ГЁГ¤Г ГҐГ¬ ГўГ­ГіГІГ°ГЁ
                 await _channelSync.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try
                 {
@@ -117,7 +128,7 @@ namespace YandexSpeech.services.Whisper
 
                 try
                 {
-                    // Тоже под тем же семафором — pull API использует тот же канал.
+                    // Г’Г®Г¦ГҐ ГЇГ®Г¤ ГІГҐГ¬ Г¦ГҐ Г±ГҐГ¬Г ГґГ®Г°Г®Г¬ вЂ” pull API ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГІ ГІГ®ГІ Г¦ГҐ ГЄГ Г­Г Г«.
                     await _channelSync.WaitAsync(cancellationToken).ConfigureAwait(false);
                     try
                     {
@@ -179,7 +190,7 @@ namespace YandexSpeech.services.Whisper
             }
             finally
             {
-                // Ack тоже под семафором
+                // Ack ГІГ®Г¦ГҐ ГЇГ®Г¤ Г±ГҐГ¬Г ГґГ®Г°Г®Г¬
                 await _channelSync.WaitAsync().ConfigureAwait(false);
                 try
                 {
@@ -214,6 +225,19 @@ namespace YandexSpeech.services.Whisper
 
             await DisposeSafelyAsync(_channel).ConfigureAwait(false);
             await DisposeSafelyAsync(_connection).ConfigureAwait(false);
+        }
+
+        private static Dictionary<string, object>? CreateQueueArguments(int? consumerTimeoutMs)
+        {
+            if (consumerTimeoutMs is null || consumerTimeoutMs <= 0)
+            {
+                return null;
+            }
+
+            return new Dictionary<string, object>
+            {
+                ["x-consumer-timeout"] = consumerTimeoutMs.Value
+            };
         }
 
         private static ConnectionFactory CreateFactory(EventBusAccessOptions access, string? brokerName)
