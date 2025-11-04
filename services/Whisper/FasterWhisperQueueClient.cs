@@ -19,22 +19,10 @@ namespace YandexSpeech.services.Whisper
         private readonly ILogger<FasterWhisperQueueClient> _logger;
         private readonly EventBusOptions _options;
         private readonly ConcurrentDictionary<string, TaskCompletionSource<FasterWhisperQueueResponse>> _pending = new();
+        private readonly SemaphoreSlim _channelSync = new(1, 1);
 
         private readonly IConnection _connection;
         private readonly IChannel _channel;
-
-            _channel.QueueDeclareAsync(
-                _options.CommandQueueName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false,
-                arguments: CreateQueueArguments(_options.ConsumerTimeoutMs)).Wait();
-            _channel.QueueDeclareAsync(
-                _options.QueueName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false,
-                arguments: CreateQueueArguments(_options.ConsumerTimeoutMs)).Wait();
 
         private readonly CancellationTokenSource _receiverCts = new();
         private readonly Task _receiverTask;
@@ -49,11 +37,23 @@ namespace YandexSpeech.services.Whisper
 
             var factory = CreateFactory(access, _options.Broker);
             _connection = CreateConnection(factory);
-            _channel = _connection.CreateChannelAsync().Result;
+            _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
 
-            // Äåêëàðàöèè è QoS (ñèíõðîííî äîæèäàåìñÿ, ò.ê. êîíñòðóêòîð íå async)
-            _channel.QueueDeclareAsync(_options.CommandQueueName, durable: true, exclusive: false, autoDelete: false, arguments: null).Wait();
-            _channel.QueueDeclareAsync(_options.QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null).Wait();
+            // Declare queues and QoS synchronously because the constructor cannot be async.
+            _channel.QueueDeclareAsync(
+                _options.CommandQueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: CreateQueueArguments(_options.ConsumerTimeoutMs)).Wait();
+
+            _channel.QueueDeclareAsync(
+                _options.QueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: CreateQueueArguments(_options.ConsumerTimeoutMs)).Wait();
+
             _channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false).Wait();
 
             _receiverTask = Task.Run(() => PollResponsesAsync(_receiverCts.Token));
@@ -72,10 +72,9 @@ namespace YandexSpeech.services.Whisper
             var correlationId = Guid.NewGuid().ToString("N");
             var body = JsonSerializer.SerializeToUtf8Bytes(request, JsonOptions);
 
-            // v7: áîëüøå íåò IChannel.CreateBasicProperties() — ñîçäà¸ì íàïðÿìóþ BasicProperties
             var props = new BasicProperties
             {
-                Persistent = true,               // èëè props.DeliveryMode = DeliveryModes.Persistent;
+                Persistent = true,
                 CorrelationId = correlationId,
                 ReplyTo = _options.QueueName,
                 ContentType = "application/json"
@@ -87,7 +86,6 @@ namespace YandexSpeech.services.Whisper
 
             try
             {
-                // Êàíàë íåëüçÿ øàðèòü êîíêóðåíòíî — çàùèùàåì publish ñåìàôîðîì è îæèäàåì âíóòðè
                 await _channelSync.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try
                 {
@@ -128,14 +126,13 @@ namespace YandexSpeech.services.Whisper
 
                 try
                 {
-                    // Òîæå ïîä òåì æå ñåìàôîðîì — pull API èñïîëüçóåò òîò æå êàíàë.
                     await _channelSync.WaitAsync(cancellationToken).ConfigureAwait(false);
                     try
                     {
                         var result = await _channel.BasicGetAsync(_options.QueueName, autoAck: false).ConfigureAwait(false);
                         if (result is not null)
                         {
-                            var body = result.Body.ToArray(); // ReadOnlyMemory<byte> -> byte[]
+                            var body = result.Body.ToArray();
                             message = new RabbitMqMessage(body, result.BasicProperties, result.DeliveryTag);
                         }
                     }
@@ -190,7 +187,6 @@ namespace YandexSpeech.services.Whisper
             }
             finally
             {
-                // Ack òîæå ïîä ñåìàôîðîì
                 await _channelSync.WaitAsync().ConfigureAwait(false);
                 try
                 {
@@ -242,7 +238,7 @@ namespace YandexSpeech.services.Whisper
 
         private static ConnectionFactory CreateFactory(EventBusAccessOptions access, string? brokerName)
         {
-            var factory = new RabbitMQ.Client.ConnectionFactory
+            var factory = new ConnectionFactory
             {
                 HostName = access.Host,
                 UserName = access.UserName,
@@ -280,7 +276,6 @@ namespace YandexSpeech.services.Whisper
         }
     }
 
-    // v7: BasicGetResult.BasicProperties -> IReadOnlyBasicProperties
     internal sealed record RabbitMqMessage(byte[] Body, IReadOnlyBasicProperties? Properties, ulong DeliveryTag);
 
     public sealed record FasterWhisperQueueRequest
