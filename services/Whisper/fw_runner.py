@@ -58,8 +58,9 @@ COMMAND_QUEUE = os.getenv("EVENTBUS_COMMAND_QUEUE_NAME", "w.ds_development_cmd")
 RESPONSE_QUEUE = os.getenv("EVENTBUS_QUEUE_NAME", "w.ds_develqqqqopmjшшj1")
 RETRY_COUNT = int(os.getenv("EVENTBUS_RETRY_COUNT", "10"))
 RETRY_DELAY_SECONDS = float(os.getenv("EVENTBUS_RETRY_DELAY", "5"))
-CONSUMER_TIMEOUT_MS_LITERAL = (os.getenv("EVENTBUS_CONSUMER_TIMEOUT_MS", "") or "").strip()
 
+# Per-queue consumer timeout to avoid server-side consumer cancel (do not drop our consumer on long jobs)
+CONSUMER_TIMEOUT_MS_LITERAL = (os.getenv("EVENTBUS_CONSUMER_TIMEOUT_MS", "") or "").strip()
 try:
     CONSUMER_TIMEOUT_MS = int(CONSUMER_TIMEOUT_MS_LITERAL)
 except (TypeError, ValueError):
@@ -113,6 +114,13 @@ def _parse_float(value: str, default: float = 0.0) -> float:
         return default
 
 
+def _parse_int(value: str, default: int = 0) -> int:
+    try:
+        return int(float(value))
+    except Exception:
+        return default
+
+
 def _parse_bool(value) -> bool:
     if isinstance(value, bool):
         return value
@@ -154,6 +162,12 @@ def _transcribe(payload: dict) -> Dict[str, object]:
     patience_literal = payload.get("patience") or "1.0"
     hallucination_silence_literal = payload.get("hallucinationSilenceThreshold") or "0.5"
 
+    # Anti-freeze / speed controls (safe defaults; can override via payload)
+    beam_size_literal = payload.get("beamSize") or "1"                 # greedy by default
+    word_timestamps_literal = payload.get("wordTimestamps")            # default False if not provided
+    chunk_length_literal = payload.get("chunkLength") or "30"          # force small chunks
+    max_speech_duration_literal = payload.get("maxSpeechDurationSec") or "30"
+
     model_instance = _ensure_model(model_name, device, compute_type)
 
     temperature = _parse_temperatures(temperature_literal)
@@ -164,15 +178,19 @@ def _transcribe(payload: dict) -> Dict[str, object]:
     repetition_penalty = _parse_float(repetition_penalty_literal, default=1.1)
     length_penalty = _parse_float(length_penalty_literal, default=1.0)
     patience = _parse_float(patience_literal, default=1.0)
-    hallucination_silence_threshold = _parse_float(
-        hallucination_silence_literal, default=0.5
-    )
+    hallucination_silence_threshold = _parse_float(hallucination_silence_literal, default=0.5)
+
     try:
         no_repeat_ngram_size = int(float(no_repeat_ngram_literal))
     except Exception:
         no_repeat_ngram_size = 3
     if no_repeat_ngram_size < 0:
         no_repeat_ngram_size = 0
+
+    beam_size = _parse_int(beam_size_literal, default=1)
+    word_timestamps = _parse_bool(word_timestamps_literal) if word_timestamps_literal is not None else False
+    chunk_length = _parse_int(chunk_length_literal, default=30)
+    max_speech_duration_s = _parse_float(max_speech_duration_literal, default=30.0)
 
     language_option = None
     if language:
@@ -189,20 +207,32 @@ def _transcribe(payload: dict) -> Dict[str, object]:
         device,
         compute_type,
     )
+    LOGGER.info(
+        "Params: chunk_length=%ss, max_speech=%ss, beam_size=%s, word_ts=%s, cond_prev=%s",
+        chunk_length, max_speech_duration_s, beam_size, word_timestamps, condition_on_previous_text
+    )
 
     start_time = time.monotonic()
     segments, info = model_instance.transcribe(
         str(audio_path),
+        task="transcribe",
         language=language_option,
-        word_timestamps=True,
+
+        # Key anti-freeze settings:
+        chunk_length=chunk_length,   # seconds
+        beam_size=beam_size,         # 1 = greedy
+        word_timestamps=word_timestamps,
+
+        # VAD + cut long speech
         vad_filter=True,
         vad_parameters={
             "threshold": 0.4,
             "min_speech_duration_ms": 250,
             "min_silence_duration_ms": 500,
             "speech_pad_ms": 150,
+            "max_speech_duration_s": max_speech_duration_s,  # keep segments short
         },
-        beam_size=5,
+
         repetition_penalty=repetition_penalty,
         no_repeat_ngram_size=no_repeat_ngram_size,
         length_penalty=length_penalty,
@@ -364,7 +394,7 @@ def _connect() -> pika.BlockingConnection:
         host=HOST,
         credentials=credentials,
         heartbeat=60,
-        blocked_connection_timeout=300,
+        blocked_connection_timeout=300,  # учитываю твою правку
     )
     return pika.BlockingConnection(parameters)
 
@@ -376,21 +406,24 @@ def main() -> None:
         try:
             connection = _connect()
             channel = connection.channel()
+
             queue_arguments = None
             if CONSUMER_TIMEOUT_MS > 0:
                 queue_arguments = {"x-consumer-timeout": CONSUMER_TIMEOUT_MS}
 
+            # ВАЖНО: аргументы применяем для обеих очередей
             channel.queue_declare(queue=COMMAND_QUEUE, durable=True, arguments=queue_arguments)
             channel.queue_declare(queue=RESPONSE_QUEUE, durable=True, arguments=queue_arguments)
             channel.basic_qos(prefetch_count=1)
             channel.basic_consume(queue=COMMAND_QUEUE, on_message_callback=_on_message)
 
             LOGGER.info(
-                "fw_runner ready. broker=%s host=%s command_queue=%s response_queue=%s",
+                "fw_runner ready. broker=%s host=%s command_queue=%s response_queue=%s timeout_ms=%s",
                 BROKER_NAME,
                 HOST,
                 COMMAND_QUEUE,
                 RESPONSE_QUEUE,
+                CONSUMER_TIMEOUT_MS if CONSUMER_TIMEOUT_MS > 0 else "off",
             )
 
             attempts = 0
