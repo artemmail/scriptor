@@ -22,6 +22,9 @@ using System.IO;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,6 +73,19 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<MyDbContext>()
     .AddDefaultTokenProviders();
 
+builder.Services.ConfigureExternalCookie(options =>
+{
+    options.Cookie.SameSite = SameSiteMode.None;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.Name = CookieAuthenticationDefaults.CookiePrefix + "External";
+});
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+});
+
 // 5. JWT-настройки
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var keyBytes = Encoding.UTF8.GetBytes(jwtSection["Key"]!);
@@ -108,6 +124,8 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
     {
         opts.ClientId = googleClientId;
         opts.ClientSecret = googleClientSecret;
+        opts.CallbackPath = "/signin-google";
+        opts.SaveTokens = true;
 
         // Перехватываем ошибку silent-входа и возвращаем корректный HTML с postMessage
         opts.Events.OnRemoteFailure = ctx =>
@@ -240,6 +258,11 @@ await SubscriptionPlanSeeder.EnsureDefaultPlansAsync(app.Services);
 await MarkIncompleteOpenAiTasksAsErroredAsync(app.Services);
 
 // (пропущена инициализация ролей и IndexNow для краткости)
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+});
 
 app.UseHttpsRedirection();
 
