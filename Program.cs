@@ -19,6 +19,9 @@ using YoutubeDownload.Managers;
 using YoutubeDownload.Services;
 using YoutubeExplode;
 using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
@@ -126,6 +129,39 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
         opts.ClientSecret = googleClientSecret;
         opts.CallbackPath = "/signin-google";
         opts.SaveTokens = true;
+
+        // В некоторых окружениях Google может обрывать HTTP/2-соединения,
+        // что приводит к WebSocketException внутри обработчика входа.
+        // Настраиваем собственный backchannel-клиент, принудительно работающий
+        // по HTTP/1.1, чтобы избежать ошибок вида
+        // "The remote party closed the WebSocket connection without completing the close handshake."
+        var backchannelHandler = new HttpClientHandler
+        {
+            AllowAutoRedirect = false,
+            UseCookies = false
+        };
+
+        if (backchannelHandler.SupportsAutomaticDecompression)
+        {
+            backchannelHandler.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
+        }
+
+        var backchannelClient = new HttpClient(backchannelHandler)
+        {
+            Timeout = opts.BackchannelTimeout,
+            DefaultRequestVersion = HttpVersion.Version11,
+#if NET8_0_OR_GREATER
+            DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
+#endif
+            MaxResponseContentBufferSize = 1024 * 1024 * 10 // 10 MB аналогично настройкам OAuthHandler
+        };
+
+        backchannelClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        backchannelClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Microsoft.AspNetCore.Authentication.OAuth", "1.0"));
+        backchannelClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Microsoft.AspNetCore.Authentication.Google", "1.0"));
+
+        opts.BackchannelHttpHandler = backchannelHandler;
+        opts.Backchannel = backchannelClient;
 
         // Перехватываем ошибку silent-входа и возвращаем корректный HTML с postMessage
         opts.Events.OnRemoteFailure = ctx =>
