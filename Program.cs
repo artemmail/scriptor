@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using System.Text;
 using System.Linq;
 using YandexSpeech;
@@ -138,13 +137,9 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
         // without completing the close handshake", из-за чего окно выбора аккаунта
         // даже не открывается. Пробрасываем конфигурацию вручную и отключаем
         // ConfigurationManager, чтобы handler использовал статические URL.
-        opts.Configuration = new OpenIdConnectConfiguration
-        {
-            AuthorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth",
-            TokenEndpoint = "https://oauth2.googleapis.com/token",
-            UserInfoEndpoint = "https://www.googleapis.com/oauth2/v3/userinfo"
-        };
-        opts.ConfigurationManager = null;
+        opts.AuthorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
+        opts.TokenEndpoint = "https://oauth2.googleapis.com/token";
+        opts.UserInformationEndpoint = "https://www.googleapis.com/oauth2/v3/userinfo";
 
         // В некоторых окружениях Google может обрывать HTTP/2-соединения,
         // что приводит к WebSocketException внутри обработчика входа.
