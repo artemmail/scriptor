@@ -19,6 +19,8 @@ using YoutubeDownload.Managers;
 using YoutubeDownload.Services;
 using YoutubeExplode;
 using System.IO;
+using System.Net;
+using System.Net.Http;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
@@ -126,6 +128,16 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
         opts.ClientSecret = googleClientSecret;
         opts.CallbackPath = "/signin-google";
         opts.SaveTokens = true;
+
+        // В некоторых окружениях Google может обрывать HTTP/2-соединения,
+        // что приводит к WebSocketException внутри обработчика входа.
+        // Принудительно используем HTTP/1.1 для backchannel-запросов,
+        // чтобы избежать ошибок вида
+        // "The remote party closed the WebSocket connection without completing the close handshake."
+        opts.Backchannel.DefaultRequestVersion = HttpVersion.Version11;
+#if NET8_0_OR_GREATER
+        opts.Backchannel.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
+#endif
 
         // Перехватываем ошибку silent-входа и возвращаем корректный HTML с postMessage
         opts.Events.OnRemoteFailure = ctx =>
