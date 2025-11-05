@@ -138,7 +138,8 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
         // даже не открывается. Пробрасываем конфигурацию вручную и отключаем
         // ConfigurationManager, чтобы handler использовал статические URL.
         opts.AuthorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
-        opts.TokenEndpoint = "https://oauth2.googleapis.com/token";
+        // Fix for region-based block of oauth2.googleapis.com (Crimea). Using www.googleapis.com instead.
+        opts.TokenEndpoint = "https://www.googleapis.com/oauth2/v4/token";
         opts.UserInformationEndpoint = "https://www.googleapis.com/oauth2/v3/userinfo";
 
         // В некоторых окружениях Google может обрывать HTTP/2-соединения,
