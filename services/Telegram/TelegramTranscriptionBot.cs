@@ -338,7 +338,7 @@ namespace YandexSpeech.services.Telegram
                 case "/start":
                     await SendTextMessageAsync(
                             message.Chat.Id,
-                            "Пришлите voice или аудиофайл — распознаю локально (GPU).",
+                            "Бот сайта распознавания речи https://YouScriptor.com  Надиктуйте фразу для распознавания или переправьте с любого чата аудиосообдение или кружок.",
                             new ReplyParameters { MessageId = message.Id },
                             cancellationToken)
                         .ConfigureAwait(false);
