@@ -37,6 +37,34 @@
     </section>
 
     <section class="tasks-section">
+      <div class="quick-recognition">
+        <div class="quick-recognition-copy">
+          <h2>Быстрое распознавание</h2>
+          <p>Добавьте ссылку или идентификатор YouTube — задача появится в очереди.</p>
+        </div>
+        <form class="quick-recognition-form" (ngSubmit)="onStartRecognition()">
+          <label class="quick-recognition-label" for="quick-recognition-input">Ссылка или идентификатор YouTube</label>
+          <div class="quick-recognition-field">
+            <input
+              id="quick-recognition-input"
+              name="recognitionInput"
+              type="text"
+              [(ngModel)]="recognitionInput"
+              placeholder="https://youtube.com/..."
+              autocomplete="off"
+            />
+            <button
+              class="quick-recognition-button"
+              type="submit"
+              [disabled]="!recognitionInput.trim() || recognitionStarting"
+            >
+              {{ recognitionStarting ? 'Запуск...' : 'Запустить' }}
+            </button>
+          </div>
+          <p class="quick-recognition-error" *ngIf="recognitionError">{{ recognitionError }}</p>
+        </form>
+      </div>
+
       <mat-card *ngIf="!isMobile" class="tasks-card">
         <mat-card-header>
           <mat-card-title>Очередь распознавания</mat-card-title>

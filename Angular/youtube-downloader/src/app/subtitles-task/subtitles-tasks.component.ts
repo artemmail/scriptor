@@ -1,8 +1,9 @@
 import { Component, DestroyRef, OnInit, ViewChild } from '@angular/core';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
-import { HttpClientModule } from '@angular/common/http';
+import { HttpClientModule, HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
+import { FormsModule } from '@angular/forms';
 
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
@@ -25,6 +26,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../services/AuthService.service';
 import { interval, forkJoin } from 'rxjs';
 import { finalize, map } from 'rxjs/operators';
+import { extractUsageLimitResponse } from '../models/usage-limit-response';
 
 @Component({
   selector: 'app-subtitles-tasks',
@@ -35,6 +37,7 @@ import { finalize, map } from 'rxjs/operators';
     CommonModule,
     HttpClientModule,
     RouterModule,
+    FormsModule,
     /* Material & CDK */
     MatTableModule,
     MatSortModule,
@@ -67,6 +70,9 @@ export class SubtitlesTasksComponent implements OnInit {
   userIdFilter: string | null = null;
   showOnlyMine = false;
   currentUserId: string | null = null;
+  recognitionInput = '';
+  recognitionStarting = false;
+  recognitionError: string | null = null;
 
   isMobile = false;
   loading = false;
@@ -408,6 +414,44 @@ export class SubtitlesTasksComponent implements OnInit {
   }
   getStatusText(s: RecognizeStatus | null | undefined): string {
     return this.subtitleService.getStatusText(s);
+  }
+
+  onStartRecognition(): void {
+    if (!this.recognitionInput.trim() || this.recognitionStarting) {
+      return;
+    }
+
+    this.recognitionStarting = true;
+    this.recognitionError = null;
+
+    this.subtitleService
+      .startSubtitleRecognition(this.recognitionInput, 'user')
+      .subscribe({
+        next: response => {
+          this.recognitionStarting = false;
+          if (response?.taskId) {
+            this.router.navigate(['/recognized', response.taskId]);
+          } else {
+            this.loadTasks();
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.recognitionStarting = false;
+          if (err.status === 401) {
+            this.router.navigate(['/login']);
+            return;
+          }
+
+          const limit = extractUsageLimitResponse(err);
+          if (limit?.message) {
+            this.recognitionError = limit.message;
+            return;
+          }
+
+          console.error('Error starting task:', err);
+          this.recognitionError = 'Не удалось запустить задачу. Попробуйте позже.';
+        },
+      });
   }
 
   async openVideoDialog(t: YoutubeCaptionTaskDto2): Promise<void> {
