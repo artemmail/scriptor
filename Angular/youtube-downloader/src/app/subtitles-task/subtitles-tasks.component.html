@@ -56,9 +56,17 @@
             <button
               class="quick-recognition-button"
               type="submit"
-              [disabled]="!recognitionInput.trim() || recognitionStarting"
+              [disabled]="!recognitionInput.trim() || recognitionStarting || recognitionBatchStarting"
             >
               {{ recognitionStarting ? 'Запуск...' : 'Запустить' }}
+            </button>
+            <button
+              class="quick-recognition-button secondary"
+              type="button"
+              (click)="onStartRecognitionBatch()"
+              [disabled]="recognitionStarting || recognitionBatchStarting"
+            >
+              {{ recognitionBatchStarting ? 'Запуск...' : 'Списком' }}
             </button>
           </div>
           <p class="quick-recognition-error" *ngIf="recognitionError">{{ recognitionError }}</p>

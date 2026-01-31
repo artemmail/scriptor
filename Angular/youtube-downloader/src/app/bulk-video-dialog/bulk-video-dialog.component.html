@@ -1,0 +1,22 @@
+<h2 mat-dialog-title>Добавить список видео</h2>
+<div mat-dialog-content class="bulk-dialog-content">
+  <p>Вставьте ссылки или ID YouTube — по одной строке.</p>
+  <textarea
+    class="bulk-dialog-textarea"
+    rows="8"
+    [(ngModel)]="inputValue"
+    placeholder="https://youtube.com/..."
+  ></textarea>
+</div>
+<div mat-dialog-actions align="end" class="bulk-dialog-actions">
+  <button mat-button type="button" (click)="cancel()">Отмена</button>
+  <button
+    mat-raised-button
+    color="primary"
+    type="button"
+    (click)="submit()"
+    [disabled]="!inputValue.trim()"
+  >
+    Ок
+  </button>
+</div>

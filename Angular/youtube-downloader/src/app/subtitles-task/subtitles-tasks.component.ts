@@ -72,7 +72,9 @@ export class SubtitlesTasksComponent implements OnInit {
   currentUserId: string | null = null;
   recognitionInput = '';
   recognitionStarting = false;
+  recognitionBatchStarting = false;
   recognitionError: string | null = null;
+  canUseBatch = false;
 
   isMobile = false;
   loading = false;
@@ -110,6 +112,7 @@ export class SubtitlesTasksComponent implements OnInit {
         this.isAuthenticated = !!user;
         this.currentUserId = user?.id ?? null;
         this.canManageVisibility = !!user?.canHideCaptions;
+        this.canUseBatch = !!user?.canHideCaptions;
         this.updateDisplayedColumns();
 
         if (previousCanManageVisibility !== this.canManageVisibility && this.dataSource.data.length) {
@@ -417,7 +420,7 @@ export class SubtitlesTasksComponent implements OnInit {
   }
 
   onStartRecognition(): void {
-    if (!this.recognitionInput.trim() || this.recognitionStarting) {
+    if (!this.recognitionInput.trim() || this.recognitionStarting || this.recognitionBatchStarting) {
       return;
     }
 
@@ -452,6 +455,95 @@ export class SubtitlesTasksComponent implements OnInit {
           this.recognitionError = 'Не удалось запустить задачу. Попробуйте позже.';
         },
       });
+  }
+
+  async onStartRecognitionBatch(): Promise<void> {
+    if (this.recognitionStarting || this.recognitionBatchStarting) {
+      return;
+    }
+
+    this.recognitionError = null;
+
+    if (!this.isAuthenticated) {
+      this.recognitionError = 'Добавление списком доступно только авторизованным подписчикам.';
+      return;
+    }
+
+    if (!this.canUseBatch) {
+      this.recognitionError = 'Добавление списком доступно только подписчикам.';
+      return;
+    }
+
+    const { BulkVideoDialogComponent } = await import('../bulk-video-dialog/bulk-video-dialog.component');
+    const dialogRef = this.dialog.open(BulkVideoDialogComponent, {
+      width: '640px',
+      data: { value: '' },
+    });
+
+    dialogRef.afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((value?: string | null) => {
+      if (!value || !value.trim()) {
+        return;
+      }
+
+      const items = this.parseBulkInput(value);
+      if (!items.length) {
+        this.recognitionError = 'Введите хотя бы одну ссылку или идентификатор.';
+        return;
+      }
+
+      this.startRecognitionBatch(items);
+    });
+  }
+
+  private startRecognitionBatch(items: string[]): void {
+    if (!items.length) {
+      return;
+    }
+
+    this.recognitionBatchStarting = true;
+    this.recognitionError = null;
+
+    this.subtitleService
+      .startSubtitleRecognitionBatch(items, 'user')
+      .subscribe({
+        next: response => {
+          this.recognitionBatchStarting = false;
+          this.loadTasks();
+
+          if (response?.invalidItems?.length) {
+            const preview = response.invalidItems.slice(0, 3).join(', ');
+            const suffix = response.invalidItems.length > 3 ? ` и ещё ${response.invalidItems.length - 3}` : '';
+            this.recognitionError = `Некоторые строки не распознаны: ${preview}${suffix}.`;
+          }
+        },
+        error: (err: HttpErrorResponse) => {
+          this.recognitionBatchStarting = false;
+          if (err.status === 401) {
+            this.router.navigate(['/login']);
+            return;
+          }
+
+          const limit = extractUsageLimitResponse(err);
+          if (limit?.message) {
+            this.recognitionError = limit.message;
+            return;
+          }
+
+          console.error('Error starting batch task:', err);
+          this.recognitionError = 'Не удалось запустить задачи. Попробуйте позже.';
+        },
+      });
+  }
+
+  private parseBulkInput(input: string): string[] {
+    const items = input
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+
+    return Array.from(new Set(items));
   }
 
   async openVideoDialog(t: YoutubeCaptionTaskDto2): Promise<void> {

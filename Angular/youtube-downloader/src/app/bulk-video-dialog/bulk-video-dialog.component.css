@@ -1,0 +1,34 @@
+:host {
+  display: block;
+  color: #0f172a;
+}
+
+.bulk-dialog-content {
+  display: grid;
+  gap: 12px;
+  font-size: 0.95rem;
+  color: #475569;
+}
+
+.bulk-dialog-textarea {
+  width: 100%;
+  min-height: 160px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  padding: 12px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: #0f172a;
+  background: #f8fafc;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.bulk-dialog-textarea:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.45);
+  border-color: rgba(59, 130, 246, 0.65);
+}
+
+.bulk-dialog-actions {
+  padding-top: 8px;
+}

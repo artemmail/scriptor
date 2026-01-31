@@ -72,6 +72,24 @@ namespace YandexSpeech.models.DTO
         public int? RemainingQuota { get; set; }
     }
 
+    public class StartSubtitleRecognitionBatchRequest
+    {
+        public IReadOnlyList<string> YoutubeIds { get; set; } = Array.Empty<string>();
+
+        public string? Language { get; set; }
+
+        public string? CreatedBy { get; set; }
+    }
+
+    public class StartSubtitleRecognitionBatchResponse
+    {
+        public IReadOnlyList<string> TaskIds { get; set; } = Array.Empty<string>();
+
+        public IReadOnlyList<string> InvalidItems { get; set; } = Array.Empty<string>();
+
+        public int? RemainingQuota { get; set; }
+    }
+
     public class ManualSubscriptionPaymentRequest
     {
         [Required]

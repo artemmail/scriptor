@@ -71,6 +71,12 @@ export interface StartSubtitleRecognitionResponse {
   remainingQuota?: number | null;
 }
 
+export interface StartSubtitleRecognitionBatchResponse {
+  taskIds: string[];
+  invalidItems?: string[];
+  remainingQuota?: number | null;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -143,6 +149,23 @@ generatePdfFromMarkdown(id: string, markdown: string): Observable<Blob> {
       `${this.apiUrl}/start`,
       null,
       { params }
+    );
+  }
+
+  startSubtitleRecognitionBatch(
+    youtubeIds: string[],
+    language?: string,
+    createdBy: string = 'system'
+  ): Observable<StartSubtitleRecognitionBatchResponse> {
+    const body = {
+      youtubeIds,
+      language: language || '',
+      createdBy,
+    };
+
+    return this.http.post<StartSubtitleRecognitionBatchResponse>(
+      `${this.apiUrl}/start-batch`,
+      body
     );
   }
 

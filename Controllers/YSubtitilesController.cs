@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using YandexSpeech.models.DB;
@@ -38,6 +40,7 @@ namespace YandexSpeech.Controllers
         private readonly IYSubtitlesService _ySubtitlesService;
         private readonly YoutubeWorkflowService _workflow; // <-- добавили
         private readonly ISubscriptionAccessService _subscriptionAccessService;
+        private readonly ISubscriptionService _subscriptionService;
 
         public YSubtitilesController(
             ICaptionTaskManager taskManager,
@@ -45,7 +48,8 @@ namespace YandexSpeech.Controllers
             IDocumentGeneratorService pdfGeneratorService,
             IYSubtitlesService ySubtitlesService,
             YoutubeWorkflowService workflow, // <-- добавили
-            ISubscriptionAccessService subscriptionAccessService
+            ISubscriptionAccessService subscriptionAccessService,
+            ISubscriptionService subscriptionService
         )
         {
             _taskManager = taskManager;
@@ -54,6 +58,7 @@ namespace YandexSpeech.Controllers
             _ySubtitlesService = ySubtitlesService;
             _workflow = workflow; // <-- добавили
             _subscriptionAccessService = subscriptionAccessService ?? throw new ArgumentNullException(nameof(subscriptionAccessService));
+            _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
         }
 
         [HttpGet("{taskId}")]
@@ -302,6 +307,100 @@ namespace YandexSpeech.Controllers
             {
                 TaskId = taskId,
                 RemainingQuota = authorization.RemainingQuota
+            };
+
+            return Ok(response);
+        }
+
+        [HttpPost("start-batch")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ActionResult<StartSubtitleRecognitionBatchResponse>> StartSubtitleRecognitionBatch(
+            [FromBody] StartSubtitleRecognitionBatchRequest request,
+            CancellationToken cancellationToken
+        )
+        {
+            if (!User.Identity?.IsAuthenticated ?? true)
+                return Unauthorized("not authenticated");
+
+            var userId = User.GetUserId();
+            if (userId == null)
+                return Unauthorized("User is not authenticated");
+
+            if (request == null || request.YoutubeIds == null || request.YoutubeIds.Count == 0)
+                return BadRequest("YoutubeIds must be provided.");
+
+            var hasLifetime = bool.TryParse(User.FindFirstValue("lifetimeAccess"), out var lifetime) && lifetime;
+            var subscription = await _subscriptionService
+                .GetActiveSubscriptionAsync(userId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (subscription == null && !hasLifetime)
+            {
+                return StatusCode(StatusCodes.Status402PaymentRequired, new UsageLimitExceededResponse
+                {
+                    Message = "Добавление списком доступно только подписчикам.",
+                    PaymentUrl = "/billing"
+                });
+            }
+
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString() ?? "UnknownIP";
+
+            var rawItems = request.YoutubeIds
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .SelectMany(item => item.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                .Select(item => item.Trim())
+                .Where(item => item.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (rawItems.Count == 0)
+                return BadRequest("YoutubeIds must be provided.");
+
+            var taskIds = new List<string>();
+            var invalidItems = new List<string>();
+            int? remainingQuota = null;
+
+            foreach (var item in rawItems)
+            {
+                var parsed = VideoId.TryParse(item);
+                if (parsed is null)
+                {
+                    invalidItems.Add(item);
+                    continue;
+                }
+
+                var normalizedId = parsed.ToString();
+
+                var authorization = await _subscriptionAccessService
+                    .AuthorizeYoutubeRecognitionAsync(userId, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (!authorization.IsAllowed)
+                {
+                    return StatusCode(StatusCodes.Status402PaymentRequired, new UsageLimitExceededResponse
+                    {
+                        Message = authorization.Message ?? "Превышен лимит распознаваний.",
+                        PaymentUrl = authorization.PaymentUrl ?? "/billing",
+                        RemainingQuota = authorization.RemainingQuota,
+                        RecognizedTitles = authorization.RecognizedTitles
+                    });
+                }
+
+                var taskId = await _taskManager.EnqueueCaptionTaskAsync(
+                    normalizedId,
+                    clientIp,
+                    userId
+                );
+
+                taskIds.Add(taskId);
+                remainingQuota = authorization.RemainingQuota;
+            }
+
+            var response = new StartSubtitleRecognitionBatchResponse
+            {
+                TaskIds = taskIds,
+                InvalidItems = invalidItems,
+                RemainingQuota = remainingQuota
             };
 
             return Ok(response);
