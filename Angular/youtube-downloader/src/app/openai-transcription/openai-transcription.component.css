@@ -337,6 +337,15 @@ section {
   box-shadow: none;
 }
 
+.warning-icon-button {
+  border-color: rgba(251, 146, 60, 0.45);
+  color: #c2410c;
+}
+
+.warning-icon-button:hover:not(:disabled) {
+  background: rgba(251, 146, 60, 0.14);
+}
+
 .tasks-list {
   display: flex;
   flex-direction: column;

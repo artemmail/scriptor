@@ -76,6 +76,13 @@ export interface OpenAiRecognizedSegmentDto {
   endSeconds: number | null;
 }
 
+export interface AdminRestartStoppedTasksResponse {
+  purgedCommandMessages: number;
+  purgedResponseMessages: number;
+  tasksFound: number;
+  tasksScheduled: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class OpenAiTranscriptionService {
   private readonly apiUrl = '/api/OpenAiTranscription';
@@ -185,6 +192,10 @@ export class OpenAiTranscriptionService {
 
   continueTask(id: string): Observable<OpenAiTranscriptionTaskDetailsDto> {
     return this.http.post<OpenAiTranscriptionTaskDetailsDto>(`${this.apiUrl}/${id}/continue`, {});
+  }
+
+  restartStoppedTasksAsAdmin(): Observable<AdminRestartStoppedTasksResponse> {
+    return this.http.post<AdminRestartStoppedTasksResponse>(`${this.apiUrl}/admin/restart-stopped`, {});
   }
 
   listRecognitionProfiles(): Observable<OpenAiRecognitionProfileOptionDto[]> {

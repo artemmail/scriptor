@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using RabbitMQ.Client;
 using System.Net;
 using System.Security.Claims;
 using System.Text;
@@ -11,6 +13,7 @@ using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 using YandexSpeech.services;
 using YandexSpeech.services.Interface;
+using YandexSpeech.services.Options;
 using YandexSpeech.services.Whisper;
 
 namespace YandexSpeech.Controllers
@@ -29,6 +32,7 @@ namespace YandexSpeech.Controllers
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IYandexDiskDownloadService _yandexDiskDownloadService;
         private readonly ISubscriptionAccessService _subscriptionAccessService;
+        private readonly EventBusOptions _eventBusOptions;
 
         public OpenAiTranscriptionController(
             IOpenAiTranscriptionService transcriptionService,
@@ -39,7 +43,8 @@ namespace YandexSpeech.Controllers
             IDocumentGeneratorService documentGeneratorService,
             IHttpClientFactory httpClientFactory,
             IYandexDiskDownloadService yandexDiskDownloadService,
-            ISubscriptionAccessService subscriptionAccessService)
+            ISubscriptionAccessService subscriptionAccessService,
+            IOptions<EventBusOptions> eventBusOptions)
         {
             _transcriptionService = transcriptionService;
             _dbContext = dbContext;
@@ -50,6 +55,7 @@ namespace YandexSpeech.Controllers
             _httpClientFactory = httpClientFactory;
             _yandexDiskDownloadService = yandexDiskDownloadService;
             _subscriptionAccessService = subscriptionAccessService ?? throw new ArgumentNullException(nameof(subscriptionAccessService));
+            _eventBusOptions = eventBusOptions?.Value ?? throw new ArgumentNullException(nameof(eventBusOptions));
         }
 
         [HttpPost]
@@ -374,6 +380,76 @@ namespace YandexSpeech.Controllers
             }
 
             return Ok(MapToDetailsDto(preparedTask, createdByEmail));
+        }
+
+        [HttpPost("admin/restart-stopped")]
+        public async Task<ActionResult<AdminRestartStoppedTasksResponse>> RestartStoppedTasksAndClearQueue()
+        {
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
+
+            if (!User.IsInRole("Admin"))
+            {
+                return Forbid();
+            }
+
+            if (!_eventBusOptions.Enabled)
+            {
+                return BadRequest(ErrorResponse.FromMessage("Event bus is disabled in configuration."));
+            }
+
+            var stoppedTaskIds = await _dbContext.OpenAiTranscriptionTasks
+                .AsNoTracking()
+                .Where(t => !t.Done && t.Status == OpenAiTranscriptionStatus.Error)
+                .OrderBy(t => t.CreatedAt)
+                .Select(t => t.Id)
+                .ToListAsync();
+
+            uint purgedCommandMessages;
+            uint purgedResponseMessages;
+
+            try
+            {
+                (purgedCommandMessages, purgedResponseMessages) = await PurgeWhisperQueuesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to purge whisper queues for admin recovery request.");
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    ErrorResponse.FromMessage("Не удалось очистить очередь распознавания."));
+            }
+
+            if (stoppedTaskIds.Count > 0)
+            {
+                _ = Task.Run(async () =>
+                {
+                    foreach (var taskId in stoppedTaskIds)
+                    {
+                        try
+                        {
+                            using var scope = _scopeFactory.CreateScope();
+                            var scopedService = scope.ServiceProvider.GetRequiredService<IOpenAiTranscriptionService>();
+                            await scopedService.ContinueTranscriptionAsync(taskId);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to restart stopped OpenAI transcription task {TaskId}", taskId);
+                        }
+                    }
+                });
+            }
+
+            return Ok(new AdminRestartStoppedTasksResponse
+            {
+                PurgedCommandMessages = purgedCommandMessages,
+                PurgedResponseMessages = purgedResponseMessages,
+                TasksFound = stoppedTaskIds.Count,
+                TasksScheduled = stoppedTaskIds.Count
+            });
         }
 
         [HttpPost("{id}/analytics")]
@@ -1008,6 +1084,46 @@ namespace YandexSpeech.Controllers
             return (task, markdown);
         }
 
+        private async Task<(uint PurgedCommandMessages, uint PurgedResponseMessages)> PurgeWhisperQueuesAsync()
+        {
+            _eventBusOptions.Validate();
+
+            var access = _eventBusOptions.BusAccess ?? throw new InvalidOperationException("Event bus access options are not configured.");
+            var factory = new ConnectionFactory
+            {
+                HostName = access.Host,
+                UserName = access.UserName,
+                Password = access.Password,
+                AutomaticRecoveryEnabled = true,
+                NetworkRecoveryInterval = TimeSpan.FromSeconds(5),
+                ClientProvidedName = string.IsNullOrWhiteSpace(_eventBusOptions.Broker)
+                    ? "openai-admin-queue-maintenance"
+                    : $"{_eventBusOptions.Broker}-openai-admin-queue-maintenance"
+            };
+
+            using var connection = await factory.CreateConnectionAsync();
+            using var channel = await connection.CreateChannelAsync();
+
+            await channel.QueueDeclareAsync(
+                _eventBusOptions.CommandQueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: null);
+
+            await channel.QueueDeclareAsync(
+                _eventBusOptions.QueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: null);
+
+            var purgedCommandMessages = await channel.QueuePurgeAsync(_eventBusOptions.CommandQueueName);
+            var purgedResponseMessages = await channel.QueuePurgeAsync(_eventBusOptions.QueueName);
+
+            return (purgedCommandMessages, purgedResponseMessages);
+        }
+
         private static string? ResolveMarkdownContent(OpenAiTranscriptionTask task)
         {
             if (!string.IsNullOrWhiteSpace(task.MarkdownText))
@@ -1072,6 +1188,14 @@ namespace YandexSpeech.Controllers
         public class UpdateMarkdownRequest
         {
             public string Markdown { get; set; } = string.Empty;
+        }
+
+        public class AdminRestartStoppedTasksResponse
+        {
+            public uint PurgedCommandMessages { get; set; }
+            public uint PurgedResponseMessages { get; set; }
+            public int TasksFound { get; set; }
+            public int TasksScheduled { get; set; }
         }
 
         private static List<SrtFormatter.SrtEntry> BuildSrtEntriesFromWhisper(WhisperTranscriptionResponse parsed)

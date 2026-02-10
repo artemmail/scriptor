@@ -12,6 +12,7 @@ import { DomSanitizer, SafeHtml, Title } from '@angular/platform-browser';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import {
+  AdminRestartStoppedTasksResponse,
   OpenAiTranscriptionService,
   OpenAiTranscriptionStatus,
   OpenAiTranscriptionTaskDetailsDto,
@@ -88,6 +89,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   summary: SubscriptionSummary | null = null;
   summaryLoading = false;
   summaryError: string | null = null;
+  adminRestartInProgress = false;
+  adminRestartError: string | null = null;
 
   readonly OpenAiTranscriptionStatus = OpenAiTranscriptionStatus;
   readonly OpenAiTranscriptionStepStatus = OpenAiTranscriptionStepStatus;
@@ -310,6 +313,45 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.listError = this.extractError(error) ?? 'Не удалось получить список задач.';
+      },
+    });
+  }
+
+  restartStoppedTasksAsAdmin(): void {
+    if (!this.isAdmin || this.adminRestartInProgress) {
+      return;
+    }
+
+    if (this.isBrowser) {
+      const confirmed = window.confirm(
+        'Очистить очередь распознавания и перезапустить все остановленные задачи?'
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    this.adminRestartInProgress = true;
+    this.adminRestartError = null;
+
+    this.transcriptionService.restartStoppedTasksAsAdmin().subscribe({
+      next: (response: AdminRestartStoppedTasksResponse) => {
+        this.adminRestartInProgress = false;
+
+        const message =
+          `Очередь очищена: команд ${response.purgedCommandMessages}, ответов ${response.purgedResponseMessages}. ` +
+          `Перезапущено задач: ${response.tasksScheduled} из ${response.tasksFound}.`;
+
+        this.snackBar.open(message, 'OK', { duration: 7000 });
+        this.loadTasks(!this.selectedTaskId);
+        if (this.selectedTaskId) {
+          this.startPolling();
+        }
+      },
+      error: (error) => {
+        this.adminRestartInProgress = false;
+        this.adminRestartError =
+          this.extractError(error) ?? 'Не удалось очистить очередь и перезапустить задачи.';
       },
     });
   }
