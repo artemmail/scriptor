@@ -403,7 +403,7 @@ namespace YandexSpeech.Controllers
 
             var stoppedTaskIds = await _dbContext.OpenAiTranscriptionTasks
                 .AsNoTracking()
-                .Where(t => !t.Done && t.Status == OpenAiTranscriptionStatus.Error)
+                .Where(t => t.Status == OpenAiTranscriptionStatus.Error)
                 .OrderBy(t => t.CreatedAt)
                 .Select(t => t.Id)
                 .ToListAsync();
@@ -423,11 +423,34 @@ namespace YandexSpeech.Controllers
                     ErrorResponse.FromMessage("Не удалось очистить очередь распознавания."));
             }
 
+            var preparedTaskIds = new List<string>(stoppedTaskIds.Count);
+
             if (stoppedTaskIds.Count > 0)
+            {
+                foreach (var taskId in stoppedTaskIds)
+                {
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var scopedService = scope.ServiceProvider.GetRequiredService<IOpenAiTranscriptionService>();
+                        var prepared = await scopedService.PrepareForContinuationAsync(taskId);
+                        if (prepared != null)
+                        {
+                            preparedTaskIds.Add(taskId);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to prepare stopped OpenAI transcription task {TaskId} for restart.", taskId);
+                    }
+                }
+            }
+
+            if (preparedTaskIds.Count > 0)
             {
                 _ = Task.Run(async () =>
                 {
-                    foreach (var taskId in stoppedTaskIds)
+                    foreach (var taskId in preparedTaskIds)
                     {
                         try
                         {
@@ -448,7 +471,7 @@ namespace YandexSpeech.Controllers
                 PurgedCommandMessages = purgedCommandMessages,
                 PurgedResponseMessages = purgedResponseMessages,
                 TasksFound = stoppedTaskIds.Count,
-                TasksScheduled = stoppedTaskIds.Count
+                TasksScheduled = preparedTaskIds.Count
             });
         }
 
