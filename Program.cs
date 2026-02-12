@@ -291,12 +291,10 @@ builder.Services.AddScoped<IYSubtitlesService, YSubtitlesService>();
 builder.Services.AddHostedService<RecognitionBackgroundService>();
 builder.Services.AddHostedService<AudioRecognitionBackgroundService>();
 builder.Services.AddHostedService<SubscriptionExpirationHostedService>();
-
 /*
 builder.Services.AddSingleton<TelegramTranscriptionBot>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<TelegramTranscriptionBot>());
 */
-
 
 // 8. SPA static files
 builder.Services.AddSpaStaticFiles(opts => opts.RootPath = "wwwroot");
@@ -305,7 +303,7 @@ var app = builder.Build();
 
 await EnsureRolesAsync(app.Services);
 await SubscriptionPlanSeeder.EnsureDefaultPlansAsync(app.Services);
-await MarkIncompleteOpenAiTasksAsErroredAsync(app.Services);
+await ResumeIncompleteOpenAiTasksAsync(app.Services);
 
 // (пропущена инициализация ролей и IndexNow для краткости)
 
@@ -421,50 +419,52 @@ static async Task EnsureRolesAsync(IServiceProvider services)
     }
 }
 
-static async Task MarkIncompleteOpenAiTasksAsErroredAsync(IServiceProvider services)
+static async Task ResumeIncompleteOpenAiTasksAsync(IServiceProvider services)
 {
     using var scope = services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<MyDbContext>();
-
-    var incompleteTasks = await dbContext.OpenAiTranscriptionTasks
-        .Where(t => !t.Done)
-        .Include(t => t.Steps)
-        .Include(t => t.Segments)
+    var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+    var logger = loggerFactory.CreateLogger("OpenAiTranscriptionStartupRecovery");
+    var pendingTaskIds = await dbContext.OpenAiTranscriptionTasks
+        .AsNoTracking()
+        .Where(t => t.Status != OpenAiTranscriptionStatus.Done)
+        .OrderBy(t => t.CreatedAt)
+        .Select(t => t.Id)
         .ToListAsync();
 
-    if (incompleteTasks.Count == 0)
+    if (pendingTaskIds.Count == 0)
     {
         return;
     }
 
-    var now = DateTime.UtcNow;
-    const string restartErrorMessage = "Задача была остановлена из-за перезапуска сервера. Перезапустите обработку вручную.";
+    logger.LogInformation(
+        "Scheduling {Count} OpenAI transcription task(s) for startup recovery.",
+        pendingTaskIds.Count);
 
-    foreach (var task in incompleteTasks)
+    _ = Task.Run(async () =>
     {
-        task.Status = OpenAiTranscriptionStatus.Error;
-        task.Error = restartErrorMessage;
-        task.Done = false;
-        task.ModifiedAt = now;
+        const int maxConcurrentRecoveryTasks = 3;
+        using var semaphore = new SemaphoreSlim(maxConcurrentRecoveryTasks, maxConcurrentRecoveryTasks);
 
-        if (task.Steps != null)
+        var workers = pendingTaskIds.Select(async taskId =>
         {
-            foreach (var step in task.Steps.Where(s => s.Status == OpenAiTranscriptionStepStatus.InProgress))
+            await semaphore.WaitAsync();
+            try
             {
-                step.Status = OpenAiTranscriptionStepStatus.Error;
-                step.Error = restartErrorMessage;
-                step.FinishedAt = now;
+                await using var taskScope = services.CreateAsyncScope();
+                var transcriptionService = taskScope.ServiceProvider.GetRequiredService<IOpenAiTranscriptionService>();
+                await transcriptionService.ContinueTranscriptionAsync(taskId);
             }
-        }
-
-        if (task.Segments != null)
-        {
-            foreach (var segment in task.Segments.Where(s => s.IsProcessing))
+            catch (Exception ex)
             {
-                segment.IsProcessing = false;
+                logger.LogError(ex, "Failed to recover OpenAI transcription task {TaskId} on startup.", taskId);
             }
-        }
-    }
+            finally
+            {
+                semaphore.Release();
+            }
+        }).ToList();
 
-    await dbContext.SaveChangesAsync();
+        await Task.WhenAll(workers);
+    });
 }

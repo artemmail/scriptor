@@ -57,27 +57,7 @@ public sealed class OpenAiTranscriptionServiceTests
         dbContext.OpenAiRecognizedSegments.AddRange(segments);
         await dbContext.SaveChangesAsync();
 
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["FfmpegExePath"] = "/usr/bin/ffmpeg",
-                ["OpenAI:ApiKey"] = "fake-key"
-            })
-            .Build();
-
-        var punctuation = new StubPunctuationService();
-        var whisper = new StubWhisperTranscriptionService();
-        var ffmpeg = new StubFfmpegService();
-
-        var service = new TestOpenAiTranscriptionService(
-            dbContext,
-            configuration,
-            NullLogger<OpenAiTranscriptionService>.Instance,
-            punctuation,
-            whisper,
-            new StubHttpClientFactory(),
-            new StubYandexDiskDownloadService(),
-            ffmpeg);
+        var service = CreateService(dbContext);
 
         var result = await service.ContinueTranscriptionAsync(task.Id);
 
@@ -85,7 +65,7 @@ public sealed class OpenAiTranscriptionServiceTests
         Assert.True(result!.Done);
         Assert.Equal(OpenAiTranscriptionStatus.Done, result.Status);
         Assert.Equal(task.SegmentsTotal, result.SegmentsProcessed);
-        Assert.NotNull(result.MarkdownText);
+        Assert.NotNull(result.ProcessedText);
         Assert.Contains("segment-", result.ProcessedText);
 
         var persistedTask = await dbContext.OpenAiTranscriptionTasks
@@ -102,6 +82,175 @@ public sealed class OpenAiTranscriptionServiceTests
             s.Step == OpenAiTranscriptionStatus.ProcessingSegments &&
             s.Status == OpenAiTranscriptionStepStatus.Completed);
         
+    }
+
+    [Fact]
+    public async Task ContinueTranscriptionAsync_RestartedErrorTaskAtProcessingSegments_CompletesRemainingSegments()
+    {
+        var dbOptions = new DbContextOptionsBuilder<MyDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var dbContext = new MyDbContext(dbOptions);
+
+        var task = new OpenAiTranscriptionTask
+        {
+            SourceFilePath = "restart-test.wav",
+            CreatedBy = "tester",
+            Status = OpenAiTranscriptionStatus.Error,
+            Error = "Задача была остановлена из-за перезапуска сервера.",
+            SegmentsTotal = 3,
+            SegmentsProcessed = 1,
+            Done = false,
+            CreatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow
+        };
+
+        dbContext.OpenAiTranscriptionTasks.Add(task);
+
+        dbContext.OpenAiTranscriptionSteps.Add(new OpenAiTranscriptionStep
+        {
+            TaskId = task.Id,
+            Task = task,
+            Step = OpenAiTranscriptionStatus.ProcessingSegments,
+            Status = OpenAiTranscriptionStepStatus.Error,
+            Error = "Задача была остановлена из-за перезапуска сервера.",
+            StartedAt = DateTime.UtcNow.AddMinutes(-2),
+            FinishedAt = DateTime.UtcNow.AddMinutes(-1)
+        });
+
+        dbContext.OpenAiRecognizedSegments.AddRange(
+            new OpenAiRecognizedSegment
+            {
+                TaskId = task.Id,
+                Task = task,
+                Order = 0,
+                Text = "segment-0",
+                ProcessedText = "segment-0-processed",
+                IsProcessed = true,
+                IsProcessing = false
+            },
+            new OpenAiRecognizedSegment
+            {
+                TaskId = task.Id,
+                Task = task,
+                Order = 1,
+                Text = "segment-1",
+                IsProcessed = false,
+                IsProcessing = true
+            },
+            new OpenAiRecognizedSegment
+            {
+                TaskId = task.Id,
+                Task = task,
+                Order = 2,
+                Text = "segment-2",
+                IsProcessed = false,
+                IsProcessing = false
+            });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var result = await service.ContinueTranscriptionAsync(task.Id);
+
+        Assert.NotNull(result);
+        Assert.True(result!.Done);
+        Assert.Equal(OpenAiTranscriptionStatus.Done, result.Status);
+        Assert.Equal(3, result.SegmentsProcessed);
+
+        var persistedTask = await dbContext.OpenAiTranscriptionTasks
+            .Include(t => t.Segments)
+            .Include(t => t.Steps)
+            .FirstAsync(t => t.Id == task.Id);
+
+        Assert.True(persistedTask.Segments.All(s => s.IsProcessed));
+        Assert.True(persistedTask.Segments.All(s => !s.IsProcessing));
+        Assert.Equal(OpenAiTranscriptionStatus.Done, persistedTask.Status);
+        Assert.True(persistedTask.Done);
+    }
+
+    [Fact]
+    public async Task PrepareForContinuationAsync_ErrorTaskWithExistingSegments_InfersProcessingSegments()
+    {
+        var dbOptions = new DbContextOptionsBuilder<MyDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var dbContext = new MyDbContext(dbOptions);
+
+        var task = new OpenAiTranscriptionTask
+        {
+            SourceFilePath = "recoverable-error.wav",
+            CreatedBy = "tester",
+            Status = OpenAiTranscriptionStatus.Error,
+            Error = "temporary network error",
+            SegmentsTotal = 2,
+            SegmentsProcessed = 1,
+            Done = true,
+            CreatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow
+        };
+
+        dbContext.OpenAiTranscriptionTasks.Add(task);
+        dbContext.OpenAiRecognizedSegments.AddRange(
+            new OpenAiRecognizedSegment
+            {
+                TaskId = task.Id,
+                Task = task,
+                Order = 0,
+                Text = "segment-0",
+                ProcessedText = "segment-0-processed",
+                IsProcessed = true,
+                IsProcessing = false
+            },
+            new OpenAiRecognizedSegment
+            {
+                TaskId = task.Id,
+                Task = task,
+                Order = 1,
+                Text = "segment-1",
+                IsProcessed = false,
+                IsProcessing = true
+            });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var prepared = await service.PrepareForContinuationAsync(task.Id);
+
+        Assert.NotNull(prepared);
+        Assert.Equal(OpenAiTranscriptionStatus.ProcessingSegments, prepared!.Status);
+        Assert.False(prepared.Done);
+        Assert.Null(prepared.Error);
+        Assert.All(prepared.Segments, segment => Assert.False(segment.IsProcessing));
+
+        var continued = await service.ContinueTranscriptionAsync(task.Id);
+        Assert.NotNull(continued);
+        Assert.True(continued!.Done);
+        Assert.Equal(OpenAiTranscriptionStatus.Done, continued.Status);
+        Assert.Equal(2, continued.SegmentsProcessed);
+    }
+
+    private static TestOpenAiTranscriptionService CreateService(MyDbContext dbContext)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["FfmpegExePath"] = "/usr/bin/ffmpeg",
+                ["OpenAI:ApiKey"] = "fake-key"
+            })
+            .Build();
+
+        return new TestOpenAiTranscriptionService(
+            dbContext,
+            configuration,
+            NullLogger<OpenAiTranscriptionService>.Instance,
+            new StubPunctuationService(),
+            new StubWhisperTranscriptionService(),
+            new StubHttpClientFactory(),
+            new StubYandexDiskDownloadService(),
+            new StubFfmpegService());
     }
 
     private sealed class StubPunctuationService : IPunctuationService

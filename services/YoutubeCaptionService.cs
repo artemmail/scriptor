@@ -99,7 +99,7 @@ namespace YandexSpeech.services
                         await RunDownloadingCaptionsStepAsync(id);
                         break;
 
-                        /*
+                        
                     case RecognizeStatus.SegmentingCaptions:
                         await RunSegmentingCaptionsStepAsync(id);
                         break;
@@ -112,7 +112,7 @@ namespace YandexSpeech.services
                     case RecognizeStatus.Error:
                         _logger.LogError($"Задача {id} находится в состоянии Error: {taskStatus.Error}");
                         break;
-                        */
+                        
                     default:
                         await Task.Delay(TimeSpan.FromSeconds(10));
                         break;
