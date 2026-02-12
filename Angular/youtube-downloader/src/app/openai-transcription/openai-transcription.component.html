@@ -82,7 +82,8 @@
                   <span class="task-email" *ngIf="isAdmin && task.createdByEmail">{{ task.createdByEmail }}</span>
                   <span class="task-display-name">{{ task.displayName }}</span>
                 </span>
-                <span matListItemLine>{{ getStatusText(task.status) }} · {{ task.modifiedAt | localTime }}</span>
+                <span matListItemLine>{{ getTaskProgressSummary(task) }}</span>
+                <span matListItemLine>{{ task.modifiedAt | localTime }}</span>
               </a>
             </mat-nav-list>
             <ng-template #emptyTasks>
@@ -324,19 +325,55 @@
                       <mat-icon>delete</mat-icon>
                       <span>Удалить</span>
                     </button>
+                    <div class="continue-from-segment" *ngIf="canContinueFromSegment(selectedTask)">
+                      <label for="continue-from-segment-number">Сегмент</label>
+                      <input
+                        id="continue-from-segment-number"
+                        type="number"
+                        min="1"
+                        [max]="selectedTask.segmentsTotal"
+                        [value]="continueFromSegmentNumber ?? ''"
+                        (input)="onContinueFromSegmentNumberInput($any($event.target).value)"
+                        [disabled]="continueFromSegmentInProgress || continueInProgress || deleteInProgress"
+                      />
+                      <button
+                        class="btn btn-outline"
+                        type="button"
+                        (click)="continueTaskFromSegment()"
+                        [disabled]="continueFromSegmentInProgress || continueInProgress || deleteInProgress"
+                      >
+                        <mat-icon>replay</mat-icon>
+                        <span>Восстановить с сегмента</span>
+                      </button>
+                    </div>
                     <mat-progress-spinner
-                      *ngIf="continueInProgress || deleteInProgress"
+                      *ngIf="continueInProgress || continueFromSegmentInProgress || deleteInProgress"
                       mode="indeterminate"
                       diameter="28"
                       class="inline-spinner"
                     ></mat-progress-spinner>
                     <div class="error" *ngIf="continueError">{{ continueError }}</div>
+                    <div class="error" *ngIf="continueFromSegmentError">{{ continueFromSegmentError }}</div>
                     <div class="error" *ngIf="deleteError">{{ deleteError }}</div>
                   </div>
 
-                  <section class="steps-section" *ngIf="selectedTask.steps.length">
+                  <section class="steps-section">
                     <h4>Прогресс обработки</h4>
-                    <ul class="steps-list">
+                    <div class="workflow-summary">
+                      <div class="workflow-summary-item">
+                        <span>Выполнено шагов</span>
+                        <strong>{{ getCompletedWorkflowSteps(selectedTask) }} / {{ getWorkflowStepCount(selectedTask) }}</strong>
+                      </div>
+                      <div class="workflow-summary-item">
+                        <span>Текущий шаг</span>
+                        <strong>{{ getCurrentWorkflowStepText(selectedTask) }}</strong>
+                      </div>
+                      <div class="workflow-summary-item" *ngIf="shouldShowSegmentProgress(selectedTask)">
+                        <span>Распознано сегментов</span>
+                        <strong>{{ selectedTask.segmentsProcessed }} / {{ selectedTask.segmentsTotal }}</strong>
+                      </div>
+                    </div>
+                    <ul class="steps-list" *ngIf="selectedTask.steps.length; else noStepLog">
                       <li *ngFor="let step of selectedTask.steps; trackBy: trackStep" [ngClass]="getStepClass(step.status)">
                         <span class="step-icon">
                           <mat-icon>{{ getStepIcon(step.status) }}</mat-icon>
@@ -352,6 +389,11 @@
                         </div>
                       </li>
                     </ul>
+                    <ng-template #noStepLog>
+                      <div class="empty-state">
+                        Подробный лог шагов появится после старта обработки.
+                      </div>
+                    </ng-template>
                   </section>
                 </ng-template>
               </ng-container>

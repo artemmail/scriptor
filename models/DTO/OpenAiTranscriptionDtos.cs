@@ -23,6 +23,8 @@ namespace YandexSpeech.models.DTO
 
         public DateTime ModifiedAt { get; set; }
 
+        public bool RequiresDownload { get; set; }
+
         public int SegmentsTotal { get; set; }
 
         public int SegmentsProcessed { get; set; }

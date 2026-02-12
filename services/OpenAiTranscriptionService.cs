@@ -115,6 +115,65 @@ namespace YandexSpeech.services
             return task;
         }
 
+        public async Task<OpenAiTranscriptionTask?> PrepareForContinuationFromSegmentAsync(string taskId, int segmentNumber)
+        {
+            if (segmentNumber < 1)
+            {
+                throw new InvalidOperationException("Номер сегмента должен быть больше нуля.");
+            }
+
+            var task = await _dbContext.OpenAiTranscriptionTasks
+                .Include(t => t.Steps)
+                .Include(t => t.Segments)
+                .Include(t => t.RecognitionProfile)
+                .FirstOrDefaultAsync(t => t.Id == taskId);
+
+            if (task == null)
+            {
+                return null;
+            }
+
+            if (task.Segments == null || task.Segments.Count == 0)
+            {
+                throw new InvalidOperationException("Для задачи отсутствуют сегменты. Восстановление с сегмента недоступно.");
+            }
+
+            var maxSegmentNumber = task.Segments.Max(s => s.Order) + 1;
+            if (segmentNumber > maxSegmentNumber)
+            {
+                throw new InvalidOperationException(
+                    $"Сегмент {segmentNumber} не найден. Доступный диапазон: 1-{maxSegmentNumber}.");
+            }
+
+            var startOrder = segmentNumber - 1;
+
+            foreach (var segment in task.Segments)
+            {
+                if (segment.Order < startOrder)
+                {
+                    segment.IsProcessed = true;
+                    segment.IsProcessing = false;
+                    continue;
+                }
+
+                segment.IsProcessed = false;
+                segment.IsProcessing = false;
+                segment.ProcessedText = null;
+            }
+
+            task.Status = OpenAiTranscriptionStatus.ProcessingSegments;
+            task.Done = false;
+            task.Error = null;
+            task.ProcessedText = null;
+            task.MarkdownText = null;
+            task.SegmentsTotal = task.Segments.Count;
+            task.SegmentsProcessed = task.Segments.Count(s => s.IsProcessed);
+            task.ModifiedAt = DateTime.UtcNow;
+
+            await _dbContext.SaveChangesAsync();
+            return task;
+        }
+
         public async Task<OpenAiTranscriptionTask?> ContinueTranscriptionAsync(string taskId)
         {
             var task = await _dbContext.OpenAiTranscriptionTasks

@@ -72,6 +72,9 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   detailsLoading = false;
   continueError: string | null = null;
   continueInProgress = false;
+  continueFromSegmentError: string | null = null;
+  continueFromSegmentInProgress = false;
+  continueFromSegmentNumber: number | null = null;
   exportError: string | null = null;
   exportingPdf = false;
   exportingDocx = false;
@@ -94,6 +97,19 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
 
   readonly OpenAiTranscriptionStatus = OpenAiTranscriptionStatus;
   readonly OpenAiTranscriptionStepStatus = OpenAiTranscriptionStepStatus;
+  private readonly workflowStepsWithDownload: readonly OpenAiTranscriptionStatus[] = [
+    OpenAiTranscriptionStatus.Downloading,
+    OpenAiTranscriptionStatus.Converting,
+    OpenAiTranscriptionStatus.Transcribing,
+    OpenAiTranscriptionStatus.Segmenting,
+    OpenAiTranscriptionStatus.ProcessingSegments,
+  ];
+  private readonly workflowStepsWithoutDownload: readonly OpenAiTranscriptionStatus[] = [
+    OpenAiTranscriptionStatus.Converting,
+    OpenAiTranscriptionStatus.Transcribing,
+    OpenAiTranscriptionStatus.Segmenting,
+    OpenAiTranscriptionStatus.ProcessingSegments,
+  ];
   readonly heroTitle = 'Преобразовать аудио и видео в текст';
   readonly heroLead =
     'Online-сервис автоматической транскрибации помогает за считанные минуты превратить записи интервью, созвонов и лекций в структурированный текст.';
@@ -381,6 +397,10 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.analyticsError = null;
     this.deleteError = null;
     this.deleteInProgress = false;
+    this.continueError = null;
+    this.continueFromSegmentError = null;
+    this.continueFromSegmentInProgress = false;
+    this.continueFromSegmentNumber = null;
     this.updateRenderedMarkdown(null);
     this.resetFullscreenState();
     this.startPolling();
@@ -430,6 +450,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
 
   private applyTaskUpdate(task: OpenAiTranscriptionTaskDetailsDto): void {
     this.selectedTask = task;
+    this.syncContinueFromSegmentNumber(task);
     this.updateRenderedMarkdown(task);
     this.scheduleEnsureDetailsPanelVisible();
 
@@ -443,6 +464,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
             modifiedAt: task.modifiedAt,
             segmentsProcessed: task.segmentsProcessed,
             segmentsTotal: task.segmentsTotal,
+            requiresDownload: task.requiresDownload,
             clarification: task.clarification,
             createdByEmail: task.createdByEmail ?? existing.createdByEmail,
           }
@@ -942,13 +964,183 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     }
   }
 
+  getTaskProgressSummary(task: OpenAiTranscriptionTaskDto): string {
+    const totalSteps = this.getWorkflowSteps(task).length;
+    const completedSteps = this.getApproximateCompletedSteps(task);
+    const currentStep = this.getApproximateCurrentStep(task);
+    const currentStepText = currentStep ? this.getStatusText(currentStep) : 'Завершено';
+
+    const parts = [`Шаги: ${completedSteps}/${totalSteps}`, `Сейчас: ${currentStepText}`];
+
+    if (currentStep === OpenAiTranscriptionStatus.ProcessingSegments && task.segmentsTotal > 0) {
+      parts.push(`Сегменты: ${task.segmentsProcessed}/${task.segmentsTotal}`);
+    }
+
+    return parts.join(' · ');
+  }
+
+  getCompletedWorkflowSteps(task: OpenAiTranscriptionTaskDetailsDto | null): number {
+    if (!task) {
+      return 0;
+    }
+
+    const steps = this.getWorkflowSteps(task);
+    if (task.status === OpenAiTranscriptionStatus.Done) {
+      return steps.length;
+    }
+
+    const latestSteps = this.getLatestStepMap(task);
+    return steps.reduce((count, stepType) => {
+      const step = latestSteps.get(stepType);
+      return step?.status === OpenAiTranscriptionStepStatus.Completed ? count + 1 : count;
+    }, 0);
+  }
+
+  getWorkflowStepCount(task: OpenAiTranscriptionTaskDto | OpenAiTranscriptionTaskDetailsDto | null): number {
+    return this.getWorkflowSteps(task).length;
+  }
+
+  getCurrentWorkflowStep(task: OpenAiTranscriptionTaskDetailsDto | null): OpenAiTranscriptionStatus | null {
+    if (!task || task.status === OpenAiTranscriptionStatus.Done) {
+      return null;
+    }
+
+    const workflowSteps = this.getWorkflowSteps(task);
+    const latestSteps = this.getLatestStepMap(task);
+
+    let inProgressStep: OpenAiTranscriptionStepDto | null = null;
+    for (const stepType of workflowSteps) {
+      const step = latestSteps.get(stepType);
+      if (step?.status !== OpenAiTranscriptionStepStatus.InProgress) {
+        continue;
+      }
+
+      if (!inProgressStep || this.isStepNewer(step, inProgressStep)) {
+        inProgressStep = step;
+      }
+    }
+
+    if (inProgressStep) {
+      return inProgressStep.step;
+    }
+
+    if (task.status === OpenAiTranscriptionStatus.Error) {
+      let errorStep: OpenAiTranscriptionStepDto | null = null;
+      for (const stepType of workflowSteps) {
+        const step = latestSteps.get(stepType);
+        if (step?.status !== OpenAiTranscriptionStepStatus.Error) {
+          continue;
+        }
+
+        if (!errorStep || this.isStepNewer(step, errorStep)) {
+          errorStep = step;
+        }
+      }
+
+      if (errorStep) {
+        return errorStep.step;
+      }
+    }
+
+    if (workflowSteps.includes(task.status)) {
+      return task.status;
+    }
+
+    if (task.status === OpenAiTranscriptionStatus.Created) {
+      return workflowSteps[0] ?? null;
+    }
+
+    return null;
+  }
+
+  getCurrentWorkflowStepText(task: OpenAiTranscriptionTaskDetailsDto | null): string {
+    if (!task) {
+      return 'Неизвестно';
+    }
+
+    if (task.status === OpenAiTranscriptionStatus.Done) {
+      return 'Все шаги завершены';
+    }
+
+    const step = this.getCurrentWorkflowStep(task);
+    if (step) {
+      return this.getStatusText(step);
+    }
+
+    if (task.status === OpenAiTranscriptionStatus.Error) {
+      return 'Ожидает восстановления';
+    }
+
+    return 'Ожидает запуска';
+  }
+
+  shouldShowSegmentProgress(task: OpenAiTranscriptionTaskDetailsDto | null): boolean {
+    if (!task || task.segmentsTotal <= 0) {
+      return false;
+    }
+
+    if (task.status === OpenAiTranscriptionStatus.Error && task.segmentsProcessed < task.segmentsTotal) {
+      return true;
+    }
+
+    return this.getCurrentWorkflowStep(task) === OpenAiTranscriptionStatus.ProcessingSegments;
+  }
+
+  canContinueFromSegment(task: OpenAiTranscriptionTaskDetailsDto | null): boolean {
+    return !!task && task.status === OpenAiTranscriptionStatus.Error && task.segmentsTotal > 0;
+  }
+
+  onContinueFromSegmentNumberInput(value: string): void {
+    const parsed = Number.parseInt(value, 10);
+    this.continueFromSegmentNumber = Number.isFinite(parsed) ? parsed : null;
+  }
+
+  continueTaskFromSegment(): void {
+    if (
+      !this.selectedTaskId ||
+      !this.selectedTask ||
+      !this.canContinueFromSegment(this.selectedTask) ||
+      this.continueFromSegmentInProgress ||
+      this.continueInProgress
+    ) {
+      return;
+    }
+
+    const segmentNumber = this.resolveContinueFromSegmentNumber(this.selectedTask);
+
+    this.continueFromSegmentInProgress = true;
+    this.continueFromSegmentError = null;
+    this.continueError = null;
+
+    this.transcriptionService.continueTaskFromSegment(this.selectedTaskId, segmentNumber).subscribe({
+      next: (task) => {
+        this.continueFromSegmentInProgress = false;
+        this.detailsError = null;
+        this.applyTaskUpdate(task);
+        this.startPolling();
+      },
+      error: (error) => {
+        this.continueFromSegmentInProgress = false;
+        const limit = extractUsageLimitResponse(error);
+        if (limit) {
+          this.handleUsageLimit(limit);
+          return;
+        }
+
+        this.continueFromSegmentError =
+          this.extractError(error) ?? 'Не удалось восстановить задачу с выбранного сегмента.';
+      },
+    });
+  }
+
   continueTask(): void {
-    if (!this.selectedTaskId || this.continueInProgress) {
+    if (!this.selectedTaskId || this.continueInProgress || this.continueFromSegmentInProgress) {
       return;
     }
 
     this.continueInProgress = true;
     this.continueError = null;
+    this.continueFromSegmentError = null;
 
     this.transcriptionService.continueTask(this.selectedTaskId).subscribe({
       next: (task) => {
@@ -989,6 +1181,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.deleteInProgress = true;
     this.deleteError = null;
     this.continueError = null;
+    this.continueFromSegmentError = null;
 
     this.transcriptionService.deleteTask(taskId).subscribe({
       next: () => {
@@ -1073,6 +1266,136 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
 
   trackStep(_: number, step: OpenAiTranscriptionStepDto): number {
     return step.id;
+  }
+
+  private getWorkflowSteps(
+    task: OpenAiTranscriptionTaskDto | OpenAiTranscriptionTaskDetailsDto | null | undefined
+  ): readonly OpenAiTranscriptionStatus[] {
+    return task?.requiresDownload ? this.workflowStepsWithDownload : this.workflowStepsWithoutDownload;
+  }
+
+  private getLatestStepMap(
+    task: OpenAiTranscriptionTaskDetailsDto
+  ): Map<OpenAiTranscriptionStatus, OpenAiTranscriptionStepDto> {
+    const map = new Map<OpenAiTranscriptionStatus, OpenAiTranscriptionStepDto>();
+
+    for (const step of task.steps ?? []) {
+      const existing = map.get(step.step);
+      if (!existing || this.isStepNewer(step, existing)) {
+        map.set(step.step, step);
+      }
+    }
+
+    return map;
+  }
+
+  private isStepNewer(
+    candidate: OpenAiTranscriptionStepDto,
+    reference: OpenAiTranscriptionStepDto
+  ): boolean {
+    const candidateTime = this.getStepTimestamp(candidate.startedAt);
+    const referenceTime = this.getStepTimestamp(reference.startedAt);
+
+    if (candidateTime !== referenceTime) {
+      return candidateTime > referenceTime;
+    }
+
+    return candidate.id > reference.id;
+  }
+
+  private getStepTimestamp(value: string | null): number {
+    if (!value) {
+      return 0;
+    }
+
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  private getApproximateCompletedSteps(task: OpenAiTranscriptionTaskDto): number {
+    const total = this.getWorkflowSteps(task).length;
+    if (task.status === OpenAiTranscriptionStatus.Done || task.done) {
+      return total;
+    }
+
+    const completedBeforeProcessing = task.requiresDownload ? 4 : 3;
+
+    switch (task.status) {
+      case OpenAiTranscriptionStatus.Created:
+        return 0;
+      case OpenAiTranscriptionStatus.Downloading:
+        return 0;
+      case OpenAiTranscriptionStatus.Converting:
+        return task.requiresDownload ? 1 : 0;
+      case OpenAiTranscriptionStatus.Transcribing:
+        return task.requiresDownload ? 2 : 1;
+      case OpenAiTranscriptionStatus.Segmenting:
+        return task.requiresDownload ? 3 : 2;
+      case OpenAiTranscriptionStatus.ProcessingSegments:
+        return completedBeforeProcessing;
+      case OpenAiTranscriptionStatus.Error:
+        if (task.segmentsTotal > 0) {
+          return completedBeforeProcessing;
+        }
+        return 0;
+      default:
+        return 0;
+    }
+  }
+
+  private getApproximateCurrentStep(task: OpenAiTranscriptionTaskDto): OpenAiTranscriptionStatus | null {
+    if (task.status === OpenAiTranscriptionStatus.Done || task.done) {
+      return null;
+    }
+
+    const workflowSteps = this.getWorkflowSteps(task);
+
+    if (workflowSteps.includes(task.status)) {
+      return task.status;
+    }
+
+    if (task.status === OpenAiTranscriptionStatus.Created) {
+      return workflowSteps[0] ?? null;
+    }
+
+    if (task.status === OpenAiTranscriptionStatus.Error && task.segmentsTotal > 0) {
+      return OpenAiTranscriptionStatus.ProcessingSegments;
+    }
+
+    return null;
+  }
+
+  private syncContinueFromSegmentNumber(task: OpenAiTranscriptionTaskDetailsDto): void {
+    if (!this.canContinueFromSegment(task)) {
+      this.continueFromSegmentNumber = null;
+      return;
+    }
+
+    const max = task.segmentsTotal;
+    if (
+      this.continueFromSegmentNumber == null ||
+      this.continueFromSegmentNumber < 1 ||
+      this.continueFromSegmentNumber > max
+    ) {
+      this.continueFromSegmentNumber = this.getSuggestedContinueFromSegment(task);
+    }
+  }
+
+  private getSuggestedContinueFromSegment(task: OpenAiTranscriptionTaskDetailsDto): number {
+    if (task.segmentsTotal <= 0) {
+      return 1;
+    }
+
+    const nextSegment = task.segmentsProcessed + 1;
+    return Math.min(Math.max(nextSegment, 1), task.segmentsTotal);
+  }
+
+  private resolveContinueFromSegmentNumber(task: OpenAiTranscriptionTaskDetailsDto): number {
+    const max = Math.max(task.segmentsTotal, 1);
+    const requested = this.continueFromSegmentNumber ?? this.getSuggestedContinueFromSegment(task);
+    const normalized = Math.min(Math.max(requested, 1), max);
+    this.continueFromSegmentNumber = normalized;
+    return normalized;
   }
 
   private extractError(error: unknown): string | null {

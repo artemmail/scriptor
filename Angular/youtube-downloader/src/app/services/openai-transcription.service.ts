@@ -30,6 +30,7 @@ export interface OpenAiTranscriptionTaskDto {
   error: string | null;
   createdAt: string;
   modifiedAt: string;
+  requiresDownload: boolean;
   segmentsTotal: number;
   segmentsProcessed: number;
   clarification: string | null;
@@ -192,6 +193,15 @@ export class OpenAiTranscriptionService {
 
   continueTask(id: string): Observable<OpenAiTranscriptionTaskDetailsDto> {
     return this.http.post<OpenAiTranscriptionTaskDetailsDto>(`${this.apiUrl}/${id}/continue`, {});
+  }
+
+  continueTaskFromSegment(
+    id: string,
+    segmentNumber: number
+  ): Observable<OpenAiTranscriptionTaskDetailsDto> {
+    return this.http.post<OpenAiTranscriptionTaskDetailsDto>(`${this.apiUrl}/${id}/continue-from-segment`, {
+      segmentNumber,
+    });
   }
 
   restartStoppedTasksAsAdmin(): Observable<AdminRestartStoppedTasksResponse> {

@@ -232,6 +232,66 @@ public sealed class OpenAiTranscriptionServiceTests
         Assert.Equal(2, continued.SegmentsProcessed);
     }
 
+    [Fact]
+    public async Task PrepareForContinuationFromSegmentAsync_RewindsFromRequestedSegment()
+    {
+        var dbOptions = new DbContextOptionsBuilder<MyDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var dbContext = new MyDbContext(dbOptions);
+
+        var task = new OpenAiTranscriptionTask
+        {
+            SourceFilePath = "resume-from-segment.wav",
+            CreatedBy = "tester",
+            Status = OpenAiTranscriptionStatus.Error,
+            Error = "temporary processing error",
+            SegmentsTotal = 5,
+            SegmentsProcessed = 5,
+            Done = true,
+            ProcessedText = "old-final-text",
+            MarkdownText = "old-markdown",
+            CreatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow
+        };
+
+        dbContext.OpenAiTranscriptionTasks.Add(task);
+        dbContext.OpenAiRecognizedSegments.AddRange(
+            Enumerable.Range(0, 5).Select(i => new OpenAiRecognizedSegment
+            {
+                TaskId = task.Id,
+                Task = task,
+                Order = i,
+                Text = $"segment-{i}",
+                ProcessedText = $"segment-{i}-processed",
+                IsProcessed = true,
+                IsProcessing = false
+            }));
+
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var prepared = await service.PrepareForContinuationFromSegmentAsync(task.Id, 4);
+
+        Assert.NotNull(prepared);
+        Assert.Equal(OpenAiTranscriptionStatus.ProcessingSegments, prepared!.Status);
+        Assert.False(prepared.Done);
+        Assert.Null(prepared.Error);
+        Assert.Null(prepared.ProcessedText);
+        Assert.Null(prepared.MarkdownText);
+        Assert.Equal(3, prepared.SegmentsProcessed);
+
+        var persistedSegments = await dbContext.OpenAiRecognizedSegments
+            .Where(s => s.TaskId == task.Id)
+            .OrderBy(s => s.Order)
+            .ToListAsync();
+
+        Assert.All(persistedSegments.Take(3), s => Assert.True(s.IsProcessed));
+        Assert.All(persistedSegments.Skip(3), s => Assert.False(s.IsProcessed));
+        Assert.All(persistedSegments.Skip(3), s => Assert.Null(s.ProcessedText));
+    }
+
     private static TestOpenAiTranscriptionService CreateService(MyDbContext dbContext)
     {
         var configuration = new ConfigurationBuilder()

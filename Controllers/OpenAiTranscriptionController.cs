@@ -203,6 +203,7 @@ namespace YandexSpeech.Controllers
                 task.Error,
                 task.CreatedAt,
                 task.ModifiedAt,
+                !string.IsNullOrWhiteSpace(task.SourceFileUrl),
                 task.SegmentsTotal,
                 task.SegmentsProcessed,
                 task.Clarification,
@@ -256,6 +257,7 @@ namespace YandexSpeech.Controllers
                     task.Error,
                     task.CreatedAt,
                     task.ModifiedAt,
+                    RequiresDownload = task.SourceFileUrl != null && task.SourceFileUrl != string.Empty,
                     task.SegmentsTotal,
                     task.SegmentsProcessed,
                     task.Clarification,
@@ -276,6 +278,7 @@ namespace YandexSpeech.Controllers
                     t.Error,
                     t.CreatedAt,
                     t.ModifiedAt,
+                    t.RequiresDownload,
                     t.SegmentsTotal,
                     t.SegmentsProcessed,
                     t.Clarification,
@@ -370,6 +373,71 @@ namespace YandexSpeech.Controllers
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to continue OpenAI transcription task {TaskId}", id);
+                }
+            });
+
+            string? createdByEmail = null;
+            if (isAdmin)
+            {
+                createdByEmail = await GetUserEmailAsync(preparedTask.CreatedBy);
+            }
+
+            return Ok(MapToDetailsDto(preparedTask, createdByEmail));
+        }
+
+        [HttpPost("{id}/continue-from-segment")]
+        public async Task<ActionResult<OpenAiTranscriptionTaskDetailsDto>> ContinueFromSegment(
+            string id,
+            [FromBody] ContinueFromSegmentRequest? request)
+        {
+            if (request == null || request.SegmentNumber < 1)
+            {
+                return BadRequest(ErrorResponse.FromMessage("Укажите номер сегмента больше нуля."));
+            }
+
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
+
+            var isAdmin = User.IsInRole("Admin");
+
+            var taskExists = await _dbContext.OpenAiTranscriptionTasks
+                .AsNoTracking()
+                .AnyAsync(t => t.Id == id && (t.CreatedBy == userId || isAdmin));
+
+            if (!taskExists)
+            {
+                return NotFound();
+            }
+
+            OpenAiTranscriptionTask? preparedTask;
+            try
+            {
+                preparedTask = await _transcriptionService.PrepareForContinuationFromSegmentAsync(id, request.SegmentNumber);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ErrorResponse.FromMessage(ex.Message));
+            }
+
+            if (preparedTask == null)
+            {
+                return NotFound();
+            }
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var scopedService = scope.ServiceProvider.GetRequiredService<IOpenAiTranscriptionService>();
+                    await scopedService.ContinueTranscriptionAsync(id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to continue OpenAI transcription task {TaskId} from segment {SegmentNumber}", id, request.SegmentNumber);
                 }
             });
 
@@ -946,6 +1014,7 @@ namespace YandexSpeech.Controllers
                 task.Error,
                 task.CreatedAt,
                 task.ModifiedAt,
+                !string.IsNullOrWhiteSpace(task.SourceFileUrl),
                 task.SegmentsTotal,
                 task.SegmentsProcessed,
                 task.Clarification,
@@ -963,6 +1032,7 @@ namespace YandexSpeech.Controllers
             string? error,
             DateTime createdAt,
             DateTime modifiedAt,
+            bool requiresDownload,
             int segmentsTotal,
             int segmentsProcessed,
             string? clarification,
@@ -981,6 +1051,7 @@ namespace YandexSpeech.Controllers
                 Error = error,
                 CreatedAt = createdAt,
                 ModifiedAt = modifiedAt,
+                RequiresDownload = requiresDownload,
                 SegmentsTotal = segmentsTotal,
                 SegmentsProcessed = segmentsProcessed,
                 Clarification = clarification,
@@ -1003,6 +1074,9 @@ namespace YandexSpeech.Controllers
                 Error = task.Error,
                 CreatedAt = task.CreatedAt,
                 ModifiedAt = task.ModifiedAt,
+                RequiresDownload = !string.IsNullOrWhiteSpace(task.SourceFileUrl),
+                SegmentsTotal = task.SegmentsTotal,
+                SegmentsProcessed = task.SegmentsProcessed,
                 RecognizedText = task.RecognizedText,
                 ProcessedText = task.ProcessedText,
                 MarkdownText = task.MarkdownText,
@@ -1211,6 +1285,11 @@ namespace YandexSpeech.Controllers
         public class UpdateMarkdownRequest
         {
             public string Markdown { get; set; } = string.Empty;
+        }
+
+        public class ContinueFromSegmentRequest
+        {
+            public int SegmentNumber { get; set; }
         }
 
         public class AdminRestartStoppedTasksResponse

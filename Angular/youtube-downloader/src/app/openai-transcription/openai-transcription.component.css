@@ -517,6 +517,28 @@ section {
   flex-wrap: wrap;
 }
 
+.continue-from-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.continue-from-segment label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.continue-from-segment input {
+  width: 88px;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+}
+
 .inline-spinner {
   width: 28px !important;
   height: 28px !important;
@@ -696,6 +718,31 @@ pre {
 .steps-section h4 {
   margin: 0;
   font-size: 1.2rem;
+  color: #0f172a;
+}
+
+.workflow-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.workflow-summary-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(241, 245, 249, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.workflow-summary-item span {
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.workflow-summary-item strong {
+  font-size: 0.95rem;
   color: #0f172a;
 }
 
