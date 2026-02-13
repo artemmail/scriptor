@@ -112,7 +112,7 @@
     <mat-tab label="Яндекс диск">
       <div class="tab-content link-tab-content">
         <div class="link-input">
-          <label class="link-input__label" for="yandex-link-input">Ссылка на публичный файл /transcriptions</label>
+          <label class="link-input__label" for="yandex-link-input">Ссылка на публичный файл Яндекс Диска</label>
           <div class="link-input__field" [class.disabled]="uploading || profilesLoading">
             <mat-icon aria-hidden="true">link</mat-icon>
             <input
@@ -155,7 +155,7 @@
         autocomplete="off"
       ></textarea>
     </div>
-    
+    <div class="clarification-input__hint" *ngIf="clarificationHint">{{ clarificationHint }}</div>
   </div>
 
   <mat-progress-bar *ngIf="uploading" mode="indeterminate"></mat-progress-bar>

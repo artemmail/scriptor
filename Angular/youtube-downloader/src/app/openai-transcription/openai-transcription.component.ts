@@ -1,4 +1,4 @@
-import { Component, ElementRef, Inject, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, Inject, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
@@ -274,6 +274,15 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.stopPolling();
     this.resetFullscreenState();
     this.userSubscription?.unsubscribe();
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscapePressed(): void {
+    if (!this.isResultFullscreen) {
+      return;
+    }
+
+    this.resetFullscreenState();
   }
 
   openUploadDialog(): void {
@@ -1088,6 +1097,14 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
 
   canContinueFromSegment(task: OpenAiTranscriptionTaskDetailsDto | null): boolean {
     return !!task && task.status === OpenAiTranscriptionStatus.Error && task.segmentsTotal > 0;
+  }
+
+  isContinueFromSegmentNumberInvalid(task: OpenAiTranscriptionTaskDetailsDto | null): boolean {
+    if (!task || !this.canContinueFromSegment(task) || this.continueFromSegmentNumber == null) {
+      return false;
+    }
+
+    return this.continueFromSegmentNumber < 1 || this.continueFromSegmentNumber > task.segmentsTotal;
   }
 
   onContinueFromSegmentNumberInput(value: string): void {

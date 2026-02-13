@@ -31,8 +31,21 @@
           <div class="panel-header">
             <h3>Мои расшифровки</h3>
             <div class="panel-header-actions">
+              <button
+                class="panel-refresh-button"
+                type="button"
+                (click)="loadTasks()"
+                [disabled]="uploading || adminRestartInProgress"
+                aria-label="Обновить список"
+              >
+                <mat-icon aria-hidden="true">refresh</mat-icon>
+                <span>Обновить</span>
+              </button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="admin-toolbar" *ngIf="canShowAllTasks">
               <mat-checkbox
-                *ngIf="canShowAllTasks"
                 class="show-all-checkbox"
                 [checked]="isShowingAllTasks"
                 (change)="onShowAllChange($event.checked)"
@@ -40,52 +53,43 @@
                 Все пользователи
               </mat-checkbox>
               <button
-                *ngIf="canShowAllTasks"
-                class="icon-button warning-icon-button"
+                class="admin-toolbar__restart"
                 type="button"
                 (click)="restartStoppedTasksAsAdmin()"
                 [disabled]="uploading || adminRestartInProgress"
-                aria-label="Очистить очередь и перезапустить остановленные задачи"
               >
-                <mat-icon>restart_alt</mat-icon>
-              </button>
-              <button
-                class="icon-button"
-                type="button"
-                (click)="loadTasks()"
-                [disabled]="uploading"
-                aria-label="Обновить список"
-              >
-                <mat-icon>refresh</mat-icon>
+                <mat-icon aria-hidden="true">restart_alt</mat-icon>
+                <span>Перезапустить остановленные</span>
               </button>
               <mat-progress-spinner
                 *ngIf="adminRestartInProgress"
                 mode="indeterminate"
-                diameter="24"
+                diameter="20"
                 class="inline-spinner"
               ></mat-progress-spinner>
             </div>
-          </div>
-          <div class="panel-body">
             <div class="error" *ngIf="listError">{{ listError }}</div>
             <div class="error" *ngIf="adminRestartError">{{ adminRestartError }}</div>
-            <mat-nav-list class="tasks-list" *ngIf="tasks.length; else emptyTasks">
-              <a
+            <mat-action-list class="tasks-list" *ngIf="tasks.length; else emptyTasks">
+              <button
                 mat-list-item
+                type="button"
+                lines="3"
                 class="task-item"
                 *ngFor="let task of tasks; trackBy: trackTask"
                 (click)="selectTask(task)"
                 [class.active]="task.id === selectedTaskId"
+                [attr.aria-current]="task.id === selectedTaskId ? 'true' : null"
               >
                 <mat-icon matListItemIcon>{{ getTaskIcon(task) }}</mat-icon>
                 <span matListItemTitle class="task-title">
                   <span class="task-email" *ngIf="isAdmin && task.createdByEmail">{{ task.createdByEmail }}</span>
                   <span class="task-display-name">{{ task.displayName }}</span>
                 </span>
-                <span matListItemLine>{{ getTaskProgressSummary(task) }}</span>
-                <span matListItemLine>{{ task.modifiedAt | localTime }}</span>
-              </a>
-            </mat-nav-list>
+                <span matListItemLine class="task-summary">{{ getTaskProgressSummary(task) }}</span>
+                <span matListItemLine class="task-updated">{{ task.modifiedAt | localTime }}</span>
+              </button>
+            </mat-action-list>
             <ng-template #emptyTasks>
               <div class="empty-state">
                 <h4>Здесь появятся ваши файлы</h4>
@@ -335,12 +339,19 @@
                         [value]="continueFromSegmentNumber ?? ''"
                         (input)="onContinueFromSegmentNumberInput($any($event.target).value)"
                         [disabled]="continueFromSegmentInProgress || continueInProgress || deleteInProgress"
+                        [class.invalid]="isContinueFromSegmentNumberInvalid(selectedTask)"
                       />
+                      <span class="continue-from-segment-hint">1-{{ selectedTask.segmentsTotal }}</span>
                       <button
                         class="btn btn-outline"
                         type="button"
                         (click)="continueTaskFromSegment()"
-                        [disabled]="continueFromSegmentInProgress || continueInProgress || deleteInProgress"
+                        [disabled]="
+                          continueFromSegmentInProgress ||
+                          continueInProgress ||
+                          deleteInProgress ||
+                          isContinueFromSegmentNumberInvalid(selectedTask)
+                        "
                       >
                         <mat-icon>replay</mat-icon>
                         <span>Восстановить с сегмента</span>
@@ -353,6 +364,9 @@
                       class="inline-spinner"
                     ></mat-progress-spinner>
                     <div class="error" *ngIf="continueError">{{ continueError }}</div>
+                    <div class="error" *ngIf="isContinueFromSegmentNumberInvalid(selectedTask)">
+                      Укажите сегмент в диапазоне 1-{{ selectedTask.segmentsTotal }}.
+                    </div>
                     <div class="error" *ngIf="continueFromSegmentError">{{ continueFromSegmentError }}</div>
                     <div class="error" *ngIf="deleteError">{{ deleteError }}</div>
                   </div>

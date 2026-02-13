@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -15,10 +16,12 @@ namespace YandexSpeech.services.Whisper
     public sealed class FasterWhisperQueueClient : IAsyncDisposable
     {
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+        private static readonly TimeSpan BufferedResponseRetention = TimeSpan.FromMinutes(30);
 
         private readonly ILogger<FasterWhisperQueueClient> _logger;
         private readonly EventBusOptions _options;
         private readonly ConcurrentDictionary<string, TaskCompletionSource<FasterWhisperQueueResponse>> _pending = new();
+        private readonly ConcurrentDictionary<string, BufferedResponse> _bufferedResponses = new();
         private readonly SemaphoreSlim _channelSync = new(1, 1);
 
         private readonly IConnection _connection;
@@ -69,7 +72,7 @@ namespace YandexSpeech.services.Whisper
             if (request is null)
                 throw new ArgumentNullException(nameof(request));
 
-            var correlationId = Guid.NewGuid().ToString("N");
+            var correlationId = BuildCorrelationId(request);
             var body = JsonSerializer.SerializeToUtf8Bytes(request, JsonOptions);
 
             var props = new BasicProperties
@@ -82,10 +85,26 @@ namespace YandexSpeech.services.Whisper
 
             var tcs = new TaskCompletionSource<FasterWhisperQueueResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
             if (!_pending.TryAdd(correlationId, tcs))
+            {
+                if (_pending.TryGetValue(correlationId, out var existingPending))
+                {
+                    _logger.LogInformation(
+                        "Joining existing pending FasterWhisper request with correlation id {CorrelationId}.",
+                        correlationId);
+                    return await existingPending.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+
                 throw new InvalidOperationException("Failed to register pending transcription request.");
+            }
 
             try
             {
+                CleanupBufferedResponses();
+                if (TryResolveFromBufferedResponse(correlationId))
+                {
+                    return await tcs.Task.ConfigureAwait(false);
+                }
+
                 await _channelSync.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try
                 {
@@ -169,16 +188,27 @@ namespace YandexSpeech.services.Whisper
             try
             {
                 correlationId = delivery.Properties?.CorrelationId;
-                if (string.IsNullOrEmpty(correlationId) || !_pending.TryRemove(correlationId, out pending))
-                {
-                    _logger.LogWarning("Received unexpected FasterWhisper response with correlation id {CorrelationId}", correlationId);
-                    return;
-                }
-
                 var json = Encoding.UTF8.GetString(delivery.Body);
                 var response = JsonSerializer.Deserialize<FasterWhisperQueueResponse>(json, JsonOptions)
                                ?? throw new InvalidOperationException("Response payload was empty.");
-                pending.TrySetResult(response);
+
+                if (string.IsNullOrEmpty(correlationId))
+                {
+                    _logger.LogWarning("Received FasterWhisper response without correlation id.");
+                    return;
+                }
+
+                if (_pending.TryRemove(correlationId, out pending))
+                {
+                    pending.TrySetResult(response);
+                    return;
+                }
+
+                CleanupBufferedResponses();
+                _bufferedResponses[correlationId] = new BufferedResponse(response, DateTime.UtcNow);
+                _logger.LogInformation(
+                    "Buffered unexpected FasterWhisper response with correlation id {CorrelationId} for later recovery.",
+                    correlationId);
             }
             catch (Exception ex)
             {
@@ -197,6 +227,43 @@ namespace YandexSpeech.services.Whisper
                     _channelSync.Release();
                 }
             }
+        }
+
+        private bool TryResolveFromBufferedResponse(string correlationId)
+        {
+            if (!_bufferedResponses.TryRemove(correlationId, out var buffered))
+                return false;
+
+            if (!_pending.TryRemove(correlationId, out var pending))
+                return false;
+
+            pending.TrySetResult(buffered.Response);
+            _logger.LogInformation(
+                "Resolved FasterWhisper request from buffered response with correlation id {CorrelationId}.",
+                correlationId);
+            return true;
+        }
+
+        private void CleanupBufferedResponses()
+        {
+            if (_bufferedResponses.IsEmpty)
+                return;
+
+            var now = DateTime.UtcNow;
+            foreach (var pair in _bufferedResponses)
+            {
+                if (now - pair.Value.ReceivedAtUtc > BufferedResponseRetention)
+                {
+                    _bufferedResponses.TryRemove(pair.Key, out _);
+                }
+            }
+        }
+
+        private static string BuildCorrelationId(FasterWhisperQueueRequest request)
+        {
+            var payload = JsonSerializer.Serialize(request, JsonOptions);
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
+            return "fw-" + Convert.ToHexString(hash).ToLowerInvariant();
         }
 
         public async ValueTask DisposeAsync()
@@ -277,6 +344,7 @@ namespace YandexSpeech.services.Whisper
     }
 
     internal sealed record RabbitMqMessage(byte[] Body, IReadOnlyBasicProperties? Properties, ulong DeliveryTag);
+    internal sealed record BufferedResponse(FasterWhisperQueueResponse Response, DateTime ReceivedAtUtc);
 
     public sealed record FasterWhisperQueueRequest
     {
