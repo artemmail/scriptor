@@ -413,17 +413,15 @@ export class About3Component implements OnInit, OnDestroy {
       return '';
     }
 
-    if (this.summary.hasLifetimeAccess || this.summary.isLifetime) {
-      return 'Безлимитный доступ активен';
-    }
-
     const planName = this.summary.planName || (this.summary.hasActiveSubscription ? 'Пакет активен' : 'Стартовый пакет');
+    const remaining = `${this.formatRemainingHours(this.summary.remainingTranscriptionMinutes)} / ${this.formatRemainingVideos(this.summary.remainingVideos)}`;
+
     if (this.summary.endsAt) {
       const ends = new Date(this.summary.endsAt).toLocaleDateString('ru-RU');
-      return `${planName} до ${ends}`;
+      return `${planName} до ${ends}: осталось ${remaining}`;
     }
 
-    return `${planName}: ${this.formatMinutes(this.summary.remainingTranscriptionMinutes)} и ${this.summary.remainingVideos} видео`;
+    return `${planName}: осталось ${remaining}`;
   }
 
   get subscriptionChipClass(): string {
@@ -492,20 +490,29 @@ export class About3Component implements OnInit, OnDestroy {
     return this.summaryLoading || !!this.summary || !!this.summaryError || !!this.limitResponse || !this.isAuthenticated;
   }
 
-  formatMinutes(minutes: number | null | undefined): string {
+  formatRemainingHours(minutes: number | null | undefined): string {
     if (minutes == null) {
-      return '0 мин';
+      return '0 ч';
     }
 
     if (minutes >= 2147483647) {
-      return 'безлимит минут';
+      return 'безлимит ч';
     }
 
-    if (minutes < 60) {
-      return `${minutes} мин`;
+    const hours = Math.max(0, minutes) / 60;
+    const formatted = hours.toFixed(1).replace('.', ',').replace(',0', '');
+    return `${formatted} ч`;
+  }
+
+  formatRemainingVideos(videos: number | null | undefined): string {
+    if (videos == null) {
+      return '0 YouTube';
     }
 
-    const hours = (minutes / 60).toFixed(1).replace('.', ',');
-    return `${hours} ч`;
+    if (videos >= 2147483647) {
+      return 'безлимит YouTube';
+    }
+
+    return `${Math.max(0, videos)} YouTube`;
   }
 }

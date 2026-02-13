@@ -76,7 +76,7 @@
             <p class="summary-description" *ngIf="!summaryLoading">
               <ng-container *ngIf="isAuthenticated; else guestSummary">
                 <ng-container *ngIf="summary; else summaryFallback">
-                  Доступно: {{ formatMinutes(summary.remainingTranscriptionMinutes) }} и {{ summary.remainingVideos }} видео.
+                  Осталось: {{ formatRemainingHours(summary.remainingTranscriptionMinutes) }} / {{ formatRemainingVideos(summary.remainingVideos) }}.
                 </ng-container>
                 <ng-template #summaryFallback>
                   Узнать актуальные условия можно в разделе биллинга.

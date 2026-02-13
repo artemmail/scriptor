@@ -31,7 +31,7 @@
             Осталось видео: {{ remainingVideos }}
           </p>
           <p class="summary-description" *ngIf="summary && !summaryLoading">
-            Доступно: {{ formatMinutes(summary.remainingTranscriptionMinutes) }} и {{ summary.remainingVideos }} видео.
+            Осталось: {{ formatRemainingHours(summary.remainingTranscriptionMinutes) }} / {{ formatRemainingVideos(summary.remainingVideos) }}.
           </p>
           <div class="limit-message" *ngIf="limitResponse">
             <p>{{ limitResponse.message }}</p>

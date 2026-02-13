@@ -45,7 +45,7 @@
             <p class="summary-error" *ngIf="summaryError">{{ summaryError }}</p>
             <ng-container *ngIf="summary && !summaryLoading">
               <p class="summary-description">
-                Доступно: {{ formatMinutes(summary.remainingTranscriptionMinutes) }} и {{ summary.remainingVideos }} видео.
+                Осталось: {{ formatRemainingHours(summary.remainingTranscriptionMinutes) }} / {{ formatRemainingVideos(summary.remainingVideos) }}.
               </p>
               <p class="summary-meta" *ngIf="summary.endsAt && summary.hasActiveSubscription">
                 Доступ активен до {{ formatDate(summary.endsAt) }}
