@@ -57,6 +57,10 @@ namespace YandexSpeech.models.DB
         [MaxLength(8)]
         public string Currency { get; set; } = "RUB";
 
+        public int IncludedTranscriptionMinutes { get; set; }
+
+        public int IncludedVideos { get; set; }
+
         public int? MaxRecognitionsPerDay { get; set; }
 
         public bool CanHideCaptions { get; set; } = true;
@@ -91,6 +95,14 @@ namespace YandexSpeech.models.DB
         public DateTime StartDate { get; set; } = DateTime.UtcNow;
 
         public DateTime? EndDate { get; set; }
+
+        public int GrantedTranscriptionMinutes { get; set; }
+
+        public int RemainingTranscriptionMinutes { get; set; }
+
+        public int GrantedVideos { get; set; }
+
+        public int RemainingVideos { get; set; }
 
         public bool AutoRenew { get; set; }
 

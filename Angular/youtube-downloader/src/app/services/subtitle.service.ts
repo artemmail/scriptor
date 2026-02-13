@@ -69,12 +69,16 @@ export interface YoutubeCaptionTaskTableDto {
 export interface StartSubtitleRecognitionResponse {
   taskId: string;
   remainingQuota?: number | null;
+  remainingTranscriptionMinutes?: number | null;
+  remainingVideos?: number | null;
 }
 
 export interface StartSubtitleRecognitionBatchResponse {
   taskIds: string[];
   invalidItems?: string[];
   remainingQuota?: number | null;
+  remainingTranscriptionMinutes?: number | null;
+  remainingVideos?: number | null;
 }
 
 @Injectable({

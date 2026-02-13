@@ -164,16 +164,13 @@ export class ProfileComponent implements OnInit {
       return 'Безлимитный доступ активен';
     }
 
-    if (this.summary.hasActiveSubscription) {
-      const planName = this.summary.planName || 'Подписка активна';
-      if (this.summary.endsAt) {
-        const ends = new Date(this.summary.endsAt).toLocaleDateString('ru-RU');
-        return `${planName} до ${ends}`;
-      }
-      return planName;
+    const planName = this.summary.planName || (this.summary.hasActiveSubscription ? 'Пакет активен' : 'Стартовый пакет');
+    if (this.summary.endsAt) {
+      const ends = new Date(this.summary.endsAt).toLocaleDateString('ru-RU');
+      return `${planName} до ${ends}`;
     }
 
-    return `Бесплатный тариф: ${this.summary.freeRecognitionsPerDay} распознавания YouTube в день и ${this.summary.freeTranscriptionsPerMonth} транскрибации в месяц`;
+    return `${planName}: ${this.formatMinutes(this.summary.remainingTranscriptionMinutes)} и ${this.summary.remainingVideos} видео`;
   }
 
   get billingUrl(): string {
@@ -275,5 +272,22 @@ export class ProfileComponent implements OnInit {
     }
 
     return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  formatMinutes(minutes: number | null | undefined): string {
+    if (minutes == null) {
+      return '0 мин';
+    }
+
+    if (minutes >= 2147483647) {
+      return 'безлимит минут';
+    }
+
+    if (minutes < 60) {
+      return `${minutes} мин`;
+    }
+
+    const hours = (minutes / 60).toFixed(1).replace('.', ',');
+    return `${hours} ч`;
   }
 }

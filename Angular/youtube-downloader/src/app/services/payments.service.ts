@@ -18,6 +18,8 @@ export interface SubscriptionPlan {
   billingPeriod: SubscriptionBillingPeriod;
   price: number;
   currency: string;
+  includedTranscriptionMinutes: number;
+  includedVideos: number;
   maxRecognitionsPerDay?: number | null;
   canHideCaptions: boolean;
   isUnlimitedRecognitions: boolean;
@@ -47,6 +49,12 @@ export interface SubscriptionSummary {
   isLifetime: boolean;
   freeRecognitionsPerDay: number;
   freeTranscriptionsPerMonth: number;
+  freeTranscriptionMinutes: number;
+  freeVideos: number;
+  remainingTranscriptionMinutes: number;
+  remainingVideos: number;
+  totalTranscriptionMinutes: number;
+  totalVideos: number;
   billingUrl: string;
   payments: SubscriptionPaymentHistoryItem[];
 }

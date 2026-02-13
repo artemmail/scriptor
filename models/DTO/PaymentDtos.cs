@@ -20,6 +20,10 @@ namespace YandexSpeech.models.DTO
 
         public string Currency { get; set; } = "RUB";
 
+        public int IncludedTranscriptionMinutes { get; set; }
+
+        public int IncludedVideos { get; set; }
+
         public int? MaxRecognitionsPerDay { get; set; }
 
         public bool CanHideCaptions { get; set; }

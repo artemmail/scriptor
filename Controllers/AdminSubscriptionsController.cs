@@ -27,6 +27,65 @@ namespace YandexSpeech.Controllers
             _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
         }
 
+        [HttpGet("plans")]
+        public async Task<ActionResult<IReadOnlyList<AdminSubscriptionPlanDto>>> GetPlans(CancellationToken cancellationToken)
+        {
+            var plans = await _subscriptionService
+                .GetPlansAsync(includeInactive: true, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+
+            var response = plans
+                .OrderBy(p => p.Priority)
+                .ThenBy(p => p.Price)
+                .ThenBy(p => p.Name)
+                .Select(MapPlan)
+                .ToList();
+
+            return Ok(response);
+        }
+
+        [HttpPut("plans/{planId:guid}")]
+        public async Task<ActionResult<AdminSubscriptionPlanDto>> SavePlan(
+            Guid planId,
+            [FromBody] SaveAdminSubscriptionPlanRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            var plan = await _dbContext.SubscriptionPlans
+                .FirstOrDefaultAsync(p => p.Id == planId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (plan == null)
+            {
+                return NotFound();
+            }
+
+            plan.Code = request.Code.Trim();
+            plan.Name = request.Name.Trim();
+            plan.Description = string.IsNullOrWhiteSpace(request.Description)
+                ? null
+                : request.Description.Trim();
+            plan.Price = request.Price;
+            plan.Currency = string.IsNullOrWhiteSpace(request.Currency)
+                ? "RUB"
+                : request.Currency.Trim().ToUpperInvariant();
+            plan.IncludedTranscriptionMinutes = Math.Max(0, request.IncludedTranscriptionMinutes);
+            plan.IncludedVideos = Math.Max(0, request.IncludedVideos);
+            plan.IsActive = request.IsActive;
+            plan.Priority = request.Priority;
+            plan.BillingPeriod = SubscriptionBillingPeriod.OneTime;
+            plan.CanHideCaptions = true;
+            plan.IsUnlimitedRecognitions = false;
+
+            await _subscriptionService.SavePlanAsync(plan, cancellationToken).ConfigureAwait(false);
+
+            return Ok(MapPlan(plan));
+        }
+
         [HttpGet]
         public async Task<ActionResult<IReadOnlyList<AdminSubscriptionDto>>> GetSubscriptions(
             [FromQuery] SubscriptionStatus? status = null,
@@ -213,6 +272,23 @@ namespace YandexSpeech.Controllers
             };
 
             return Ok(dto);
+        }
+
+        private static AdminSubscriptionPlanDto MapPlan(SubscriptionPlan plan)
+        {
+            return new AdminSubscriptionPlanDto
+            {
+                Id = plan.Id,
+                Code = plan.Code,
+                Name = plan.Name,
+                Description = plan.Description,
+                Price = plan.Price,
+                Currency = plan.Currency,
+                IncludedTranscriptionMinutes = plan.IncludedTranscriptionMinutes,
+                IncludedVideos = plan.IncludedVideos,
+                IsActive = plan.IsActive,
+                Priority = plan.Priority
+            };
         }
     }
 }

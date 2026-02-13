@@ -24,7 +24,8 @@ namespace YandexSpeech.services
             IWhisperTranscriptionService whisperTranscriptionService,
             IHttpClientFactory httpClientFactory,
             IYandexDiskDownloadService yandexDiskDownloadService,
-            IFfmpegService ffmpegService)
+            IFfmpegService ffmpegService,
+            ISubscriptionService subscriptionService)
             : base(
                 dbContext,
                 configuration,
@@ -33,7 +34,8 @@ namespace YandexSpeech.services
                 whisperTranscriptionService,
                 httpClientFactory,
                 yandexDiskDownloadService,
-                ffmpegService)
+                ffmpegService,
+                subscriptionService)
         {
         }
 

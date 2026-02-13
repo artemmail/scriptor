@@ -14,7 +14,7 @@ import { Title } from '@angular/platform-browser';
 import {
   PaymentsService,
   SubscriptionPlan,
-  SubscriptionBillingPeriod,
+  SubscriptionSummary,
   WalletBalance
 } from '../services/payments.service';
 
@@ -38,6 +38,7 @@ import {
 })
 export class BillingComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
+  private readonly unlimitedQuotaValue = 2147483647;
 
   readonly depositControl = new FormControl<number | null>(500, {
     nonNullable: false,
@@ -45,9 +46,11 @@ export class BillingComponent implements OnInit, OnDestroy {
   });
 
   plans: SubscriptionPlan[] = [];
+  summary?: SubscriptionSummary;
   wallet?: WalletBalance;
   loadingPlans = false;
   loadingWallet = false;
+  loadingSummary = false;
   submitting = false;
   infoMessage = '';
   readonly heroHighlights = [
@@ -86,6 +89,7 @@ export class BillingComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadPlans();
     this.loadWallet();
+    this.loadSummary();
 
     this.route.queryParamMap
       .pipe(takeUntil(this.destroy$))
@@ -145,6 +149,11 @@ export class BillingComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (plan.price <= 0) {
+      this.snackBar.open('Стартовый пакет выдаётся автоматически при регистрации.', 'Понятно', { duration: 4000 });
+      return;
+    }
+
     this.submitting = true;
     this.paymentsService.createSubscription(plan.code).subscribe({
       next: response => {
@@ -187,44 +196,88 @@ export class BillingComponent implements OnInit, OnDestroy {
   }
 
   formatPrice(plan: SubscriptionPlan): string {
-    return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: plan.currency }).format(plan.price);
+    return this.formatCurrency(plan.price, plan.currency);
   }
 
-  getPlanDuration(plan: SubscriptionPlan): string {
-    if (plan.isLifetime) {
-      return 'Бессрочно';
-    }
-
-    switch (this.normalizeBillingPeriod(plan.billingPeriod)) {
-      case 'ThreeDays':
-        return '3 дня';
-      case 'Monthly':
-        return '1 месяц';
-      case 'Yearly':
-        return '1 год';
-      default:
-        return 'Разово';
-    }
+  loadSummary(): void {
+    this.loadingSummary = true;
+    this.paymentsService.getSubscriptionSummary().subscribe({
+      next: summary => {
+        this.summary = summary;
+        this.loadingSummary = false;
+      },
+      error: () => {
+        this.summary = undefined;
+        this.loadingSummary = false;
+      }
+    });
   }
 
-  private normalizeBillingPeriod(period: SubscriptionBillingPeriod): string {
-    if (typeof period === 'string') {
-      return period;
+  formatPricePerHour(plan: SubscriptionPlan): string {
+    const minutes = Math.max(0, Math.round(plan.includedTranscriptionMinutes ?? 0));
+    if (minutes <= 0) {
+      return '—';
     }
 
-    switch (period) {
-      case 0:
-        return 'OneTime';
-      case 1:
-        return 'Monthly';
-      case 2:
-        return 'Yearly';
-      case 3:
-        return 'Lifetime';
-      case 4:
-        return 'ThreeDays';
-      default:
-        return `${period}`;
+    const rate = (Number(plan.price) * 60) / minutes;
+    return `${this.formatCurrency(rate, plan.currency)} / час`;
+  }
+
+  formatMinutes(minutes: number | null | undefined): string {
+    if (minutes == null) {
+      return '0 мин';
+    }
+
+    if (minutes < 60) {
+      return `${minutes} мин`;
+    }
+
+    const hours = (minutes / 60).toFixed(1).replace('.', ',');
+    return `${hours} ч`;
+  }
+
+  formatCredits(plan: SubscriptionPlan): string {
+    return `${this.formatMinutes(plan.includedTranscriptionMinutes)} и ${plan.includedVideos} видео`;
+  }
+
+  isWelcomePlan(plan: SubscriptionPlan): boolean {
+    return plan.price <= 0;
+  }
+
+  formatRemainingMinutes(minutes: number | null | undefined): string {
+    if (minutes == null) {
+      return '0 мин';
+    }
+
+    if (minutes >= this.unlimitedQuotaValue) {
+      return 'безлимит';
+    }
+
+    return this.formatMinutes(Math.max(0, minutes));
+  }
+
+  formatRemainingVideos(videos: number | null | undefined): string {
+    if (videos == null) {
+      return '0';
+    }
+
+    if (videos >= this.unlimitedQuotaValue) {
+      return 'безлимит';
+    }
+
+    return `${Math.max(0, Math.round(videos))}`;
+  }
+
+  private formatCurrency(amount: number, currency: string): string {
+    const normalizedCurrency = (currency || 'RUB').trim().toUpperCase() || 'RUB';
+    try {
+      return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: normalizedCurrency,
+        maximumFractionDigits: 2
+      }).format(amount);
+    } catch {
+      return `${amount.toFixed(2)} ${normalizedCurrency}`;
     }
   }
 }

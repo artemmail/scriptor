@@ -37,7 +37,11 @@ namespace YandexSpeech.models.DTO
 
         public string? RecognitionProfileDisplayedName { get; set; }
 
-        public int? RemainingMonthlyQuota { get; set; }
+        public int? RemainingTranscriptionMinutes { get; set; }
+
+        public int? RemainingVideos { get; set; }
+
+        public int? RequestedTranscriptionMinutes { get; set; }
 
         public string? CreatedByEmail { get; set; }
     }

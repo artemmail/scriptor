@@ -210,6 +210,33 @@ section {
   max-width: 640px;
 }
 
+.remaining-balance {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 0 0 20px;
+}
+
+.remaining-balance__item {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.remaining-balance__label {
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.remaining-balance__value {
+  font-size: 1.2rem;
+  line-height: 1.25;
+  color: #1d4ed8;
+}
+
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -250,19 +277,19 @@ section {
 
 .plans__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 32px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
 }
 
 .plan-card {
   display: flex;
   flex-direction: column;
-  padding: 32px;
-  border-radius: 28px;
+  padding: 24px;
+  border-radius: 24px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(226, 232, 240, 0.8);
   box-shadow: 0 28px 48px rgba(15, 23, 42, 0.1);
-  min-height: 440px;
+  min-height: 420px;
 }
 
 .plan-card__badge {
@@ -303,6 +330,13 @@ section {
   font-weight: 700;
   margin: 0;
   color: #1d4ed8;
+}
+
+.plan-card__hourly-price {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #334155;
 }
 
 .plan-card__description {

@@ -242,7 +242,7 @@ namespace YandexSpeech.services
         {
             var query = _dbContext.YoutubeCaptionTasks
                 .AsQueryable()
-                .Where(x => x.ChannelId != "UCa0jIrHPmqCHopklH8ltmVw")
+                .Where(x => x.ChannelId == null || x.ChannelId != "UCa0jIrHPmqCHopklH8ltmVw")
                 .Where(t => t.Visibility != YoutubeCaptionVisibility.Deleted);
 
             if (!includeHidden)

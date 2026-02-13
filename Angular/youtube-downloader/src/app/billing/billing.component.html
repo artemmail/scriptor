@@ -1,4 +1,4 @@
-<div class="billing-page" *ngIf="!loadingPlans && !loadingWallet; else loadingTemplate">
+<div class="billing-page" *ngIf="!loadingPlans && !loadingWallet && !loadingSummary; else loadingTemplate">
   <main class="page-content">
     <!--section class="hero">
       <div class="hero-text">
@@ -84,35 +84,48 @@
 
     <section class="plans">
       <div class="section-header">
-        <h2>Выберите подходящий план</h2>
-        <p>Подписка убирает все лимиты на распознавание роликов YouTube и транскрибацию и позволяет скрывать отправленные ролики в общей ленте Scriptorium</p>
+        <h2>Пакеты минут и видео</h2>
+        <p>Покупайте кредитные пакеты: минуты списываются за транскрибацию, видео — за распознавание YouTube.</p>
+      </div>
+      <div class="remaining-balance" *ngIf="summary">
+        <div class="remaining-balance__item">
+          <span class="remaining-balance__label">Осталось минут</span>
+          <strong class="remaining-balance__value">{{ formatRemainingMinutes(summary.remainingTranscriptionMinutes) }}</strong>
+        </div>
+        <div class="remaining-balance__item">
+          <span class="remaining-balance__label">Осталось YouTube-видео</span>
+          <strong class="remaining-balance__value">{{ formatRemainingVideos(summary.remainingVideos) }}</strong>
+        </div>
       </div>
       <div class="plans__grid" *ngIf="plans.length; else plansEmpty">
         <mat-card *ngFor="let plan of plans" class="plan-card">
           <mat-card-header>
             <div mat-card-avatar class="plan-card__badge">
-              <mat-icon>{{ plan.isUnlimitedRecognitions ? 'bolt' : 'star' }}</mat-icon>
+              <mat-icon>{{ isWelcomePlan(plan) ? 'gift' : 'workspace_premium' }}</mat-icon>
             </div>
             <mat-card-title>{{ plan.name }}</mat-card-title>
-            <mat-card-subtitle>{{ getPlanDuration(plan) }}</mat-card-subtitle>
+            <mat-card-subtitle>{{ formatCredits(plan) }}</mat-card-subtitle>
           </mat-card-header>
           <mat-card-content>
-            <p class="plan-card__price">{{ formatPrice(plan) }}</p>
+            <p class="plan-card__price">
+              {{ isWelcomePlan(plan) ? 'Бесплатно' : formatPrice(plan) }}
+            </p>
+            <p class="plan-card__hourly-price">{{ formatPricePerHour(plan) }}</p>
             <p class="plan-card__description" *ngIf="plan.description">{{ plan.description }}</p>
             <mat-nav-list class="plan-benefits">
-              <mat-list-item *ngIf="plan.isUnlimitedRecognitions">
+              <mat-list-item>
                 <mat-icon matListItemIcon color="primary">speed</mat-icon>
-                <span matListItemTitle>Без ограничений на количество распознаваний</span>
+                <span matListItemTitle>{{ plan.includedTranscriptionMinutes }} минут транскрибации</span>
               </mat-list-item>
-              <mat-list-item *ngIf="!plan.isUnlimitedRecognitions">
+              <mat-list-item>
                 <mat-icon matListItemIcon color="primary">workspace_premium</mat-icon>
-                <span matListItemTitle>Специальные возможности аккаунта</span>
+                <span matListItemTitle>{{ plan.includedVideos }} видео</span>
               </mat-list-item>
             </mat-nav-list>
           </mat-card-content>
           <mat-card-actions>
-            <button class="btn btn-outline plan-card__action" type="button" (click)="buyPlan(plan)" [disabled]="submitting">
-              Оформить подписку
+            <button class="btn btn-outline plan-card__action" type="button" (click)="buyPlan(plan)" [disabled]="submitting || isWelcomePlan(plan)">
+              {{ isWelcomePlan(plan) ? 'Выдаётся автоматически' : 'Купить пакет' }}
             </button>
           </mat-card-actions>
         </mat-card>

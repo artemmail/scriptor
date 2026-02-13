@@ -29,7 +29,7 @@ export class RecognitionControlComponent implements OnInit {
   isStarting = false;
   startError: string | null = null;
   limitResponse: UsageLimitResponse | null = null;
-  remainingQuota: number | null = null;
+  remainingVideos: number | null = null;
   summary: SubscriptionSummary | null = null;
   summaryLoading = false;
   summaryError: string | null = null;
@@ -69,7 +69,7 @@ export class RecognitionControlComponent implements OnInit {
       .subscribe({
         next: (response) => {
           this.isStarting = false;
-          this.remainingQuota = response.remainingQuota ?? null;
+          this.remainingVideos = response.remainingVideos ?? response.remainingQuota ?? null;
           if (response?.taskId) {
             this.router.navigate(['/recognized', response.taskId]);
           }
@@ -83,7 +83,7 @@ export class RecognitionControlComponent implements OnInit {
             const limit = extractUsageLimitResponse(err);
             if (limit) {
               this.limitResponse = limit;
-              this.remainingQuota = limit.remainingQuota ?? null;
+              this.remainingVideos = limit.remainingVideos ?? limit.remainingQuota ?? null;
             } else {
               console.error('Error starting task:', err);
               this.startError = 'Не удалось запустить задачу. Попробуйте позже.';
@@ -121,16 +121,13 @@ export class RecognitionControlComponent implements OnInit {
       return 'Безлимитный доступ активен';
     }
 
-    if (this.summary.hasActiveSubscription) {
-      const planName = this.summary.planName || 'Подписка активна';
-      if (this.summary.endsAt) {
-        const ends = new Date(this.summary.endsAt).toLocaleDateString('ru-RU');
-        return `${planName} до ${ends}`;
-      }
-      return planName;
+    const planName = this.summary.planName || (this.summary.hasActiveSubscription ? 'Пакет активен' : 'Стартовый пакет');
+    if (this.summary.endsAt) {
+      const ends = new Date(this.summary.endsAt).toLocaleDateString('ru-RU');
+      return `${planName} до ${ends}`;
     }
 
-    return `Бесплатный тариф: ${this.summary.freeRecognitionsPerDay} YouTube-распознавания в день и ${this.summary.freeTranscriptionsPerMonth} транскрибации в месяц`;
+    return `${planName}: ${this.formatMinutes(this.summary.remainingTranscriptionMinutes)} и ${this.summary.remainingVideos} видео`;
   }
 
   get subscriptionChipClass(): string {
@@ -173,5 +170,22 @@ export class RecognitionControlComponent implements OnInit {
     }
 
     this.router.navigateByUrl(url);
+  }
+
+  formatMinutes(minutes: number | null | undefined): string {
+    if (minutes == null) {
+      return '0 мин';
+    }
+
+    if (minutes >= 2147483647) {
+      return 'безлимит минут';
+    }
+
+    if (minutes < 60) {
+      return `${minutes} мин`;
+    }
+
+    const hours = (minutes / 60).toFixed(1).replace('.', ',');
+    return `${hours} ч`;
   }
 }

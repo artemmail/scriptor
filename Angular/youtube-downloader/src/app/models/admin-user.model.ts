@@ -36,6 +36,12 @@ export interface AdminUserSubscriptionSummary {
   isLifetime: boolean;
   freeRecognitionsPerDay: number;
   freeTranscriptionsPerMonth: number;
+  freeTranscriptionMinutes: number;
+  freeVideos: number;
+  remainingTranscriptionMinutes: number;
+  remainingVideos: number;
+  totalTranscriptionMinutes: number;
+  totalVideos: number;
   billingUrl: string;
   payments: AdminSubscriptionPaymentHistoryItem[];
 }

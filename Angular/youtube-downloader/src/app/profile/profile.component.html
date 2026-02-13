@@ -44,12 +44,8 @@
           <div class="subscription-body">
             <p class="summary-error" *ngIf="summaryError">{{ summaryError }}</p>
             <ng-container *ngIf="summary && !summaryLoading">
-              <p class="summary-description" *ngIf="summary.hasActiveSubscription || summary.hasLifetimeAccess || summary.isLifetime">
-                Расшифровки и распознавания доступны без ограничений. Управляйте подпиской и реквизитами в разделе биллинга.
-              </p>
-              <p class="summary-description" *ngIf="!summary.hasActiveSubscription && !summary.hasLifetimeAccess && !summary.isLifetime">
-                Бесплатный тариф: {{ summary.freeRecognitionsPerDay }} распознавания YouTube в день и
-                {{ summary.freeTranscriptionsPerMonth }} транскрибации в месяц.
+              <p class="summary-description">
+                Доступно: {{ formatMinutes(summary.remainingTranscriptionMinutes) }} и {{ summary.remainingVideos }} видео.
               </p>
               <p class="summary-meta" *ngIf="summary.endsAt && summary.hasActiveSubscription">
                 Доступ активен до {{ formatDate(summary.endsAt) }}

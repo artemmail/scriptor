@@ -59,7 +59,7 @@ namespace YandexSpeech.Controllers
         [HttpGet("plans")]
         public async Task<ActionResult<IReadOnlyList<SubscriptionPlanDto>>> GetPlans(CancellationToken cancellationToken)
         {
-            var plans = await _subscriptionService.GetPlansAsync(includeInactive: false, cancellationToken)
+            var plans = await _subscriptionService.GetPlansAsync(includeInactive: false, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
             var response = new List<SubscriptionPlanDto>(plans.Count);
@@ -74,6 +74,8 @@ namespace YandexSpeech.Controllers
                     BillingPeriod = plan.BillingPeriod,
                     Price = plan.Price,
                     Currency = plan.Currency,
+                    IncludedTranscriptionMinutes = plan.IncludedTranscriptionMinutes,
+                    IncludedVideos = plan.IncludedVideos,
                     MaxRecognitionsPerDay = plan.MaxRecognitionsPerDay,
                     CanHideCaptions = true,
                     IsUnlimitedRecognitions = plan.IsUnlimitedRecognitions,
@@ -272,21 +274,57 @@ namespace YandexSpeech.Controllers
                 Status = null,
                 EndsAt = null,
                 IsLifetime = false,
-                FreeRecognitionsPerDay = _subscriptionLimits.FreeYoutubeRecognitionsPerDay,
-                FreeTranscriptionsPerMonth = _subscriptionLimits.FreeTranscriptionsPerMonth,
+                FreeRecognitionsPerDay = 0,
+                FreeTranscriptionsPerMonth = 0,
+                FreeTranscriptionMinutes = 0,
+                FreeVideos = 0,
+                RemainingTranscriptionMinutes = 0,
+                RemainingVideos = 0,
+                TotalTranscriptionMinutes = 0,
+                TotalVideos = 0,
                 BillingUrl = _subscriptionLimits.GetBillingUrlOrDefault(),
                 Payments = Array.Empty<SubscriptionPaymentHistoryItemDto>()
             };
 
+            var freePlan = await _dbContext.SubscriptionPlans
+                .AsNoTracking()
+                .Where(p => p.IsActive && p.Price == 0m)
+                .OrderBy(p => p.Priority)
+                .ThenBy(p => p.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            if (freePlan != null)
+            {
+                summary.FreeTranscriptionMinutes = freePlan.IncludedTranscriptionMinutes;
+                summary.FreeVideos = freePlan.IncludedVideos;
+            }
+
             var userId = TryGetUserId();
             if (string.IsNullOrEmpty(userId))
             {
+                summary.RemainingTranscriptionMinutes = summary.FreeTranscriptionMinutes;
+                summary.RemainingVideos = summary.FreeVideos;
+                summary.TotalTranscriptionMinutes = summary.FreeTranscriptionMinutes;
+                summary.TotalVideos = summary.FreeVideos;
                 return Ok(summary);
             }
 
-            var subscription = await _subscriptionService
-                .GetActiveSubscriptionAsync(userId, cancellationToken)
+            var subscriptions = await _subscriptionService
+                .GetActiveSubscriptionsAsync(userId, cancellationToken)
                 .ConfigureAwait(false);
+
+            var balance = await _subscriptionService
+                .GetQuotaBalanceAsync(userId, cancellationToken)
+                .ConfigureAwait(false);
+
+            var paidSubscription = subscriptions
+                .Where(s => s.Plan != null && s.Plan.Price > 0m)
+                .OrderByDescending(s => s.CreatedAt)
+                .FirstOrDefault();
+
+            var displaySubscription = paidSubscription
+                ?? subscriptions.OrderByDescending(s => s.CreatedAt).FirstOrDefault();
 
             var user = await _dbContext.Users
                 .AsNoTracking()
@@ -321,14 +359,18 @@ namespace YandexSpeech.Controllers
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            var plan = subscription?.Plan;
-            summary.HasActiveSubscription = subscription != null && subscription.Status == SubscriptionStatus.Active;
+            var plan = displaySubscription?.Plan;
+            summary.HasActiveSubscription = paidSubscription != null && paidSubscription.Status == SubscriptionStatus.Active;
             summary.HasLifetimeAccess = user.HasLifetimeAccess;
             summary.PlanCode = plan?.Code;
             summary.PlanName = plan?.Name;
-            summary.Status = subscription?.Status;
-            summary.EndsAt = subscription?.EndDate;
-            summary.IsLifetime = subscription?.IsLifetime ?? user.HasLifetimeAccess;
+            summary.Status = displaySubscription?.Status;
+            summary.EndsAt = displaySubscription?.EndDate;
+            summary.IsLifetime = displaySubscription?.IsLifetime ?? user.HasLifetimeAccess;
+            summary.RemainingTranscriptionMinutes = balance.RemainingTranscriptionMinutes == int.MaxValue ? int.MaxValue : Math.Max(0, balance.RemainingTranscriptionMinutes);
+            summary.RemainingVideos = balance.RemainingVideos == int.MaxValue ? int.MaxValue : Math.Max(0, balance.RemainingVideos);
+            summary.TotalTranscriptionMinutes = Math.Max(0, balance.TotalTranscriptionMinutes);
+            summary.TotalVideos = Math.Max(0, balance.TotalVideos);
             summary.Payments = payments;
 
             return Ok(summary);

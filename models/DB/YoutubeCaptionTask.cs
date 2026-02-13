@@ -67,5 +67,7 @@ namespace YandexSpeech.models.DB
         public YoutubeCaptionVisibility Visibility { get; set; } = YoutubeCaptionVisibility.Public;
 
         public DateTime? VisibilityChangedAt { get; set; }
+
+        public DateTime? QuotaChargedAt { get; set; }
     }
 }

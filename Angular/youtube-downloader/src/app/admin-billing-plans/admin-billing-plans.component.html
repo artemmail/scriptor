@@ -1,0 +1,112 @@
+<mat-card class="table-card plans-card">
+  <mat-card-header>
+    <mat-card-title>Тарифы billing</mat-card-title>
+    <mat-card-subtitle>Редактирование карточек, которые видит пользователь на странице /billing.</mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div class="toolbar">
+      <button mat-stroked-button color="primary" type="button" (click)="loadPlans()" [disabled]="loadingPlans">
+        Обновить
+      </button>
+    </div>
+
+    <div class="loading-overlay" *ngIf="loadingPlans">
+      <mat-progress-spinner mode="indeterminate" diameter="36"></mat-progress-spinner>
+    </div>
+
+    <div class="plans-error" *ngIf="plansError">{{ plansError }}</div>
+    <div class="plans-success" *ngIf="plansSuccess">{{ plansSuccess }}</div>
+
+    <div class="table-container" *ngIf="plans.length > 0; else plansEmptyState">
+      <table class="plans-table">
+        <thead>
+          <tr>
+            <th>Код</th>
+            <th>Название</th>
+            <th>Описание</th>
+            <th>Цена</th>
+            <th>Валюта</th>
+            <th>Минуты</th>
+            <th>Видео</th>
+            <th>Цена / час</th>
+            <th>Приоритет</th>
+            <th>Активен</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let plan of plans; trackBy: trackByPlanId">
+            <td>
+              <input type="text" [(ngModel)]="plan.code" (ngModelChange)="markPlanDirty(plan)" />
+            </td>
+            <td>
+              <input type="text" [(ngModel)]="plan.name" (ngModelChange)="markPlanDirty(plan)" />
+            </td>
+            <td class="description-cell">
+              <textarea rows="3" [(ngModel)]="plan.description" (ngModelChange)="markPlanDirty(plan)"></textarea>
+            </td>
+            <td>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                [(ngModel)]="plan.price"
+                (ngModelChange)="markPlanDirty(plan)"
+              />
+            </td>
+            <td>
+              <input type="text" maxlength="8" [(ngModel)]="plan.currency" (ngModelChange)="markPlanDirty(plan)" />
+            </td>
+            <td>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                [(ngModel)]="plan.includedTranscriptionMinutes"
+                (ngModelChange)="markPlanDirty(plan)"
+              />
+            </td>
+            <td>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                [(ngModel)]="plan.includedVideos"
+                (ngModelChange)="markPlanDirty(plan)"
+              />
+            </td>
+            <td class="hourly-cell">{{ formatHourlyRate(plan) }}</td>
+            <td>
+              <input
+                type="number"
+                step="1"
+                [(ngModel)]="plan.priority"
+                (ngModelChange)="markPlanDirty(plan)"
+              />
+            </td>
+            <td class="plan-active-cell">
+              <input type="checkbox" [(ngModel)]="plan.isActive" (ngModelChange)="markPlanDirty(plan)" />
+            </td>
+            <td class="plan-actions">
+              <button
+                mat-stroked-button
+                color="primary"
+                type="button"
+                (click)="savePlan(plan)"
+                [disabled]="isSavingPlan(plan.id) || !plan.dirty"
+              >
+                {{ isSavingPlan(plan.id) ? 'Сохраняем…' : 'Сохранить' }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ng-template #plansEmptyState>
+      <div class="empty-state" *ngIf="!loadingPlans">Тарифы не найдены.</div>
+    </ng-template>
+  </mat-card-content>
+</mat-card>
+

@@ -70,19 +70,13 @@
               </button>
             </div>
             <p class="summary-error" *ngIf="summaryError">{{ summaryError }}</p>
-            <p class="quota-message" *ngIf="remainingQuota !== null && remainingQuota >= 0 && !summaryLoading">
-              Осталось распознаваний сегодня: {{ remainingQuota }}
+            <p class="quota-message" *ngIf="remainingVideos !== null && remainingVideos >= 0 && !summaryLoading">
+              Осталось видео: {{ remainingVideos }}
             </p>
             <p class="summary-description" *ngIf="!summaryLoading">
               <ng-container *ngIf="isAuthenticated; else guestSummary">
                 <ng-container *ngIf="summary; else summaryFallback">
-                  <ng-container *ngIf="summary.hasActiveSubscription || summary.hasLifetimeAccess || summary.isLifetime; else aboutFree">
-                    Распознавания доступны без ограничений. Управляйте подпиской в разделе биллинга.
-                  </ng-container>
-                  <ng-template #aboutFree>
-                    Бесплатный тариф: {{ summary.freeRecognitionsPerDay }} распознавания YouTube в день и
-                    {{ summary.freeTranscriptionsPerMonth }} транскрибации в месяц.
-                  </ng-template>
+                  Доступно: {{ formatMinutes(summary.remainingTranscriptionMinutes) }} и {{ summary.remainingVideos }} видео.
                 </ng-container>
                 <ng-template #summaryFallback>
                   Узнать актуальные условия можно в разделе биллинга.

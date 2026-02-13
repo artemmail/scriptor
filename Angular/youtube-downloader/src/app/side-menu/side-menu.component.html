@@ -88,6 +88,15 @@
             mat-list-item
             class="submenu-item"
             *ngIf="hasRole(user, 'Admin')"
+            (click)="navigate('/admin/billing-plans')"
+          >
+            <mat-icon matListItemIcon>sell</mat-icon>
+            <span matListItemTitle>Тарифы billing</span>
+          </a>
+          <a
+            mat-list-item
+            class="submenu-item"
+            *ngIf="hasRole(user, 'Admin')"
             (click)="navigate('/admin/recognition-profiles')"
           >
             <mat-icon matListItemIcon>tune</mat-icon>

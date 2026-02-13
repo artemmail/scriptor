@@ -181,7 +181,8 @@ export class AdminUserRoleDialogComponent implements OnInit {
 
   getPlanLabel(plan: SubscriptionPlan): string {
     const price = plan.price != null ? `${plan.price} ${plan.currency}` : '';
-    return price ? `${plan.name} — ${price}` : plan.name;
+    const credits = `${plan.includedTranscriptionMinutes} мин / ${plan.includedVideos} видео`;
+    return price ? `${plan.name} — ${price} (${credits})` : `${plan.name} (${credits})`;
   }
 
   trackPayment(_: number, payment: { invoiceId: string }): string {

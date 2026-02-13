@@ -162,6 +162,9 @@
   <div class="error" *ngIf="uploadError">{{ uploadError }}</div>
   <div class="limit-message" *ngIf="limitResponse">
     <p>{{ limitResponse.message }}</p>
+    <p *ngIf="limitResponse.maxUploadMinutes != null && limitResponse.maxUploadMinutes > 0">
+      Можно обрезать исходник до {{ limitResponse.maxUploadMinutes }} мин и попробовать снова.
+    </p>
     <button mat-stroked-button color="primary" type="button" (click)="confirmLimit()">
       Перейти к оплате
     </button>

@@ -73,6 +73,12 @@ namespace YandexSpeech.models.DB
 
         public int SegmentsProcessed { get; set; }
 
+        public int? SourceDurationSeconds { get; set; }
+
+        public int RequestedTranscriptionMinutes { get; set; }
+
+        public DateTime? QuotaChargedAt { get; set; }
+
         public virtual ICollection<OpenAiTranscriptionStep> Steps { get; set; }
             = new List<OpenAiTranscriptionStep>();
 

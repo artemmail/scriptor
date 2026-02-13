@@ -224,6 +224,18 @@ namespace YandexSpeech.Controllers
                 .GetActiveSubscriptionAsync(userId, cancellationToken)
                 .ConfigureAwait(false);
 
+            var balance = await _subscriptionService
+                .GetQuotaBalanceAsync(userId, cancellationToken)
+                .ConfigureAwait(false);
+
+            var freePlan = await _dbContext.SubscriptionPlans
+                .AsNoTracking()
+                .Where(p => p.IsActive && p.Price == 0m)
+                .OrderBy(p => p.Priority)
+                .ThenBy(p => p.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+
             var payments = await _dbContext.SubscriptionInvoices
                 .AsNoTracking()
                 .Include(i => i.UserSubscription)
@@ -258,8 +270,14 @@ namespace YandexSpeech.Controllers
                 Status = subscription?.Status,
                 EndsAt = subscription?.EndDate,
                 IsLifetime = subscription?.IsLifetime ?? user.HasLifetimeAccess,
-                FreeRecognitionsPerDay = _subscriptionLimits.FreeYoutubeRecognitionsPerDay,
-                FreeTranscriptionsPerMonth = _subscriptionLimits.FreeTranscriptionsPerMonth,
+                FreeRecognitionsPerDay = 0,
+                FreeTranscriptionsPerMonth = 0,
+                FreeTranscriptionMinutes = freePlan?.IncludedTranscriptionMinutes ?? 0,
+                FreeVideos = freePlan?.IncludedVideos ?? 0,
+                RemainingTranscriptionMinutes = balance.RemainingTranscriptionMinutes == int.MaxValue ? int.MaxValue : Math.Max(0, balance.RemainingTranscriptionMinutes),
+                RemainingVideos = balance.RemainingVideos == int.MaxValue ? int.MaxValue : Math.Max(0, balance.RemainingVideos),
+                TotalTranscriptionMinutes = Math.Max(0, balance.TotalTranscriptionMinutes),
+                TotalVideos = Math.Max(0, balance.TotalVideos),
                 BillingUrl = _subscriptionLimits.GetBillingUrlOrDefault(),
                 Payments = payments
             };

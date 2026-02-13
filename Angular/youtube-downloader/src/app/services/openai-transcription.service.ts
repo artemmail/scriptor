@@ -37,6 +37,9 @@ export interface OpenAiTranscriptionTaskDto {
   recognitionProfileId?: number | null;
   recognitionProfileName?: string | null;
   recognitionProfileDisplayedName?: string | null;
+  remainingTranscriptionMinutes?: number | null;
+  remainingVideos?: number | null;
+  requestedTranscriptionMinutes?: number | null;
   createdByEmail?: string | null;
 }
 

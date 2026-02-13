@@ -9,6 +9,7 @@ using YoutubeDownload.Services;
 using YoutubeExplode.Common;
 using YoutubeExplode.Videos.ClosedCaptions;
 using Microsoft.Extensions.Logging;
+using YandexSpeech.services.Interface;
 
 namespace YandexSpeech.services
 {
@@ -26,18 +27,21 @@ namespace YandexSpeech.services
         private readonly CaptionService _captionService;
         private readonly ILogger<YoutubeCaptionService> _logger;
         private readonly IYSubtitlesService _slugService;
+        private readonly ISubscriptionService _subscriptionService;
 
         public YoutubeCaptionService(
             MyDbContext dbContext,
             IPunctuationService punctuationService,
             CaptionService captionService,
             IYSubtitlesService slugService,
+            ISubscriptionService subscriptionService,
             ILogger<YoutubeCaptionService> logger)
         {
             _dbContext = dbContext;
             _punctuationService = punctuationService;
             _captionService = captionService;
             _slugService = slugService;
+            _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
             _logger = logger;
         }
 
@@ -88,11 +92,11 @@ namespace YandexSpeech.services
 
                 switch (taskStatus.Status)
                 {
-                    
+                     
                     case RecognizeStatus.Created:
                     case RecognizeStatus.FetchingMetadata:
                         await RunFetchingSubtitlesStepAsync(id);
-                        goto case RecognizeStatus.DownloadingCaptions;
+                        break;
 
 
                     case RecognizeStatus.DownloadingCaptions:
@@ -168,6 +172,12 @@ namespace YandexSpeech.services
         {
             var task = await _dbContext.YoutubeCaptionTasks.FirstOrDefaultAsync(t => t.Id == id);
             if (task == null) throw new InvalidOperationException($"Task {id} not found");
+
+            var canStart = await EnsureVideoQuotaBeforeStartAsync(task).ConfigureAwait(false);
+            if (!canStart)
+            {
+                return;
+            }
 
             task.Status = RecognizeStatus.FetchingMetadata;
             task.ModifiedAt = DateTime.UtcNow;
@@ -323,6 +333,25 @@ namespace YandexSpeech.services
             var task = await _dbContext.YoutubeCaptionTasks.FirstOrDefaultAsync(t => t.Id == id);
             if (task == null) return;
 
+            if (!task.QuotaChargedAt.HasValue && !string.IsNullOrWhiteSpace(task.UserId))
+            {
+                var charged = await _subscriptionService
+                    .TryConsumeQuotaAsync(task.UserId, transcriptionMinutes: 0, videos: 1, reference: id)
+                    .ConfigureAwait(false);
+
+                if (!charged)
+                {
+                    task.Status = RecognizeStatus.Error;
+                    task.Error = "Недостаточно видео-кредитов для завершения задачи.";
+                    task.Done = true;
+                    task.ModifiedAt = DateTime.UtcNow;
+                    await _dbContext.SaveChangesAsync();
+                    return;
+                }
+
+                task.QuotaChargedAt = DateTime.UtcNow;
+            }
+
             task.Status = RecognizeStatus.Done;
             task.Done = true;
 
@@ -338,6 +367,42 @@ namespace YandexSpeech.services
             await _dbContext.SaveChangesAsync();
 
             await _slugService.NotifyYandexAsync("youscriptor.com", "f59e3d2c25e394fb", task.Slug);
+        }
+
+        private async Task<bool> EnsureVideoQuotaBeforeStartAsync(YoutubeCaptionTask task)
+        {
+            if (task.QuotaChargedAt.HasValue || string.IsNullOrWhiteSpace(task.UserId))
+            {
+                return true;
+            }
+
+            var charged = await _subscriptionService
+                .TryConsumeQuotaAsync(task.UserId, transcriptionMinutes: 0, videos: 1, reference: task.Id)
+                .ConfigureAwait(false);
+
+            if (charged)
+            {
+                task.QuotaChargedAt = DateTime.UtcNow;
+                task.ModifiedAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync().ConfigureAwait(false);
+                return true;
+            }
+
+            var balance = await _subscriptionService
+                .GetQuotaBalanceAsync(task.UserId)
+                .ConfigureAwait(false);
+
+            var remainingVideosText = balance.RemainingVideos == int.MaxValue
+                ? "безлимит"
+                : Math.Max(0, balance.RemainingVideos).ToString();
+
+            task.Status = RecognizeStatus.Error;
+            task.Error =
+                $"Недостаточно видео-кредитов для запуска задачи. Доступно: {remainingVideosText}. Пополните пакет в биллинге.";
+            task.Done = true;
+            task.ModifiedAt = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync().ConfigureAwait(false);
+            return false;
         }
 
         private async Task<int?> GetSegmentBlockSizeAsync(string profileName)

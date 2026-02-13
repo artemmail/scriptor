@@ -15,6 +15,7 @@ using YandexSpeech.services;
 using YandexSpeech.services.Interface;
 using YandexSpeech.services.Options;
 using YandexSpeech.services.Whisper;
+using Xabe.FFmpeg;
 
 namespace YandexSpeech.Controllers
 {
@@ -33,6 +34,7 @@ namespace YandexSpeech.Controllers
         private readonly IYandexDiskDownloadService _yandexDiskDownloadService;
         private readonly ISubscriptionAccessService _subscriptionAccessService;
         private readonly EventBusOptions _eventBusOptions;
+        private readonly IFfmpegService _ffmpegService;
 
         public OpenAiTranscriptionController(
             IOpenAiTranscriptionService transcriptionService,
@@ -44,7 +46,8 @@ namespace YandexSpeech.Controllers
             IHttpClientFactory httpClientFactory,
             IYandexDiskDownloadService yandexDiskDownloadService,
             ISubscriptionAccessService subscriptionAccessService,
-            IOptions<EventBusOptions> eventBusOptions)
+            IOptions<EventBusOptions> eventBusOptions,
+            IFfmpegService ffmpegService)
         {
             _transcriptionService = transcriptionService;
             _dbContext = dbContext;
@@ -56,6 +59,7 @@ namespace YandexSpeech.Controllers
             _yandexDiskDownloadService = yandexDiskDownloadService;
             _subscriptionAccessService = subscriptionAccessService ?? throw new ArgumentNullException(nameof(subscriptionAccessService));
             _eventBusOptions = eventBusOptions?.Value ?? throw new ArgumentNullException(nameof(eventBusOptions));
+            _ffmpegService = ffmpegService ?? throw new ArgumentNullException(nameof(ffmpegService));
         }
 
         [HttpPost]
@@ -104,23 +108,6 @@ namespace YandexSpeech.Controllers
 
             var userEmail = User.FindFirstValue(ClaimTypes.Email);
 
-            //  var userEmail = User.FindFirstValue(ClaimTypes.Email);
-
-            var authorization = await _subscriptionAccessService
-                .AuthorizeTranscriptionAsync(userId, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (!authorization.IsAllowed)
-            {
-                return StatusCode(StatusCodes.Status402PaymentRequired, new UsageLimitExceededResponse
-                {
-                    Message = authorization.Message ?? "Превышен месячный лимит транскрибаций.",
-                    PaymentUrl = authorization.PaymentUrl ?? "/billing",
-                    RemainingQuota = authorization.RemainingQuota,
-                    RecognizedTitles = authorization.RecognizedTitles
-                });
-            }
-
             var uploadsDirectory = Path.Combine(_environment.ContentRootPath, "App_Data", "transcriptions");
             Directory.CreateDirectory(uploadsDirectory);
 
@@ -140,6 +127,42 @@ namespace YandexSpeech.Controllers
 
                 var sanitizedName = OpenAiTranscriptionFileHelper.SanitizeFileName(validationResult.FileName);
                 storedFilePath = OpenAiTranscriptionFileHelper.GenerateStoredFilePath(uploadsDirectory, sanitizedName);
+            }
+
+            int? sourceDurationSeconds = null;
+            var requestedTranscriptionMinutes = 1;
+
+            if (hasFile)
+            {
+                sourceDurationSeconds = await TryResolveDurationSecondsAsync(storedFilePath, cancellationToken).ConfigureAwait(false);
+                if (sourceDurationSeconds.HasValue && sourceDurationSeconds.Value > 0)
+                {
+                    requestedTranscriptionMinutes = Math.Max(1, (int)Math.Ceiling(sourceDurationSeconds.Value / 60d));
+                }
+            }
+
+            var authorization = await _subscriptionAccessService
+                .AuthorizeTranscriptionAsync(userId, requestedTranscriptionMinutes, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!authorization.IsAllowed)
+            {
+                if (hasFile)
+                {
+                    TryDeleteFile(storedFilePath);
+                }
+
+                return StatusCode(StatusCodes.Status402PaymentRequired, new UsageLimitExceededResponse
+                {
+                    Message = authorization.Message ?? "Недостаточно минут для запуска транскрибации.",
+                    PaymentUrl = authorization.PaymentUrl ?? "/billing",
+                    RemainingQuota = authorization.RemainingQuota,
+                    RemainingTranscriptionMinutes = authorization.RemainingTranscriptionMinutes,
+                    RemainingVideos = authorization.RemainingVideos,
+                    RequestedTranscriptionMinutes = authorization.RequestedTranscriptionMinutes,
+                    MaxUploadMinutes = authorization.MaxUploadMinutes,
+                    RecognizedTitles = authorization.RecognizedTitles
+                });
             }
 
             var sanitizedClarification = string.IsNullOrWhiteSpace(clarification)
@@ -179,7 +202,9 @@ namespace YandexSpeech.Controllers
                 sanitizedClarification,
                 hasUrl ? normalizedUrl : null,
                 profile.Id,
-                profile.DisplayedName);
+                profile.DisplayedName,
+                sourceDurationSeconds,
+                requestedTranscriptionMinutes);
 
             _ = Task.Run(async () =>
             {
@@ -210,9 +235,14 @@ namespace YandexSpeech.Controllers
                 task.RecognitionProfileId,
                 profile.Name,
                 task.RecognitionProfileDisplayedName ?? profile.DisplayedName,
-                userEmail);
+                userEmail,
+                authorization.RemainingTranscriptionMinutes,
+                authorization.RemainingVideos,
+                requestedTranscriptionMinutes);
 
-            dto.RemainingMonthlyQuota = authorization.RemainingQuota;
+            dto.RemainingTranscriptionMinutes = authorization.RemainingTranscriptionMinutes;
+            dto.RemainingVideos = authorization.RemainingVideos;
+            dto.RequestedTranscriptionMinutes = requestedTranscriptionMinutes;
 
             return CreatedAtAction(
                 nameof(GetById),
@@ -846,6 +876,41 @@ namespace YandexSpeech.Controllers
             return storedFilePath;
         }
 
+        private async Task<int?> TryResolveDurationSecondsAsync(string filePath, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !System.IO.File.Exists(filePath))
+            {
+                return null;
+            }
+
+            try
+            {
+                var ffmpegDirectory = _ffmpegService.ResolveFfmpegDirectory();
+                if (!string.IsNullOrWhiteSpace(ffmpegDirectory))
+                {
+                    FFmpeg.SetExecutablesPath(ffmpegDirectory);
+                }
+
+                var mediaInfo = await FFmpeg.GetMediaInfo(filePath).ConfigureAwait(false);
+                if (mediaInfo.Duration <= TimeSpan.Zero)
+                {
+                    return null;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                return Math.Max(1, (int)Math.Ceiling(mediaInfo.Duration.TotalSeconds));
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to resolve source duration for transcription file {FilePath}", filePath);
+                return null;
+            }
+        }
+
         private async Task<(bool Success, string? FileName, string? ErrorMessage)> ValidateExternalFileUrlAsync(string fileUrl)
         {
             if (!Uri.TryCreate(fileUrl, UriKind.Absolute, out var uri))
@@ -1021,7 +1086,10 @@ namespace YandexSpeech.Controllers
                 task.RecognitionProfileId,
                 recognitionProfileName,
                 recognitionProfileDisplayedName,
-                createdByEmail);
+                createdByEmail,
+                null,
+                null,
+                task.RequestedTranscriptionMinutes > 0 ? task.RequestedTranscriptionMinutes : null);
         }
 
         private static OpenAiTranscriptionTaskDto MapToDto(
@@ -1039,7 +1107,10 @@ namespace YandexSpeech.Controllers
             int? recognitionProfileId,
             string? recognitionProfileName,
             string? recognitionProfileDisplayedName,
-            string? createdByEmail)
+            string? createdByEmail,
+            int? remainingTranscriptionMinutes = null,
+            int? remainingVideos = null,
+            int? requestedTranscriptionMinutes = null)
         {
             return new OpenAiTranscriptionTaskDto
             {
@@ -1058,6 +1129,9 @@ namespace YandexSpeech.Controllers
                 RecognitionProfileId = recognitionProfileId,
                 RecognitionProfileName = recognitionProfileName,
                 RecognitionProfileDisplayedName = recognitionProfileDisplayedName,
+                RemainingTranscriptionMinutes = remainingTranscriptionMinutes,
+                RemainingVideos = remainingVideos,
+                RequestedTranscriptionMinutes = requestedTranscriptionMinutes,
                 CreatedByEmail = createdByEmail
             };
         }
@@ -1086,6 +1160,9 @@ namespace YandexSpeech.Controllers
                 RecognitionProfileName = task.RecognitionProfile?.Name,
                 RecognitionProfileDisplayedName = task.RecognitionProfileDisplayedName
                     ?? task.RecognitionProfile?.DisplayedName,
+                RequestedTranscriptionMinutes = task.RequestedTranscriptionMinutes > 0
+                    ? task.RequestedTranscriptionMinutes
+                    : null,
                 CreatedByEmail = createdByEmail
             };
 

@@ -1,15 +1,21 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AdminYooMoneyOperation } from '../models/admin-payments.model';
 import { AdminPaymentsService } from '../services/admin-payments.service';
+import {
+  AdminSubscriptionPlan,
+  AdminSubscriptionPlansService
+} from '../services/admin-subscription-plans.service';
 import { Title } from '@angular/platform-browser';
 import {
   AdminPaymentDetailsDialogComponent,
@@ -45,6 +51,10 @@ interface OperationMetadata {
   spendingCategories: ReadonlyArray<SpendingCategory>;
 }
 
+interface EditableAdminSubscriptionPlan extends AdminSubscriptionPlan {
+  dirty?: boolean;
+}
+
 @Component({
   selector: 'app-admin-payments',
   standalone: true,
@@ -52,9 +62,11 @@ interface OperationMetadata {
   styleUrls: ['./admin-payments.component.css'],
   imports: [
     CommonModule,
+    FormsModule,
     MatCardModule,
     DatePipe,
     MatTableModule,
+    MatButtonModule,
     MatPaginatorModule,
     MatIconModule,
     MatTooltipModule,
@@ -77,15 +89,21 @@ export class AdminPaymentsComponent implements OnInit {
   ];
   readonly dataSource = new MatTableDataSource<AdminYooMoneyOperationViewModel>();
   operations: AdminYooMoneyOperationViewModel[] = [];
+  plans: EditableAdminSubscriptionPlan[] = [];
   loading = false;
+  loadingPlans = false;
   error: string | null = null;
+  plansError: string | null = null;
+  plansSuccess: string | null = null;
   pageSize = 30;
   pageIndex = 0;
   total = 0;
   readonly pageSizeOptions = [10, 20, 30, 50];
+  private readonly savingPlanIds = new Set<string>();
 
   constructor(
     private readonly adminPaymentsService: AdminPaymentsService,
+    private readonly adminSubscriptionPlansService: AdminSubscriptionPlansService,
     private readonly dialog: MatDialog,
     private readonly titleService: Title
   ) {
@@ -94,6 +112,76 @@ export class AdminPaymentsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadOperations();
+    this.loadPlans();
+  }
+
+  loadPlans(): void {
+    this.loadingPlans = true;
+    this.plansError = null;
+    this.plansSuccess = null;
+
+    this.adminSubscriptionPlansService.getPlans().subscribe({
+      next: plans => {
+        this.loadingPlans = false;
+        this.plans = (plans ?? []).map(plan => ({ ...plan, dirty: false }));
+      },
+      error: err => {
+        this.loadingPlans = false;
+        this.plans = [];
+        this.plansError = this.resolveErrorMessage(err, 'Не удалось загрузить тарифы.');
+      }
+    });
+  }
+
+  markPlanDirty(plan: EditableAdminSubscriptionPlan): void {
+    plan.dirty = true;
+    this.plansSuccess = null;
+    this.plansError = null;
+  }
+
+  isSavingPlan(planId: string): boolean {
+    return this.savingPlanIds.has(planId);
+  }
+
+  savePlan(plan: EditableAdminSubscriptionPlan): void {
+    if (!plan || !plan.id || this.isSavingPlan(plan.id)) {
+      return;
+    }
+
+    this.savingPlanIds.add(plan.id);
+    this.plansError = null;
+    this.plansSuccess = null;
+
+    this.adminSubscriptionPlansService
+      .savePlan(plan.id, {
+        code: (plan.code || '').trim(),
+        name: (plan.name || '').trim(),
+        description: plan.description?.trim() || null,
+        price: Number.isFinite(plan.price) ? plan.price : 0,
+        currency: (plan.currency || 'RUB').trim().toUpperCase(),
+        includedTranscriptionMinutes: Math.max(0, Math.round(plan.includedTranscriptionMinutes ?? 0)),
+        includedVideos: Math.max(0, Math.round(plan.includedVideos ?? 0)),
+        isActive: !!plan.isActive,
+        priority: Math.round(plan.priority ?? 0),
+      })
+      .subscribe({
+        next: updated => {
+          this.savingPlanIds.delete(plan.id);
+          const index = this.plans.findIndex(item => item.id === updated.id);
+          if (index >= 0) {
+            this.plans[index] = { ...updated, dirty: false };
+          }
+          this.plansSuccess = `Тариф "${updated.name}" сохранён.`;
+        },
+        error: err => {
+          this.savingPlanIds.delete(plan.id);
+          this.plansError = this.resolveErrorMessage(err, 'Не удалось сохранить тариф.');
+        }
+      });
+  }
+
+  trackByPlanId(_: number, plan: EditableAdminSubscriptionPlan): string {
+    return plan.id;
   }
 
   loadOperations(pageIndex = this.pageIndex, pageSize = this.pageSize): void {

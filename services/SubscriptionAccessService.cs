@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -31,160 +30,149 @@ namespace YandexSpeech.services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public async Task<UsageDecision> AuthorizeYoutubeRecognitionAsync(string userId, CancellationToken cancellationToken = default)
+        public async Task<UsageDecision> AuthorizeYoutubeRecognitionAsync(
+            string userId,
+            int requestedVideos = 1,
+            CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrEmpty(userId);
 
-            var user = await _dbContext.Users
-                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
-                .ConfigureAwait(false)
-                ?? throw new InvalidOperationException($"User '{userId}' was not found.");
+            var billingUrl = _options.GetBillingUrlOrDefault();
 
-            var subscription = await _subscriptionService
-                .GetActiveSubscriptionAsync(userId, cancellationToken)
+            var userExists = await _dbContext.Users
+                .AsNoTracking()
+                .AnyAsync(u => u.Id == userId, cancellationToken)
                 .ConfigureAwait(false);
 
-            var billingUrl = _options.GetBillingUrlOrDefault();
-            var plan = subscription?.Plan;
-
-            var hasUnlimited = user.HasLifetimeAccess
-                || (subscription?.IsLifetime ?? false)
-                || (plan?.IsUnlimitedRecognitions ?? false);
-
-            if (hasUnlimited)
+            if (!userExists)
             {
-                return UsageDecision.Allowed(null);
+                throw new InvalidOperationException($"User '{userId}' was not found.");
             }
 
-            var dailyLimit = plan?.MaxRecognitionsPerDay ?? _options.FreeYoutubeRecognitionsPerDay;
-            if (dailyLimit <= 0)
+            var normalizedRequestedVideos = Math.Max(1, requestedVideos);
+            var balance = await _subscriptionService
+                .GetQuotaBalanceAsync(userId, cancellationToken)
+                .ConfigureAwait(false);
+
+            var remainingVideos = balance.RemainingVideos;
+            var remainingMinutes = balance.RemainingTranscriptionMinutes;
+
+            if (remainingVideos == int.MaxValue)
             {
-                return UsageDecision.Allowed(null);
+                return UsageDecision.Allowed(
+                    remainingQuota: null,
+                    remainingTranscriptionMinutes: remainingMinutes == int.MaxValue ? null : remainingMinutes,
+                    remainingVideos: null);
             }
 
-            var cutoff = DateTime.UtcNow.AddDays(-1);
-            var usageQuery = _dbContext.YoutubeCaptionTasks
+            if (remainingVideos >= normalizedRequestedVideos)
+            {
+                var afterVideos = Math.Max(remainingVideos - normalizedRequestedVideos, 0);
+                return UsageDecision.Allowed(
+                    remainingQuota: afterVideos,
+                    remainingTranscriptionMinutes: remainingMinutes,
+                    remainingVideos: afterVideos);
+            }
+
+            var message = remainingVideos > 0
+                ? $"Недостаточно видео-кредитов: доступно {remainingVideos}, требуется {normalizedRequestedVideos}. Пополните пакет в биллинге."
+                : "Лимит видео исчерпан. Пополните пакет в биллинге.";
+
+            _logger.LogInformation(
+                "User {UserId} exceeded video quota. RemainingVideos={RemainingVideos}, RequestedVideos={RequestedVideos}",
+                userId,
+                remainingVideos,
+                normalizedRequestedVideos);
+
+            return UsageDecision.Denied(
+                message,
+                billingUrl,
+                remainingQuota: remainingVideos,
+                remainingTranscriptionMinutes: remainingMinutes,
+                remainingVideos: remainingVideos);
+        }
+
+        public async Task<UsageDecision> AuthorizeTranscriptionAsync(
+            string userId,
+            int requestedTranscriptionMinutes,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(userId);
+
+            var userExists = await _dbContext.Users
                 .AsNoTracking()
-                .Where(t => t.UserId == userId)
-                .Where(t => t.Status != RecognizeStatus.Error)
-                .Where(t =>
-                    (t.ModifiedAt.HasValue && t.ModifiedAt.Value >= cutoff) ||
-                    (t.CreatedAt.HasValue && t.CreatedAt.Value >= cutoff));
+                .AnyAsync(u => u.Id == userId, cancellationToken)
+                .ConfigureAwait(false);
 
-            var usedRecognitions = await usageQuery.CountAsync(cancellationToken).ConfigureAwait(false);
-
-            if (usedRecognitions >= dailyLimit)
+            if (!userExists)
             {
-                var message = subscription != null
-                    ? "Достигнут дневной лимит распознаваний для текущей подписки. Попробуйте завтра или продлите подписку."
-                    : $"Бесплатный тариф включает {_options.FreeYoutubeRecognitionsPerDay} распознавания в день. Оформите подписку, чтобы снять ограничение.";
+                throw new InvalidOperationException($"User '{userId}' was not found.");
+            }
 
-                var remainingQuota = Math.Max(dailyLimit - usedRecognitions, 0);
-                _logger.LogInformation("User {UserId} exceeded daily recognition limit. Remaining {Remaining}", userId, remainingQuota);
-                var recognizedTitles = await usageQuery
-                    .Where(t => t.Done)
-                    .OrderByDescending(t => t.ModifiedAt ?? t.CreatedAt ?? DateTime.MinValue)
-                    .Select(t => string.IsNullOrWhiteSpace(t.Title) ? t.Id : t.Title!)
-                    .Take(3)
-                    .ToListAsync(cancellationToken)
-                    .ConfigureAwait(false);
+            var billingUrl = _options.GetBillingUrlOrDefault();
+            var requestedMinutes = Math.Max(1, requestedTranscriptionMinutes);
 
-                if (recognizedTitles.Count > 0)
-                {
-                    message = string.Concat(
-                        message,
-                        " Уже распознаны: ",
-                        string.Join(", ", recognizedTitles),
-                        ".");
-                }
+            var balance = await _subscriptionService
+                .GetQuotaBalanceAsync(userId, cancellationToken)
+                .ConfigureAwait(false);
+
+            var remainingMinutes = balance.RemainingTranscriptionMinutes;
+            var remainingVideos = balance.RemainingVideos;
+
+            if (remainingMinutes == int.MaxValue)
+            {
+                return UsageDecision.Allowed(
+                    remainingQuota: remainingVideos == int.MaxValue ? null : remainingVideos,
+                    remainingTranscriptionMinutes: null,
+                    remainingVideos: remainingVideos == int.MaxValue ? null : remainingVideos);
+            }
+
+            if (remainingMinutes >= requestedMinutes)
+            {
+                var afterMinutes = Math.Max(remainingMinutes - requestedMinutes, 0);
+                return UsageDecision.Allowed(
+                    remainingQuota: remainingVideos,
+                    remainingTranscriptionMinutes: afterMinutes,
+                    remainingVideos: remainingVideos);
+            }
+
+            if (remainingMinutes <= 0)
+            {
+                var message = "Лимит часов распознавания исчерпан. Пополните пакет в биллинге.";
+                _logger.LogInformation(
+                    "User {UserId} exceeded transcription minutes quota. RemainingMinutes={RemainingMinutes}, RequestedMinutes={RequestedMinutes}",
+                    userId,
+                    remainingMinutes,
+                    requestedMinutes);
 
                 return UsageDecision.Denied(
                     message,
                     billingUrl,
-                    remainingQuota,
-                    recognizedTitles);
+                    remainingQuota: remainingVideos,
+                    remainingTranscriptionMinutes: remainingMinutes,
+                    remainingVideos: remainingVideos,
+                    requestedTranscriptionMinutes: requestedMinutes,
+                    maxUploadMinutes: 0);
             }
 
-            var remaining = Math.Max(dailyLimit - usedRecognitions - 1, 0);
+            var deniedMessage =
+                $"Файл длиннее доступного остатка: {requestedMinutes} мин при доступных {remainingMinutes} мин. " +
+                $"Обрежьте файл до {remainingMinutes} мин или пополните пакет.";
 
-            return UsageDecision.Allowed(remaining);
-        }
+            _logger.LogInformation(
+                "User {UserId} attempted transcription beyond quota. RemainingMinutes={RemainingMinutes}, RequestedMinutes={RequestedMinutes}",
+                userId,
+                remainingMinutes,
+                requestedMinutes);
 
-        public async Task<UsageDecision> AuthorizeTranscriptionAsync(string userId, CancellationToken cancellationToken = default)
-        {
-            ArgumentException.ThrowIfNullOrEmpty(userId);
-
-            var user = await _dbContext.Users
-                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
-                .ConfigureAwait(false)
-                ?? throw new InvalidOperationException($"User '{userId}' was not found.");
-
-            var subscription = await _subscriptionService
-                .GetActiveSubscriptionAsync(userId, cancellationToken)
-                .ConfigureAwait(false);
-
-            var billingUrl = _options.GetBillingUrlOrDefault();
-
-            if (user.HasLifetimeAccess || subscription != null)
-            {
-                return UsageDecision.Allowed(null);
-            }
-
-            var limit = Math.Max(0, _options.FreeTranscriptionsPerMonth);
-            if (limit == 0)
-            {
-                return UsageDecision.Allowed(null);
-            }
-
-            var now = DateTime.UtcNow;
-            var periodCode = $"usage:transcriptions:{now:yyyy-MM}";
-
-            var usageFlag = await _dbContext.UserFeatureFlags
-                .FirstOrDefaultAsync(f => f.UserId == userId && f.FeatureCode == periodCode, cancellationToken)
-                .ConfigureAwait(false);
-
-            var used = 0;
-            if (usageFlag != null && !string.IsNullOrWhiteSpace(usageFlag.Value) && int.TryParse(usageFlag.Value, out var parsed))
-            {
-                used = Math.Max(0, parsed);
-            }
-
-            if (used >= limit)
-            {
-                var message = $"Бесплатный тариф включает {limit} транскрибации в месяц. Оформите подписку, чтобы продолжить без ограничений.";
-                _logger.LogInformation("User {UserId} reached monthly transcription limit", userId);
-                return UsageDecision.Denied(message, billingUrl, 0);
-            }
-
-            var updatedValue = used + 1;
-            var nextReset = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(1);
-
-            if (usageFlag == null)
-            {
-                usageFlag = new UserFeatureFlag
-                {
-                    Id = Guid.NewGuid(),
-                    UserId = userId,
-                    FeatureCode = periodCode,
-                    Source = FeatureFlagSource.System,
-                    Value = updatedValue.ToString(),
-                    CreatedAt = now,
-                    ExpiresAt = nextReset
-                };
-
-                _dbContext.UserFeatureFlags.Add(usageFlag);
-            }
-            else
-            {
-                usageFlag.Value = updatedValue.ToString();
-                usageFlag.CreatedAt = now;
-                usageFlag.ExpiresAt = nextReset;
-                usageFlag.Source = FeatureFlagSource.System;
-            }
-
-            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-            return UsageDecision.Allowed(Math.Max(limit - updatedValue, 0));
+            return UsageDecision.Denied(
+                deniedMessage,
+                billingUrl,
+                remainingQuota: remainingVideos,
+                remainingTranscriptionMinutes: remainingMinutes,
+                remainingVideos: remainingVideos,
+                requestedTranscriptionMinutes: requestedMinutes,
+                maxUploadMinutes: remainingMinutes);
         }
     }
 }

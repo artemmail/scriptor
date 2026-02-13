@@ -205,16 +205,13 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       return 'Безлимитный доступ активен';
     }
 
-    if (this.summary.hasActiveSubscription) {
-      const planName = this.summary.planName || 'Подписка активна';
-      if (this.summary.endsAt) {
-        const ends = new Date(this.summary.endsAt).toLocaleDateString('ru-RU');
-        return `${planName} до ${ends}`;
-      }
-      return planName;
+    const planName = this.summary.planName || (this.summary.hasActiveSubscription ? 'Пакет активен' : 'Стартовый пакет');
+    if (this.summary.endsAt) {
+      const ends = new Date(this.summary.endsAt).toLocaleDateString('ru-RU');
+      return `${planName} до ${ends}`;
     }
 
-    return `Бесплатный тариф: ${this.summary.freeTranscriptionsPerMonth} транскрибаций в месяц и ${this.summary.freeRecognitionsPerDay} распознавания YouTube в день`;
+    return `${planName}: ${this.formatMinutes(this.summary.remainingTranscriptionMinutes)} и ${this.summary.remainingVideos} видео`;
   }
 
   get subscriptionChipClass(): string {
@@ -1439,5 +1436,22 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     }
 
     return null;
+  }
+
+  private formatMinutes(minutes: number | null | undefined): string {
+    if (minutes == null) {
+      return '0 мин';
+    }
+
+    if (minutes >= 2147483647) {
+      return 'безлимит минут';
+    }
+
+    if (minutes < 60) {
+      return `${minutes} мин`;
+    }
+
+    const hours = (minutes / 60).toFixed(1).replace('.', ',');
+    return `${hours} ч`;
   }
 }

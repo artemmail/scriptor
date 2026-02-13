@@ -1,0 +1,98 @@
+:host {
+  display: block;
+  padding: 24px;
+}
+
+.table-card {
+  max-width: 1700px;
+  margin: 20px auto;
+  position: relative;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.table-container {
+  position: relative;
+  overflow-x: auto;
+  min-height: 260px;
+}
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.85);
+  z-index: 2;
+}
+
+.plans-error {
+  margin-bottom: 12px;
+  color: #d32f2f;
+}
+
+.plans-success {
+  margin-bottom: 12px;
+  color: #2e7d32;
+}
+
+.plans-table {
+  width: 100%;
+  min-width: 1320px;
+  border-collapse: collapse;
+}
+
+.plans-table th,
+.plans-table td {
+  padding: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  vertical-align: middle;
+}
+
+.plans-table input[type='text'],
+.plans-table input[type='number'],
+.plans-table textarea {
+  width: 100%;
+  min-width: 90px;
+  padding: 6px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 4px;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.plans-table textarea {
+  min-width: 240px;
+  resize: vertical;
+}
+
+.description-cell {
+  min-width: 300px;
+}
+
+.hourly-cell {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.plan-active-cell {
+  text-align: center;
+}
+
+.plan-actions {
+  min-width: 128px;
+  text-align: right;
+}
+
+.empty-state {
+  padding: 48px 0;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.54);
+  font-size: 15px;
+}
+

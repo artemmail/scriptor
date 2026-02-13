@@ -2,6 +2,10 @@ export interface UsageLimitResponse {
   message: string;
   paymentUrl?: string | null;
   remainingQuota?: number | null;
+  remainingTranscriptionMinutes?: number | null;
+  remainingVideos?: number | null;
+  requestedTranscriptionMinutes?: number | null;
+  maxUploadMinutes?: number | null;
 }
 
 export function extractUsageLimitResponse(error: unknown): UsageLimitResponse | null {
@@ -16,6 +20,10 @@ export function extractUsageLimitResponse(error: unknown): UsageLimitResponse | 
       message: payload,
       paymentUrl: '/billing',
       remainingQuota: null,
+      remainingTranscriptionMinutes: null,
+      remainingVideos: null,
+      requestedTranscriptionMinutes: null,
+      maxUploadMinutes: null,
     };
   }
 
@@ -27,11 +35,27 @@ export function extractUsageLimitResponse(error: unknown): UsageLimitResponse | 
       const paymentUrl =
         readString(record, ['paymentUrl', 'PaymentUrl', 'payment_url', 'PaymentURL']) ?? '/billing';
       const remaining = readNumber(record, ['remainingQuota', 'RemainingQuota', 'remaining_quota']);
+      const remainingMinutes = readNumber(record, [
+        'remainingTranscriptionMinutes',
+        'RemainingTranscriptionMinutes',
+        'remaining_transcription_minutes',
+      ]);
+      const remainingVideos = readNumber(record, ['remainingVideos', 'RemainingVideos', 'remaining_videos']);
+      const requestedMinutes = readNumber(record, [
+        'requestedTranscriptionMinutes',
+        'RequestedTranscriptionMinutes',
+        'requested_transcription_minutes',
+      ]);
+      const maxUploadMinutes = readNumber(record, ['maxUploadMinutes', 'MaxUploadMinutes', 'max_upload_minutes']);
 
       return {
         message,
         paymentUrl: paymentUrl && paymentUrl.trim().length > 0 ? paymentUrl : '/billing',
         remainingQuota: remaining,
+        remainingTranscriptionMinutes: remainingMinutes,
+        remainingVideos,
+        requestedTranscriptionMinutes: requestedMinutes,
+        maxUploadMinutes,
       };
     }
   }

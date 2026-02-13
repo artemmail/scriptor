@@ -27,17 +27,11 @@
             </button>
           </div>
           <p class="summary-error" *ngIf="summaryError">{{ summaryError }}</p>
-          <p class="quota-message" *ngIf="remainingQuota !== null && remainingQuota >= 0 && !summaryLoading">
-            Осталось распознаваний сегодня: {{ remainingQuota }}
+          <p class="quota-message" *ngIf="remainingVideos !== null && remainingVideos >= 0 && !summaryLoading">
+            Осталось видео: {{ remainingVideos }}
           </p>
           <p class="summary-description" *ngIf="summary && !summaryLoading">
-            <ng-container *ngIf="summary.hasActiveSubscription || summary.hasLifetimeAccess || summary.isLifetime; else freePlan">
-              Распознавания и транскрибации доступны без ограничений. Управляйте подпиской в разделе биллинга.
-            </ng-container>
-            <ng-template #freePlan>
-              Бесплатный тариф: {{ summary.freeRecognitionsPerDay }} распознавания YouTube в день и
-              {{ summary.freeTranscriptionsPerMonth }} транскрибации в месяц.
-            </ng-template>
+            Доступно: {{ formatMinutes(summary.remainingTranscriptionMinutes) }} и {{ summary.remainingVideos }} видео.
           </p>
           <div class="limit-message" *ngIf="limitResponse">
             <p>{{ limitResponse.message }}</p>

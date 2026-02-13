@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using YandexSpeech.models.DB;
 using YandexSpeech.services.Interface;
 using YandexSpeech.services.Whisper;
+using Xabe.FFmpeg;
 
 namespace YandexSpeech.services
 {
@@ -31,6 +32,7 @@ namespace YandexSpeech.services
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IYandexDiskDownloadService _yandexDiskDownloadService;
         private readonly IFfmpegService _ffmpegService;
+        private readonly ISubscriptionService _subscriptionService;
 
         protected virtual string SegmentProcessingProfileName => RecognitionProfileNames.PunctuationOnly;
 
@@ -42,7 +44,8 @@ namespace YandexSpeech.services
             IWhisperTranscriptionService whisperTranscriptionService,
             IHttpClientFactory httpClientFactory,
             IYandexDiskDownloadService yandexDiskDownloadService,
-            IFfmpegService ffmpegService)
+            IFfmpegService ffmpegService,
+            ISubscriptionService subscriptionService)
         {
             _dbContext = dbContext;
             _logger = logger;
@@ -51,6 +54,7 @@ namespace YandexSpeech.services
             _httpClientFactory = httpClientFactory;
             _yandexDiskDownloadService = yandexDiskDownloadService;
             _ffmpegService = ffmpegService;
+            _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
             _openAiApiKey = configuration["OpenAI:ApiKey"]
                              ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured.");
             _workingDirectory = Path.Combine(Path.GetTempPath(), "openai-transcriptions");
@@ -63,7 +67,9 @@ namespace YandexSpeech.services
             string? clarification = null,
             string? sourceFileUrl = null,
             int? recognitionProfileId = null,
-            string? recognitionProfileDisplayedName = null)
+            string? recognitionProfileDisplayedName = null,
+            int? sourceDurationSeconds = null,
+            int requestedTranscriptionMinutes = 0)
         {
             if (string.IsNullOrWhiteSpace(sourceFilePath))
                 throw new ArgumentException("Source file path must be provided.", nameof(sourceFilePath));
@@ -91,7 +97,9 @@ namespace YandexSpeech.services
                 RecognitionProfileId = recognitionProfileId,
                 RecognitionProfileDisplayedName = string.IsNullOrWhiteSpace(recognitionProfileDisplayedName)
                     ? null
-                    : recognitionProfileDisplayedName.Trim()
+                    : recognitionProfileDisplayedName.Trim(),
+                SourceDurationSeconds = sourceDurationSeconds,
+                RequestedTranscriptionMinutes = Math.Max(0, requestedTranscriptionMinutes)
             };
 
             _dbContext.OpenAiTranscriptionTasks.Add(task);
@@ -459,6 +467,8 @@ namespace YandexSpeech.services
                     }
                 }
 
+                await EnsureTranscriptionMinutesAvailableAsync(task, sourcePath);
+
                 await _ffmpegService.ConvertToWav16kMonoAsync(sourcePath, outputPath);
 
                 task.ConvertedFilePath = outputPath;
@@ -745,6 +755,38 @@ namespace YandexSpeech.services
 
             task.SegmentsProcessed = task.SegmentsTotal;
             task.ProcessedText = string.Join("\n", processedSegments);
+
+            if (!task.QuotaChargedAt.HasValue && task.RequestedTranscriptionMinutes > 0)
+            {
+                var charged = await _subscriptionService
+                    .TryConsumeQuotaAsync(
+                        task.CreatedBy,
+                        transcriptionMinutes: task.RequestedTranscriptionMinutes,
+                        videos: 0,
+                        reference: task.Id)
+                    .ConfigureAwait(false);
+
+                if (!charged)
+                {
+                    var balance = await _subscriptionService
+                        .GetQuotaBalanceAsync(task.CreatedBy)
+                        .ConfigureAwait(false);
+                    int? remainingMinutes = balance.RemainingTranscriptionMinutes == int.MaxValue
+                        ? null
+                        : Math.Max(0, balance.RemainingTranscriptionMinutes);
+
+                    if (remainingMinutes.HasValue)
+                    {
+                        throw new InvalidOperationException(
+                            $"Недостаточно минут для завершения распознавания: требуется {task.RequestedTranscriptionMinutes} мин, доступно {remainingMinutes.Value} мин. Пополните пакет в биллинге.");
+                    }
+
+                    throw new InvalidOperationException("Недостаточно минут на балансе для завершения распознавания. Пополните пакет в биллинге.");
+                }
+
+                task.QuotaChargedAt = DateTime.UtcNow;
+            }
+
             task.Status = OpenAiTranscriptionStatus.Done;            
             task.Done = true;
             task.ModifiedAt = DateTime.UtcNow;
@@ -806,6 +848,101 @@ namespace YandexSpeech.services
             }
 
             return SegmentProcessingProfileName;
+        }
+
+        private async Task EnsureTranscriptionMinutesAvailableAsync(OpenAiTranscriptionTask task, string sourcePath)
+        {
+            if (task == null)
+            {
+                throw new ArgumentNullException(nameof(task));
+            }
+
+            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+            {
+                return;
+            }
+
+            var requiredMinutes = Math.Max(1, task.RequestedTranscriptionMinutes);
+            var resolvedDurationSeconds = await TryResolveDurationSecondsAsync(sourcePath).ConfigureAwait(false);
+            var metadataUpdated = false;
+
+            if (resolvedDurationSeconds.HasValue && resolvedDurationSeconds.Value > 0)
+            {
+                var calculatedMinutes = Math.Max(1, (int)Math.Ceiling(resolvedDurationSeconds.Value / 60d));
+                requiredMinutes = calculatedMinutes;
+
+                if (task.SourceDurationSeconds != resolvedDurationSeconds.Value)
+                {
+                    task.SourceDurationSeconds = resolvedDurationSeconds.Value;
+                    metadataUpdated = true;
+                }
+
+                if (task.RequestedTranscriptionMinutes != calculatedMinutes)
+                {
+                    task.RequestedTranscriptionMinutes = calculatedMinutes;
+                    metadataUpdated = true;
+                }
+            }
+
+            if (metadataUpdated)
+            {
+                task.ModifiedAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync().ConfigureAwait(false);
+            }
+
+            var balance = await _subscriptionService
+                .GetQuotaBalanceAsync(task.CreatedBy)
+                .ConfigureAwait(false);
+
+            if (balance.RemainingTranscriptionMinutes == int.MaxValue)
+            {
+                return;
+            }
+
+            var remainingMinutes = Math.Max(0, balance.RemainingTranscriptionMinutes);
+            if (remainingMinutes >= requiredMinutes)
+            {
+                return;
+            }
+
+            if (remainingMinutes <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Недостаточно минут для обработки файла: лимит исчерпан. Пополните пакет в биллинге.");
+            }
+
+            throw new InvalidOperationException(
+                $"Недостаточно минут для обработки файла: требуется {requiredMinutes} мин, доступно {remainingMinutes} мин. Обрежьте файл до {remainingMinutes} мин или пополните пакет.");
+        }
+
+        private async Task<int?> TryResolveDurationSecondsAsync(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            {
+                return null;
+            }
+
+            try
+            {
+                var ffmpegDirectory = _ffmpegService.ResolveFfmpegDirectory();
+                if (!string.IsNullOrWhiteSpace(ffmpegDirectory))
+                {
+                    FFmpeg.SetExecutablesPath(ffmpegDirectory);
+                }
+
+                var mediaInfo = await FFmpeg.GetMediaInfo(filePath).ConfigureAwait(false);
+                if (mediaInfo.Duration <= TimeSpan.Zero)
+                {
+                    return null;
+                }
+
+                return Math.Max(1, (int)Math.Ceiling(mediaInfo.Duration.TotalSeconds));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Не удалось определить длительность файла {FilePath} для задачи OpenAI-транскрибации.", filePath);
+                return null;
+            }
         }
 
         private static List<CaptionSegment> BuildCaptionSegmentsFromWhisper(WhisperTranscriptionResponse parsed)

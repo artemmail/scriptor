@@ -16,6 +16,7 @@ using YandexSpeech.models.DB;
 using YandexSpeech.models.DTO;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using YandexSpeech.services.Interface;
 
 namespace YandexSpeech.Controllers
 {
@@ -28,17 +29,20 @@ namespace YandexSpeech.Controllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IConfiguration _config;
         private readonly MyDbContext _dbContext;
+        private readonly ISubscriptionService _subscriptionService;
 
         public AccountController(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             IConfiguration config,
-            MyDbContext dbContext)
+            MyDbContext dbContext,
+            ISubscriptionService subscriptionService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _config = config;
             _dbContext = dbContext;
+            _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
         }
 
         // ---------- EXTERNAL SIGN-IN ----------
@@ -130,7 +134,7 @@ namespace YandexSpeech.Controllers
 
             await EnsureDisplayNameAsync(user);
             await EnsureFinancialProfileAsync(user);
-            await EnsureFinancialProfileAsync(user);
+            await _subscriptionService.EnsureWelcomePackageAsync(user.Id);
 
             // ---------- выдаём JWT + refresh ----------
             var accessToken = await GenerateJwtToken(user);
@@ -204,6 +208,7 @@ namespace YandexSpeech.Controllers
 
             await EnsureDisplayNameAsync(user);
             await EnsureFinancialProfileAsync(user);
+            await _subscriptionService.EnsureWelcomePackageAsync(user.Id);
 
             return Ok(new UserProfileDto
             {

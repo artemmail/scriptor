@@ -65,10 +65,10 @@
                 <span class="summary-value">{{ subscriptionSummary.endsAt | date: 'medium' }}</span>
               </div>
               <div class="summary-row">
-                <span class="summary-label">Бесплатные лимиты:</span>
+                <span class="summary-label">Баланс:</span>
                 <span class="summary-value">
-                  {{ subscriptionSummary.freeRecognitionsPerDay }} распознаваний/день,
-                  {{ subscriptionSummary.freeTranscriptionsPerMonth }} транскрибаций/мес
+                  {{ subscriptionSummary.remainingTranscriptionMinutes }} мин,
+                  {{ subscriptionSummary.remainingVideos }} видео
                 </span>
               </div>
             </div>

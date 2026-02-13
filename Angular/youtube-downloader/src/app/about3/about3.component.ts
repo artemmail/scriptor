@@ -104,7 +104,7 @@ export class About3Component implements OnInit, OnDestroy {
   isStarting = false;
   startError: string | null = null;
   limitResponse: UsageLimitResponse | null = null;
-  remainingQuota: number | null = null;
+  remainingVideos: number | null = null;
   summary: SubscriptionSummary | null = null;
   summaryLoading = false;
   summaryError: string | null = null;
@@ -112,7 +112,7 @@ export class About3Component implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
   private hasRequestedSummary = false;
   readonly guestSummaryDescription =
-    '3 Youtube ролика в сутки и 2 файла с рабочим митингом или собеседованием в месяц бесплатно.';
+    'После регистрации доступен стартовый пакет минут и видео.';
 
   ngOnInit(): void {
     this.authService.user$
@@ -124,7 +124,7 @@ export class About3Component implements OnInit, OnDestroy {
           this.summaryLoading = false;
           this.summaryError = null;
           this.summary = null;
-          this.remainingQuota = null;
+          this.remainingVideos = null;
           this.hasRequestedSummary = false;
           return;
         }
@@ -364,7 +364,7 @@ export class About3Component implements OnInit, OnDestroy {
     this.subtitleService.startSubtitleRecognition(query, 'user').subscribe({
       next: (response) => {
         this.isStarting = false;
-        this.remainingQuota = response.remainingQuota ?? null;
+        this.remainingVideos = response.remainingVideos ?? response.remainingQuota ?? null;
         if (response?.taskId) {
           this.router.navigate(['/recognized', response.taskId]);
         }
@@ -380,7 +380,7 @@ export class About3Component implements OnInit, OnDestroy {
         const limit = extractUsageLimitResponse(err);
         if (limit) {
           this.limitResponse = limit;
-          this.remainingQuota = limit.remainingQuota ?? null;
+          this.remainingVideos = limit.remainingVideos ?? limit.remainingQuota ?? null;
         } else {
           console.error('Не удалось запустить распознавание', err);
           this.startError = 'Не удалось запустить распознавание. Попробуйте ещё раз позже.';
@@ -417,16 +417,13 @@ export class About3Component implements OnInit, OnDestroy {
       return 'Безлимитный доступ активен';
     }
 
-    if (this.summary.hasActiveSubscription) {
-      const planName = this.summary.planName || 'Подписка активна';
-      if (this.summary.endsAt) {
-        const ends = new Date(this.summary.endsAt).toLocaleDateString('ru-RU');
-        return `${planName} до ${ends}`;
-      }
-      return planName;
+    const planName = this.summary.planName || (this.summary.hasActiveSubscription ? 'Пакет активен' : 'Стартовый пакет');
+    if (this.summary.endsAt) {
+      const ends = new Date(this.summary.endsAt).toLocaleDateString('ru-RU');
+      return `${planName} до ${ends}`;
     }
 
-    return `Бесплатный тариф: ${this.summary.freeRecognitionsPerDay} распознавания в день и ${this.summary.freeTranscriptionsPerMonth} транскрибации в месяц`;
+    return `${planName}: ${this.formatMinutes(this.summary.remainingTranscriptionMinutes)} и ${this.summary.remainingVideos} видео`;
   }
 
   get subscriptionChipClass(): string {
@@ -484,7 +481,7 @@ export class About3Component implements OnInit, OnDestroy {
 
   handleHeroUsageLimit(limit: UsageLimitResponse): void {
     this.limitResponse = limit;
-    this.remainingQuota = limit.remainingQuota ?? null;
+    this.remainingVideos = limit.remainingVideos ?? limit.remainingQuota ?? null;
   }
 
   onHeroUploadStateChange(_: boolean): void {
@@ -493,5 +490,22 @@ export class About3Component implements OnInit, OnDestroy {
 
   get shouldShowSubscriptionCard(): boolean {
     return this.summaryLoading || !!this.summary || !!this.summaryError || !!this.limitResponse || !this.isAuthenticated;
+  }
+
+  formatMinutes(minutes: number | null | undefined): string {
+    if (minutes == null) {
+      return '0 мин';
+    }
+
+    if (minutes >= 2147483647) {
+      return 'безлимит минут';
+    }
+
+    if (minutes < 60) {
+      return `${minutes} мин`;
+    }
+
+    const hours = (minutes / 60).toFixed(1).replace('.', ',');
+    return `${hours} ч`;
   }
 }
