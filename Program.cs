@@ -28,6 +28,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
+using System.Text.RegularExpressions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -480,7 +481,7 @@ static string BuildBlogServerHtml(BlogTopic topic, string canonicalUrl)
     var canonical = WebUtility.HtmlEncode(canonicalUrl);
     var description = WebUtility.HtmlEncode(BuildBlogDescription(topic.Content));
     var publishedAt = topic.CreatedAt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
-    var articleBody = WebUtility.HtmlEncode(topic.Content)
+    var articleBody = WebUtility.HtmlDecode(topic.Content ?? string.Empty)
         .Replace("\r\n", "\n", StringComparison.Ordinal)
         .Replace("\r", "\n", StringComparison.Ordinal)
         .Replace("\n", "<br/>\n", StringComparison.Ordinal);
