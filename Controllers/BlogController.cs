@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -14,6 +15,18 @@ namespace YandexSpeech.Controllers
     [Route("api/[controller]")]
     public class BlogController : ControllerBase
     {
+        private static readonly IReadOnlyDictionary<char, string> TransliterationMap = new Dictionary<char, string>
+        {
+            ['а'] = "a",   ['б'] = "b",   ['в'] = "v",   ['г'] = "g",   ['д'] = "d",
+            ['е'] = "e",   ['ё'] = "yo",  ['ж'] = "zh",  ['з'] = "z",   ['и'] = "i",
+            ['й'] = "y",   ['к'] = "k",   ['л'] = "l",   ['м'] = "m",   ['н'] = "n",
+            ['о'] = "o",   ['п'] = "p",   ['р'] = "r",   ['с'] = "s",   ['т'] = "t",
+            ['у'] = "u",   ['ф'] = "f",   ['х'] = "kh",  ['ц'] = "ts",  ['ч'] = "ch",
+            ['ш'] = "sh",  ['щ'] = "sch", ['ъ'] = "",    ['ы'] = "y",   ['ь'] = "",
+            ['э'] = "e",   ['ю'] = "yu",  ['я'] = "ya",
+            ['і'] = "i",   ['ї'] = "yi",  ['є'] = "ye",  ['ґ'] = "g"
+        };
+
         private readonly MyDbContext _dbContext;
         private readonly UserManager<ApplicationUser> _userManager;
 
@@ -278,9 +291,11 @@ namespace YandexSpeech.Controllers
 
         private async Task<string> GenerateSlugAsync(string title, int? excludeTopicId = null)
         {
-            var normalized = Regex.Replace(title.ToLowerInvariant(), "[^a-z0-9а-яё\\s-]", "").Trim();
+            var transliterated = TransliterateToLatin(title);
+            var normalized = Regex.Replace(transliterated.ToLowerInvariant(), "[^a-z0-9\\s-]", " ").Trim();
             normalized = Regex.Replace(normalized, "\\s+", "-");
             normalized = Regex.Replace(normalized, "-+", "-");
+            normalized = normalized.Trim('-');
             if (string.IsNullOrWhiteSpace(normalized))
             {
                 normalized = Guid.NewGuid().ToString("n");
@@ -295,6 +310,26 @@ namespace YandexSpeech.Controllers
             }
 
             return slug;
+        }
+
+        private static string TransliterateToLatin(string source)
+        {
+            var lower = source.ToLowerInvariant();
+            var builder = new StringBuilder(lower.Length * 2);
+
+            foreach (var ch in lower)
+            {
+                if (TransliterationMap.TryGetValue(ch, out var mapped))
+                {
+                    builder.Append(mapped);
+                }
+                else
+                {
+                    builder.Append(ch);
+                }
+            }
+
+            return builder.ToString();
         }
 
         private static BlogTopicDto MapTopic(BlogTopic topic)

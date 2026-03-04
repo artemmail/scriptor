@@ -241,6 +241,7 @@ if (!string.IsNullOrWhiteSpace(vkClientId) && !string.IsNullOrWhiteSpace(vkClien
 
 
 builder.Services.AddScoped<IAudioFileService, AudioFileService>();
+builder.Services.AddSingleton<ServerRenderModeService>();
 
 
 builder.Services.Configure<EventBusOptions>(builder.Configuration.GetSection("EventBus"));
@@ -355,6 +356,60 @@ app.Use(async (context, next) =>
 
     await next();
 });
+
+app.Use(async (context, next) =>
+{
+    if ((HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)) &&
+        context.Request.Path.StartsWithSegments("/blog", out var remaining))
+    {
+        var modeService = context.RequestServices.GetRequiredService<ServerRenderModeService>();
+        if (!modeService.IsEnabled())
+        {
+            await next();
+            return;
+        }
+
+        var slugCandidate = remaining.Value?.Trim('/');
+        if (string.IsNullOrWhiteSpace(slugCandidate) || slugCandidate.Contains('/'))
+        {
+            await next();
+            return;
+        }
+
+        var decodedSlug = Uri.UnescapeDataString(slugCandidate);
+
+        await using var scope = context.RequestServices.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+        var topic = await dbContext.BlogTopics
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Slug == decodedSlug || t.Slug == slugCandidate);
+
+        if (topic == null)
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            context.Response.ContentType = "text/plain; charset=utf-8";
+            if (!HttpMethods.IsHead(context.Request.Method))
+            {
+                await context.Response.WriteAsync("Blog topic not found.");
+            }
+
+            return;
+        }
+
+        context.Response.StatusCode = StatusCodes.Status200OK;
+        context.Response.ContentType = "text/html; charset=utf-8";
+
+        if (!HttpMethods.IsHead(context.Request.Method))
+        {
+            var canonicalUrl = $"{context.Request.Scheme}://{context.Request.Host}/blog/{Uri.EscapeDataString(topic.Slug)}";
+            await context.Response.WriteAsync(BuildBlogServerHtml(topic, canonicalUrl));
+        }
+
+        return;
+    }
+
+    await next();
+});
 app.UseCors("AllowAngularApp");
 app.UseAuthentication();
 app.UseAuthorization();
@@ -417,6 +472,66 @@ static async Task EnsureRolesAsync(IServiceProvider services)
             await roleManager.CreateAsync(new IdentityRole(roleName));
         }
     }
+}
+
+static string BuildBlogServerHtml(BlogTopic topic, string canonicalUrl)
+{
+    var title = WebUtility.HtmlEncode(topic.Title);
+    var canonical = WebUtility.HtmlEncode(canonicalUrl);
+    var description = WebUtility.HtmlEncode(BuildBlogDescription(topic.Content));
+    var publishedAt = topic.CreatedAt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
+    var articleBody = WebUtility.HtmlEncode(topic.Content)
+        .Replace("\r\n", "\n", StringComparison.Ordinal)
+        .Replace("\r", "\n", StringComparison.Ordinal)
+        .Replace("\n", "<br/>\n", StringComparison.Ordinal);
+
+    return $@"<!doctype html>
+<html lang=""ru"">
+<head>
+    <meta charset=""utf-8"" />
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1"" />
+    <title>{title}</title>
+    <meta name=""description"" content=""{description}"" />
+    <link rel=""canonical"" href=""{canonical}"" />
+    <meta property=""og:type"" content=""article"" />
+    <meta property=""og:title"" content=""{title}"" />
+    <meta property=""og:description"" content=""{description}"" />
+    <meta property=""og:url"" content=""{canonical}"" />
+</head>
+<body>
+    <article>
+        <h1>{title}</h1>
+        <time datetime=""{publishedAt}"">{publishedAt}</time>
+        <div>{articleBody}</div>
+    </article>
+</body>
+</html>";
+}
+
+static string BuildBlogDescription(string? content)
+{
+    if (string.IsNullOrWhiteSpace(content))
+    {
+        return "Blog topic";
+    }
+
+    var normalized = content
+        .Replace("\r\n", " ", StringComparison.Ordinal)
+        .Replace('\n', ' ')
+        .Replace('\r', ' ')
+        .Trim();
+
+    while (normalized.Contains("  ", StringComparison.Ordinal))
+    {
+        normalized = normalized.Replace("  ", " ", StringComparison.Ordinal);
+    }
+
+    if (normalized.Length <= 180)
+    {
+        return normalized;
+    }
+
+    return normalized[..177].TrimEnd() + "...";
 }
 
 static async Task ResumeIncompleteOpenAiTasksAsync(IServiceProvider services)
