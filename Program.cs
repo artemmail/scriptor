@@ -515,7 +515,10 @@ static string BuildBlogDescription(string? content)
         return "Blog topic";
     }
 
-    var normalized = content
+    var normalized = WebUtility.HtmlDecode(content);
+    normalized = Regex.Replace(normalized, "<[^>]+>", " ");
+
+    normalized = normalized
         .Replace("\r\n", " ", StringComparison.Ordinal)
         .Replace('\n', ' ')
         .Replace('\r', ' ')
