@@ -7,6 +7,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Telegram.Bot;
+using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using YandexSpeech.services.Interface;
@@ -823,13 +824,35 @@ namespace YandexSpeech.services.Telegram
                 cancellationToken: cancellationToken);
         }
 
-        private Task<Message> SendTextMessageAsync(ChatId chatId, string text, ReplyParameters? replyParameters, CancellationToken cancellationToken)
+        private async Task<Message> SendTextMessageAsync(ChatId chatId, string text, ReplyParameters? replyParameters, CancellationToken cancellationToken)
         {
-            return RequireClient().SendMessage(
-                chatId: chatId,
-                text: text,
-                replyParameters: replyParameters,
-                cancellationToken: cancellationToken);
+            var client = RequireClient();
+            var currentReplyParameters = replyParameters;
+
+            for (var attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    return await client.SendMessage(
+                            chatId: chatId,
+                            text: text,
+                            replyParameters: currentReplyParameters,
+                            cancellationToken: cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (ApiRequestException ex) when (currentReplyParameters is not null && IsReplyReferenceError(ex))
+                {
+                    _logger.LogWarning(ex, "Telegram rejected reply reference for chat {ChatId}. Retrying without reply parameters.", chatId.Identifier);
+                    currentReplyParameters = null;
+                }
+                catch (ApiRequestException ex) when (attempt < 2 && ex.ErrorCode == 429)
+                {
+                    var retryAfterSeconds = ex.Parameters?.RetryAfter ?? 1;
+                    retryAfterSeconds = Math.Clamp(retryAfterSeconds, 1, 30);
+                    _logger.LogWarning("Telegram rate limit while sending message to chat {ChatId}. Retrying in {DelaySeconds}s.", chatId.Identifier, retryAfterSeconds);
+                    await Task.Delay(TimeSpan.FromSeconds(retryAfterSeconds), cancellationToken).ConfigureAwait(false);
+                }
+            }
         }
 
         private async Task SendChatActionAsync(ChatId chatId, ChatAction chatAction, CancellationToken cancellationToken)
@@ -903,6 +926,18 @@ namespace YandexSpeech.services.Telegram
 
             var withoutSlash = trimmed.TrimEnd('/');
             return withoutSlash.Length == 0 ? DefaultTelegramApiBaseUrl : withoutSlash;
+        }
+
+        private static bool IsReplyReferenceError(ApiRequestException ex)
+        {
+            var message = ex.Message;
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return false;
+            }
+
+            return message.Contains("message to be replied not found", StringComparison.OrdinalIgnoreCase)
+                   || message.Contains("reply message not found", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string Truncate(string value, int maxLength)

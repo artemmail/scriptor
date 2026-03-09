@@ -94,6 +94,7 @@ namespace YandexSpeech.services
                 {
                      
                     case RecognizeStatus.Created:
+
                     case RecognizeStatus.FetchingMetadata:
                         await RunFetchingSubtitlesStepAsync(id);
                         break;
@@ -102,7 +103,7 @@ namespace YandexSpeech.services
                     case RecognizeStatus.DownloadingCaptions:
                         await RunDownloadingCaptionsStepAsync(id);
                         break;
-
+                     
                         
                     case RecognizeStatus.SegmentingCaptions:
                         await RunSegmentingCaptionsStepAsync(id);

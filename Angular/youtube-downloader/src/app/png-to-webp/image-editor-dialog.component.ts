@@ -141,7 +141,7 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
   private canvasCssHeight = 0;
 
   // DEBUG: отрисовывать центры ручек и рамки их хит-боксов
-  private readonly DEBUG_HIT = true;
+  private readonly DEBUG_HIT = false;
 
   private get canvas(): HTMLCanvasElement {
     return this.canvasRef.nativeElement;
@@ -274,8 +274,8 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     this.updateZoom(value, { resetPan: true });
   }
 
-  rotateRight(): void {
-    this.rotation.update(value => (value + 90) % 360);
+  rotateLeft(): void {
+    this.rotation.update(value => (value + 270) % 360);
     this.scheduleRender();
   }
 
@@ -284,8 +284,8 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
     this.scheduleRender();
   }
 
-  rotate270(): void {
-    this.rotation.update(value => (value + 270) % 360);
+  rotateRight(): void {
+    this.rotation.update(value => (value + 90) % 360);
     this.scheduleRender();
   }
 

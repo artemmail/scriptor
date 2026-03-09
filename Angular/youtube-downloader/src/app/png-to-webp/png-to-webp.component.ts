@@ -10,7 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
-import { ImageEditorDialogComponent, ImageEditorDialogResult } from './image-editor-dialog.component';
+import { EditorState, ImageEditorDialogComponent, ImageEditorDialogResult } from './image-editor-dialog.component';
 import { Title } from '@angular/platform-browser';
 
 interface ConversionResult {
@@ -41,6 +41,7 @@ interface ConversionResult {
 export class PngToWebpComponent implements OnDestroy {
   readonly quality = signal(0.92);
   readonly processing = signal(false);
+  readonly dragOver = signal(false);
   readonly originalFile = signal<File | null>(null);
   readonly originalUrl = signal<string | null>(null);
   readonly originalSize = signal<number>(0);
@@ -57,6 +58,8 @@ export class PngToWebpComponent implements OnDestroy {
   private lastObjectUrls: string[] = [];
   private pendingQuality: number | null = null;
   private currentImageBlob: Blob | null = null;
+  private editorState: EditorState | null = null;
+  private dragDepth = 0;
 
   readonly originalSizeLabel: Signal<string> = computed(() => this.formatBytes(this.originalSize()));
   readonly resultSizeLabel: Signal<string> = computed(() => {
@@ -72,7 +75,7 @@ export class PngToWebpComponent implements OnDestroy {
   });
 
   readonly compressionRatio: Signal<string> = computed(() => {
-    const original = this.originalSize();
+    const original = this.workingFileSize() || this.originalSize();
     const res = this.result();
     if (!original || !res) return '—';
     const ratio = original / res.size;
@@ -114,6 +117,8 @@ export class PngToWebpComponent implements OnDestroy {
 
   async onDrop(event: DragEvent): Promise<void> {
     event.preventDefault();
+    this.dragDepth = 0;
+    this.dragOver.set(false);
     if (event.dataTransfer?.files?.length) {
       const file = Array.from(event.dataTransfer.files).find(f => this.isPngFile(f));
       if (file) {
@@ -126,6 +131,23 @@ export class PngToWebpComponent implements OnDestroy {
 
   onDragOver(event: DragEvent): void {
     event.preventDefault();
+    if (!this.dragOver()) {
+      this.dragOver.set(true);
+    }
+  }
+
+  onDragEnter(event: DragEvent): void {
+    event.preventDefault();
+    this.dragDepth += 1;
+    this.dragOver.set(true);
+  }
+
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    this.dragDepth = Math.max(0, this.dragDepth - 1);
+    if (this.dragDepth === 0) {
+      this.dragOver.set(false);
+    }
   }
 
   async handleFile(file: File): Promise<void> {
@@ -210,14 +232,17 @@ export class PngToWebpComponent implements OnDestroy {
   }
 
   async openEditor(): Promise<void> {
-    if (!this.currentImageBlob) {
+    const original = this.originalFile();
+    const blobForEditor = original ?? this.currentImageBlob;
+    if (!blobForEditor) {
       return;
     }
 
     const dialogRef = this.dialog.open(ImageEditorDialogComponent, {
       data: {
-        blob: this.currentImageBlob,
-        name: this.originalFile()?.name ?? 'image.png',
+        blob: blobForEditor,
+        name: original?.name ?? 'image.png',
+        previousState: this.editorState,
       },
       panelClass: 'image-editor-panel',
       width: 'auto',
@@ -247,6 +272,7 @@ export class PngToWebpComponent implements OnDestroy {
       this.sourceImage = this.originalImage;
       const dims = this.originalDimensions();
       this.workingDimensions.set(dims ? { ...dims } : null);
+      this.editorState = null;
       await this.convertToWebp();
     } catch (err) {
       console.error(err);
@@ -366,6 +392,9 @@ export class PngToWebpComponent implements OnDestroy {
     this.canvas = null;
     this.pendingQuality = null;
     this.currentImageBlob = null;
+    this.editorState = null;
+    this.dragDepth = 0;
+    this.dragOver.set(false);
     this.releaseSourceImage();
     if (this.originalImage && 'close' in this.originalImage) {
       try {
@@ -401,6 +430,7 @@ export class PngToWebpComponent implements OnDestroy {
     try {
       this.currentImageBlob = result.blob;
       this.workingFileSize.set(result.blob.size);
+      this.editorState = result.state;
       const editedUrl = URL.createObjectURL(result.blob);
       this.setEditedPreviewUrl(editedUrl);
       await this.setActiveImageFromBlob(result.blob);

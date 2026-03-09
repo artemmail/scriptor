@@ -6,6 +6,9 @@
   </p>
 
   <div class="upload-area"
+       [class.drag-over]="dragOver()"
+       (dragenter)="onDragEnter($event)"
+       (dragleave)="onDragLeave($event)"
        (drop)="onDrop($event)"
        (dragover)="onDragOver($event)">
     <div class="upload-content">
@@ -53,18 +56,30 @@
 
   <mat-card class="previews" *ngIf="originalFile()">
     <div class="preview">
-      <h2>Оригинал</h2>
+      <h2>{{ hasEdits() ? 'PNG после редактирования' : 'Оригинал PNG' }}</h2>
+      <p class="edited-state" *ngIf="hasEdits()">Показан текущий PNG перед конвертацией</p>
       <div class="image-frame">
         <div class="checkerboard"></div>
-        <img *ngIf="originalUrl()" [src]="originalUrl()" alt="Оригинал">
+        <img
+          *ngIf="workingPreviewUrl() as previewUrl"
+          [src]="previewUrl"
+          [alt]="hasEdits() ? 'PNG после редактирования' : 'Оригинал PNG'">
       </div>
       <dl>
         <div>
-          <dt>Размер</dt>
+          <dt>Текущий размер</dt>
+          <dd>{{ workingSizeLabel() }}</dd>
+        </div>
+        <div>
+          <dt>Текущее разрешение</dt>
+          <dd>{{ workingDimensionsLabel() }}</dd>
+        </div>
+        <div *ngIf="hasEdits()">
+          <dt>Исходный размер</dt>
           <dd>{{ originalSizeLabel() }}</dd>
         </div>
-        <div *ngIf="originalDimensions() as dims">
-          <dt>Разрешение</dt>
+        <div *ngIf="hasEdits() && originalDimensions() as dims">
+          <dt>Исходное разрешение</dt>
           <dd>{{ dims.width }} × {{ dims.height }} px</dd>
         </div>
       </dl>

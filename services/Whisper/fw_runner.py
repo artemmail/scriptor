@@ -51,7 +51,7 @@ os.environ.setdefault("CT2_VERBOSE", "1")
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
 BROKER_NAME = os.getenv("EVENTBUS_BROKER", "workspace_development71")
-HOST = os.getenv("EVENTBUS_HOST", "192.168.1.8")
+HOST = os.getenv("EVENTBUS_HOST", "localhost")
 USERNAME = os.getenv("EVENTBUS_USERNAME", "admin")
 PASSWORD = os.getenv("EVENTBUS_PASSWORD", "121212")
 COMMAND_QUEUE = os.getenv("EVENTBUS_COMMAND_QUEUE_NAME", "w.ds_development_cmd")

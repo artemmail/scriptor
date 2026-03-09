@@ -81,7 +81,15 @@ namespace YandexSpeech.services
             var existing = await db.YoutubeCaptionTasks
                                    .FirstOrDefaultAsync(t => t.Id == youtubeId);// && !t.Done);
             if (existing is not null)
+            {
+                // Re-enqueue unfinished tasks so "Created" items do not stay stuck forever.
+                if (!existing.Done && existing.Status != RecognizeStatus.Error)
+                {
+                    _ = ProcessQueueAsync();
+                }
+
                 return existing.Id;
+            }
 
             var newTask = new YoutubeCaptionTask
             {
@@ -253,7 +261,33 @@ namespace YandexSpeech.services
                                 if (dto == null || dto.Done || dto.Status == RecognizeStatus.Error)
                                     break;
 
+                                var statusBefore = dto.Status;
+                                var segmentsBefore = dto.SegmentsProcessed;
+                                var modifiedBefore = dto.ModifiedAt;
+
                                 await service.ContinueCaptionTaskAsync(task.Id);
+
+                                var updated = await GetTaskStatusAsync(task.Id);
+                                if (updated == null || updated.Done || updated.Status == RecognizeStatus.Error)
+                                    break;
+
+                                var progressDetected =
+                                    updated.Status != statusBefore
+                                    || updated.SegmentsProcessed != segmentsBefore
+                                    || updated.ModifiedAt > modifiedBefore;
+
+                                if (!progressDetected)
+                                {
+                                    var delay = TimeSpan.FromSeconds(5);
+                                    _logger.LogWarning(
+                                        "No progress detected for caption task {TaskId} at status {Status}. Scheduling retry in {DelaySeconds}s to avoid infinite loop.",
+                                        task.Id,
+                                        updated.Status,
+                                        delay.TotalSeconds);
+
+                                    ScheduleQueueRetry(delay);
+                                    break;
+                                }
                             }
                         }
                         catch (Exception ex)
@@ -276,6 +310,22 @@ namespace YandexSpeech.services
             {
                 _scanning = false;
             }
+        }
+
+        private void ScheduleQueueRetry(TimeSpan delay)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(delay, CancellationToken.None);
+                    await ProcessQueueAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error while scheduling caption task queue retry");
+                }
+            });
         }
     }
 }

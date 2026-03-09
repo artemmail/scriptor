@@ -300,10 +300,10 @@ builder.Services.AddScoped<IYSubtitlesService, YSubtitlesService>();
 builder.Services.AddHostedService<RecognitionBackgroundService>();
 builder.Services.AddHostedService<AudioRecognitionBackgroundService>();
 builder.Services.AddHostedService<SubscriptionExpirationHostedService>();
-/*
+
 builder.Services.AddSingleton<TelegramTranscriptionBot>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<TelegramTranscriptionBot>());
-*/
+
 
 // 8. SPA static files
 builder.Services.AddSpaStaticFiles(opts => opts.RootPath = "wwwroot");
