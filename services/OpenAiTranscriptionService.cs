@@ -28,6 +28,7 @@ namespace YandexSpeech.services
         private readonly IWhisperTranscriptionService _whisperTranscriptionService;
         private readonly IPunctuationService _punctuationService;
         private const int FormattingMaxAttempts = 5;
+        private const int MaxGeneratedTitleLength = 120;
         private static readonly TimeSpan FormattingRetryDelay = TimeSpan.FromSeconds(5);
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IYandexDiskDownloadService _yandexDiskDownloadService;
@@ -328,6 +329,7 @@ namespace YandexSpeech.services
                 RecognitionProfileDisplayedName = string.IsNullOrWhiteSpace(recognitionProfile.DisplayedName)
                     ? null
                     : recognitionProfile.DisplayedName,
+                Title = sourceTask.Title,
                 Status = OpenAiTranscriptionStatus.ProcessingSegments,
                 Done = false,
                 Error = null,
@@ -756,6 +758,11 @@ namespace YandexSpeech.services
             task.SegmentsProcessed = task.SegmentsTotal;
             task.ProcessedText = string.Join("\n", processedSegments);
 
+            if (string.IsNullOrWhiteSpace(task.Title))
+            {
+                task.Title = await ResolveTaskTitleAsync(task).ConfigureAwait(false);
+            }
+
             if (!task.QuotaChargedAt.HasValue && task.RequestedTranscriptionMinutes > 0)
             {
                 var charged = await _subscriptionService
@@ -791,6 +798,170 @@ namespace YandexSpeech.services
             task.Done = true;
             task.ModifiedAt = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
+        }
+
+        private async Task<string> ResolveTaskTitleAsync(OpenAiTranscriptionTask task)
+        {
+            var persistedTitle = await _dbContext.OpenAiTranscriptionTasks
+                .AsNoTracking()
+                .Where(t => t.Id == task.Id)
+                .Select(t => t.Title)
+                .FirstOrDefaultAsync()
+                .ConfigureAwait(false);
+
+            var normalizedPersistedTitle = NormalizeTaskTitle(persistedTitle);
+            if (!string.IsNullOrWhiteSpace(normalizedPersistedTitle))
+            {
+                return normalizedPersistedTitle;
+            }
+
+            var sourceText = task.MarkdownText
+                ?? task.ProcessedText
+                ?? task.RecognizedText
+                ?? string.Empty;
+
+            var normalizedSourceText = NormalizeSourceText(sourceText);
+            var fallbackTitle = BuildFallbackTitle(task.SourceFilePath, normalizedSourceText);
+
+            if (string.IsNullOrWhiteSpace(normalizedSourceText))
+            {
+                return fallbackTitle;
+            }
+
+            try
+            {
+                var generatedTitle = await GenerateTitleAsync(normalizedSourceText).ConfigureAwait(false);
+                return NormalizeTaskTitle(generatedTitle) ?? fallbackTitle;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to generate AI title for transcription task {TaskId}", task.Id);
+                return fallbackTitle;
+            }
+        }
+
+        private async Task<string?> GenerateTitleAsync(string sourceText)
+        {
+            var excerpt = sourceText.Length > 5000
+                ? sourceText[..5000]
+                : sourceText;
+
+            var payload = JsonSerializer.Serialize(new
+            {
+                model = FormattingModel,
+                messages = new object[]
+                {
+                    new
+                    {
+                        role = "system",
+                        content = "Generate a concise, descriptive title for a voice note transcription. Return only the title without quotes. Keep it under 80 characters."
+                    },
+                    new
+                    {
+                        role = "user",
+                        content = excerpt
+                    }
+                },
+                temperature = 0.2
+            });
+
+            using var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromMinutes(2);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _openAiApiKey);
+
+            for (int attempt = 1; attempt <= FormattingMaxAttempts; attempt++)
+            {
+                using var content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+                try
+                {
+                    using var response = await client
+                        .PostAsync("https://api.openai.com/v1/chat/completions", content)
+                        .ConfigureAwait(false);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                        using var doc = JsonDocument.Parse(json);
+                        var title = doc.RootElement
+                            .GetProperty("choices")[0]
+                            .GetProperty("message")
+                            .GetProperty("content")
+                            .GetString();
+
+                        return NormalizeTaskTitle(title);
+                    }
+                }
+                catch (HttpRequestException)
+                {
+                    // Retry below.
+                }
+
+                if (attempt < FormattingMaxAttempts)
+                {
+                    await Task.Delay(FormattingRetryDelay * attempt).ConfigureAwait(false);
+                }
+            }
+
+            return null;
+        }
+
+        private static string NormalizeSourceText(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            return string.Join(" ", text
+                .Trim()
+                .Split(new[] { '\r', '\n', '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        private static string BuildFallbackTitle(string sourceFilePath, string normalizedSourceText)
+        {
+            if (!string.IsNullOrWhiteSpace(normalizedSourceText))
+            {
+                var separators = new[] { '.', '!', '?', ':', ';' };
+                var sentence = normalizedSourceText
+                    .Split(separators, 2, StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault()
+                    ?.Trim();
+
+                if (!string.IsNullOrWhiteSpace(sentence))
+                {
+                    var truncated = sentence.Length > MaxGeneratedTitleLength
+                        ? sentence[..MaxGeneratedTitleLength].Trim()
+                        : sentence;
+
+                    return truncated.Trim(' ', '"', '\'', '.', ',', ';', ':', '-', '_');
+                }
+            }
+
+            var fileName = Path.GetFileNameWithoutExtension(sourceFilePath);
+            return NormalizeTaskTitle(fileName) ?? "Voice note";
+        }
+
+        private static string? NormalizeTaskTitle(string? title)
+        {
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                return null;
+            }
+
+            var normalized = title
+                .Trim()
+                .Trim('"', '\'', '.', ',', ';', ':');
+
+            normalized = string.Join(" ", normalized
+                .Split(new[] { '\r', '\n', '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries));
+
+            if (normalized.Length > MaxGeneratedTitleLength)
+            {
+                normalized = normalized[..MaxGeneratedTitleLength].Trim();
+            }
+
+            return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
         }
 
         private static int ClampIndex(int value, int length)

@@ -12,6 +12,8 @@ namespace YandexSpeech.models.DTO
 
         public string DisplayName { get; set; } = null!;
 
+        public string? Title { get; set; }
+
         public OpenAiTranscriptionStatus Status { get; set; }
             = OpenAiTranscriptionStatus.Created;
 

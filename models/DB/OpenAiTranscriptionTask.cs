@@ -46,6 +46,9 @@ namespace YandexSpeech.models.DB
 
         public string? MarkdownText { get; set; }
 
+        [MaxLength(200)]
+        public string? Title { get; set; }
+
         public string? Clarification { get; set; }
 
         public int? RecognitionProfileId { get; set; }

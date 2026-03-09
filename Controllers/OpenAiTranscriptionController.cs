@@ -223,6 +223,7 @@ namespace YandexSpeech.Controllers
             var dto = MapToDto(
                 task.Id,
                 task.SourceFilePath,
+                task.Title,
                 task.Status,
                 task.Done,
                 task.Error,
@@ -282,6 +283,7 @@ namespace YandexSpeech.Controllers
                 {
                     task.Id,
                     task.SourceFilePath,
+                    task.Title,
                     task.Status,
                     task.Done,
                     task.Error,
@@ -303,6 +305,7 @@ namespace YandexSpeech.Controllers
                 .Select(t => MapToDto(
                     t.Id,
                     t.SourceFilePath,
+                    t.Title,
                     t.Status,
                     t.Done,
                     t.Error,
@@ -644,6 +647,36 @@ namespace YandexSpeech.Controllers
             }
 
             task.MarkdownText = request.Markdown;
+            task.ModifiedAt = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        [HttpPut("{id}/title")]
+        public async Task<IActionResult> UpdateTitle(string id, [FromBody] UpdateTitleRequest request)
+        {
+            var normalizedTitle = NormalizeTaskTitle(request?.Title);
+            if (string.IsNullOrWhiteSpace(normalizedTitle))
+            {
+                return BadRequest(ErrorResponse.FromMessage("Title must be provided."));
+            }
+
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
+
+            var task = await _dbContext.OpenAiTranscriptionTasks
+                .FirstOrDefaultAsync(t => t.Id == id && t.CreatedBy == userId);
+
+            if (task == null)
+            {
+                return NotFound();
+            }
+
+            task.Title = normalizedTitle;
             task.ModifiedAt = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
 
@@ -1074,6 +1107,7 @@ namespace YandexSpeech.Controllers
             return MapToDto(
                 task.Id,
                 task.SourceFilePath,
+                task.Title,
                 task.Status,
                 task.Done,
                 task.Error,
@@ -1095,6 +1129,7 @@ namespace YandexSpeech.Controllers
         private static OpenAiTranscriptionTaskDto MapToDto(
             string id,
             string sourceFilePath,
+            string? title,
             OpenAiTranscriptionStatus status,
             bool done,
             string? error,
@@ -1117,6 +1152,7 @@ namespace YandexSpeech.Controllers
                 Id = id,
                 FileName = Path.GetFileName(sourceFilePath) ?? sourceFilePath,
                 DisplayName = ResolveDisplayName(sourceFilePath),
+                Title = NormalizeTaskTitle(title) ?? ResolveDisplayName(sourceFilePath),
                 Status = status,
                 Done = done,
                 Error = error,
@@ -1143,6 +1179,7 @@ namespace YandexSpeech.Controllers
                 Id = task.Id,
                 FileName = Path.GetFileName(task.SourceFilePath) ?? task.SourceFilePath,
                 DisplayName = ResolveDisplayName(task.SourceFilePath),
+                Title = NormalizeTaskTitle(task.Title) ?? ResolveDisplayName(task.SourceFilePath),
                 Status = task.Status,
                 Done = task.Done,
                 Error = task.Error,
@@ -1364,6 +1401,11 @@ namespace YandexSpeech.Controllers
             public string Markdown { get; set; } = string.Empty;
         }
 
+        public class UpdateTitleRequest
+        {
+            public string Title { get; set; } = string.Empty;
+        }
+
         public class ContinueFromSegmentRequest
         {
             public int SegmentNumber { get; set; }
@@ -1415,6 +1457,25 @@ namespace YandexSpeech.Controllers
             }
 
             return result;
+        }
+
+        private static string? NormalizeTaskTitle(string? title)
+        {
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                return null;
+            }
+
+            var normalized = string.Join(" ", title
+                .Trim()
+                .Split(new[] { '\r', '\n', '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries));
+
+            if (normalized.Length > 200)
+            {
+                normalized = normalized[..200].Trim();
+            }
+
+            return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
         }
 
         private static TimeSpan ToSafeTimeSpan(double seconds)
