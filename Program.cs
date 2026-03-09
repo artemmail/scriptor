@@ -195,8 +195,11 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
                 return ctx.Response.WriteAsync(html);
             }
 
-            // Для обычного (не-silent) входа — редиректим на callback с ошибкой
-            var redirect = $"/api/account/externallogincallback?remoteError={Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error")}";
+            var callback = ctx.Properties?.RedirectUri;
+            var error = Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error");
+            var redirect = string.IsNullOrWhiteSpace(callback)
+                ? $"/api/account/externallogincallback?remoteError={error}"
+                : $"{callback}{(callback.Contains('?', StringComparison.Ordinal) ? "&" : "?")}remoteError={error}";
             ctx.Response.Redirect(redirect);
             ctx.HandleResponse();
             return Task.CompletedTask;
@@ -217,7 +220,11 @@ if (!string.IsNullOrWhiteSpace(yandexClientId) && !string.IsNullOrWhiteSpace(yan
 
         opts.Events.OnRemoteFailure = ctx =>
         {
-            var redirect = $"/api/account/externallogincallback?remoteError={Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error")}";
+            var callback = ctx.Properties?.RedirectUri;
+            var error = Uri.EscapeDataString(ctx.Failure?.Message ?? "auth_error");
+            var redirect = string.IsNullOrWhiteSpace(callback)
+                ? $"/api/account/externallogincallback?remoteError={error}"
+                : $"{callback}{(callback.Contains('?', StringComparison.Ordinal) ? "&" : "?")}remoteError={error}";
             ctx.Response.Redirect(redirect);
             ctx.HandleResponse();
             return Task.CompletedTask;

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System;
@@ -58,111 +59,102 @@ namespace YandexSpeech.Controllers
             => SignInWithProvider("Yandex", returnUrl);
 
         [AllowAnonymous]
+        [HttpGet("mobile/signin-google")]
+        public IActionResult MobileSignInWithGoogle([FromQuery] string redirectUri, string? returnUrl = null)
+        {
+            if (!TryValidateMobileRedirectUri(redirectUri, out _))
+            {
+                return BadRequest("Invalid mobile redirect URI.");
+            }
+
+            return SignInWithProvider("Google", returnUrl, redirectUri);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("mobile/signin-yandex")]
+        public IActionResult MobileSignInWithYandex([FromQuery] string redirectUri, string? returnUrl = null)
+        {
+            if (!TryValidateMobileRedirectUri(redirectUri, out _))
+            {
+                return BadRequest("Invalid mobile redirect URI.");
+            }
+
+            return SignInWithProvider("Yandex", returnUrl, redirectUri);
+        }
+
+        [AllowAnonymous]
         [HttpGet("externallogincallback")]
         public async Task<IActionResult> ExternalLoginCallback(
             string? returnUrl = null,
             string? remoteError = null)
         {
-            // --- ошибки провайдера ---
             if (!string.IsNullOrEmpty(remoteError))
             {
                 Console.WriteLine($"ExternalLoginCallback error: {remoteError}");
-                return Redirect($"{GetAngularRedirectUrl()}?error={Uri.EscapeDataString(remoteError)}");
+                return Redirect(AppendQueryParameter(GetAngularRedirectUrl(), "error", remoteError));
             }
 
-            // --- внешняя учётка ---
-            var info = await _signInManager.GetExternalLoginInfoAsync();
-            if (info == null)
+            var result = await CompleteExternalLoginAsync();
+            if (!result.Success || result.User == null)
             {
-                Console.WriteLine("ExternalLoginCallback: NoExternalLoginInfo");
-                return Redirect($"{GetAngularRedirectUrl()}?error=NoExternalLoginInfo");
+                return Redirect(AppendQueryParameter(GetAngularRedirectUrl(), "error", result.Error ?? "ExternalLoginFailed"));
             }
 
-            // уже есть привязка?
-            var signInResult = await _signInManager.ExternalLoginSignInAsync(
-                info.LoginProvider, info.ProviderKey, isPersistent: false);
-
-            ApplicationUser user;
-            if (signInResult.Succeeded)
-            {
-                user = await _userManager.FindByLoginAsync(info.LoginProvider, info.ProviderKey);
-            }
-            else
-            {
-                // ----- первый логин -----
-                var email = info.Principal.FindFirstValue(ClaimTypes.Email)
-                            ?? info.Principal.FindFirstValue("urn:yandex:email");
-                if (string.IsNullOrEmpty(email))
-                {
-                    Console.WriteLine("ExternalLoginCallback: EmailNotFound");
-                    return Redirect($"{GetAngularRedirectUrl()}?error=EmailNotFound");
-                }
-
-                user = await _userManager.FindByEmailAsync(email);
-                if (user == null)
-                {
-                    var displayName = info.Principal.FindFirstValue(ClaimTypes.Name)
-                        ?? info.Principal.FindFirstValue("urn:yandex:login")
-                        ?? GenerateDefaultDisplayName();
-
-                    user = new ApplicationUser
-                    {
-                        Email = email,
-                        UserName = email,
-                        DisplayName = displayName
-                    };
-
-                    var createRes = await _userManager.CreateAsync(user);
-                    if (!createRes.Succeeded)
-                    {
-                        Console.WriteLine("ExternalLoginCallback: UserCreationFailed");
-                        return Redirect($"{GetAngularRedirectUrl()}?error=UserCreationFailed");
-                    }
-
-                    user = await _userManager.FindByEmailAsync(email);
-                }
-
-                var addLoginRes = await _userManager.AddLoginAsync(user, info);
-                if (!addLoginRes.Succeeded)
-                {
-                    Console.WriteLine("ExternalLoginCallback: ExternalLoginFailed");
-                    return Redirect($"{GetAngularRedirectUrl()}?error=ExternalLoginFailed");
-                }
-
-                await _userManager.AddToRoleAsync(user, "Free");
-            }
-
-            await EnsureDisplayNameAsync(user);
-            await EnsureFinancialProfileAsync(user);
-            await _subscriptionService.EnsureWelcomePackageAsync(user.Id);
-
-            // ---------- выдаём JWT + refresh ----------
-            var accessToken = await GenerateJwtToken(user);
-            var refreshValue = GenerateRefreshToken();
-            var refreshLifetime = TimeSpan.FromDays(30);
-
-            _dbContext.RefreshTokens.Add(new RefreshToken
-            {
-                Token = refreshValue,
-                UserId = user.Id,
-                Created = DateTime.UtcNow,
-                Expires = DateTime.UtcNow + refreshLifetime
-            });
-            await _dbContext.SaveChangesAsync();
-
-            Response.Cookies.Append("refreshToken", refreshValue, new CookieOptions
+            var tokens = await IssueMobileAuthResultAsync(result.User, revokeExistingToken: null);
+            Response.Cookies.Append("refreshToken", tokens.RefreshToken, new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Lax,
-                Expires = DateTime.UtcNow + refreshLifetime
+                Expires = DateTime.UtcNow + TimeSpan.FromDays(30)
             });
 
-            var redirect = $"{GetAngularRedirectUrl()}?token={accessToken}";
+            var redirect = AppendQueryParameter(GetAngularRedirectUrl(), "token", tokens.AccessToken);
             if (!string.IsNullOrEmpty(returnUrl))
-                redirect += $"&returnUrl={Uri.EscapeDataString(returnUrl)}";
+            {
+                redirect = AppendQueryParameter(redirect, "returnUrl", returnUrl);
+            }
 
             return Redirect(redirect);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("mobile/externallogincallback")]
+        public async Task<IActionResult> MobileExternalLoginCallback(
+            [FromQuery] string redirectUri,
+            string? returnUrl = null,
+            string? remoteError = null)
+        {
+            if (!TryValidateMobileRedirectUri(redirectUri, out var safeRedirectUri))
+            {
+                return BadRequest("Invalid mobile redirect URI.");
+            }
+
+            if (!string.IsNullOrEmpty(remoteError))
+            {
+                return Redirect(AppendQueryParameter(safeRedirectUri, "error", remoteError));
+            }
+
+            var result = await CompleteExternalLoginAsync();
+            if (!result.Success || result.User == null)
+            {
+                return Redirect(AppendQueryParameter(safeRedirectUri, "error", result.Error ?? "ExternalLoginFailed"));
+            }
+
+            var tokens = await IssueMobileAuthResultAsync(result.User, revokeExistingToken: null);
+
+            var callbackUri = AppendQueryParameter(safeRedirectUri, "token", tokens.AccessToken);
+            callbackUri = AppendQueryParameter(callbackUri, "refreshToken", tokens.RefreshToken);
+            callbackUri = AppendQueryParameter(callbackUri, "userId", tokens.User.Id);
+            callbackUri = AppendQueryParameter(callbackUri, "displayName", tokens.User.DisplayName);
+            callbackUri = AppendQueryParameter(callbackUri, "email", tokens.User.Email);
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                callbackUri = AppendQueryParameter(callbackUri, "returnUrl", returnUrl);
+            }
+
+            return Redirect(callbackUri);
         }
 
         // ---------- LOGOUT ----------
@@ -269,10 +261,7 @@ namespace YandexSpeech.Controllers
             if (string.IsNullOrEmpty(refreshTokenValue))
                 return Unauthorized("No refresh token");
 
-            var tokenEntity = await _dbContext.RefreshTokens.FirstOrDefaultAsync(rt =>
-                rt.Token == refreshTokenValue &&
-                rt.Expires > DateTime.UtcNow &&
-                !rt.IsRevoked);
+            var tokenEntity = await FindValidRefreshTokenAsync(refreshTokenValue);
 
             if (tokenEntity == null)
                 return Unauthorized("Invalid refresh token");
@@ -281,40 +270,84 @@ namespace YandexSpeech.Controllers
             if (user == null)
                 return Unauthorized("User not found");
 
-            await EnsureDisplayNameAsync(user);
+            var tokens = await IssueMobileAuthResultAsync(user, tokenEntity);
 
-            tokenEntity.IsRevoked = true;
-
-            var newAccessToken = await GenerateJwtToken(user);
-            var newRefreshValue = GenerateRefreshToken();
-            var refreshLifetime = TimeSpan.FromDays(30);
-
-            _dbContext.RefreshTokens.Add(new RefreshToken
-            {
-                Token = newRefreshValue,
-                UserId = user.Id,
-                Created = DateTime.UtcNow,
-                Expires = DateTime.UtcNow + refreshLifetime
-            });
-            await _dbContext.SaveChangesAsync();
-
-            Response.Cookies.Append("refreshToken", newRefreshValue, new CookieOptions
+            Response.Cookies.Append("refreshToken", tokens.RefreshToken, new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Lax,
-                Expires = DateTime.UtcNow + refreshLifetime
+                Expires = DateTime.UtcNow + TimeSpan.FromDays(30)
             });
 
-            return Ok(new { token = newAccessToken });
+            return Ok(new { token = tokens.AccessToken });
+        }
+
+        [AllowAnonymous]
+        [HttpPost("mobile/refresh")]
+        public async Task<ActionResult<MobileAuthResultDto>> MobileRefreshToken([FromBody] MobileRefreshTokenRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            var tokenEntity = await FindValidRefreshTokenAsync(request.RefreshToken);
+            if (tokenEntity == null)
+            {
+                return Unauthorized("Invalid refresh token");
+            }
+
+            var user = await _userManager.FindByIdAsync(tokenEntity.UserId);
+            if (user == null)
+            {
+                return Unauthorized("User not found");
+            }
+
+            return Ok(await IssueMobileAuthResultAsync(user, tokenEntity));
+        }
+
+        [AllowAnonymous]
+        [HttpPost("mobile/logout")]
+        public async Task<IActionResult> MobileLogout([FromBody] MobileLogoutRequest? request)
+        {
+            var tokenValue = request?.RefreshToken;
+            if (string.IsNullOrWhiteSpace(tokenValue))
+            {
+                return NoContent();
+            }
+
+            var tokenEntity = await _dbContext.RefreshTokens
+                .FirstOrDefaultAsync(rt => rt.Token == tokenValue);
+
+            if (tokenEntity != null && !tokenEntity.IsRevoked)
+            {
+                tokenEntity.IsRevoked = true;
+                await _dbContext.SaveChangesAsync();
+            }
+
+            return NoContent();
         }
 
         // ---------- ВСПОМОГАТЕЛЬНЫЕ ----------
 
-        private IActionResult SignInWithProvider(string provider, string? returnUrl)
+        private IActionResult SignInWithProvider(string provider, string? returnUrl, string? mobileRedirectUri = null)
         {
-            var redirectUrl = Url.Action(nameof(ExternalLoginCallback), "Account", new { returnUrl });
+            var redirectAction = string.IsNullOrWhiteSpace(mobileRedirectUri)
+                ? nameof(ExternalLoginCallback)
+                : nameof(MobileExternalLoginCallback);
+
+            object routeValues = string.IsNullOrWhiteSpace(mobileRedirectUri)
+                ? new { returnUrl }
+                : new { returnUrl, redirectUri = mobileRedirectUri };
+
+            var redirectUrl = Url.Action(redirectAction, "Account", routeValues);
             var props = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+            if (!string.IsNullOrWhiteSpace(mobileRedirectUri))
+            {
+                props.Items["mobileRedirectUri"] = mobileRedirectUri;
+            }
+
             return Challenge(props, provider);
         }
 
@@ -323,6 +356,131 @@ namespace YandexSpeech.Controllers
 
         private string GetAngularRedirectUrl()
             => _config["Angular:RedirectUri"] ?? "/auth/callback";
+
+        private async Task<ExternalLoginCompletionResult> CompleteExternalLoginAsync()
+        {
+            var info = await _signInManager.GetExternalLoginInfoAsync();
+            if (info == null)
+            {
+                Console.WriteLine("ExternalLoginCallback: NoExternalLoginInfo");
+                return ExternalLoginCompletionResult.Failed("NoExternalLoginInfo");
+            }
+
+            var signInResult = await _signInManager.ExternalLoginSignInAsync(
+                info.LoginProvider, info.ProviderKey, isPersistent: false);
+
+            ApplicationUser? user;
+            if (signInResult.Succeeded)
+            {
+                user = await _userManager.FindByLoginAsync(info.LoginProvider, info.ProviderKey);
+            }
+            else
+            {
+                var email = info.Principal.FindFirstValue(ClaimTypes.Email)
+                            ?? info.Principal.FindFirstValue("urn:yandex:email");
+                if (string.IsNullOrEmpty(email))
+                {
+                    Console.WriteLine("ExternalLoginCallback: EmailNotFound");
+                    return ExternalLoginCompletionResult.Failed("EmailNotFound");
+                }
+
+                user = await _userManager.FindByEmailAsync(email);
+                if (user == null)
+                {
+                    var displayName = info.Principal.FindFirstValue(ClaimTypes.Name)
+                        ?? info.Principal.FindFirstValue("urn:yandex:login")
+                        ?? GenerateDefaultDisplayName();
+
+                    user = new ApplicationUser
+                    {
+                        Email = email,
+                        UserName = email,
+                        DisplayName = displayName
+                    };
+
+                    var createRes = await _userManager.CreateAsync(user);
+                    if (!createRes.Succeeded)
+                    {
+                        Console.WriteLine("ExternalLoginCallback: UserCreationFailed");
+                        return ExternalLoginCompletionResult.Failed("UserCreationFailed");
+                    }
+
+                    user = await _userManager.FindByEmailAsync(email);
+                }
+
+                var addLoginRes = await _userManager.AddLoginAsync(user!, info);
+                if (!addLoginRes.Succeeded)
+                {
+                    Console.WriteLine("ExternalLoginCallback: ExternalLoginFailed");
+                    return ExternalLoginCompletionResult.Failed("ExternalLoginFailed");
+                }
+
+                await _userManager.AddToRoleAsync(user!, "Free");
+            }
+
+            if (user == null)
+            {
+                return ExternalLoginCompletionResult.Failed("UserNotFound");
+            }
+
+            await EnsureDisplayNameAsync(user);
+            await EnsureFinancialProfileAsync(user);
+            await _subscriptionService.EnsureWelcomePackageAsync(user.Id);
+
+            return ExternalLoginCompletionResult.Completed(user);
+        }
+
+        private async Task<RefreshToken?> FindValidRefreshTokenAsync(string? refreshTokenValue)
+        {
+            if (string.IsNullOrWhiteSpace(refreshTokenValue))
+            {
+                return null;
+            }
+
+            return await _dbContext.RefreshTokens.FirstOrDefaultAsync(rt =>
+                rt.Token == refreshTokenValue &&
+                rt.Expires > DateTime.UtcNow &&
+                !rt.IsRevoked);
+        }
+
+        private async Task<MobileAuthResultDto> IssueMobileAuthResultAsync(
+            ApplicationUser user,
+            RefreshToken? revokeExistingToken)
+        {
+            await EnsureDisplayNameAsync(user);
+            await EnsureFinancialProfileAsync(user);
+            await _subscriptionService.EnsureWelcomePackageAsync(user.Id);
+
+            if (revokeExistingToken != null)
+            {
+                revokeExistingToken.IsRevoked = true;
+            }
+
+            var refreshLifetime = TimeSpan.FromDays(30);
+            var refreshValue = GenerateRefreshToken();
+
+            _dbContext.RefreshTokens.Add(new RefreshToken
+            {
+                Token = refreshValue,
+                UserId = user.Id,
+                Created = DateTime.UtcNow,
+                Expires = DateTime.UtcNow + refreshLifetime
+            });
+
+            await _dbContext.SaveChangesAsync();
+
+            return new MobileAuthResultDto
+            {
+                AccessToken = await GenerateJwtToken(user),
+                RefreshToken = refreshValue,
+                User = new UserProfileDto
+                {
+                    Id = user.Id,
+                    Email = user.Email ?? string.Empty,
+                    DisplayName = user.DisplayName ?? string.Empty
+                }
+            };
+        }
 
         private async Task<string> GenerateJwtToken(ApplicationUser user)
         {
@@ -434,11 +592,76 @@ namespace YandexSpeech.Controllers
             return $"User{number:000000}";
         }
 
+        private static bool TryValidateMobileRedirectUri(string? redirectUri, out string normalizedRedirectUri)
+        {
+            normalizedRedirectUri = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(redirectUri))
+            {
+                return false;
+            }
+
+            if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out var uri))
+            {
+                return false;
+            }
+
+            var isAllowedCustomScheme =
+                string.Equals(uri.Scheme, "youscriptor", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(uri.Scheme, "scriptor", StringComparison.OrdinalIgnoreCase);
+
+            var isAllowedLoopback =
+                (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)) &&
+                (string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(uri.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase));
+
+            if (!isAllowedCustomScheme && !isAllowedLoopback)
+            {
+                return false;
+            }
+
+            normalizedRedirectUri = uri.ToString();
+            return true;
+        }
+
+        private static string AppendQueryParameter(string url, string key, string value)
+        {
+            return QueryHelpers.AddQueryString(url, key, value);
+        }
+
         public class UpdateProfileRequest
         {
             [Required]
             [StringLength(100)]
             public string DisplayName { get; set; } = string.Empty;
+        }
+
+        private sealed class ExternalLoginCompletionResult
+        {
+            public bool Success { get; private init; }
+
+            public string? Error { get; private init; }
+
+            public ApplicationUser? User { get; private init; }
+
+            public static ExternalLoginCompletionResult Completed(ApplicationUser user)
+            {
+                return new ExternalLoginCompletionResult
+                {
+                    Success = true,
+                    User = user
+                };
+            }
+
+            public static ExternalLoginCompletionResult Failed(string error)
+            {
+                return new ExternalLoginCompletionResult
+                {
+                    Success = false,
+                    Error = error
+                };
+            }
         }
     }
 }
