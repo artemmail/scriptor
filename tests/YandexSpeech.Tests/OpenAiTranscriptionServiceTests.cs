@@ -310,7 +310,8 @@ public sealed class OpenAiTranscriptionServiceTests
             new StubWhisperTranscriptionService(),
             new StubHttpClientFactory(),
             new StubYandexDiskDownloadService(),
-            new StubFfmpegService());
+            new StubFfmpegService(),
+            new StubSubscriptionService());
     }
 
     private sealed class StubPunctuationService : IPunctuationService
@@ -351,8 +352,9 @@ public sealed class OpenAiTranscriptionServiceTests
             IWhisperTranscriptionService whisperTranscriptionService,
             IHttpClientFactory httpClientFactory,
             IYandexDiskDownloadService yandexDiskDownloadService,
-            IFfmpegService ffmpegService)
-            : base(dbContext, configuration, logger, punctuationService, whisperTranscriptionService, httpClientFactory, yandexDiskDownloadService, ffmpegService)
+            IFfmpegService ffmpegService,
+            ISubscriptionService subscriptionService)
+            : base(dbContext, configuration, logger, punctuationService, whisperTranscriptionService, httpClientFactory, yandexDiskDownloadService, ffmpegService, subscriptionService)
         {
         }
 
@@ -392,6 +394,43 @@ public sealed class OpenAiTranscriptionServiceTests
         {
             return new HttpClient(new HttpClientHandler());
         }
+    }
+
+    private sealed class StubSubscriptionService : ISubscriptionService
+    {
+        public Task<IReadOnlyList<SubscriptionPlan>> GetPlansAsync(bool includeInactive = false, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<SubscriptionPlan>>(Array.Empty<SubscriptionPlan>());
+
+        public Task<SubscriptionPlan> SavePlanAsync(SubscriptionPlan plan, CancellationToken cancellationToken = default)
+            => Task.FromResult(plan);
+
+        public Task<UserSubscription?> GetActiveSubscriptionAsync(string userId, CancellationToken cancellationToken = default)
+            => Task.FromResult<UserSubscription?>(null);
+
+        public Task<IReadOnlyList<UserSubscription>> GetActiveSubscriptionsAsync(string userId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<UserSubscription>>(Array.Empty<UserSubscription>());
+
+        public Task<UserSubscription> ActivateSubscriptionAsync(string userId, Guid planId, bool autoRenew = false, bool isLifetimeOverride = false, string? externalPaymentId = null, CancellationToken cancellationToken = default)
+            => throw new NotImplementedException();
+
+        public Task CancelSubscriptionAsync(Guid subscriptionId, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task RefreshUserCapabilitiesAsync(string userId, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task<YandexSpeech.services.Models.SubscriptionQuotaBalance> GetQuotaBalanceAsync(string userId, CancellationToken cancellationToken = default)
+            => Task.FromResult(new YandexSpeech.services.Models.SubscriptionQuotaBalance
+            {
+                RemainingTranscriptionMinutes = int.MaxValue,
+                RemainingVideos = int.MaxValue
+            });
+
+        public Task<bool> TryConsumeQuotaAsync(string userId, int transcriptionMinutes, int videos, string? reference = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
+
+        public Task EnsureWelcomePackageAsync(string userId, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     private sealed class StubYandexDiskDownloadService : IYandexDiskDownloadService

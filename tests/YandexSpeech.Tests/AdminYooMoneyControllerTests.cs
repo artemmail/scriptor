@@ -42,6 +42,7 @@ namespace YandexSpeech.Tests
                 BillingPeriod = SubscriptionBillingPeriod.Monthly,
                 Price = 123m,
                 Currency = "RUB",
+                IncludedTranscriptionMinutes = 120,
                 IsActive = true
             };
 
@@ -65,9 +66,12 @@ namespace YandexSpeech.Tests
             var controller = new AdminYooMoneyController(
                 new YooMoneyRepositoryStub(),
                 dbContext,
-                new PaymentGatewayService(dbContext, NullLogger<PaymentGatewayService>.Instance),
-                new WalletService(dbContext, NullLogger<WalletService>.Instance),
-                new SubscriptionService(dbContext, NullLogger<SubscriptionService>.Instance));
+                new PaymentOperationApplicationService(
+                    dbContext,
+                    new PaymentGatewayService(dbContext, NullLogger<PaymentGatewayService>.Instance),
+                    new WalletService(dbContext, NullLogger<WalletService>.Instance),
+                    new SubscriptionService(dbContext, NullLogger<SubscriptionService>.Instance),
+                    NullLogger<PaymentOperationApplicationService>.Instance));
 
             var result = await controller.ApplyPaymentOperation(operation.Id.ToString());
 

@@ -280,7 +280,9 @@ builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<IYandexDiskDownloadService, YandexDiskDownloadService>();
 builder.Services.AddScoped<IPaymentGatewayService, PaymentGatewayService>();
+builder.Services.AddScoped<IPaymentOperationApplicationService, PaymentOperationApplicationService>();
 builder.Services.AddScoped<ISubscriptionAccessService, SubscriptionAccessService>();
+builder.Services.AddScoped<IYooMoneyAutoActivationService, YooMoneyAutoActivationService>();
 
 builder.Services.Configure<YooMoneyOptions>(builder.Configuration.GetSection("YooMoney"));
 builder.Services.Configure<SubscriptionLimitsOptions>(builder.Configuration.GetSection("SubscriptionLimits"));
@@ -300,6 +302,7 @@ builder.Services.AddScoped<IYSubtitlesService, YSubtitlesService>();
 builder.Services.AddHostedService<RecognitionBackgroundService>();
 builder.Services.AddHostedService<AudioRecognitionBackgroundService>();
 builder.Services.AddHostedService<SubscriptionExpirationHostedService>();
+builder.Services.AddHostedService<YooMoneyAutoActivationHostedService>();
 
 builder.Services.AddSingleton<TelegramTranscriptionBot>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<TelegramTranscriptionBot>());

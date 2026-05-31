@@ -27,8 +27,8 @@ namespace YandexSpeech.Controllers
     [Authorize]
     public class PaymentsController : ControllerBase
     {
-        private const string SubscriptionPayloadType = "subscription";
-        private const string WalletPayloadType = "wallet";
+        private const string SubscriptionPayloadType = PaymentOperationPayloadTypes.Subscription;
+        private const string WalletPayloadType = PaymentOperationPayloadTypes.Wallet;
 
         private readonly MyDbContext _dbContext;
         private readonly IPaymentGatewayService _paymentGatewayService;
@@ -126,7 +126,7 @@ namespace YandexSpeech.Controllers
 
             var userId = GetUserId();
 
-            var payload = SerializePayload(new PaymentPayload
+            var payload = SerializePayload(new PaymentOperationPayload
             {
                 Type = SubscriptionPayloadType,
                 PlanId = plan.Id
@@ -162,7 +162,7 @@ namespace YandexSpeech.Controllers
 
             var userId = GetUserId();
 
-            var payload = SerializePayload(new PaymentPayload
+            var payload = SerializePayload(new PaymentOperationPayload
             {
                 Type = WalletPayloadType,
                 Comment = string.IsNullOrWhiteSpace(request.Comment)
@@ -378,7 +378,7 @@ namespace YandexSpeech.Controllers
 
         private async Task HandleSubscriptionPaymentAsync(
             PaymentOperation operation,
-            PaymentPayload payload,
+            PaymentOperationPayload payload,
             YooMoneyNotification notification,
             CancellationToken cancellationToken)
         {
@@ -418,7 +418,7 @@ namespace YandexSpeech.Controllers
 
         private async Task HandleWalletDepositAsync(
             PaymentOperation operation,
-            PaymentPayload payload,
+            PaymentOperationPayload payload,
             YooMoneyNotification notification,
             CancellationToken cancellationToken)
         {
@@ -520,42 +520,14 @@ namespace YandexSpeech.Controllers
             return string.Equals(computed, notification.Sha1Hash, StringComparison.OrdinalIgnoreCase);
         }
 
-        private static string SerializePayload(PaymentPayload payload)
+        private static string SerializePayload(PaymentOperationPayload payload)
         {
-            return JsonSerializer.Serialize(payload, new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-            });
+            return PaymentOperationPayloadSerializer.Serialize(payload);
         }
 
-        private static PaymentPayload? DeserializePayload(string? payload)
+        private static PaymentOperationPayload? DeserializePayload(string? payload)
         {
-            if (string.IsNullOrWhiteSpace(payload))
-            {
-                return null;
-            }
-
-            try
-            {
-                return JsonSerializer.Deserialize<PaymentPayload>(payload, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private sealed class PaymentPayload
-        {
-            public string Type { get; set; } = string.Empty;
-
-            public Guid? PlanId { get; set; }
-
-            public string? Comment { get; set; }
+            return PaymentOperationPayloadSerializer.Deserialize(payload);
         }
 
         public sealed class YooMoneyNotification

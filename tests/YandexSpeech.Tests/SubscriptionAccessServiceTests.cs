@@ -256,15 +256,15 @@ public sealed class SubscriptionAccessServiceTests
 
         var service = CreateService(dbContext, new SubscriptionServiceStub(), options);
 
-        var first = await service.AuthorizeTranscriptionAsync("user-3");
+        var first = await service.AuthorizeTranscriptionAsync("user-3", 1);
         Assert.True(first.IsAllowed);
         Assert.Equal(1, first.RemainingQuota);
 
-        var second = await service.AuthorizeTranscriptionAsync("user-3");
+        var second = await service.AuthorizeTranscriptionAsync("user-3", 1);
         Assert.True(second.IsAllowed);
         Assert.Equal(0, second.RemainingQuota);
 
-        var third = await service.AuthorizeTranscriptionAsync("user-3");
+        var third = await service.AuthorizeTranscriptionAsync("user-3", 1);
         Assert.False(third.IsAllowed);
         Assert.Equal(0, third.RemainingQuota);
         Assert.NotNull(third.Message);
@@ -305,6 +305,15 @@ public sealed class SubscriptionAccessServiceTests
             return Task.FromResult(ActiveSubscription);
         }
 
+        public Task<IReadOnlyList<UserSubscription>> GetActiveSubscriptionsAsync(string userId, CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<UserSubscription> subscriptions = ActiveSubscription == null
+                ? Array.Empty<UserSubscription>()
+                : new[] { ActiveSubscription };
+
+            return Task.FromResult(subscriptions);
+        }
+
         public Task<UserSubscription> ActivateSubscriptionAsync(string userId, Guid planId, bool autoRenew = false, bool isLifetimeOverride = false, string? externalPaymentId = null, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
 
@@ -316,6 +325,15 @@ public sealed class SubscriptionAccessServiceTests
 
         public Task RefreshUserCapabilitiesAsync(string userId, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
+
+        public Task<SubscriptionQuotaBalance> GetQuotaBalanceAsync(string userId, CancellationToken cancellationToken = default)
+            => Task.FromResult(new SubscriptionQuotaBalance());
+
+        public Task<bool> TryConsumeQuotaAsync(string userId, int transcriptionMinutes, int videos, string? reference = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(false);
+
+        public Task EnsureWelcomePackageAsync(string userId, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
 
         public Task<SubscriptionPlan> SavePlanAsync(SubscriptionPlan plan, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
