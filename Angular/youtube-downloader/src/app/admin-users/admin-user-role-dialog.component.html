@@ -84,6 +84,7 @@
                     {{ getPlanLabel(plan) }}
                   </mat-option>
                 </mat-select>
+                <mat-hint>Количество кредитов определяется тарифом, а не суммой платежа</mat-hint>
                 <mat-error *ngIf="manualPaymentForm.get('planCode')?.hasError('required')">
                   Выберите тариф
                 </mat-error>
@@ -92,6 +93,7 @@
               <mat-form-field appearance="fill">
                 <mat-label>Сумма</mat-label>
                 <input matInput type="number" formControlName="amount" placeholder="По умолчанию из тарифа" />
+                <mat-error *ngIf="manualPaymentForm.get('amount')?.hasError('min')">Сумма не может быть отрицательной</mat-error>
               </mat-form-field>
 
               <mat-form-field appearance="fill">
@@ -102,6 +104,8 @@
               <mat-form-field appearance="fill">
                 <mat-label>Дата окончания подписки</mat-label>
                 <input matInput [matDatepicker]="endDatePicker" formControlName="endDate" />
+                <mat-hint>Необязательно: пакет действует до исчерпания кредитов</mat-hint>
+                <mat-error>Укажите корректную дату окончания</mat-error>
                 <mat-datepicker-toggle matSuffix [for]="endDatePicker"></mat-datepicker-toggle>
                 <mat-datepicker #endDatePicker></mat-datepicker>
               </mat-form-field>
@@ -109,6 +113,7 @@
               <mat-form-field appearance="fill">
                 <mat-label>Дата оплаты</mat-label>
                 <input matInput [matDatepicker]="paidAtPicker" formControlName="paidAt" />
+                <mat-error>Укажите корректную дату оплаты</mat-error>
                 <mat-datepicker-toggle matSuffix [for]="paidAtPicker"></mat-datepicker-toggle>
                 <mat-datepicker #paidAtPicker></mat-datepicker>
               </mat-form-field>

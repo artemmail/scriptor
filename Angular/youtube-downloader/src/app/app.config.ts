@@ -6,12 +6,15 @@ import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { HttpClientModule } from '@angular/common/http';
 import { MarkdownModule } from 'ngx-markdown';
+import { MAT_DATE_LOCALE, provideNativeDateAdapter } from '@angular/material/core';
 
 import { appRoutes } from './app.routes';
 import { authInterceptor } from './services/AuthInterceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    provideNativeDateAdapter(),
+    { provide: MAT_DATE_LOCALE, useValue: 'ru-RU' },
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideAnimationsAsync(),
     provideClientHydration(withEventReplay()),

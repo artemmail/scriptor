@@ -59,6 +59,59 @@
   font-weight: 600;
 }
 
+.error-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.restart-button {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24);
+  transition: background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.restart-button:hover:not(:disabled) {
+  background: #1d4ed8;
+  box-shadow: 0 18px 34px rgba(37, 99, 235, 0.28);
+  transform: translateY(-1px);
+}
+
+.restart-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+  box-shadow: none;
+}
+
+.restart-button mat-icon {
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+  line-height: 20px;
+}
+
+.restart-error {
+  color: #b91c1c !important;
+  font-size: 0.94rem !important;
+  font-weight: 600;
+}
+
 @media (max-width: 768px) {
   .page-content {
     padding: 64px 16px 96px;
@@ -79,6 +132,11 @@
 
   .recognized-section {
     gap: 20px;
+  }
+
+  .restart-button {
+    width: 100%;
+    padding: 0 14px;
   }
 }
   

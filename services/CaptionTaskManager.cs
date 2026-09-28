@@ -31,6 +31,7 @@ namespace YandexSpeech.services
         Task<YoutubeCaptionTaskDto?> GetTaskStatusAsync(string taskId);
         Task<bool> DeleteTaskAsync(string taskId);
         Task<bool> UpdateTaskResultAsync(string taskId, string newResult);
+        Task<YoutubeCaptionTaskDto?> RestartCaptionTaskAsync(string taskId, string userId, bool isAdmin);
         Task<List<YoutubeCaptionTask>> GetAllTasksAsync();
         Task ResumeIncompleteTasksAsync(CancellationToken ct = default);
         Task ProcessQueueAsync(CancellationToken ct = default);
@@ -82,6 +83,22 @@ namespace YandexSpeech.services
                                    .FirstOrDefaultAsync(t => t.Id == youtubeId);// && !t.Done);
             if (existing is not null)
             {
+                // A shared video may have failed for a different user's empty balance.
+                // A new request must use the requesting user's credits, not that old error.
+                if (existing.Status == RecognizeStatus.Error
+                    && !existing.QuotaChargedAt.HasValue
+                    && string.IsNullOrWhiteSpace(existing.Result)
+                    && existing.Error?.StartsWith("Недостаточно видео-кредитов для запуска задачи.", StringComparison.Ordinal) == true)
+                {
+                    existing.UserId = userId;
+                    existing.IP = createdBy;
+                    existing.Status = RecognizeStatus.Created;
+                    existing.Done = false;
+                    existing.Error = null;
+                    existing.ModifiedAt = DateTime.UtcNow;
+                    await db.SaveChangesAsync();
+                }
+
                 // Re-enqueue unfinished tasks so "Created" items do not stay stuck forever.
                 if (!existing.Done && existing.Status != RecognizeStatus.Error)
                 {
@@ -211,6 +228,60 @@ namespace YandexSpeech.services
             await db.SaveChangesAsync();
 
             return true;
+        }
+
+        public async Task<YoutubeCaptionTaskDto?> RestartCaptionTaskAsync(string taskId, string userId, bool isAdmin)
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+
+            YoutubeCaptionTask? task = await db.YoutubeCaptionTasks
+                .FirstOrDefaultAsync(t => t.Slug == taskId);
+
+            if (task is null)
+            {
+                task = await db.YoutubeCaptionTasks.FindAsync(taskId);
+            }
+
+            if (task is null)
+                return null;
+
+            if (!isAdmin && !string.Equals(task.UserId, userId, StringComparison.Ordinal))
+                throw new UnauthorizedAccessException("User is not allowed to restart this task.");
+
+            if (task.Status != RecognizeStatus.Error)
+                return await GetTaskStatusAsync(task.Id);
+
+            var stuckSegments = await db.RecognizedSegments
+                .Where(s => s.YoutubeCaptionTaskId == task.Id && s.IsProcessing)
+                .ToListAsync();
+
+            foreach (var segment in stuckSegments)
+            {
+                segment.IsProcessing = false;
+            }
+
+            var hasSegments = await db.RecognizedSegments
+                .AnyAsync(s => s.YoutubeCaptionTaskId == task.Id);
+            var hasCaptionText = await db.YoutubeCaptionTexts
+                .AnyAsync(t => t.Id == task.Id);
+
+            task.Status = hasSegments
+                ? RecognizeStatus.ApplyingPunctuationSegment
+                : hasCaptionText
+                    ? RecognizeStatus.SegmentingCaptions
+                    : !string.IsNullOrWhiteSpace(task.Title) || task.UploadDate.HasValue || !string.IsNullOrWhiteSpace(task.ChannelId)
+                        ? RecognizeStatus.DownloadingCaptions
+                        : RecognizeStatus.Created;
+
+            task.Done = false;
+            task.Error = null;
+            task.ModifiedAt = DateTime.UtcNow;
+
+            await db.SaveChangesAsync();
+
+            _ = ProcessQueueAsync();
+            return await GetTaskStatusAsync(task.Id);
         }
 
 

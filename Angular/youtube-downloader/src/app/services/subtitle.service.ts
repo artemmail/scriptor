@@ -130,9 +130,13 @@ generatePdfFromMarkdown(id: string, markdown: string): Observable<Blob> {
    * @param taskId — ID или slug задачи
    * @param result — новое значение result
    */
-   updateResult(taskId: string, result: string): Observable<void> {
+  updateResult(taskId: string, result: string): Observable<void> {
     const body = { result };
     return this.http.put<void>(`${this.apiUrl}/${taskId}/result`, body);
+  }
+
+  restartTask(taskId: string): Observable<YoutubeCaptionTaskDto> {
+    return this.http.post<YoutubeCaptionTaskDto>(`${this.apiUrl}/${taskId}/restart`, null);
   }
 
   getAllTasks(): Observable<YoutubeCaptionTaskDto[]> {

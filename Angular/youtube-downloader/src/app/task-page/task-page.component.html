@@ -10,6 +10,18 @@
           <div class="info-panel error-state">
             <h2>Возникла ошибка</h2>
             <p class="error-message">{{ taskErrorMessage }}</p>
+            <div class="error-actions">
+              <button
+                class="restart-button"
+                type="button"
+                [disabled]="restartInProgress"
+                (click)="onRestartTask()"
+              >
+                <mat-icon>{{ restartInProgress ? 'sync' : 'replay' }}</mat-icon>
+                <span>{{ restartInProgress ? 'Перезапускаем' : 'Перезапустить' }}</span>
+              </button>
+              <p class="restart-error" *ngIf="restartErrorMessage">{{ restartErrorMessage }}</p>
+            </div>
           </div>
         </ng-container>
 

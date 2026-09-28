@@ -160,6 +160,15 @@ namespace YandexSpeech.Controllers
                 return NotFound($"Subscription plan '{request.PlanCode}' was not found.");
             }
 
+            if (request.EndDate.HasValue && request.EndDate.Value.ToUniversalTime() <= DateTime.UtcNow)
+            {
+                return BadRequest("Дата окончания подписки должна быть в будущем, иначе начисленные кредиты будут недоступны.");
+            }
+
+            await using var transaction = _dbContext.Database.IsRelational()
+                ? await _dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false)
+                : null;
+
             var subscription = await _subscriptionService
                 .ActivateSubscriptionAsync(user.Id, plan.Id, externalPaymentId: request.Reference, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
@@ -174,6 +183,7 @@ namespace YandexSpeech.Controllers
                 subscription.IsLifetime = false;
                 subscription.Status = SubscriptionStatus.Active;
                 await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                await _subscriptionService.RefreshUserCapabilitiesAsync(user.Id, cancellationToken).ConfigureAwait(false);
             }
 
             var amount = request.Amount ?? plan.Price;
@@ -196,6 +206,10 @@ namespace YandexSpeech.Controllers
 
             _dbContext.SubscriptionInvoices.Add(invoice);
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            }
 
             var dto = new AdminSubscriptionDto
             {

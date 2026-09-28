@@ -83,6 +83,32 @@ namespace YandexSpeech.Controllers
             return NoContent();
         }
 
+        [HttpPost("{taskId}/restart")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ActionResult<YoutubeCaptionTaskDto>> RestartTask(string taskId)
+        {
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized("User is not authenticated");
+
+            try
+            {
+                var restarted = await _taskManager.RestartCaptionTaskAsync(
+                    taskId,
+                    userId,
+                    User.IsInRole("Admin"));
+
+                if (restarted == null)
+                    return NotFound("Task not found.");
+
+                return Ok(restarted);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+        }
+
         [HttpPut("{taskId}/result")]
         public async Task<IActionResult> UpdateResult(string taskId, [FromBody] UpdateResultDto dto)
         {
