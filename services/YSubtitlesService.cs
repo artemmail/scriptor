@@ -57,14 +57,17 @@ namespace YandexSpeech.services
 
         public async Task PopulateSlugsAsync()
         {
-            var existingSlugs = _dbContext.YoutubeCaptionTasks.Select(t => t.Slug).ToList();
+            var existingSlugs = _dbContext.YoutubeCaptionTasks.Select(t => t.Slug)
+                .Concat(_dbContext.YoutubeCaptionTasks.Select(t => t.PreviousSlug))
+                .ToList();
             var topicsWithoutSlug = await _dbContext.YoutubeCaptionTasks
                 .Where(x => string.IsNullOrEmpty(x.Slug))
                 .ToListAsync();
 
             foreach (var topic in topicsWithoutSlug)
             {
-                topic.Slug = GenerateSlug(topic.Title, existingSlugs);
+                topic.Slug = GenerateCaptionTaskSlug(topic, existingSlugs);
+                existingSlugs.Add(topic.Slug);
                 _dbContext.Update(topic);
             }
 
@@ -134,13 +137,51 @@ namespace YandexSpeech.services
 
         public string GenerateSlug(string header)
         {
-            var existingSlugs = _dbContext.YoutubeCaptionTasks.Select(t => t.Slug).ToList();
-            var topicsWithoutSlug =  _dbContext.YoutubeCaptionTasks
-                .Where(x => string.IsNullOrEmpty(x.Slug))
+            var existingSlugs = _dbContext.YoutubeCaptionTasks.Select(t => t.Slug)
+                .Concat(_dbContext.YoutubeCaptionTasks.Select(t => t.PreviousSlug))
                 .ToList();
-
-
             return GenerateSlug(header,existingSlugs);
+        }
+
+        public string GenerateCaptionTaskSlug(YoutubeCaptionTask task, IEnumerable<string> existingSlugs)
+        {
+            if (string.IsNullOrWhiteSpace(task.CaptionTrackKey))
+                return GenerateSlug(task.Title ?? task.Id, existingSlugs);
+
+            var languageCode = task.CaptionTrackKey.Split('|')[0].ToLowerInvariant();
+            languageCode = Regex.Replace(languageCode, @"[^a-z0-9-]", string.Empty).Trim('-');
+            if (languageCode.Length == 0)
+                return GenerateSlug(task.Title ?? task.Id, existingSlugs);
+
+            var baseSlug = Regex.Replace(Transliterate(task.Title ?? task.Id), @"[^a-zA-Z0-9\-]", "-")
+                .Trim('-').ToLowerInvariant();
+            if (baseSlug.Length == 0)
+                baseSlug = "video";
+
+            var existing = new HashSet<string>(existingSlugs.Where(slug => !string.IsNullOrEmpty(slug))!,
+                StringComparer.OrdinalIgnoreCase);
+            var primaryCode = languageCode.Split('-')[0];
+            var candidate = $"{baseSlug}-{primaryCode}";
+            if (!existing.Contains(candidate)) return candidate;
+
+            if (languageCode != primaryCode)
+            {
+                candidate = $"{baseSlug}-{languageCode}";
+                if (!existing.Contains(candidate)) return candidate;
+            }
+
+            var trackKind = task.CaptionTrackKey.Split('|').Skip(1).FirstOrDefault();
+            if (trackKind is "auto" or "manual")
+            {
+                candidate = $"{baseSlug}-{languageCode}-{trackKind}";
+                if (!existing.Contains(candidate)) return candidate;
+            }
+
+            candidate = $"{baseSlug}-{languageCode}-{task.VideoId ?? task.Id}".ToLowerInvariant();
+            if (!existing.Contains(candidate)) return candidate;
+
+            // Multiple tracks may share a video and language; the task ID is unique.
+            return $"{baseSlug}-{languageCode}-{task.Id}".ToLowerInvariant();
         }
 
 
@@ -199,7 +240,9 @@ namespace YandexSpeech.services
         // -----------------------------
         public async Task<List<YoutubeCaptionTask>> GetAllTasksAsync()
         {
-            return await _dbContext.YoutubeCaptionTasks.ToListAsync();
+            return await _dbContext.YoutubeCaptionTasks
+                .Where(t => t.Visibility == YoutubeCaptionVisibility.Public)
+                .ToListAsync();
         }
 
         public async Task<YoutubeCaptionTask> GetTaskByIdAsync(string taskId)
@@ -215,7 +258,8 @@ namespace YandexSpeech.services
             // Выполняем запрос к базе с сортировкой по дате создания в обратном порядке
             // и выборкой только необходимых полей
             var itemsDto = await _dbContext.YoutubeCaptionTasks
-                .Where(x=>x.Status==RecognizeStatus.Done)
+                .Where(x => x.Status == RecognizeStatus.Done &&
+                            x.Visibility == YoutubeCaptionVisibility.Public)
                 .OrderByDescending(t => t.CreatedAt)
                 .Select(t => new YoutubeCaptionTaskTableDto1
                 {
@@ -312,6 +356,7 @@ namespace YandexSpeech.services
             var itemsDto = tasks.Select(t => new YoutubeCaptionTaskTableDto
             {
                 Id = t.Id,
+                CaptionTrackKey = t.CaptionTrackKey,
                 ChannelId = t.ChannelId,
                 ChannelName = t.ChannelName,
                 UploadDate = t.UploadDate,

@@ -5,6 +5,7 @@ namespace YandexSpeech.models.DTO
     public class YoutubeCaptionTaskTableDto
     {
         public string Id { get; set; }
+        public string? CaptionTrackKey { get; set; }
         public string ChannelId { get; set; }
         public string ChannelName { get; set; }
 

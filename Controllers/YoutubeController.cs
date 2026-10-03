@@ -10,6 +10,8 @@ using YoutubeDownload.Managers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;             // StreamDto, MergedVideoDto
+using System.Text.RegularExpressions;
+using YoutubeExplode.Videos;
 using YandexSpeech.Extensions;
 
 namespace YourNamespace.Controllers
@@ -17,14 +19,12 @@ namespace YourNamespace.Controllers
     /// <summary>
     /// DTO для запроса на склейку (merge):  
     /// - VideoUrlOrId — URL или ID видео  
-    /// - CreatedBy    — идентификатор/имя пользователя, который создал задачу  
     /// - QualityLabel, Container — параметры видео  
     /// - AudioStreams — список аудиодорожек  
     /// </summary>
     public class MergeRequestDto
     {
         public string VideoUrlOrId { get; set; } = string.Empty;
-        public string CreatedBy { get; set; } = string.Empty;
         public string? QualityLabel { get; set; }
         public string? Container { get; set; }
         public List<StreamDto> AudioStreams { get; set; } = new();
@@ -37,15 +37,18 @@ namespace YourNamespace.Controllers
         private readonly YoutubeStreamService _youtubeStreamService;
         private readonly IYoutubeDownloadTaskManager _downloadTaskManager;
         private readonly YoutubeWorkflowService _workflowService;
+        private readonly ILogger<YoutubeController> _logger;
 
         public YoutubeController(
             YoutubeStreamService youtubeStreamService,
             IYoutubeDownloadTaskManager downloadTaskManager,
-            YoutubeWorkflowService workflowService)
+            YoutubeWorkflowService workflowService,
+            ILogger<YoutubeController> logger)
         {
             _youtubeStreamService = youtubeStreamService;
             _downloadTaskManager = downloadTaskManager;
             _workflowService = workflowService;
+            _logger = logger;
         }
 
         /// <summary>
@@ -57,6 +60,8 @@ namespace YourNamespace.Controllers
         {
             if (string.IsNullOrWhiteSpace(videoUrlOrId))
                 return BadRequest("Параметр videoUrlOrId обязателен.");
+            if (VideoId.TryParse(videoUrlOrId) is null)
+                return BadRequest("Неверная ссылка или ID видео YouTube.");
 
             try
             {
@@ -65,7 +70,8 @@ namespace YourNamespace.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Ошибка при получении потоков: {ex.Message}");
+                _logger.LogError(ex, "Failed to list YouTube streams");
+                return Problem("Не удалось получить список дорожек.", statusCode: 500);
             }
         }
 
@@ -82,15 +88,19 @@ namespace YourNamespace.Controllers
         {
             if (string.IsNullOrWhiteSpace(videoUrlOrId) || string.IsNullOrWhiteSpace(type))
                 return BadRequest("Параметры videoUrlOrId и type обязательны.");
+            if (VideoId.TryParse(videoUrlOrId) is null)
+                return BadRequest("Неверная ссылка или ID видео YouTube.");
 
             var typeLower = type.ToLowerInvariant();
             if (typeLower != "audio" && typeLower != "video" && typeLower != "muxed")
                 return BadRequest("type должен быть 'audio', 'video' или 'muxed'.");
 
             // формируем уникальное имя файла
-            var ext = container ?? "mp4";
-            var qualityPart = qualityLabel ?? "default";
-            var fileName = $"{typeLower}_{qualityPart}_{Guid.NewGuid()}.{ext}";
+            var ext = string.IsNullOrWhiteSpace(container) ? "mp4" : container;
+            if (!Regex.IsMatch(ext, @"\A[a-zA-Z0-9]{1,8}\z"))
+                return BadRequest("Недопустимый формат файла.");
+
+            var fileName = $"{typeLower}_{Guid.NewGuid():N}.{ext}";
             var tempDir = Path.Combine(Directory.GetCurrentDirectory(), "Temp");
             Directory.CreateDirectory(tempDir);
             var filePath = Path.Combine(tempDir, fileName);
@@ -105,11 +115,21 @@ namespace YourNamespace.Controllers
                     saveFilePath: filePath
                 );
 
-                return Ok(new { Message = "Downloaded", Path = filePath });
+                if (!System.IO.File.Exists(filePath))
+                    return Problem("Файл не был создан.", statusCode: 500);
+
+                Response.OnCompleted(() =>
+                {
+                    TryDeleteTemporaryFile(filePath);
+                    return Task.CompletedTask;
+                });
+                return PhysicalFile(filePath, GetContentTypeByExtension(Path.GetExtension(fileName)), fileName);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Ошибка при скачивании: {ex.Message}");
+                TryDeleteTemporaryFile(filePath);
+                _logger.LogError(ex, "Failed to download YouTube stream");
+                return Problem("Не удалось скачать дорожку.", statusCode: 500);
             }
         }
 
@@ -119,7 +139,7 @@ namespace YourNamespace.Controllers
         /// </summary>
         [HttpPost("merge")]      
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]       
-        public async Task<IActionResult> MergeVideoAndAudios([FromBody] MergeRequestDto dto)
+        public async Task<IActionResult> MergeVideoAndAudios([FromBody] MergeRequestDto? dto)
         {
             var userId = User.GetUserId();
             if (userId == null)
@@ -129,6 +149,11 @@ namespace YourNamespace.Controllers
             {
                 return BadRequest("VideoUrlOrId  обязательны.");
             }
+            if (VideoId.TryParse(dto.VideoUrlOrId) is null)
+                return BadRequest("Неверная ссылка или ID видео YouTube.");
+            if (dto.AudioStreams?.Any(stream => stream is null ||
+                    !string.Equals(stream.Type, "audio", StringComparison.OrdinalIgnoreCase)) == true)
+                return BadRequest("AudioStreams должен содержать только аудиодорожки.");
 
             // Собираем список дорожек: сначала видео, затем все аудиодорожки
             var streams = new List<StreamDto>();
@@ -142,7 +167,11 @@ namespace YourNamespace.Controllers
                     Container = dto.Container
                 });
             
-            streams.AddRange(dto.AudioStreams);
+            if (dto.AudioStreams != null)
+                streams.AddRange(dto.AudioStreams);
+
+            if (streams.Count == 0)
+                return BadRequest("Выберите видео или аудиодорожку.");
 
             try
             {
@@ -154,7 +183,8 @@ namespace YourNamespace.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Ошибка при постановке в очередь: {ex.Message}");
+                _logger.LogError(ex, "Failed to enqueue YouTube download for user {UserId}", userId);
+                return Problem("Не удалось создать задачу скачивания.", statusCode: 500);
             }
         }
 
@@ -163,11 +193,16 @@ namespace YourNamespace.Controllers
         /// Возвращает прогресс по задаче.
         /// </summary>
         [HttpGet("progress/{taskId}")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<IActionResult> GetProgress(string taskId)
         {
-            var task = await _downloadTaskManager.GetTaskStatusAsync(taskId);
-            if (task == null)
-                return NotFound($"Задача {taskId} не найдена.");
+            var userId = User.GetUserId();
+            if (userId == null)
+                return Unauthorized();
+
+            var task = await _downloadTaskManager.GetTaskStatusAsync(taskId, userId);
+            if (task == null || task.UserId != userId)
+                return NotFound();
 
             int progress = task.Status switch
             {
@@ -177,7 +212,17 @@ namespace YourNamespace.Controllers
                 YoutubeWorkflowStatus.Done => 100,
                 _ => 0
             };
-            return Ok(new { TaskId = taskId, Status = task.Status.ToString(), Progress = progress });
+            var hasResult = task.Status == YoutubeWorkflowStatus.Done &&
+                !string.IsNullOrWhiteSpace(task.MergedFilePath);
+            return Ok(new
+            {
+                TaskId = taskId,
+                Status = task.Status.ToString(),
+                Progress = progress,
+                Error = task.Error,
+                FileName = hasResult ? Path.GetFileName(task.MergedFilePath) : null,
+                DownloadUrl = hasResult ? $"/api/youtube/downloadResult/{Uri.EscapeDataString(taskId)}" : null
+            });
         }
 
         /// <summary>
@@ -185,21 +230,28 @@ namespace YourNamespace.Controllers
         /// Скачивает результирующий файл после слияния.
         /// </summary>
         [HttpGet("downloadResult/{taskId}")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<IActionResult> DownloadMergedResult(string taskId)
         {
-            var task = await _downloadTaskManager.GetTaskStatusAsync(taskId);
-            if (task == null)
-                return NotFound($"Задача {taskId} не найдена.");
+            var userId = User.GetUserId();
+            if (userId == null)
+                return Unauthorized();
+
+            var task = await _downloadTaskManager.GetTaskStatusAsync(taskId, userId);
+            if (task == null || task.UserId != userId)
+                return NotFound();
             if (task.Status != YoutubeWorkflowStatus.Done
                 || string.IsNullOrWhiteSpace(task.MergedFilePath))
             {
                 return BadRequest("Задача не завершена или нет итогового файла.");
             }
 
-            var data = await System.IO.File.ReadAllBytesAsync(task.MergedFilePath);
+            if (!System.IO.File.Exists(task.MergedFilePath))
+                return NotFound("Итоговый файл не найден.");
+
             var name = Path.GetFileName(task.MergedFilePath);
             var contentType = GetContentTypeByExtension(Path.GetExtension(name));
-            return File(data, contentType, name);
+            return PhysicalFile(task.MergedFilePath, contentType, name);
         }
 
         /// <summary>
@@ -221,7 +273,8 @@ namespace YourNamespace.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Ошибка при получении списка: {ex.Message}");
+                _logger.LogError(ex, "Failed to list YouTube downloads for user {UserId}", userId);
+                return Problem("Не удалось получить список скачиваний.", statusCode: 500);
             }
         }
 
@@ -246,6 +299,16 @@ namespace YourNamespace.Controllers
                 ".mkv" => "video/x-matroska",
                 _ => "application/octet-stream"
             };
+        }
+
+        private static void TryDeleteTemporaryFile(string filePath)
+        {
+            try
+            {
+                System.IO.File.Delete(filePath);
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
         }
 
     }

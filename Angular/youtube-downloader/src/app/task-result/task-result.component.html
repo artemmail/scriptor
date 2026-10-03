@@ -20,6 +20,7 @@
           <span *ngIf="task.channelName">Канал: {{ task.channelName }}</span>
           <span *ngIf="task.uploadDate">· Видео от {{ task.uploadDate | localTime: 'yyyy-MM-dd' }}</span>
           <span *ngIf="task.createdAt">· Обновлено {{ task.createdAt | localTime: 'yyyy-MM-dd HH:mm' }}</span>
+          <span *ngIf="selectedTrackLabel">· Дорожка: {{ selectedTrackLabel }}</span>
         </div>
       </div>
     </div>

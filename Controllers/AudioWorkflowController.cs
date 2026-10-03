@@ -28,14 +28,29 @@ namespace YandexSpeech.Controllers
             if (string.IsNullOrEmpty(userId))
                 return Unauthorized();
 
-            var taskId = await _taskManager.EnqueueRecognitionTaskAsync(fileId, userId);
-            return Ok(taskId);
+            try
+            {
+                var taskId = await _taskManager.EnqueueRecognitionTaskAsync(fileId, userId);
+                return Ok(taskId);
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound("Audio file not found.");
+            }
+            catch (AudioWorkflowUnavailableException)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                    "Распознавание аудио сейчас недоступно.");
+            }
         }
 
         [HttpGet("{taskId}")]
         public async Task<IActionResult> GetStatus(string taskId)
         {
-            var dto = await _taskManager.GetTaskStatusAsync(taskId);
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var dto = await _taskManager.GetTaskStatusAsync(taskId, userId);
             if (dto == null)
                 return NotFound("Task not found.");
             return Ok(dto);
@@ -44,14 +59,20 @@ namespace YandexSpeech.Controllers
         [HttpGet("tasks")]
         public async Task<IActionResult> ListTasks()
         {
-            var list = await _taskManager.GetAllTasksAsync();
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var list = await _taskManager.GetAllTasksAsync(userId);
             return Ok(list);
         }
 
         [HttpDelete("{taskId}")]
         public async Task<IActionResult> DeleteTask(string taskId)
         {
-            var deleted = await _taskManager.DeleteTaskAsync(taskId);
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var deleted = await _taskManager.DeleteTaskAsync(taskId, userId);
             if (!deleted)
                 return NotFound("Task not found.");
             return NoContent();

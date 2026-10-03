@@ -361,7 +361,7 @@ export class About3Component implements OnInit, OnDestroy {
     this.startError = null;
     this.limitResponse = null;
 
-    this.subtitleService.startSubtitleRecognition(query, 'user').subscribe({
+    this.subtitleService.startWithTrackChoice(query).subscribe({
       next: (response) => {
         this.isStarting = false;
         this.remainingVideos = response.remainingVideos ?? response.remainingQuota ?? null;

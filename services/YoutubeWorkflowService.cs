@@ -329,12 +329,12 @@ namespace YoutubeDownload.Services
                     ? $"https://youtu.be/{t.VideoId}"
                     : null;
 
-                var downloadUrl = $"/api/youtube/tasks/{t.Id}/download";
+                var downloadUrl = $"/api/youtube/downloadResult/{t.Id}";
 
                 return new MergedVideoDto
                 {
                     TaskId = t.Id,
-                    FilePath = t.Status == YoutubeWorkflowStatus.Done ? t.MergedFilePath : null,
+                    FilePath = null,
                     FileName = fileName,
                     Title = t.Title,
                     YoutubeId = t.VideoId,
@@ -372,7 +372,7 @@ namespace YoutubeDownload.Services
             if (t.Status == YoutubeWorkflowStatus.Done && !string.IsNullOrWhiteSpace(t.MergedFilePath))
             {
                 dto.FileName = Path.GetFileName(t.MergedFilePath);
-                dto.DownloadUrl = $"/api/youtube/tasks/{t.Id}/download";
+                dto.DownloadUrl = $"/api/youtube/downloadResult/{t.Id}";
             }
 
             return dto;

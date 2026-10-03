@@ -18,6 +18,10 @@ namespace YandexSpeech.Controllers
     [Authorize]
     public class AudioFilesController : ControllerBase
     {
+        private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".mp3", ".wav", ".m4a", ".ogg", ".opus", ".webm", ".mp4", ".flac", ".aac"
+        };
         private readonly IAudioFileService _fileService;
         private readonly MyDbContext _db;
 
@@ -39,6 +43,8 @@ namespace YandexSpeech.Controllers
         {
             if (file == null || file.Length == 0)
                 return BadRequest("File not provided.");
+            if (!AllowedExtensions.Contains(Path.GetExtension(file.FileName)))
+                return BadRequest("Unsupported audio file type.");
 
             var userId = User.GetUserId();
             if (string.IsNullOrEmpty(userId))
@@ -46,7 +52,7 @@ namespace YandexSpeech.Controllers
 
             using var stream = file.OpenReadStream();
             var audio = await _fileService.SaveOriginalAsync(stream, file.FileName, userId);
-            return CreatedAtAction(nameof(GetById), new { id = audio.Id }, audio);
+            return CreatedAtAction(nameof(GetById), new { id = audio.Id }, ToResponse(audio));
         }
 
         [HttpGet]
@@ -59,10 +65,8 @@ namespace YandexSpeech.Controllers
                 .Where(f => f.CreatedBy == userId)
                 .Select(f => new {
                     f.Id,
-                    OriginalFileName = f.OriginalFileName,  // ← обязательно выводим его
-                    f.OriginalFilePath,
+                    f.OriginalFileName,
                     f.ConvertedFileName,
-                    f.ConvertedFilePath,
                     f.UploadedAt
                 })
                 .ToListAsync();
@@ -78,7 +82,7 @@ namespace YandexSpeech.Controllers
             var file = await _db.AudioFiles.FirstOrDefaultAsync(f => f.Id == id && f.CreatedBy == userId);
             if (file == null)
                 return NotFound();
-            return Ok(file);
+            return Ok(ToResponse(file));
         }
 
         // DELETE: api/AudioFiles/{id}
@@ -91,7 +95,14 @@ namespace YandexSpeech.Controllers
             if (file == null)
                 return NotFound();
 
-            // Удаление физических файлов
+            if (await _db.AudioWorkflowTasks.AnyAsync(t =>
+                    t.AudioFileId == id && !t.Done && t.Status != RecognizeStatus.Error))
+                return Conflict("Audio file is being recognized.");
+
+            _db.AudioFiles.Remove(file);
+            await _db.SaveChangesAsync();
+
+            // Deleting the database record first keeps active tasks from losing their input.
             try
             {
                 if (System.IO.File.Exists(file.OriginalFilePath))
@@ -104,9 +115,15 @@ namespace YandexSpeech.Controllers
                 // логирование при необходимости
             }
 
-            _db.AudioFiles.Remove(file);
-            await _db.SaveChangesAsync();
             return NoContent();
         }
+
+        private static object ToResponse(AudioFile file) => new
+        {
+            file.Id,
+            file.OriginalFileName,
+            file.ConvertedFileName,
+            file.UploadedAt
+        };
     }
 }

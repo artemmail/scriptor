@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using YandexSpeech.services;
 using YandexSpeech;
+using YoutubeExplode.Videos;
 
 using YoutubeDownload.Models;     // ваши модели
 using YoutubeDownload.Services;   // YoutubeWorkflowService и т.д.
@@ -21,7 +22,7 @@ namespace YoutubeDownload.Managers
         );
 
         /// <summary>Получить статус задачи (из БД).</summary>
-        Task<YoutubeDownloadTask> GetTaskStatusAsync(string taskId);
+        Task<YoutubeDownloadTask?> GetTaskStatusAsync(string taskId, string userId);
 
         /// <summary>Обработать очередь (запустить задачи, которые ещё не выполнены).</summary>
         void ProcessQueue();
@@ -66,22 +67,25 @@ namespace YoutubeDownload.Managers
             using var scope = _scopeFactory.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<MyDbContext>();
 
-            // Проверяем, нет ли уже незавершённой задачи для этого videoId
-            // (или используйте другую логику, если нужен уникальный ключ).
+            var canonicalVideoId = VideoId.Parse(videoId).Value;
+
+            // A task belongs to one user. Reusing another user's task would expose its id
+            // and prevent the caller from creating their own download.
             var existingTask = await dbContext.YoutubeDownloadTasks.FirstOrDefaultAsync(x =>
-                x.VideoId == videoId && !x.Done && x.Status != YoutubeWorkflowStatus.Error
+                x.VideoId == canonicalVideoId && x.UserId == userId &&
+                !x.Done && x.Status != YoutubeWorkflowStatus.Error
             );
 
             if (existingTask != null)
             {
-                // Такая задача уже есть — возвращаем её Id
+                ProcessQueue();
                 return existingTask.Id;
             }
 
             // Иначе создаём новую задачу
             var workflowService = scope.ServiceProvider.GetRequiredService<YoutubeWorkflowService>();
             // Запускаем "с нуля" (StartNewTaskAsync создаёт запись в БД).
-            var newTask = await workflowService.StartNewTaskAsync(videoId, streamsToDownload, userId);
+            var newTask = await workflowService.StartNewTaskAsync(canonicalVideoId, streamsToDownload, userId);
 
             // Попробуем запустить
             ProcessQueue();
@@ -92,16 +96,12 @@ namespace YoutubeDownload.Managers
         /// <summary>
         /// Возвращаем статус задачи из БД.
         /// </summary>
-        public async Task<YoutubeDownloadTask> GetTaskStatusAsync(string taskId)
+        public async Task<YoutubeDownloadTask?> GetTaskStatusAsync(string taskId, string userId)
         {
             using var scope = _scopeFactory.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<MyDbContext>();
-            var task = await dbContext.YoutubeDownloadTasks.FindAsync(taskId);
-
-            if (task == null)
-                throw new Exception($"YoutubeDownloadTask with Id={taskId} not found.");
-
-            return task;
+            return await dbContext.YoutubeDownloadTasks.AsNoTracking()
+                .FirstOrDefaultAsync(task => task.Id == taskId && task.UserId == userId);
         }
 
         /// <summary>

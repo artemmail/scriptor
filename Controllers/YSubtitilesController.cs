@@ -18,6 +18,7 @@ using YandexSpeech.Extensions;
 using YoutubeExplode.Videos;
 using YoutubeDownload.Services; // <-- добавили
 using System.Text;
+using System.Text.RegularExpressions;
 
 public class UpdateResultDto
 {
@@ -42,6 +43,7 @@ namespace YandexSpeech.Controllers
         private readonly YoutubeWorkflowService _workflow; // <-- добавили
         private readonly ISubscriptionService _subscriptionService;
         private readonly MyDbContext _dbContext;
+        private readonly CaptionService _captionService;
 
         public YSubtitilesController(
             ICaptionTaskManager taskManager,
@@ -50,7 +52,8 @@ namespace YandexSpeech.Controllers
             IYSubtitlesService ySubtitlesService,
             YoutubeWorkflowService workflow, // <-- добавили
             MyDbContext dbContext,
-            ISubscriptionService subscriptionService
+            ISubscriptionService subscriptionService,
+            CaptionService captionService
         )
         {
             _taskManager = taskManager;
@@ -60,11 +63,16 @@ namespace YandexSpeech.Controllers
             _workflow = workflow; // <-- добавили
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
             _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
+            _captionService = captionService;
         }
 
         [HttpGet("{taskId}")]
-        public async Task<ActionResult<YoutubeCaptionTask>> GetStatus(string taskId)
+        public async Task<ActionResult<YoutubeCaptionTaskDto>> GetStatus(string taskId)
         {
+            var entity = await FindVisibleTaskAsync(taskId);
+            if (entity == null)
+                return NotFound("Task not found.");
+
             var task = await _taskManager.GetTaskStatusAsync(taskId);
             if (task == null)
                 return NotFound("Task not found.");
@@ -74,9 +82,13 @@ namespace YandexSpeech.Controllers
 
 
         [HttpDelete("{taskId}")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<IActionResult> DeleteTask(string taskId)
         {
-            var deleted = await _taskManager.DeleteTaskAsync(taskId);
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var deleted = await _taskManager.DeleteTaskAsync(taskId, userId, User.IsInRole("Admin"));
             if (!deleted)
                 return NotFound("Task not found.");
 
@@ -110,12 +122,16 @@ namespace YandexSpeech.Controllers
         }
 
         [HttpPut("{taskId}/result")]
-        public async Task<IActionResult> UpdateResult(string taskId, [FromBody] UpdateResultDto dto)
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<IActionResult> UpdateResult(string taskId, [FromBody] UpdateResultDto? dto)
         {
             if (dto == null || string.IsNullOrWhiteSpace(dto.Result))
                 return BadRequest("Result must be provided.");
 
-            var updated = await _taskManager.UpdateTaskResultAsync(taskId, dto.Result);
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var updated = await _taskManager.UpdateTaskResultAsync(taskId, dto.Result, userId, User.IsInRole("Admin"));
             if (!updated)
                 return NotFound("Task not found.");
 
@@ -157,13 +173,32 @@ namespace YandexSpeech.Controllers
         }
 
         [HttpGet("all")]
-        public async Task<ActionResult<List<YoutubeCaptionTask>>> GetAllTasks()
+        public async Task<ActionResult<List<YoutubeCaptionTaskDto>>> GetAllTasks()
         {
             var tasks = await _ySubtitlesService.GetAllTasksAsync();
-            return Ok(tasks);
+            return Ok(tasks.Select(t => new YoutubeCaptionTaskDto
+            {
+                Id = t.Id,
+                VideoId = t.VideoId ?? t.Id,
+                CaptionTrackKey = t.CaptionTrackKey,
+                Slug = t.Slug ?? t.Id,
+                Title = t.Title,
+                ChannelName = t.ChannelName,
+                ChannelId = t.ChannelId,
+                Result = t.Result,
+                Error = t.Error,
+                Status = t.Status,
+                Done = t.Done,
+                SegmentsTotal = t.SegmentsTotal,
+                SegmentsProcessed = t.SegmentsProcessed,
+                CreatedAt = t.CreatedAt,
+                ModifiedAt = t.ModifiedAt,
+                UploadDate = t.UploadDate
+            }).ToList());
         }
 
         [HttpGet("Titles")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Admin")]
         public async Task<ActionResult> Titles()
         {
             await _youtubeCaptionService.UpdateNullTitlesAsync();
@@ -180,6 +215,16 @@ namespace YandexSpeech.Controllers
             [FromQuery] string userId = null,
             [FromQuery] bool includeHidden = false)
         {
+            var currentUserId = User.GetUserId();
+            var isAdmin = User.IsInRole("Admin");
+            if (!string.IsNullOrEmpty(userId) && userId != currentUserId && !isAdmin)
+                return Forbid();
+            if (includeHidden && string.IsNullOrEmpty(userId) && !isAdmin)
+                return Forbid();
+
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 1, 100);
+
             var (items, totalCount) = await _ySubtitlesService.GetTasksPagedAsync(
                 page, pageSize, sortField, sortOrder, filter, userId, includeHidden);
 
@@ -199,6 +244,7 @@ namespace YandexSpeech.Controllers
         }
 
         [HttpGet("Slug")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Admin")]
         public async Task Slug()
         {
             await _ySubtitlesService.PopulateSlugsAsync();
@@ -208,26 +254,28 @@ namespace YandexSpeech.Controllers
         [Produces("application/x-subrip")]
         public async Task<IActionResult> GenerateSrt(string taskId, [FromQuery] string? lang = null)
         {
-            // Для一致ности с другими методами сначала проверим наличие задачи
-            var task = await _taskManager.GetTaskStatusAsync(taskId);
-            if (task == null)
+            var visibleTask = await FindVisibleTaskAsync(taskId);
+            if (visibleTask == null)
                 return NotFound("Task not found.");
 
             try
             {
                 // Генерация SRT из JSON субтитров, лежащего в YoutubeCaptionTexts.Caption
-                var srtPath = await _pdfGeneratorService.GenerateSrtFromDbJsonAsync(taskId, lang);
+                var srtPath = await _pdfGeneratorService.GenerateSrtFromDbJsonAsync(visibleTask.Id, lang);
 
                 if (!System.IO.File.Exists(srtPath))
                     return NotFound("SRT file not found.");
 
-                var fileBytes = await System.IO.File.ReadAllBytesAsync(srtPath);
-                var fileName = System.IO.Path.GetFileName(srtPath);
-
-                // Если нужны временные файлы — оставляем; иначе можно удалить после чтения
-                // System.IO.File.Delete(srtPath);
-
-                return File(fileBytes, "application/x-subrip", fileName);
+                try
+                {
+                    var fileBytes = await System.IO.File.ReadAllBytesAsync(srtPath);
+                    var fileName = System.IO.Path.GetFileName(srtPath);
+                    return File(fileBytes, "application/x-subrip", fileName);
+                }
+                finally
+                {
+                    System.IO.File.Delete(srtPath);
+                }
             }
             catch (Exception ex)
             {
@@ -241,7 +289,10 @@ namespace YandexSpeech.Controllers
         [HttpGet("GenerateWord/{taskId}")]
         public async Task<IActionResult> GenerateWord(string taskId)
         {
-            var task = await _taskManager.GetTaskStatusAsync(taskId);
+            var visibleTask = await FindVisibleTaskAsync(taskId);
+            if (visibleTask == null) return NotFound("Task not found.");
+
+            var task = await _taskManager.GetTaskStatusAsync(visibleTask.Id);
             if (task == null)
                 return NotFound("Task not found.");
 
@@ -254,8 +305,15 @@ namespace YandexSpeech.Controllers
                 if (!System.IO.File.Exists(wordPath))
                     return NotFound("DOCX file not found.");
 
-                var fileBytes = await System.IO.File.ReadAllBytesAsync(wordPath);
-                return File(fileBytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"task-{task.Title}.docx");
+                try
+                {
+                    var fileBytes = await System.IO.File.ReadAllBytesAsync(wordPath);
+                    return File(fileBytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", GetExportFileName(task.Title, "docx"));
+                }
+                finally
+                {
+                    System.IO.File.Delete(wordPath);
+                }
             }
             catch (Exception ex)
             {
@@ -266,7 +324,10 @@ namespace YandexSpeech.Controllers
         [HttpGet("GeneratePdf/{taskId}")]
         public async Task<IActionResult> GeneratePdf(string taskId)
         {
-            var task = await _taskManager.GetTaskStatusAsync(taskId);
+            var visibleTask = await FindVisibleTaskAsync(taskId);
+            if (visibleTask == null) return NotFound("Task not found.");
+
+            var task = await _taskManager.GetTaskStatusAsync(visibleTask.Id);
             if (task == null)
                 return NotFound("Task not found.");
 
@@ -281,8 +342,15 @@ namespace YandexSpeech.Controllers
                     return NotFound("PDF file not found.");
                 }
 
-                var fileBytes = await System.IO.File.ReadAllBytesAsync(pdfPath);
-                return File(fileBytes, "application/pdf", $"task-{task.Title}.pdf");
+                try
+                {
+                    var fileBytes = await System.IO.File.ReadAllBytesAsync(pdfPath);
+                    return File(fileBytes, "application/pdf", GetExportFileName(task.Title, "pdf"));
+                }
+                finally
+                {
+                    System.IO.File.Delete(pdfPath);
+                }
             }
             catch (Exception ex)
             {
@@ -290,11 +358,53 @@ namespace YandexSpeech.Controllers
             }
         }
 
+        private static string GetExportFileName(string? title, string extension)
+        {
+            var safeTitle = Regex.Replace(title ?? string.Empty, @"[^\p{L}\p{N} _-]", "_").Trim();
+            if (safeTitle.Length > 80)
+                safeTitle = safeTitle[..80];
+            return $"task-{(safeTitle.Length == 0 ? "document" : safeTitle)}.{extension}";
+        }
+
+        private async Task<YoutubeCaptionTask?> FindVisibleTaskAsync(string taskId)
+        {
+            var query = _dbContext.YoutubeCaptionTasks.AsNoTracking();
+            var task = await query.FirstOrDefaultAsync(t => t.Slug == taskId)
+                ?? await query.FirstOrDefaultAsync(t => t.PreviousSlug == taskId)
+                ?? await query.FirstOrDefaultAsync(t => t.Id == taskId);
+            if (task == null || task.Visibility == YoutubeCaptionVisibility.Deleted)
+                return null;
+
+            if (task.Visibility == YoutubeCaptionVisibility.Hidden)
+            {
+                var currentUserId = User.GetUserId();
+                var isOwner = currentUserId != null && task.UserId == currentUserId;
+                if (!isOwner && !User.IsInRole("Admin"))
+                    return null;
+            }
+
+            return task;
+        }
+
+        [HttpGet("tracks")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ActionResult<IReadOnlyList<CaptionTrackOption>>> GetCaptionTracks(
+            [FromQuery] string youtubeId)
+        {
+            var videoId = VideoId.TryParse(youtubeId);
+            if (videoId is null)
+                return BadRequest("Invalid YouTube video ID.");
+
+            var tracks = await _captionService.GetAvailableSubtitlesAsync(videoId.Value);
+            return Ok(CaptionTrackSelection.Describe(tracks));
+        }
+
         [HttpPost("start")]        
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<ActionResult<StartSubtitleRecognitionResponse>> StartSubtitleRecognition(
             [FromQuery] string youtubeId,
             [FromQuery] string? language,
+            [FromQuery] string? trackKey,
             CancellationToken cancellationToken
         )
         {
@@ -307,12 +417,36 @@ namespace YandexSpeech.Controllers
 
             var clientIp = HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString() ?? "UnknownIP";
 
-            youtubeId = VideoId.Parse(youtubeId).Value;
+            var videoId = VideoId.TryParse(youtubeId);
+            if (videoId is null)
+                return BadRequest("Invalid YouTube video ID.");
+            youtubeId = videoId.Value;
+
+            if (!string.IsNullOrWhiteSpace(trackKey))
+            {
+                var tracks = await _captionService.GetAvailableSubtitlesAsync(youtubeId);
+                if (CaptionTrackSelection.Find(tracks, trackKey) is null)
+                    return BadRequest("Selected subtitle track is not available.");
+            }
+            else if (IsRequestedLanguage(language))
+            {
+                var tracks = await _captionService.GetAvailableSubtitlesAsync(youtubeId);
+                trackKey = CaptionTrackSelection.Describe(tracks)
+                    .FirstOrDefault(option => string.Equals(
+                        option.LanguageCode, language, StringComparison.OrdinalIgnoreCase))?.Key;
+                if (trackKey is null)
+                    return BadRequest("Requested subtitle language is not available.");
+            }
+            else
+            {
+                trackKey = null;
+            }
 
             var taskId = await _taskManager.EnqueueCaptionTaskAsync(
                 youtubeId,
                 clientIp,
-                userId
+                userId,
+                trackKey
             );
 
             var balance = await _subscriptionService
@@ -380,10 +514,42 @@ namespace YandexSpeech.Controllers
 
                 var normalizedId = parsed.ToString();
 
+                string? trackKey = null;
+                if (request.TrackKeys != null &&
+                    (request.TrackKeys.TryGetValue(item, out trackKey) ||
+                     request.TrackKeys.TryGetValue(normalizedId, out trackKey)) &&
+                    !string.IsNullOrWhiteSpace(trackKey))
+                {
+                    var tracks = await _captionService.GetAvailableSubtitlesAsync(normalizedId);
+                    if (CaptionTrackSelection.Find(tracks, trackKey) is null)
+                    {
+                        invalidItems.Add(item);
+                        continue;
+                    }
+                }
+                else
+                {
+                    trackKey = null;
+                }
+
+                if (trackKey is null && IsRequestedLanguage(request.Language))
+                {
+                    var tracks = await _captionService.GetAvailableSubtitlesAsync(normalizedId);
+                    trackKey = CaptionTrackSelection.Describe(tracks)
+                        .FirstOrDefault(option => string.Equals(
+                            option.LanguageCode, request.Language, StringComparison.OrdinalIgnoreCase))?.Key;
+                    if (trackKey is null)
+                    {
+                        invalidItems.Add(item);
+                        continue;
+                    }
+                }
+
                 var taskId = await _taskManager.EnqueueCaptionTaskAsync(
                     normalizedId,
                     clientIp,
-                    userId
+                    userId,
+                    trackKey
                 );
 
                 taskIds.Add(taskId);
@@ -414,5 +580,10 @@ namespace YandexSpeech.Controllers
                 ? null
                 : Math.Max(0, remaining);
         }
+
+        private static bool IsRequestedLanguage(string? language)
+            => !string.IsNullOrWhiteSpace(language)
+               && !string.Equals(language, "user", StringComparison.OrdinalIgnoreCase)
+               && !string.Equals(language, "system", StringComparison.OrdinalIgnoreCase);
     }
 }

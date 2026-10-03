@@ -18,6 +18,11 @@ namespace YandexSpeech.models.DB
         [Key]
         public string Id { get; set; }
 
+        // Legacy tasks use Id as the video ID. Selected tracks get their own task ID.
+        public string? VideoId { get; set; }
+
+        public string? CaptionTrackKey { get; set; }
+
         public string? Title { get; set; }
 
         public string? ChannelName { get; set; }
@@ -55,6 +60,8 @@ namespace YandexSpeech.models.DB
         public YoutubeCaptionText CaptionText { get; set; }
 
         public string? Slug { get; set; }
+
+        public string? PreviousSlug { get; set; }
 
         public string? IP { get; set; }
       

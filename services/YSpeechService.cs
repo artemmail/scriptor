@@ -22,11 +22,12 @@ namespace YandexSpeech.services
         private readonly string awsSecretKey;
         private readonly string s3ServiceUrl;
         private readonly string defaultBucketName;
-        private readonly OpusConversionService opusService = new OpusConversionService();
+        private readonly OpusConversionService opusService;
 
         public YSpeechService(IConfiguration configuration)
         {
             ArgumentNullException.ThrowIfNull(configuration);
+            opusService = new OpusConversionService(configuration);
 
             var section = configuration.GetSection("YSpeech");
             if (!section.Exists())
@@ -158,6 +159,7 @@ namespace YandexSpeech.services
             {
                 client.DefaultRequestHeaders.Add("Authorization", $"Api-Key {apiKey}");
                 HttpResponseMessage response = await client.GetAsync(url);
+                response.EnsureSuccessStatusCode();
                 string result = await response.Content.ReadAsStringAsync();
                 return JsonConvert.DeserializeObject<RecognizeResult>(result);
             }
@@ -182,6 +184,7 @@ namespace YandexSpeech.services
                     "application/json"
                 );
                 HttpResponseMessage response = await client.PostAsync(url, content);
+                response.EnsureSuccessStatusCode();
                 string result = await response.Content.ReadAsStringAsync();
                 return JsonConvert.DeserializeObject<RecognizeResult>(result);
             }
@@ -256,8 +259,7 @@ namespace YandexSpeech.services
 
         public async Task ConvertMp3ToOpusAsync(string inputMp3, string outputOpus)
         {
-            opusService.ConvertToOpus(inputMp3, outputOpus);
-            await Task.CompletedTask;
+            await opusService.ConvertToOpusAsync(inputMp3, outputOpus);
         }
 
         public async Task<string> ConvertMp3UploadAndRecognizeAsync(string inputMp3)

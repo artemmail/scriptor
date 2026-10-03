@@ -48,16 +48,12 @@ public class DocumentGeneratorService : IDocumentGeneratorService
 
     public async Task<string> GeneratePdfFromMarkdownAsync(string id, string markdown)
     {
-        var (_, outputPath) = await PrepareAndRunPandoc(
-            id, markdown, "pdf", "--pdf-engine=lualatex");
-        return outputPath;
+        return await PrepareAndRunPandoc(markdown, "pdf", "--pdf-engine=lualatex");
     }
 
     public async Task<string> GenerateWordFromMarkdownAsync(string id, string markdown)
     {
-        var (_, outputPath) = await PrepareAndRunPandoc(
-            id, markdown, "docx", null);
-        return outputPath;
+        return await PrepareAndRunPandoc(markdown, "docx", null);
     }
 
     public async Task<string> GenerateBbcodeFromMarkdownAsync(string id, string markdown)
@@ -65,36 +61,19 @@ public class DocumentGeneratorService : IDocumentGeneratorService
         string tempMdPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.md");
         await File.WriteAllTextAsync(tempMdPath, markdown, Encoding.UTF8);
 
-        string outputPath = Path.Combine(Path.GetTempPath(), $"{id}.bbcode");
+        string outputPath = CreateTemporaryOutputPath("bbcode");
         string bbcodeWriterPath = Path.Combine(_pandocWorkingDirectory, "bbcode_phpbb.lua");
 
-        var args = new StringBuilder();
-        args.AppendFormat("\"{0}\" -o \"{1}\" --to=\"{2}\"", tempMdPath, outputPath, bbcodeWriterPath);
-
-        var startInfo = new ProcessStartInfo
+        try
         {
-            FileName = _pandocExecutablePath,
-            Arguments = args.ToString(),
-            WorkingDirectory = _pandocWorkingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = new Process { StartInfo = startInfo };
-        process.Start();
-        string stdErr = await process.StandardError.ReadToEndAsync();
-        await process.StandardOutput.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        File.Delete(tempMdPath);
-        if (process.ExitCode != 0)
-            throw new Exception($"Pandoc error (exit code {process.ExitCode}): {stdErr}");
-
-        string bbcode = await File.ReadAllTextAsync(outputPath);
-        File.Delete(outputPath);
-        return bbcode;
+            await RunPandocAsync(tempMdPath, outputPath, $"--to={bbcodeWriterPath}");
+            return await File.ReadAllTextAsync(outputPath);
+        }
+        finally
+        {
+            File.Delete(tempMdPath);
+            File.Delete(outputPath);
+        }
     }
 
     // ======================== SRT из JSON (БД) ========================
@@ -120,8 +99,11 @@ public class DocumentGeneratorService : IDocumentGeneratorService
             .FirstOrDefaultAsync(t => t.Id == taskId);
 
         var baseTitle = MakeSafeFileName(task?.Title ?? taskId);
-        var fileName = !string.IsNullOrWhiteSpace(lang)
-            ? $"{baseTitle}.{lang}.srt"
+        var safeLanguage = Regex.Replace(lang ?? string.Empty, @"[^a-zA-Z0-9-]", string.Empty);
+        if (safeLanguage.Length > 16)
+            safeLanguage = safeLanguage[..16];
+        var fileName = !string.IsNullOrWhiteSpace(safeLanguage)
+            ? $"{baseTitle}.{safeLanguage}.srt"
             : $"{baseTitle}.srt";
 
         // 3) Конвертируем JSON -> SRT (формат: массив с Text/Offset/Duration/Parts)
@@ -135,8 +117,8 @@ public class DocumentGeneratorService : IDocumentGeneratorService
 
     // ======================== Pandoc общие ========================
 
-    private async Task<(string tempMdPath, string outputPath)> PrepareAndRunPandoc(
-        string id, string markdown, string format, string pdfEngineArgs)
+    private async Task<string> PrepareAndRunPandoc(
+        string markdown, string format, string? pdfEngineArgs)
     {
         string yamlHeader = @"
 ---
@@ -162,39 +144,25 @@ header-includes:
         await File.WriteAllTextAsync(tempMdPath, finalMd, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
 
         string ext = format.Equals("pdf", StringComparison.OrdinalIgnoreCase) ? "pdf" : "docx";
-        string outputPath = Path.Combine(Path.GetTempPath(), $"{id}.{ext}");
+        string outputPath = CreateTemporaryOutputPath(ext);
 
-        var args = new StringBuilder();
-        args.AppendFormat("\"{0}\" -o \"{1}\" --from=markdown+tex_math_dollars+tex_math_double_backslash+raw_tex",
-            tempMdPath, outputPath);
-        if (!string.IsNullOrEmpty(pdfEngineArgs))
-            args.Append(' ').Append(pdfEngineArgs);
-
-        var startInfo = new ProcessStartInfo
+        try
         {
-            FileName = _pandocExecutablePath,
-            Arguments = args.ToString(),
-            WorkingDirectory = _pandocWorkingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(startInfo)!;
-        string stdOut = await process.StandardOutput.ReadToEndAsync();
-        string stdErr = await process.StandardError.ReadToEndAsync();
-        process.WaitForExit();
-
-        File.Delete(tempMdPath);
-
-        if (process.ExitCode != 0)
+            if (pdfEngineArgs is null)
+                await RunPandocAsync(tempMdPath, outputPath, "--from=markdown+tex_math_dollars+tex_math_double_backslash+raw_tex");
+            else
+                await RunPandocAsync(tempMdPath, outputPath, "--from=markdown+tex_math_dollars+tex_math_double_backslash+raw_tex", pdfEngineArgs);
+            return outputPath;
+        }
+        catch
         {
             File.Delete(outputPath);
-            throw new Exception($"Pandoc error (exit code {process.ExitCode}): {stdErr}");
+            throw;
         }
-
-        return (tempMdPath, outputPath);
+        finally
+        {
+            File.Delete(tempMdPath);
+        }
     }
 
     public async Task<string> GenerateMarkdownFromHtmlAsync(string id, string html)
@@ -202,38 +170,47 @@ header-includes:
         string tempHtmlPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.html");
         await File.WriteAllTextAsync(tempHtmlPath, html, Encoding.UTF8);
 
-        string outputPath = Path.Combine(Path.GetTempPath(), $"{id}.md");
+        string outputPath = CreateTemporaryOutputPath("md");
 
-        var args = new StringBuilder();
-        args.AppendFormat("\"{0}\" -o \"{1}\" --from=html --to=markdown_strict+smart", tempHtmlPath, outputPath);
+        try
+        {
+            await RunPandocAsync(tempHtmlPath, outputPath, "--from=html", "--to=markdown_strict+smart");
+            return await File.ReadAllTextAsync(outputPath, Encoding.UTF8);
+        }
+        finally
+        {
+            File.Delete(tempHtmlPath);
+            File.Delete(outputPath);
+        }
+    }
 
+    internal static string CreateTemporaryOutputPath(string extension)
+        => Path.Combine(Path.GetTempPath(), $"scriptor-{Guid.NewGuid():N}.{extension}");
+
+    private async Task RunPandocAsync(string inputPath, string outputPath, params string[] options)
+    {
         var startInfo = new ProcessStartInfo
         {
             FileName = _pandocExecutablePath,
-            Arguments = args.ToString(),
             WorkingDirectory = _pandocWorkingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        startInfo.ArgumentList.Add(inputPath);
+        startInfo.ArgumentList.Add("-o");
+        startInfo.ArgumentList.Add(outputPath);
+        foreach (var option in options)
+            startInfo.ArgumentList.Add(option);
 
-        using var process = Process.Start(startInfo)!;
-        string stdErr = await process.StandardError.ReadToEndAsync();
-        await process.StandardOutput.ReadToEndAsync();
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Pandoc could not start.");
+        var stdOutTask = process.StandardOutput.ReadToEndAsync();
+        var stdErrTask = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
-
-        File.Delete(tempHtmlPath);
-
+        await Task.WhenAll(stdOutTask, stdErrTask);
         if (process.ExitCode != 0)
-        {
-            if (File.Exists(outputPath))
-                File.Delete(outputPath);
-            throw new Exception($"Pandoc error (exit code {process.ExitCode}): {stdErr}");
-        }
-
-        string markdown = await File.ReadAllTextAsync(outputPath, Encoding.UTF8);
-        return markdown;
+            throw new InvalidOperationException($"Pandoc error (exit code {process.ExitCode}): {await stdErrTask}");
     }
 
     private string PreprocessMathMinimal(string content)

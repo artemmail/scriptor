@@ -428,7 +428,7 @@ export class SubtitlesTasksComponent implements OnInit {
     this.recognitionError = null;
 
     this.subtitleService
-      .startSubtitleRecognition(this.recognitionInput, 'user')
+      .startWithTrackChoice(this.recognitionInput)
       .subscribe({
         next: response => {
           this.recognitionStarting = false;
@@ -506,7 +506,7 @@ export class SubtitlesTasksComponent implements OnInit {
     this.recognitionError = null;
 
     this.subtitleService
-      .startSubtitleRecognitionBatch(items, 'user')
+      .startBatchWithTrackChoices(items)
       .subscribe({
         next: response => {
           this.recognitionBatchStarting = false;

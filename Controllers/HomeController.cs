@@ -15,9 +15,9 @@ public class GenerateController : ControllerBase
     }
 
     [HttpPost("pdf")]
-    public async Task<IActionResult> GeneratePdf([FromBody] GenerateRequest request)
+    public async Task<IActionResult> GeneratePdf([FromBody] GenerateRequest? request)
     {
-        if (string.IsNullOrWhiteSpace(request.Markdown))
+        if (request == null || string.IsNullOrWhiteSpace(request.Markdown))
         {
             return BadRequest("Markdown content is required.");
         }
@@ -25,12 +25,15 @@ public class GenerateController : ControllerBase
         try
         {
             var pdfPath = await _documentGeneratorService.GeneratePdfFromMarkdownAsync(request.Id ?? "temp", request.Markdown);
-            var bytes = await System.IO.File.ReadAllBytesAsync(pdfPath);
-
-            // Опционально: удалить временный файл после чтения
-            System.IO.File.Delete(pdfPath);
-
-            return File(bytes, "application/pdf", $"{request.Id ?? "converted"}.pdf");
+            try
+            {
+                var bytes = await System.IO.File.ReadAllBytesAsync(pdfPath);
+                return File(bytes, "application/pdf", GetDownloadFileName(request.Id, "pdf"));
+            }
+            finally
+            {
+                System.IO.File.Delete(pdfPath);
+            }
         }
         catch (Exception ex)
         {
@@ -41,9 +44,9 @@ public class GenerateController : ControllerBase
     }
 
     [HttpPost("bbcode")]
-    public async Task<IActionResult> GenerateBbcode([FromBody] GenerateRequest request)
+    public async Task<IActionResult> GenerateBbcode([FromBody] GenerateRequest? request)
     {
-        if (string.IsNullOrWhiteSpace(request.Markdown))
+        if (request == null || string.IsNullOrWhiteSpace(request.Markdown))
         {
             return BadRequest("Markdown content is required.");
         }
@@ -53,7 +56,7 @@ public class GenerateController : ControllerBase
             var bbcode = await _documentGeneratorService.GenerateBbcodeFromMarkdownAsync(request.Id ?? "temp", request.Markdown);
             var bytes = Encoding.UTF8.GetBytes(bbcode);
 
-            return File(bytes, "text/plain", $"{request.Id ?? "converted"}.bbcode");
+            return File(bytes, "text/plain", GetDownloadFileName(request.Id, "bbcode"));
         }
         catch (Exception ex)
         {
@@ -63,9 +66,9 @@ public class GenerateController : ControllerBase
     }
 
     [HttpPost("docx")]
-    public async Task<IActionResult> GenerateWord([FromBody] GenerateRequest request)
+    public async Task<IActionResult> GenerateWord([FromBody] GenerateRequest? request)
     {
-        if (string.IsNullOrWhiteSpace(request.Markdown))
+        if (request == null || string.IsNullOrWhiteSpace(request.Markdown))
         {
             return BadRequest("Markdown content is required.");
         }
@@ -73,12 +76,15 @@ public class GenerateController : ControllerBase
         try
         {
             var docxPath = await _documentGeneratorService.GenerateWordFromMarkdownAsync(request.Id ?? "temp", request.Markdown);
-            var bytes = await System.IO.File.ReadAllBytesAsync(docxPath);
-
-            // Опционально: удалить временный файл после чтения
-            System.IO.File.Delete(docxPath);
-
-            return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"{request.Id ?? "converted"}.docx");
+            try
+            {
+                var bytes = await System.IO.File.ReadAllBytesAsync(docxPath);
+                return File(bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", GetDownloadFileName(request.Id, "docx"));
+            }
+            finally
+            {
+                System.IO.File.Delete(docxPath);
+            }
         }
         catch (Exception ex)
         {
@@ -86,6 +92,15 @@ public class GenerateController : ControllerBase
             Console.Error.WriteLine(ex);
             return StatusCode(500, "Error generating Word document.");
         }
+    }
+
+    private static string GetDownloadFileName(string? id, string extension)
+    {
+        var safeName = new string((id ?? string.Empty)
+            .Where(c => char.IsLetterOrDigit(c) || c is '-' or '_')
+            .Take(80)
+            .ToArray());
+        return $"{(safeName.Length == 0 ? "converted" : safeName)}.{extension}";
     }
 }
 

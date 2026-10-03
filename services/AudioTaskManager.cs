@@ -12,6 +12,12 @@ using YandexSpeech.services;
 
 namespace YandexSpeech.services
 {
+    public sealed class AudioWorkflowUnavailableException : Exception
+    {
+        public AudioWorkflowUnavailableException()
+            : base("Audio workflow service is not configured.") { }
+    }
+
     // DTO for controller responses
     public class AudioWorkflowTaskDto
     {
@@ -31,9 +37,9 @@ namespace YandexSpeech.services
     public interface IAudioTaskManager
     {
         Task<string> EnqueueRecognitionTaskAsync(string fileId, string createdBy);
-        Task<AudioWorkflowTaskDto?> GetTaskStatusAsync(string taskId);
-        Task<bool> DeleteTaskAsync(string taskId);
-        Task<List<AudioWorkflowTaskDto>> GetAllTasksAsync();
+        Task<AudioWorkflowTaskDto?> GetTaskStatusAsync(string taskId, string createdBy);
+        Task<bool> DeleteTaskAsync(string taskId, string createdBy);
+        Task<List<AudioWorkflowTaskDto>> GetAllTasksAsync(string createdBy);
         Task ResumeIncompleteTasksAsync(CancellationToken ct = default);
         Task ProcessQueueAsync(CancellationToken ct = default);
     }
@@ -45,6 +51,7 @@ namespace YandexSpeech.services
         private readonly ILogger<AudioTaskManager> _logger;
         private readonly SemaphoreSlim _semaphore;
         private static readonly ConcurrentDictionary<string, bool> _inProgress = new();
+        private int _missingWorkflowLogged;
         private volatile bool _scanning;
 
         public AudioTaskManager(IServiceScopeFactory scopeFactory,
@@ -60,7 +67,11 @@ namespace YandexSpeech.services
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
-            var speechSvc = scope.ServiceProvider.GetRequiredService<ISpeechWorkflowService>();
+            if (!await db.AudioFiles.AsNoTracking().AnyAsync(f => f.Id == fileId && f.CreatedBy == createdBy))
+                throw new KeyNotFoundException("Audio file not found.");
+
+            var speechSvc = scope.ServiceProvider.GetService<ISpeechWorkflowService>()
+                ?? throw new AudioWorkflowUnavailableException();
 
             // Start or retrieve existing
             var task = await speechSvc.StartRecognitionTaskAsync(fileId, createdBy);
@@ -68,14 +79,17 @@ namespace YandexSpeech.services
             return task.Id;
         }
 
-        public async Task<AudioWorkflowTaskDto?> GetTaskStatusAsync(string taskId)
+        public Task<AudioWorkflowTaskDto?> GetTaskStatusAsync(string taskId, string createdBy)
+            => GetTaskStatusCoreAsync(taskId, createdBy);
+
+        private async Task<AudioWorkflowTaskDto?> GetTaskStatusCoreAsync(string taskId, string? createdBy)
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
 
             var task = await db.AudioWorkflowTasks
                                .AsNoTracking()
-                               .FirstOrDefaultAsync(t => t.Id == taskId);
+                               .FirstOrDefaultAsync(t => t.Id == taskId && (createdBy == null || t.CreatedBy == createdBy));
             if (task == null)
                 return null;
 
@@ -94,11 +108,12 @@ namespace YandexSpeech.services
             };
         }
 
-        public async Task<bool> DeleteTaskAsync(string taskId)
+        public async Task<bool> DeleteTaskAsync(string taskId, string createdBy)
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
-            var task = await db.AudioWorkflowTasks.FindAsync(taskId);
+            var task = await db.AudioWorkflowTasks
+                .FirstOrDefaultAsync(t => t.Id == taskId && t.CreatedBy == createdBy);
             if (task == null)
                 return false;
 
@@ -107,12 +122,13 @@ namespace YandexSpeech.services
             return true;
         }
 
-        public async Task<List<AudioWorkflowTaskDto>> GetAllTasksAsync()
+        public async Task<List<AudioWorkflowTaskDto>> GetAllTasksAsync(string createdBy)
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
             var tasks = await db.AudioWorkflowTasks
                                  .AsNoTracking()
+                                 .Where(t => t.CreatedBy == createdBy)
                                  .OrderByDescending(t => t.CreatedAt)
                                  .ToListAsync();
             return tasks.Select(t => new AudioWorkflowTaskDto
@@ -148,12 +164,27 @@ namespace YandexSpeech.services
                                       .OrderBy(t => t.CreatedAt)
                                       .ToListAsync(ct);
 
+                if (pending.Count > 0 && scope.ServiceProvider.GetService<ISpeechWorkflowService>() is null)
+                {
+                    if (Interlocked.Exchange(ref _missingWorkflowLogged, 1) == 0)
+                        _logger.LogError("Audio workflow service is not registered; pending audio tasks cannot be resumed.");
+                    return;
+                }
+
                 foreach (var task in pending)
                 {
                     if (!_inProgress.TryAdd(task.Id, true))
                         continue;
 
-                    await _semaphore.WaitAsync(ct);
+                    try
+                    {
+                        await _semaphore.WaitAsync(ct);
+                    }
+                    catch
+                    {
+                        _inProgress.TryRemove(task.Id, out _);
+                        throw;
+                    }
 
                     // 2) Запускаем воркер, который внутри себя откроет свой scope
                     _ = Task.Run(async () =>
@@ -162,7 +193,7 @@ namespace YandexSpeech.services
                         {
                             while (true)
                             {
-                                var dto = await GetTaskStatusAsync(task.Id);
+                                var dto = await GetTaskStatusCoreAsync(task.Id, null);
                                 if (dto == null || dto.Done || dto.Status == RecognizeStatus.Error)
                                     break;
 
@@ -177,7 +208,7 @@ namespace YandexSpeech.services
 
                                 await speechSvcWorker.ContinueRecognitionAsync(task.Id);
 
-                                var updated = await GetTaskStatusAsync(task.Id);
+                                var updated = await GetTaskStatusCoreAsync(task.Id, null);
                                 if (updated == null || updated.Done || updated.Status == RecognizeStatus.Error)
                                     break;
 
@@ -188,9 +219,17 @@ namespace YandexSpeech.services
 
                                 if (!progressDetected)
                                 {
+                                    if (updated.Status == RecognizeStatus.Recognizing)
+                                    {
+                                        // SpeechKit limits operation-status requests; keep one worker
+                                        // per active operation and poll at a bounded interval.
+                                        await Task.Delay(TimeSpan.FromSeconds(30), ct);
+                                        continue;
+                                    }
+
                                     var delay = TimeSpan.FromSeconds(5);
                                     _logger.LogWarning(
-                                        "No progress detected for audio task {TaskId} at status {Status}. Scheduling retry in {DelaySeconds}s to avoid infinite loop.",
+                                        "No progress detected for audio task {TaskId} at status {Status}. Scheduling retry in {DelaySeconds}s.",
                                         task.Id,
                                         updated.Status,
                                         delay.TotalSeconds);
@@ -199,6 +238,10 @@ namespace YandexSpeech.services
                                     break;
                                 }
                             }
+                        }
+                        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                        {
+                            // The next startup resumes the operation.
                         }
                         catch (Exception ex)
                         {
@@ -209,8 +252,12 @@ namespace YandexSpeech.services
                             _inProgress.TryRemove(task.Id, out _);
                             _semaphore.Release();
                         }
-                    }, ct);
+                    }, CancellationToken.None);
                 }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // The next startup will resume remaining tasks.
             }
             catch (Exception ex)
             {

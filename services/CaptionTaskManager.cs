@@ -1,5 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 using YandexSpeech.models.DB;
 using YoutubeExplode.Videos; // for VideoId.TryParse
 
@@ -9,6 +11,8 @@ namespace YandexSpeech.services
     public class YoutubeCaptionTaskDto
     {
         public string Id { get; set; } = default!;
+        public string? VideoId { get; set; }
+        public string? CaptionTrackKey { get; set; }
         public string? Title { get; set; }
         public string? ChannelName { get; set; }
         public string? ChannelId { get; set; }
@@ -27,10 +31,10 @@ namespace YandexSpeech.services
     // -------------  INTERFACE -------------
     public interface ICaptionTaskManager
     {
-        Task<string> EnqueueCaptionTaskAsync(string youtubeId, string createdBy, string userId);
+        Task<string> EnqueueCaptionTaskAsync(string youtubeId, string createdBy, string userId, string? trackKey = null);
         Task<YoutubeCaptionTaskDto?> GetTaskStatusAsync(string taskId);
-        Task<bool> DeleteTaskAsync(string taskId);
-        Task<bool> UpdateTaskResultAsync(string taskId, string newResult);
+        Task<bool> DeleteTaskAsync(string taskId, string userId, bool isAdmin);
+        Task<bool> UpdateTaskResultAsync(string taskId, string newResult, string userId, bool isAdmin);
         Task<YoutubeCaptionTaskDto?> RestartCaptionTaskAsync(string taskId, string userId, bool isAdmin);
         Task<List<YoutubeCaptionTask>> GetAllTasksAsync();
         Task ResumeIncompleteTasksAsync(CancellationToken ct = default);
@@ -70,7 +74,8 @@ namespace YandexSpeech.services
             _semaphore = new SemaphoreSlim(maxConcurrent, maxConcurrent);
         }
 
-        public async Task<string> EnqueueCaptionTaskAsync(string youtubeId, string createdBy, string userId)
+        public async Task<string> EnqueueCaptionTaskAsync(
+            string youtubeId, string createdBy, string userId, string? trackKey = null)
         {
             var vid = VideoId.TryParse(youtubeId);
             if (vid is not null)
@@ -79,8 +84,12 @@ namespace YandexSpeech.services
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
 
+            var taskId = trackKey is null
+                ? youtubeId
+                : $"{youtubeId}-cc-{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(trackKey))).ToLowerInvariant()}";
+
             var existing = await db.YoutubeCaptionTasks
-                                   .FirstOrDefaultAsync(t => t.Id == youtubeId);// && !t.Done);
+                                   .FirstOrDefaultAsync(t => t.Id == taskId);
             if (existing is not null)
             {
                 // A shared video may have failed for a different user's empty balance.
@@ -110,7 +119,9 @@ namespace YandexSpeech.services
 
             var newTask = new YoutubeCaptionTask
             {
-                Id = youtubeId,
+                Id = taskId,
+                VideoId = youtubeId,
+                CaptionTrackKey = trackKey,
                 IP = createdBy,
                 Result = string.Empty,
                 Status = RecognizeStatus.Created,
@@ -140,6 +151,11 @@ namespace YandexSpeech.services
 
             if (task is null)
             {
+                task = await db.YoutubeCaptionTasks.FirstOrDefaultAsync(t => t.PreviousSlug == taskId);
+            }
+
+            if (task is null)
+            {
                 task = await db.YoutubeCaptionTasks.FindAsync(taskId);
             }
 
@@ -148,6 +164,8 @@ namespace YandexSpeech.services
             return new YoutubeCaptionTaskDto
             {
                 Id = task.Id,
+                VideoId = task.VideoId ?? task.Id,
+                CaptionTrackKey = task.CaptionTrackKey,
                 Slug = task.Slug ?? task.Id,
                 Title = task.Title,
                 UploadDate = task.UploadDate,
@@ -164,22 +182,33 @@ namespace YandexSpeech.services
             };
         }
 
-        public async Task<bool> DeleteTaskAsync(string taskId)
+        public async Task<bool> DeleteTaskAsync(string taskId, string userId, bool isAdmin)
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
 
             // Поиск задачи по Slug с последующим падением к ID
-            YoutubeCaptionTask? task = await db.YoutubeCaptionTasks
+            var tasksWithDependents = db.YoutubeCaptionTasks
+                .Include(t => t.RecognizedSegments)
+                .Include(t => t.CaptionText);
+            YoutubeCaptionTask? task = await tasksWithDependents
                 .FirstOrDefaultAsync(t => t.Slug == taskId);
 
             if (task is null)
             {
-                task = await db.YoutubeCaptionTasks.FindAsync(taskId);
+                task = await tasksWithDependents.FirstOrDefaultAsync(t => t.PreviousSlug == taskId);
+            }
+
+            if (task is null)
+            {
+                task = await tasksWithDependents.FirstOrDefaultAsync(t => t.Id == taskId);
             }
 
             if (task is null)
                 return false; // Задача не найдена
+
+            if (!isAdmin && task.UserId != userId)
+                return false;
 
             // Удаляем связанные сегменты (если нужно обеспечить каскадное удаление вручную)
             if (task.RecognizedSegments?.Any() == true)
@@ -203,7 +232,7 @@ namespace YandexSpeech.services
         }
 
 
-        public async Task<bool> UpdateTaskResultAsync(string taskId, string newResult)
+        public async Task<bool> UpdateTaskResultAsync(string taskId, string newResult, string userId, bool isAdmin)
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
@@ -214,11 +243,19 @@ namespace YandexSpeech.services
 
             if (task is null)
             {
+                task = await db.YoutubeCaptionTasks.FirstOrDefaultAsync(t => t.PreviousSlug == taskId);
+            }
+
+            if (task is null)
+            {
                 task = await db.YoutubeCaptionTasks.FindAsync(taskId);
             }
 
             if (task is null)
                 return false; // Задача не найдена
+
+            if (!isAdmin && task.UserId != userId)
+                return false;
 
             // Обновляем результат и время модификации
             task.Result = newResult;
@@ -237,6 +274,12 @@ namespace YandexSpeech.services
 
             YoutubeCaptionTask? task = await db.YoutubeCaptionTasks
                 .FirstOrDefaultAsync(t => t.Slug == taskId);
+
+            if (task is null)
+            {
+                task = await db.YoutubeCaptionTasks
+                    .FirstOrDefaultAsync(t => t.PreviousSlug == taskId);
+            }
 
             if (task is null)
             {

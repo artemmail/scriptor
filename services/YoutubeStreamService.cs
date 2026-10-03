@@ -199,6 +199,8 @@ namespace YandexSpeech.services
                 "audio" => manifest.GetAudioOnlyStreams()
                                    .Where(s => qualityLabel == null
                                         || string.Equals(s.AudioLanguage?.Name, qualityLabel, StringComparison.OrdinalIgnoreCase))
+                                   .Where(s => container == null
+                                        || s.Container.Name.Equals(container, StringComparison.OrdinalIgnoreCase))
                                    .FirstOrDefault(),
 
                 "video" => manifest.GetVideoOnlyStreams()

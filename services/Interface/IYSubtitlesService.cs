@@ -45,6 +45,8 @@ namespace YandexSpeech.services
 
         public string GenerateSlug(string header);
 
+        string GenerateCaptionTaskSlug(YoutubeCaptionTask task, IEnumerable<string> existingSlugs);
+
         // -----------------------------
         // Методы для работы с БД
         // -----------------------------

@@ -100,6 +100,8 @@ namespace YandexSpeech.models.DTO
     {
         public IReadOnlyList<string> YoutubeIds { get; set; } = Array.Empty<string>();
 
+        public Dictionary<string, string> TrackKeys { get; set; } = new();
+
         public string? Language { get; set; }
 
         public string? CreatedBy { get; set; }

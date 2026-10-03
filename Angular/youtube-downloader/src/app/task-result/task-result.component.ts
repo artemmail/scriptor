@@ -69,6 +69,13 @@ export class TaskResultComponent implements OnDestroy {
     return this.hasCyrillic(this.youtubeTask.result) ? this.russianPromo : this.englishPromo;
   }
 
+  get selectedTrackLabel(): string | null {
+    const key = this.youtubeTask?.captionTrackKey;
+    if (!key) return null;
+    const [language, kind] = key.split('|');
+    return `${language.toUpperCase()} · ${kind === 'auto' ? 'автоматические' : 'авторские'} субтитры`;
+  }
+
   get hasResultText(): boolean {
     return !!this.youtubeTask?.result?.trim();
   }
@@ -131,7 +138,7 @@ export class TaskResultComponent implements OnDestroy {
   openVideoDialog(task: YoutubeCaptionTaskDto | null): void {
     if (!task || !this.isAuthenticated) return;
     const data: VideoDialogData = {
-      videoId: task.id,
+      videoId: task.videoId || task.id,
       title: task.title,
       channelName: task.channelName,
       channelId: task.channelId,

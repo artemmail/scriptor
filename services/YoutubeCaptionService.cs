@@ -153,10 +153,10 @@ namespace YandexSpeech.services
             {
                 try
                 {
-                    var info = await _captionService.GetVideoInfoAsync(taskId);
                     var task = await _dbContext.YoutubeCaptionTasks.FirstOrDefaultAsync(t => t.Id == taskId);
                     if (task != null)
                     {
+                        var info = await _captionService.GetVideoInfoAsync(task.VideoId ?? taskId);
                         task.UploadDate = info.UploadDate?.UtcDateTime;
                         task.ModifiedAt = DateTime.UtcNow;
                         await _dbContext.SaveChangesAsync();
@@ -184,10 +184,20 @@ namespace YandexSpeech.services
             task.ModifiedAt = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
 
-            var info = await _captionService.GetVideoInfoAsync(id);
+            var info = await _captionService.GetVideoInfoAsync(task.VideoId ?? id);
             task.Title = info.Title;
             task.UploadDate = info.UploadDate?.UtcDateTime;
-            task.Slug = _slugService.GenerateSlug(info.Title);
+            if (string.IsNullOrWhiteSpace(task.Slug))
+            {
+                var existingSlugs = await _dbContext.YoutubeCaptionTasks
+                    .Where(t => t.Id != id && t.Slug != null)
+                    .Select(t => t.Slug!)
+                    .Concat(_dbContext.YoutubeCaptionTasks
+                        .Where(t => t.Id != id && t.PreviousSlug != null)
+                        .Select(t => t.PreviousSlug!))
+                    .ToListAsync();
+                task.Slug = _slugService.GenerateCaptionTaskSlug(task, existingSlugs);
+            }
             task.ChannelName = info.Author.ChannelTitle;
             task.ChannelId = info.Author.ChannelId;
             await _dbContext.SaveChangesAsync();
@@ -209,7 +219,8 @@ namespace YandexSpeech.services
             var existing = await _dbContext.YoutubeCaptionTexts.FindAsync(id);
             if (existing == null)
             {
-                var caps = await _captionService.GetCaptionsAsync(id);
+                var caps = await _captionService.GetCaptionsAsync(
+                    task.VideoId ?? id, trackKey: task.CaptionTrackKey);
                 var serialized = JsonConvert.SerializeObject(caps);
                 _dbContext.YoutubeCaptionTexts.Add(new YoutubeCaptionText { Id = id, Caption = serialized });
                 await _dbContext.SaveChangesAsync();

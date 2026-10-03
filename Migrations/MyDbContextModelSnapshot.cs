@@ -350,6 +350,9 @@ namespace YandexSpeech.Migrations
                     b.Property<string>("Preview")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PreviousSlug")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("RecognizedText")
                         .HasColumnType("nvarchar(max)");
 
@@ -1188,6 +1191,9 @@ namespace YandexSpeech.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("CaptionTrackKey")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("ChannelId")
                         .HasColumnType("nvarchar(max)");
 
@@ -1238,6 +1244,9 @@ namespace YandexSpeech.Migrations
 
                     b.Property<string>("UserId")
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("VideoId")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Visibility")
                         .HasColumnType("int");

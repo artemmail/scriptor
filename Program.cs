@@ -274,6 +274,7 @@ builder.Services.AddScoped<IOpenAiTranscriptionService, IntegratedFormattingOpen
 builder.Services.AddSingleton<YoutubeClient>();
 builder.Services.AddSingleton<CaptionService>();
 builder.Services.AddScoped<IYSpeechService, YSpeechService>();
+builder.Services.AddScoped<ISpeechWorkflowService, SpeechWorkflowService>();
 builder.Services.AddScoped<IPunctuationService, PunctuationService>();
 
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();

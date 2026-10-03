@@ -23,7 +23,8 @@ namespace YandexSpeech.services
         {
             _db = dbContext;
             _ySpeechService = ySpeechService;
-            _storageRoot = "c:/Temp";// /* configuration.GetValue<string>("Storage:RootPath")                ?? throw new InvalidOperationException("Storage:RootPath not configured");*/
+            _storageRoot = configuration["Storage:RootPath"]
+                ?? "c:/Temp";
         }
 
         // Сохраняет оригинальный файл с привязкой к пользователю
@@ -47,8 +48,16 @@ namespace YandexSpeech.services
                 UploadedAt = DateTime.UtcNow,
                 CreatedBy = createdBy
             };
-            _db.AudioFiles.Add(entity);
-            await _db.SaveChangesAsync();
+            try
+            {
+                _db.AudioFiles.Add(entity);
+                await _db.SaveChangesAsync();
+            }
+            catch
+            {
+                File.Delete(path);
+                throw;
+            }
 
             return entity;
         }

@@ -53,6 +53,13 @@ namespace YandexSpeech.services
 
         public bool done { get; set; } // Свойство для поля "done"
         public RecognizeResponse response { get; set; } // Поле "response"
+        public RecognizeOperationError? error { get; set; }
+    }
+
+    public class RecognizeOperationError
+    {
+        public int code { get; set; }
+        public string? message { get; set; }
     }
 
     public class RecognizeResponse

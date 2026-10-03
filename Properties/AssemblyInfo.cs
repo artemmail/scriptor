@@ -1,4 +1,7 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("YandexSpeech.Tests")]
 
 [assembly: AssemblyCompany("YandexSpeech")]
 [assembly: AssemblyProduct("YandexSpeech")]

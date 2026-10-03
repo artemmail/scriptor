@@ -65,7 +65,7 @@ export class RecognitionControlComponent implements OnInit {
     this.limitResponse = null;
 
     this.recognitionService
-      .startSubtitleRecognition(this.inputValue, 'user')
+      .startWithTrackChoice(this.inputValue)
       .subscribe({
         next: (response) => {
           this.isStarting = false;
