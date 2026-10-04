@@ -1,23 +1,47 @@
+.track-dialog-header { padding: 28px 30px 4px; color: #22241f; font-family: 'Segoe UI', Arial, sans-serif; }
+.track-dialog-header p { margin: 0 0 8px; color: #698635; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+.track-dialog-header h2 { margin: 0; padding: 0; font-size: 27px; font-weight: 600; letter-spacing: -1px; line-height: 1.1; }
+.track-dialog-content { padding: 14px 30px 7px; color: #666d5c; font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; line-height: 1.65; }
+.track-dialog-content > p:first-child { margin: 0; }
 .track-list {
   display: grid;
-  gap: 10px;
-  margin: 16px 0;
+  gap: 8px;
+  margin: 18px 0;
 }
 
 .track-list button {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  min-height: 48px;
+  gap: 15px;
+  min-height: 58px;
   width: 100%;
+  padding: 11px 13px;
+  border-color: #d4dcc8;
+  border-radius: 10px;
+  color: #35412a;
+  background: #fffefa;
   text-align: left;
+  font-family: inherit;
 }
 
-.track-list small {
-  color: #64748b;
-  margin-left: 16px;
-}
+.track-list button:hover { border-color: #a2b97d; background: #f2f7e8; }
+.track-list button > span { display: grid; gap: 1px; }
+.track-list strong { font-size: 13px; font-weight: 650; }
+.track-list small { color: #78826c; font-size: 10px; }
+.track-list em { flex: 0 0 auto; color: #657e3f; font-size: 10px; font-style: normal; font-weight: 650; text-align: right; }
 
 .timer-hint {
-  color: #64748b;
-  font-size: 0.9rem;
+  color: #7a8270;
+  font-size: 11px;
+}
+
+.track-dialog-actions { display: flex; justify-content: flex-end; padding: 17px 30px 27px; }
+.track-dialog-actions .mat-mdc-button { color: #526b2c; font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; font-weight: 650; }
+
+@media (max-width: 520px) {
+  .track-dialog-header { padding: 22px 20px 4px; }
+  .track-dialog-header h2 { font-size: 23px; }
+  .track-dialog-content { padding-inline: 20px; }
+  .track-dialog-actions { padding: 15px 20px 22px; }
 }

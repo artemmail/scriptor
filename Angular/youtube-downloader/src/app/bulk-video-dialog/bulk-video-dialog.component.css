@@ -1,34 +1,58 @@
 :host {
   display: block;
-  color: #0f172a;
+  color: #22241f;
+  font-family: 'Segoe UI', Arial, sans-serif;
 }
 
+.bulk-dialog-header { display: flex; align-items: start; justify-content: space-between; gap: 20px; padding: 28px 30px 8px; }
+.bulk-dialog-header p { margin: 0 0 8px; color: #698635; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+.bulk-dialog-header h2 { margin: 0; padding: 0; font-size: 27px; font-weight: 600; letter-spacing: -1px; line-height: 1.1; }
+.bulk-close { display: grid; width: 34px; height: 34px; place-items: center; padding: 0; border: 0; border-radius: 8px; color: #596151; background: transparent; font-size: 25px; line-height: 1; cursor: pointer; }
+.bulk-close:hover { color: #22241f; background: #e9f0dd; }
 .bulk-dialog-content {
   display: grid;
-  gap: 12px;
-  font-size: 0.95rem;
-  color: #475569;
+  gap: 10px;
+  padding: 14px 30px 8px;
+  font-size: 13px;
+  color: #666d5c;
 }
+
+.bulk-dialog-content > p { margin: 0 0 8px; line-height: 1.65; }
+.bulk-dialog-content label { color: #4d5d38; font-size: 11px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; }
 
 .bulk-dialog-textarea {
   width: 100%;
   min-height: 160px;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.5);
-  padding: 12px;
-  font-size: 0.95rem;
-  line-height: 1.4;
-  color: #0f172a;
-  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #cbd2c1;
+  padding: 13px;
+  font: inherit;
+  line-height: 1.55;
+  color: #22241f;
+  background: #fffefa;
   resize: vertical;
   box-sizing: border-box;
 }
 
 .bulk-dialog-textarea:focus {
-  outline: 2px solid rgba(59, 130, 246, 0.45);
-  border-color: rgba(59, 130, 246, 0.65);
+  outline: 3px solid rgba(105, 134, 53, .18);
+  border-color: #829c4b;
 }
 
 .bulk-dialog-actions {
-  padding-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 18px 30px 28px;
+}
+
+.bulk-dialog-actions .mat-mdc-button { color: #626b57; font-size: 13px; }
+.bulk-dialog-actions .mat-mdc-unelevated-button { min-height: 42px; border-radius: 9px; color: #22241f; background: #d4f568; font-size: 12px; font-weight: 700; }
+.bulk-dialog-actions .mat-mdc-unelevated-button:disabled { opacity: .5; }
+
+@media (max-width: 520px) {
+  .bulk-dialog-header { padding: 22px 20px 6px; }
+  .bulk-dialog-header h2 { font-size: 23px; }
+  .bulk-dialog-content { padding-inline: 20px; }
+  .bulk-dialog-actions { padding: 16px 20px 22px; }
 }

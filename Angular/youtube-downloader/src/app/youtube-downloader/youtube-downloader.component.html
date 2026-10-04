@@ -1,263 +1,119 @@
-<div class="downloader-page">
-  <main class="page-content">
-    <section class="hero">
-      <div class="hero-text">
-        <h1>Скачать YouTube видео/аудио с выбором дорожек</h1>
-        <p class="hero-lead">
-          YouTube хранит видео/аудио потоки разного качетва в отдельных файлах. Вы можете выбрать нужные дорожки с скачать в итоговый файл:
-        </p>
-        <ul class="hero-highlights">
-          <li *ngFor="let highlight of heroHighlights">{{ highlight }}</li>
-        </ul>
-        <div class="hero-actions">
-          <button class="btn btn-primary" type="button" (click)="scrollToWorkspace()">
-            <mat-icon>play_circle</mat-icon>
-            <span>Начать работу</span>
+<div class="ap-page dl-page">
+  <main class="ap-container">
+    <header class="dl-hero">
+      <div>
+        <p class="ap-eyebrow">YOUTUBE → ВАША МЕДИАТЕКА</p>
+        <h1>Заберите с собой.<br><em>Звук. Видео. Идеи.</em></h1>
+        <p class="dl-lead">Подкаст в наушники, лекцию в дорогу, видеодорожку для проекта. Выберите, что сохранить, — мы подготовим файл.</p>
+        <div class="dl-hero-tags"><span>Аудио в MP3</span><span>Видео со звуком</span><span>Выбор качества</span></div>
+      </div>
+      <div class="dl-art" aria-hidden="true">
+        <div class="dl-art-top"><span>YOUR NEXT LISTEN</span><span>↗</span></div>
+        <div class="dl-wave"><i *ngFor="let height of waveform" [style.height.%]="height"></i></div>
+        <div class="dl-art-bottom"><strong>Меньше экрана.<br>Больше свободы.</strong><span class="dl-disc">↓</span></div>
+        <div class="dl-art-caption"><span>YOU CHOOSE THE FORMAT</span><span>MP3 / MP4</span></div>
+      </div>
+    </header>
+
+    <section class="dl-workspace" aria-labelledby="dl-form-title">
+      <div class="dl-workspace-main">
+        <div class="dl-step-heading"><span>01</span><div><p class="ap-eyebrow">ИСТОЧНИК</p><h2 id="dl-form-title">Начните со ссылки</h2></div></div>
+        <form (ngSubmit)="fetchStreams()" class="dl-form" [attr.aria-busy]="isLoading">
+          <label for="downloader-input">Ссылка или ID YouTube-видео</label>
+          <div class="dl-url-field">
+            <mat-icon aria-hidden="true">link</mat-icon>
+            <input id="downloader-input" type="text" [formControl]="videoUrlControl" [readOnly]="isMerging" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false" aria-describedby="dl-url-hint" [attr.aria-invalid]="!!errorMessage">
+            <button class="ap-button ap-button-dark" type="submit" [disabled]="isLoading || isMerging || !videoUrlControl.value.trim()">{{ isLoading ? 'Проверяем…' : 'Найти дорожки' }} <span aria-hidden="true">↗</span></button>
+          </div>
+          <p id="dl-url-hint" class="dl-hint">Обычные ссылки, Shorts, youtu.be и ID ролика.</p>
+        </form>
+        <p class="dl-alert dl-error" *ngIf="errorMessage" role="alert">{{ errorMessage }}</p>
+        <div class="dl-loading" *ngIf="isLoading" role="status"><mat-progress-bar mode="indeterminate" aria-label="Поиск дорожек"></mat-progress-bar><p>Проверяем доступные форматы и качество…</p></div>
+
+        <div class="dl-step-heading dl-format-heading"><span>02</span><div><p class="ap-eyebrow">ФОРМАТ</p><h2>Что сохраняем?</h2></div></div>
+        <div class="dl-modes" aria-label="Формат результата">
+          <button type="button" *ngFor="let option of modes" [class.dl-mode-selected]="mode === option.id" [attr.aria-pressed]="mode === option.id" [disabled]="isMerging" (click)="setMode(option.id)">
+            <mat-icon aria-hidden="true">{{ option.icon }}</mat-icon><strong>{{ option.title }}</strong><small>{{ option.hint }}</small><span class="dl-mode-check" *ngIf="mode === option.id" aria-hidden="true">✓</span>
           </button>
-          <a class="btn btn-secondary" [routerLink]="['/transcriptions']">
-            <mat-icon>record_voice_over</mat-icon>
-            <span>К расшифровкам</span>
-          </a>
+        </div>
+
+        <div class="dl-choose-placeholder" *ngIf="!hasFetched && !isLoading"><mat-icon aria-hidden="true">tune</mat-icon><p>После проверки ссылки здесь появятся доступные дорожки. Вы сможете выбрать качество и увидеть размер исходных файлов.</p></div>
+        <div class="dl-alert" *ngIf="hasFetched && !streams.length">Для этого ролика не найдены отдельные аудио- и видеодорожки. Попробуйте другое видео.</div>
+
+        <div class="dl-tracks" *ngIf="hasFetched && streams.length">
+          <fieldset *ngIf="mode !== 'audio'" [disabled]="isMerging">
+            <legend>Качество видео <span>Выберите один вариант</span></legend>
+            <div class="dl-video-options">
+              <label *ngFor="let stream of videoStreams" class="dl-track" [class.dl-track-selected]="selectedVideo === stream">
+                <input type="radio" name="video-quality" [checked]="selectedVideo === stream" (change)="selectVideo(stream)">
+                <div><strong>{{ quality(stream) }}</strong><small>{{ stream.container | uppercase }} · {{ stream.size | fileSize }}</small></div>
+              </label>
+            </div>
+            <p class="dl-hint" *ngIf="!videoStreams.length">Видеодорожки недоступны. Попробуйте режим «Только аудио».</p>
+          </fieldset>
+          <fieldset *ngIf="mode !== 'silent'" [disabled]="isMerging">
+            <legend>Аудиодорожки <span>{{ mode === 'audio' ? 'Одна дорожка → MP3' : 'Можно выбрать несколько' }}</span></legend>
+            <div class="dl-audio-options">
+              <label *ngFor="let stream of audioStreams" class="dl-track dl-audio-track" [class.dl-track-selected]="selectedAudios.includes(stream)">
+                <input [type]="mode === 'audio' ? 'radio' : 'checkbox'" name="audio-track" [checked]="selectedAudios.includes(stream)" (change)="selectAudio(stream, $any($event.target).checked)">
+                <div><strong>{{ stream.language || 'Аудиодорожка' }}</strong><small>{{ stream.bitrate | bitrate }} · {{ stream.container | uppercase }} · {{ stream.codec }}</small></div><span>{{ stream.size | fileSize }}</span>
+              </label>
+            </div>
+            <p class="dl-hint" *ngIf="!audioStreams.length">Аудиодорожки недоступны. Попробуйте режим «Видео без звука».</p>
+          </fieldset>
         </div>
       </div>
-      <div class="hero-card">
-        <div class="card-header">Продвинутая онлнайн утилита для скачивания с YouTube</div>
-        <div class="card-dropzone">
-          <p>Вставьте ссылку, выберите дорожки и запустите объединение. Можно закрыть страницу сайта и вернуться позже</p>
-          
-          <button class="btn btn-primary" type="button" (click)="scrollToWorkspace()">
-            <mat-icon>bolt</mat-icon>
-            <span>Перейти к форме</span>
-          </button>
-        </div>
-        <div class="card-preview">
-          <div class="card-preview-caption">Что вы получаете:</div>
-          <ul class="card-preview-list">
-            <li *ngFor="let highlight of cardHighlights">
-              <h4>{{ highlight.title }}</h4>
-              <p>{{ highlight.description }}</p>
-            </li>
-          </ul>
-        </div>
-      </div>
+
+      <aside class="dl-summary" aria-labelledby="dl-summary-title">
+        <div class="dl-step-heading"><span>03</span><div><p class="ap-eyebrow">РЕЗУЛЬТАТ</p><h2 id="dl-summary-title">Ваш файл</h2></div></div>
+        <div class="dl-file-art" aria-hidden="true"><mat-icon>{{ mode === 'audio' ? 'graphic_eq' : 'movie' }}</mat-icon><strong>{{ outputFormat }}</strong><span>↓</span></div>
+        <h3>{{ mode === 'audio' ? 'Только то, что слышно.' : mode === 'video' ? 'Картинка и звук. Вместе.' : 'Картинка для ваших идей.' }}</h3>
+        <p>{{ mode === 'audio' ? 'Сохраним выбранную аудиодорожку в MP3.' : mode === 'video' ? 'Объединим видео и выбранные аудиодорожки в MP4.' : 'Сохраним видеодорожку в исходном контейнере, без звука.' }}</p>
+        <dl *ngIf="loadedVideoId">
+          <div *ngIf="mode !== 'audio'"><dt>Качество</dt><dd>{{ selectedVideo ? quality(selectedVideo) : 'Не выбрано' }}</dd></div>
+          <div *ngIf="mode !== 'silent'"><dt>Аудиодорожек</dt><dd>{{ selectedAudios.length }}</dd></div>
+          <div><dt>Исходные файлы</dt><dd>{{ selectedSize | fileSize }}</dd></div>
+        </dl>
+        <p class="dl-size-note" *ngIf="loadedVideoId">Размер результата может отличаться после обработки.</p>
+        <button *ngIf="isAuthenticated; else signInToPrepare" class="ap-button ap-button-lime dl-prepare" type="button" [disabled]="!canPrepare" (click)="mergeSelectedStreams()">{{ isMerging ? 'Готовим файл…' : 'Подготовить файл' }} <mat-icon aria-hidden="true">arrow_forward</mat-icon></button>
+        <ng-template #signInToPrepare><a class="ap-button ap-button-lime dl-prepare" routerLink="/login" [queryParams]="{ returnUrl: '/down' }">Войти и подготовить файл ↗</a><p class="dl-size-note">Дорожки можно посмотреть без входа. Задачи и файлы сохраняются в вашем аккаунте.</p></ng-template>
+        <p class="dl-size-note" *ngIf="isAuthenticated">Подготовка идёт на сервере. К результату можно вернуться из истории.</p>
+      </aside>
     </section>
 
-    <section class="workspace" id="downloader-workspace">
-      <div class="section-header">
-        <h2>Рабочая область</h2>
-        <p>Вставьте ссылку на ролик, отметьте дорожки и наблюдайте за прогрессом объединения и историей задач.</p>
-      </div>
-
-      <div class="workspace-grid">
-        <div class="panel import-panel">
-          <div class="panel-header">
-            <h3>Импорт и объединение потоков</h3>
-            <span
-              *ngIf="mergeStatus || isMerging"
-              class="status-chip"
-              [ngClass]="{
-                'status-running': isMerging && mergeStatus !== 'Done' && mergeStatus !== 'Error',
-                'status-done': mergeStatus === 'Done',
-                'status-error': mergeStatus === 'Error'
-              }"
-            >
-              {{ mergeStatus || 'В обработке' }}
-            </span>
-          </div>
-
-          <div class="panel-body">
-            <p class="panel-description">
-              Сервис автоматически сортирует потоки по типу и качеству. Отметьте подходящие дорожки и запустите
-              объединение — результат появится в истории задач и будет доступен для скачивания.
-            </p>
-
-            <form (submit)="fetchStreams(); $event.preventDefault()" class="stream-form">
-              <label class="stream-form-label" for="downloader-input">Введите идентификатор или ссылку YouTube</label>
-              <div class="stream-form-field">
-                <input
-                  id="downloader-input"
-                  type="text"
-                  [formControl]="videoUrlControl"
-                  placeholder="https://youtube.com/..."
-                  autocomplete="off"
-                />
-                <button class="btn btn-primary" type="submit" [disabled]="isLoading">
-                  {{ isLoading ? 'Загружаем…' : 'Загрузить потоки' }}
-                </button>
-              </div>
-            </form>
-
-            <mat-progress-bar *ngIf="isLoading" mode="indeterminate"></mat-progress-bar>
-
-            <div class="error" *ngIf="errorMessage">{{ errorMessage }}</div>
-
-            <div class="quick-tips" *ngIf="quickTips.length">
-              <h4>Подсказки</h4>
-              <ul>
-                <li *ngFor="let tip of quickTips">{{ tip }}</li>
-              </ul>
-            </div>
-
-            <div class="table-wrapper" *ngIf="streams.length">
-              <table mat-table [dataSource]="streams" class="mat-elevation-z2 selection-table">
-                <ng-container matColumnDef="select">
-                  <th mat-header-cell *matHeaderCellDef></th>
-                  <td mat-cell *matCellDef="let s">
-                    <mat-checkbox
-                      [checked]="isStreamSelected(s)"
-                      (change)="toggleSelection(s, $event.checked)"
-                      [disabled]="isRowDisabled(s)"
-                    ></mat-checkbox>
-                  </td>
-                </ng-container>
-
-                <ng-container matColumnDef="typeIcon">
-                  <th mat-header-cell *matHeaderCellDef></th>
-                  <td mat-cell *matCellDef="let s">
-                    <mat-icon>{{ s.type === 'video' ? 'videocam' : 'audiotrack' }}</mat-icon>
-                  </td>
-                </ng-container>
-
-                <ng-container matColumnDef="codec">
-                  <th mat-header-cell *matHeaderCellDef>Кодек</th>
-                  <td mat-cell *matCellDef="let s">{{ s.codec }}</td>
-                </ng-container>
-
-                <ng-container matColumnDef="quality">
-                  <th mat-header-cell *matHeaderCellDef>Качество</th>
-                  <td mat-cell *matCellDef="let s">{{ s.qualityLabel?.label || s.qualityLabel || '-' }}</td>
-                </ng-container>
-
-                <ng-container matColumnDef="bitrate">
-                  <th mat-header-cell *matHeaderCellDef>Битрейт</th>
-                  <td mat-cell *matCellDef="let s">{{ s.bitrate | bitrate }}</td>
-                </ng-container>
-
-                <ng-container matColumnDef="size">
-                  <th mat-header-cell *matHeaderCellDef>Размер</th>
-                  <td mat-cell *matCellDef="let s">{{ s.size | fileSize }}</td>
-                </ng-container>
-
-                <ng-container matColumnDef="language" *ngIf="showLanguageColumn">
-                  <th mat-header-cell *matHeaderCellDef>Язык</th>
-                  <td mat-cell *matCellDef="let s">{{ s.language || '-' }}</td>
-                </ng-container>
-
-                <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-                <tr mat-row *matRowDef="let row; columns: displayedColumns" [class.disabled-row]="isRowDisabled(row) && !isStreamSelected(row)"></tr>
-              </table>
-            </div>
-
-            <div class="empty-state" *ngIf="!streams.length && !isLoading">
-              <h4>Нет загруженных потоков</h4>
-              <p>Вставьте ссылку на видео и нажмите «Загрузить потоки», чтобы выбрать нужные дорожки.</p>
-            </div>
-
-            <div class="merge-actions">
-              <button
-                mat-flat-button
-                color="accent"
-                (click)="mergeSelectedStreams()"
-                [disabled]="!selectedStreams.length || isMerging"
-              >
-                Объединить дорожки
-              </button>
-
-              <div class="merge-progress" *ngIf="isMerging || mergeStatus">
-                <div class="progress-header">
-                  <span>{{ mergeStatus || 'Подготовка задачи' }}</span>
-                  <span>{{ mergeProgress }}%</span>
-                </div>
-                <mat-progress-bar mode="determinate" [value]="mergeProgress"></mat-progress-bar>
-              </div>
-            </div>
-
-            <div class="status-banner" *ngIf="mergeResult || mergeDownloadUrl">
-              <div class="status-text">
-                <strong *ngIf="mergeResult">{{ mergeResult }}</strong>
-                <span *ngIf="!mergeResult && mergeStatus">Статус: {{ mergeStatus }} ({{ mergeProgress }}%)</span>
-              </div>
-              <a
-                *ngIf="mergeDownloadUrl"
-                [href]="mergeDownloadUrl"
-                [attr.download]="mergeFileName"
-                class="btn btn-outline"
-              >
-                <mat-icon>download</mat-icon>
-                <span>Скачать файл</span>
-              </a>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel history-panel">
-          <div class="panel-header">
-            <h3>История задач</h3>
-            <button class="icon-button" type="button" (click)="loadMergedVideos()" aria-label="Обновить список">
-              <mat-icon>refresh</mat-icon>
-            </button>
-          </div>
-          <div class="panel-body">
-            <div class="error" *ngIf="mergedErrorMessage">{{ mergedErrorMessage }}</div>
-
-            <div class="empty-state" *ngIf="!mergedVideos.length && !mergedErrorMessage">
-              <h4>Задач пока нет</h4>
-              <p>Как только вы запустите объединение, готовые файлы появятся здесь.</p>
-            </div>
-
-            <div class="history-table" *ngIf="mergedVideos.length">
-              <table mat-table [dataSource]="mergedVideos">
-                <ng-container matColumnDef="video">
-                  <th mat-header-cell *matHeaderCellDef>Видео</th>
-                  <td mat-cell *matCellDef="let v">
-                    <a
-                      *ngIf="v.youtubeId"
-                      [href]="'https://youtu.be/' + v.youtubeId"
-                      target="_blank"
-                      rel="noopener"
-                    >
-                      {{ v.title || v.fileName || v.youtubeId }}
-                    </a>
-                    <span *ngIf="!v.youtubeId">{{ v.title || v.fileName || '—' }}</span>
-                  </td>
-                </ng-container>
-
-                <ng-container matColumnDef="status">
-                  <th mat-header-cell *matHeaderCellDef>Статус</th>
-                  <td mat-cell *matCellDef="let v">{{ v.status }}</td>
-                </ng-container>
-
-                <ng-container matColumnDef="progress">
-                  <th mat-header-cell *matHeaderCellDef>Прогресс</th>
-                  <td mat-cell *matCellDef="let v">
-                    <div class="history-progress">
-                      <mat-progress-bar mode="determinate" [value]="v.progress"></mat-progress-bar>
-                      <span>{{ v.progress }}%</span>
-                    </div>
-                  </td>
-                </ng-container>
-
-                <ng-container matColumnDef="action">
-                  <th mat-header-cell *matHeaderCellDef>Действие</th>
-                  <td mat-cell *matCellDef="let v">
-                    <button
-                      mat-stroked-button
-                      color="primary"
-                      [disabled]="!v.filePath"
-                      (click)="downloadMergedVideo(v)"
-                    >
-                      Скачать
-                    </button>
-                  </td>
-                </ng-container>
-
-                <tr mat-header-row *matHeaderRowDef="['video', 'status', 'progress', 'action']"></tr>
-                <tr mat-row *matRowDef="let row; columns: ['video', 'status', 'progress', 'action']"></tr>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
+    <section class="dl-job" *ngIf="mergeStatus" aria-labelledby="dl-job-title" [class.dl-job-done]="mergeStatus === 'Done'" [class.dl-job-error]="mergeStatus === 'Error'">
+      <div class="dl-job-heading"><div><p class="ap-eyebrow">ТЕКУЩАЯ ЗАДАЧА</p><h2 id="dl-job-title" aria-live="polite">{{ statusLabel(mergeStatus) }}</h2></div><mat-icon aria-hidden="true">{{ mergeStatus === 'Done' ? 'task_alt' : mergeStatus === 'Error' ? 'error_outline' : 'hourglass_top' }}</mat-icon></div>
+      <ol class="dl-stages" *ngIf="mergeStatus !== 'Error'" aria-label="Этапы подготовки">
+        <li [class.dl-stage-current]="mergeStatus === 'Created'"><span>01</span>Очередь</li><li [class.dl-stage-current]="mergeStatus === 'Downloading'"><span>02</span>Скачивание дорожек</li><li [class.dl-stage-current]="mergeStatus === 'Merging'"><span>03</span>Подготовка файла</li><li [class.dl-stage-current]="mergeStatus === 'Done'"><span>04</span>Готово</li>
+      </ol>
+      <mat-progress-bar *ngIf="isMerging" mode="indeterminate" aria-label="Файл готовится"></mat-progress-bar>
+      <p *ngIf="pollingWarning" class="dl-alert" role="status">{{ pollingWarning }}</p>
+      <p *ngIf="mergeError" class="dl-alert dl-error" role="alert">{{ mergeError }}</p>
+      <div class="dl-result" *ngIf="mergeStatus === 'Done'"><span>{{ mergeFileName || 'Файл готов. Можно скачивать.' }}</span><button class="ap-button ap-button-dark" type="button" (click)="downloadMergedFile()" [disabled]="!activeTaskId || downloading.has(activeTaskId)"><mat-icon aria-hidden="true">download</mat-icon>{{ activeTaskId && downloading.has(activeTaskId) ? 'Скачиваем…' : 'Скачать файл' }}</button></div>
+      <p class="dl-alert dl-error" *ngIf="activeTaskId && downloadErrors.get(activeTaskId)" role="alert">{{ downloadErrors.get(activeTaskId!) }}</p>
     </section>
+
+    <section class="dl-history" aria-labelledby="dl-history-title">
+      <header class="dl-section-heading"><div><p class="ap-eyebrow">ВСЁ ПОД РУКОЙ</p><h2 id="dl-history-title">Ваши скачивания<span>.</span></h2><p>Вернитесь за готовым файлом, когда удобно.</p></div><div class="dl-history-counter" *ngIf="isAuthenticated"><strong>{{ readyCount }}</strong><span>готово к скачиванию</span></div></header>
+      <div class="dl-guest" *ngIf="!isAuthenticated"><mat-icon aria-hidden="true">folder_open</mat-icon><div><h3>Ваша медиатека начинается здесь</h3><p>Войдите, чтобы запускать подготовку и видеть свои файлы.</p></div><a class="ap-button ap-button-outline" routerLink="/login" [queryParams]="{ returnUrl: '/down' }">Войти в аккаунт ↗</a></div>
+      <ng-container *ngIf="isAuthenticated">
+        <div class="dl-history-toolbar"><div class="dl-filters" aria-label="Фильтр задач"><button type="button" [attr.aria-pressed]="historyFilter === 'all'" (click)="setHistoryFilter('all')">Все</button><button type="button" [attr.aria-pressed]="historyFilter === 'active'" (click)="setHistoryFilter('active')">В работе</button><button type="button" [attr.aria-pressed]="historyFilter === 'done'" (click)="setHistoryFilter('done')">Готовые</button><button type="button" [attr.aria-pressed]="historyFilter === 'error'" (click)="setHistoryFilter('error')">С ошибкой</button></div><button class="dl-refresh" type="button" (click)="loadMergedVideos()" [disabled]="historyLoading"><mat-icon aria-hidden="true">refresh</mat-icon>Обновить</button></div>
+        <mat-progress-bar *ngIf="historyLoading" mode="indeterminate" aria-label="Обновление истории"></mat-progress-bar>
+        <p class="dl-alert dl-error" *ngIf="mergedErrorMessage" role="alert">{{ mergedErrorMessage }}</p>
+        <div class="dl-history-list">
+          <article *ngFor="let item of visibleHistory" class="dl-history-item">
+            <div class="dl-history-icon" [class.dl-history-icon-ready]="item.status === 'Done'"><mat-icon aria-hidden="true">{{ item.status === 'Done' ? 'download_done' : item.status === 'Error' ? 'error_outline' : 'schedule' }}</mat-icon></div>
+            <div class="dl-history-info"><h3><a *ngIf="item.youtubeId; else plainTitle" [href]="'https://youtu.be/' + item.youtubeId" target="_blank" rel="noopener">{{ item.title || item.fileName || item.youtubeId }} <span aria-hidden="true">↗</span></a><ng-template #plainTitle>{{ item.title || item.fileName || 'Подготовка файла' }}</ng-template></h3><p><span>{{ item.createdAt | localTime:'dd.MM.yyyy HH:mm' }}</span><span [class.dl-error-text]="item.status === 'Error'">{{ statusLabel(item.status) }}</span></p><p class="dl-error-text" *ngIf="downloadErrors.get(item.taskId)" role="alert">{{ downloadErrors.get(item.taskId) }}</p></div>
+            <button class="ap-button ap-button-outline" type="button" *ngIf="item.status === 'Done'" [disabled]="!canDownload(item) || downloading.has(item.taskId)" (click)="downloadMergedVideo(item)"><mat-icon aria-hidden="true">download</mat-icon>{{ downloading.has(item.taskId) ? 'Скачиваем…' : 'Скачать' }}</button><span class="dl-history-wait" *ngIf="!isTerminal(item.status)">Обновляется автоматически</span>
+          </article>
+        </div>
+        <div class="dl-empty" *ngIf="!historyLoading && !mergedErrorMessage && !filteredHistory.length"><mat-icon aria-hidden="true">inbox</mat-icon><h3>{{ mergedVideos.length ? 'В этой подборке пока пусто' : 'Здесь появятся ваши файлы' }}</h3><p>{{ mergedVideos.length ? 'Выберите другой фильтр, чтобы увидеть остальные задачи.' : 'Вставьте ссылку выше и запустите подготовку первого файла.' }}</p></div>
+        <button class="ap-button ap-button-outline dl-more" type="button" *ngIf="filteredHistory.length > historyLimit" (click)="historyLimit = historyLimit + 6">Показать ещё ↓</button>
+      </ng-container>
+    </section>
+
+    <section class="dl-next" aria-labelledby="dl-next-title"><div><p class="ap-eyebrow">ОТ ПРОСЛУШИВАНИЯ — К РАБОТЕ С ТЕКСТОМ</p><h2 id="dl-next-title">Нужен смысл <em>на бумаге?</em></h2><p>Откройте Скрипторий для расшифровок YouTube или загрузите свой файл для транскрибации с постобработкой.</p></div><div><a class="ap-button ap-button-dark" routerLink="/Scriptorium">Открыть Скрипторий ↗</a><a class="dl-secondary-link" routerLink="/transcriptions">Расшифровать свой файл →</a></div></section>
+    <section class="dl-faq" aria-labelledby="dl-faq-title"><h2 id="dl-faq-title">Перед скачиванием</h2><div><details><summary>Какой файл я получу?</summary><p>В режиме аудио — MP3. Видео с выбранным звуком собирается в MP4. Видео без звука сохраняется в контейнере выбранной дорожки, например MP4 или WebM.</p></details><details><summary>Можно закрыть страницу во время подготовки?</summary><p>Да, после создания задачи обработка продолжается на сервере. Вернитесь в этот раздел под тем же аккаунтом: результат будет в истории скачиваний.</p></details><details><summary>Почему нет нужного качества?</summary><p>Список зависит от дорожек, доступных у конкретного ролика. Сервис показывает доступные варианты и не увеличивает исходное качество видео.</p></details></div></section>
+    <footer class="ap-bottom"><span>YouScriptor · Из ролика — в ваш формат</span><nav aria-label="Полезные ссылки"><a routerLink="/">Главная</a><a routerLink="/Scriptorium">Скрипторий</a><a routerLink="/blog">Новости сайта</a></nav></footer>
   </main>
 </div>

@@ -32,7 +32,8 @@
         </span>
       </div>
       <nav *ngIf="isAccountPage" class="account-nav" aria-label="Основная навигация">
-        <a class="account-workspace-link" routerLink="/transcriptions" routerLinkActive="account-nav-active">Мои записи</a>
+        <a class="account-workspace-link" routerLink="/transcriptions" routerLinkActive="account-nav-active" ariaCurrentWhenActive="page">Мои записи</a>
+        <a class="account-scriptorium-link" routerLink="/Scriptorium" routerLinkActive="account-nav-active" ariaCurrentWhenActive="page">Скрипторий</a>
         <a routerLink="/billing" routerLinkActive="account-nav-active" ariaCurrentWhenActive="page">Тарифы</a>
         <a *ngIf="user$ | async; else loginLink" routerLink="/profile" routerLinkActive="account-nav-active" ariaCurrentWhenActive="page">Профиль</a>
         <ng-template #loginLink><a routerLink="/login" routerLinkActive="account-nav-active" ariaCurrentWhenActive="page">Войти</a></ng-template>

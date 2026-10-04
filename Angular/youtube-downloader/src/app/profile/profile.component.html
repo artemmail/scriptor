@@ -53,6 +53,6 @@
     </div>
 
     <section class="profile-session" aria-label="Выход из аккаунта"><div><h2>Закончили работу?</h2><p>На общем устройстве лучше выйти из аккаунта.</p></div><button class="ap-button ap-button-outline" type="button" (click)="logout()" [disabled]="logoutInProgress"><mat-icon aria-hidden="true">logout</mat-icon>{{ logoutInProgress ? 'Выходим…' : 'Выйти из аккаунта' }}</button><p class="ap-notice ap-error" *ngIf="logoutError" role="alert">{{ logoutError }}</p></section>
-    <footer class="ap-bottom"><span>YouScriptor · Из записи — в текст</span><nav aria-label="Полезные ссылки"><a routerLink="/">На главную</a><a routerLink="/billing">Тарифы</a><a routerLink="/ServiceNews">Новости</a></nav></footer>
+    <footer class="ap-bottom"><span>YouScriptor · Из записи — в текст</span><nav aria-label="Полезные ссылки"><a routerLink="/">На главную</a><a routerLink="/billing">Тарифы</a><a routerLink="/blog">Новости</a></nav></footer>
   </main>
 </div>

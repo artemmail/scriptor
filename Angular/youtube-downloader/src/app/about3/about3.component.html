@@ -9,7 +9,7 @@
       <a href="#features" (click)="scrollTo('features', $event)">Возможности</a>
       <a href="#postprocessing" (click)="scrollTo('postprocessing', $event)">Постобработка</a>
       <a href="#pricing" (click)="scrollTo('pricing', $event)">Цены</a>
-      <a routerLink="/ServiceNews">Новости</a>
+      <a routerLink="/blog">Новости</a>
       <button type="button" (click)="openSupport()">Поддержка</button>
     </nav>
     <div class="s-header-actions">
@@ -18,7 +18,7 @@
     </div>
   </header>
   <nav class="s-mobile-nav s-container" aria-label="Новости, цены и поддержка">
-    <a routerLink="/ServiceNews">Новости</a>
+    <a routerLink="/blog">Новости</a>
     <a href="#pricing" (click)="scrollTo('pricing', $event)">Цены</a>
     <button type="button" (click)="openSupport()">Поддержка</button>
   </nav>
@@ -151,5 +151,5 @@
     <section class="s-final s-container" aria-labelledby="final-title"><div><p class="s-eyebrow">ХОРОШИЕ МЫСЛИ СТОИТ СОХРАНЯТЬ</p><h2 id="final-title">Пусть запись<br>работает на вас.</h2><p>Начните с одного ролика. Или с одной важной встречи.</p><a class="s-button s-button-dark" href="#start" (click)="scrollTo('start', $event)">Превратить запись в результат <span aria-hidden="true">↗</span></a></div><div class="s-final-art" aria-hidden="true"><span>≋</span><span>↗</span><span>Аа</span></div></section>
   </main>
 
-  <footer class="s-footer s-container"><a class="s-brand" routerLink="/"><span class="s-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>YouScriptor<span class="s-brand-sub">из записи — в текст</span></span></a><p>Ваши записи. Ваши мысли. Ваш следующий шаг.</p><nav aria-label="Ссылки в подвале"><a routerLink="/tasks">YouTube в текст</a><a routerLink="/transcriptions">Мои расшифровки</a><a routerLink="/down">Скачать дорожки</a><a routerLink="/billing">Тарифы</a><a routerLink="/ServiceNews">Новости сайта</a><button type="button" (click)="openSupport()">Поддержка</button></nav><div class="s-footer-bottom"><span>© YouScriptor · Скрипторий</span><span>Сделано для тех, кто ценит содержание.</span></div></footer>
+  <footer class="s-footer s-container"><a class="s-brand" routerLink="/"><span class="s-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>YouScriptor<span class="s-brand-sub">из записи — в текст</span></span></a><p>Ваши записи. Ваши мысли. Ваш следующий шаг.</p><nav aria-label="Ссылки в подвале"><a routerLink="/tasks">YouTube в текст</a><a routerLink="/transcriptions">Мои расшифровки</a><a routerLink="/down">Скачать дорожки</a><a routerLink="/billing">Тарифы</a><a routerLink="/blog">Новости сайта</a><button type="button" (click)="openSupport()">Поддержка</button></nav><div class="s-footer-bottom"><span>© YouScriptor · Скрипторий</span><span>Сделано для тех, кто ценит содержание.</span></div></footer>
 </div>

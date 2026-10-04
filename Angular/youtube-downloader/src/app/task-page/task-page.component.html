@@ -1,39 +1,26 @@
-<div class="recognized-page transcription-page">
-  <main class="page-content">
-    <section class="recognized-section">
-      <ng-container *ngIf="taskDone && task; else showProgressOrError">
-        <app-task-result [youtubeTask]="task"></app-task-result>
-      </ng-container>
-
-      <ng-template #showProgressOrError>
-        <ng-container *ngIf="taskErrorMessage; else showProgress">
-          <div class="info-panel error-state">
-            <h2>Возникла ошибка</h2>
-            <p class="error-message">{{ taskErrorMessage }}</p>
-            <div class="error-actions">
-              <button
-                class="restart-button"
-                type="button"
-                [disabled]="restartInProgress"
-                (click)="onRestartTask()"
-              >
-                <mat-icon>{{ restartInProgress ? 'sync' : 'replay' }}</mat-icon>
-                <span>{{ restartInProgress ? 'Перезапускаем' : 'Перезапустить' }}</span>
-              </button>
-              <p class="restart-error" *ngIf="restartErrorMessage">{{ restartErrorMessage }}</p>
-            </div>
-          </div>
-        </ng-container>
-
-        <ng-template #showProgress>
-          <app-task-progress
-            [taskId]="taskId"
-            (taskLoaded)="onTaskLoaded($event)"
-            (taskDone)="onTaskDone($event)"
-            (taskError)="onTaskError($event)"
-          ></app-task-progress>
-        </ng-template>
-      </ng-template>
-    </section>
+<div class="ap-page rp-page">
+  <main class="ap-container rp-container">
+    <nav class="rp-breadcrumb" aria-label="Навигация"><a routerLink="/Scriptorium"><mat-icon aria-hidden="true">arrow_back</mat-icon>Скрипторий</a><span aria-hidden="true">/</span><span>Расшифровка</span></nav>
+    <ng-container *ngIf="taskDone && task; else pending">
+      <app-task-result [youtubeTask]="task"></app-task-result>
+    </ng-container>
+    <ng-template #pending>
+      <section *ngIf="taskErrorMessage; else progress" class="rp-error" aria-labelledby="rp-error-title">
+        <div class="rp-error-icon"><mat-icon aria-hidden="true">error_outline</mat-icon></div>
+        <p class="ap-eyebrow">ОБРАБОТКА ОСТАНОВИЛАСЬ</p>
+        <h1 id="rp-error-title">Не удалось завершить расшифровку</h1>
+        <h2 *ngIf="task?.title">{{ task?.title }}</h2>
+        <p>Можно попробовать запустить задачу снова. Перезапуск доступен владельцу и администратору.</p>
+        <details><summary>Подробности ошибки</summary><p>{{ taskErrorMessage }}</p></details>
+        <div class="rp-error-actions">
+          <button *ngIf="isAuthenticated; else login" class="ap-button ap-button-dark" type="button" [disabled]="restartInProgress" (click)="onRestartTask()"><mat-icon aria-hidden="true">replay</mat-icon>{{ restartInProgress ? 'Перезапускаем…' : 'Попробовать снова' }}</button>
+          <ng-template #login><a class="ap-button ap-button-dark" routerLink="/login" [queryParams]="{returnUrl: '/recognized/' + taskId}">Войти для перезапуска ↗</a></ng-template>
+          <a class="ap-button ap-button-outline" routerLink="/Scriptorium">В библиотеку</a>
+        </div>
+        <p class="rp-restart-error" *ngIf="restartErrorMessage" role="alert">{{ restartErrorMessage }}</p>
+      </section>
+      <ng-template #progress><app-task-progress [taskId]="taskId" (taskLoaded)="onTaskLoaded($event)" (taskDone)="onTaskDone($event)" (taskError)="onTaskError($event)"></app-task-progress></ng-template>
+    </ng-template>
+    <footer class="ap-bottom"><span>YouScriptor · От записи к знаниям</span><nav aria-label="Полезные ссылки"><a routerLink="/Scriptorium">Скрипторий</a><a routerLink="/transcriptions">Мои записи</a><a routerLink="/blog">Новости сайта</a></nav></footer>
   </main>
 </div>

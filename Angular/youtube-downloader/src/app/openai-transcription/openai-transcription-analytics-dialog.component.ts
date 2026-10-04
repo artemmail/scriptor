@@ -1,11 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import {
   OpenAiRecognitionProfileOptionDto,
@@ -29,10 +25,6 @@ export interface OpenAiTranscriptionAnalyticsDialogResult {
     CommonModule,
     FormsModule,
     MatDialogModule,
-    MatButtonModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
     MatProgressBarModule,
   ],
   templateUrl: './openai-transcription-analytics-dialog.component.html',
@@ -50,6 +42,10 @@ export class OpenAiTranscriptionAnalyticsDialogComponent implements OnInit {
   clarificationPlaceholder = this.defaultClarificationPlaceholder;
   clarificationHint: string | null = null;
 
+  get selectedProfile(): OpenAiRecognitionProfileOptionDto | undefined {
+    return this.profiles.find(profile => profile.id === this.selectedProfileId);
+  }
+
   constructor(
     private readonly dialogRef: MatDialogRef<
       OpenAiTranscriptionAnalyticsDialogComponent,
@@ -65,9 +61,6 @@ export class OpenAiTranscriptionAnalyticsDialogComponent implements OnInit {
   }
 
   onCancel(): void {
-    if (this.profilesLoading) {
-      return;
-    }
     this.dialogRef.close();
   }
 
@@ -84,7 +77,7 @@ export class OpenAiTranscriptionAnalyticsDialogComponent implements OnInit {
   }
 
   canSubmit(): boolean {
-    return !this.profilesLoading && this.selectedProfileId != null;
+    return !this.profilesLoading && !!this.selectedProfile;
   }
 
   onProfileSelectionChanged(rawValue: unknown): void {
@@ -100,7 +93,7 @@ export class OpenAiTranscriptionAnalyticsDialogComponent implements OnInit {
     this.applySelectedProfile();
   }
 
-  private loadProfiles(): void {
+  loadProfiles(): void {
     this.profilesLoading = true;
     this.profilesError = null;
     this.transcriptionService.listRecognitionProfiles().subscribe({
@@ -112,8 +105,8 @@ export class OpenAiTranscriptionAnalyticsDialogComponent implements OnInit {
           this.selectedProfileId = null;
         } else {
           const currentId = this.data?.currentProfileId ?? null;
-          const alternative = profiles.find((profile) => profile.id !== currentId);
-          this.selectedProfileId = (alternative ?? profiles[0]).id;
+          const current = profiles.find((profile) => profile.id === currentId);
+          this.selectedProfileId = (current ?? profiles[0]).id;
         }
         this.applySelectedProfile();
       },

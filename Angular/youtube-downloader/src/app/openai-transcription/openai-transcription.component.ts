@@ -1,7 +1,8 @@
 import { Component, ElementRef, HostListener, Inject, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatIconModule } from '@angular/material/icon';
-import { MatListModule } from '@angular/material/list';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatButtonModule } from '@angular/material/button';
@@ -10,7 +11,6 @@ import { Subscription, timer } from 'rxjs';
 import { exhaustMap } from 'rxjs/operators';
 import { DomSanitizer, SafeHtml, Title } from '@angular/platform-browser';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import {
   AdminRestartStoppedTasksResponse,
   OpenAiTranscriptionService,
@@ -26,7 +26,6 @@ import { MatDialog } from '@angular/material/dialog';
 import { OpenAiTranscriptionUploadDialogComponent } from './openai-transcription-upload-dialog.component';
 import { OpenAiTranscriptionUploadFormComponent } from './openai-transcription-upload-form.component';
 import { ActionMenuPanelDirective } from '../shared/action-menu-panel.directive';
-import { TranscriptionHeroComponent } from '../shared/transcription-hero/transcription-hero.component';
 import {
   OpenAiTranscriptionAnalyticsDialogComponent,
   OpenAiTranscriptionAnalyticsDialogData,
@@ -42,27 +41,40 @@ import { PLATFORM_ID } from '@angular/core';
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
+    MatProgressBarModule,
     MatIconModule,
-    MatListModule,
     MatProgressSpinnerModule,
     MatMenuModule,
     MatButtonModule,
     MatSnackBarModule,
-    MatCheckboxModule,
     LocalTimePipe,
     RouterModule,
     ActionMenuPanelDirective,
-    TranscriptionHeroComponent,
     OpenAiTranscriptionUploadFormComponent,
   ],
   templateUrl: './openai-transcription.component.html',
-  styleUrls: ['./openai-transcription.component.css'],
+  styleUrls: ['../shared/account-page.css', './openai-transcription.component.css'],
 })
 export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   @ViewChild('detailsPanelContainer')
   private detailsPanelContainer?: ElementRef<HTMLElement>;
+  @ViewChild('uploadPanel') private uploadPanel?: ElementRef<HTMLElement>;
+  @ViewChild('deleteConfirmPanel') private deleteConfirmPanel?: ElementRef<HTMLElement>;
 
   tasks: OpenAiTranscriptionTaskDto[] = [];
+  listLoading = false;
+  searchQuery = '';
+  taskFilter: 'all' | 'active' | 'done' | 'error' = 'all';
+  sortOrder: 'newest' | 'oldest' | 'name' = 'newest';
+  visibleTaskLimit = 25;
+  uploadExpanded = false;
+  mobileDetailsOpen = false;
+  deleteConfirmation = false;
+  resultView: 'formatted' | 'original' = 'formatted';
+  private initialListLoaded = false;
+  private listSubscription?: Subscription;
+  private listPollSubscription?: Subscription;
   selectedTaskId: string | null = null;
   selectedTask: OpenAiTranscriptionTaskDetailsDto | null = null;
 
@@ -140,6 +152,78 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     return this.isAdmin && this.showAllTasks;
   }
 
+  get taskActionBusy(): boolean {
+    return this.deleteInProgress || this.continueInProgress || this.continueFromSegmentInProgress
+      || this.analyticsInProgress || this.downloadInProgress || this.copying || this.adminRestartInProgress;
+  }
+
+  get filteredTasks(): OpenAiTranscriptionTaskDto[] {
+    const query = this.searchQuery.trim().toLocaleLowerCase('ru');
+    return this.tasks.filter(task => {
+      const statusMatches = this.taskFilter === 'all'
+        || this.taskFilter === 'done' && task.status === OpenAiTranscriptionStatus.Done
+        || this.taskFilter === 'error' && task.status === OpenAiTranscriptionStatus.Error
+        || this.taskFilter === 'active' && this.isTaskActive(task);
+      const text = [task.displayName, task.fileName, task.recognitionProfileDisplayedName,
+        this.isAdmin ? task.createdByEmail : ''].filter(Boolean).join(' ').toLocaleLowerCase('ru');
+      return statusMatches && (!query || text.includes(query));
+    }).sort((a, b) => this.sortOrder === 'name'
+      ? (a.displayName || a.fileName).localeCompare(b.displayName || b.fileName, 'ru')
+      : (Date.parse(a.createdAt) - Date.parse(b.createdAt)) * (this.sortOrder === 'oldest' ? 1 : -1));
+  }
+
+  get visibleTasks(): OpenAiTranscriptionTaskDto[] { return this.filteredTasks.slice(0, this.visibleTaskLimit); }
+  get activeTaskCount(): number { return this.tasks.filter(task => this.isTaskActive(task)).length; }
+  get doneTaskCount(): number { return this.tasks.filter(task => task.status === OpenAiTranscriptionStatus.Done).length; }
+  get errorTaskCount(): number { return this.tasks.filter(task => task.status === OpenAiTranscriptionStatus.Error).length; }
+
+  isTaskActive(task: OpenAiTranscriptionTaskDto): boolean {
+    return !task.done && task.status !== OpenAiTranscriptionStatus.Done && task.status !== OpenAiTranscriptionStatus.Error;
+  }
+
+  setTaskFilter(filter: 'all' | 'active' | 'done' | 'error'): void {
+    this.taskFilter = filter;
+    this.visibleTaskLimit = 25;
+  }
+
+  clearFilters(): void { this.searchQuery = ''; this.setTaskFilter('all'); }
+
+  toggleUpload(): void {
+    if (this.uploading || this.taskActionBusy) return;
+    if (this.uploadExpanded) this.uploadExpanded = false;
+    else this.showUpload();
+  }
+
+  showUpload(): void {
+    if (this.uploading || this.taskActionBusy) return;
+    this.uploadExpanded = true;
+    this.mobileDetailsOpen = false;
+    if (this.isBrowser) window.requestAnimationFrame(() => {
+      this.uploadPanel?.nativeElement.scrollIntoView({ block: 'start', behavior: 'auto' });
+    });
+  }
+
+  showTaskList(): void {
+    this.mobileDetailsOpen = false;
+    this.resetFullscreenState();
+  }
+
+  retrySelectedTask(): void { if (this.selectedTaskId) this.startPolling(); }
+
+  requestDelete(): void {
+    if (!this.canDeleteSelectedTask() || this.taskActionBusy || this.uploading) return;
+    this.deleteConfirmation = true;
+    if (this.isBrowser) window.requestAnimationFrame(() => {
+      this.deleteConfirmPanel?.nativeElement.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+      this.deleteConfirmPanel?.nativeElement.focus({ preventScroll: true });
+    });
+  }
+
+  get remainingMinutesLabel(): string {
+    const minutes = this.summary?.remainingTranscriptionMinutes ?? 0;
+    return minutes >= 2147483647 ? 'Безлимит' : `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(Math.max(0, minutes))} мин`;
+  }
+
   constructor(
     private readonly transcriptionService: OpenAiTranscriptionService,
     private readonly markdownRenderer: MarkdownRendererService1,
@@ -153,7 +237,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     @Inject(PLATFORM_ID) platformId: Object,
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
-    this.titleService.setTitle('Протокол совещаний — расшифровки YouScriptor');
+    this.titleService.setTitle('Мои расшифровки — YouScriptor');
   }
 
   ngOnInit(): void {
@@ -175,6 +259,11 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       this.loadSubscriptionSummary();
     }
     this.loadTasks(true);
+    if (this.isBrowser) {
+      this.listPollSubscription = timer(15000, 15000).subscribe(() => {
+        if (this.activeTaskCount && !this.listLoading && !this.taskActionBusy) this.loadTasks(false, true);
+      });
+    }
   }
 
   loadSubscriptionSummary(): void {
@@ -266,6 +355,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.listSubscription?.unsubscribe();
+    this.listPollSubscription?.unsubscribe();
     this.stopPolling();
     this.resetFullscreenState();
     this.userSubscription?.unsubscribe();
@@ -282,7 +373,10 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
 
   openUploadDialog(): void {
     const dialogRef = this.dialog.open(OpenAiTranscriptionUploadDialogComponent, {
-      width: '520px',
+      width: '600px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      panelClass: 'transcription-dialog-panel',
       autoFocus: false,
       restoreFocus: false,
       disableClose: true,
@@ -310,28 +404,40 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     });
   }
 
-  loadTasks(selectFirstAvailable = false): void {
-    this.listError = null;
+  loadTasks(selectFirstAvailable = false, background = false): void {
+    if (this.taskActionBusy) return;
+    this.listSubscription?.unsubscribe();
+    if (!background) this.listError = null;
+    this.listLoading = true;
     const includeAll = this.isAdmin && this.showAllTasks;
-    this.transcriptionService.list(includeAll).subscribe({
+    this.listSubscription = this.transcriptionService.list(includeAll).subscribe({
       next: (tasks) => {
+        this.listLoading = false;
+        this.listError = null;
         this.tasks = tasks;
+        if (!this.initialListLoaded) {
+          this.uploadExpanded = tasks.length === 0;
+          this.initialListLoaded = true;
+        }
 
         if (!this.selectedTaskId && selectFirstAvailable && tasks.length > 0) {
-          this.selectTask(tasks[0]);
+          this.selectTaskById(this.filteredTasks[0]?.id ?? tasks[0].id);
           return;
         }
 
         if (this.selectedTaskId && !tasks.some((task) => task.id === this.selectedTaskId)) {
           this.stopPolling();
+          this.resetFullscreenState();
+          this.mobileDetailsOpen = false;
           this.selectedTaskId = null;
           this.selectedTask = null;
           if (selectFirstAvailable && tasks.length > 0) {
-            this.selectTask(tasks[0]);
+            this.selectTaskById(this.filteredTasks[0]?.id ?? tasks[0].id);
           }
         }
       },
       error: (error) => {
+        this.listLoading = false;
         this.listError = this.extractError(error) ?? 'Не удалось получить список задач.';
       },
     });
@@ -377,7 +483,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   }
 
   onShowAllChange(checked: boolean): void {
-    if (!this.isAdmin) {
+    if (!this.isAdmin || this.taskActionBusy) {
       return;
     }
 
@@ -386,7 +492,10 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   }
 
   selectTask(task: OpenAiTranscriptionTaskDto): void {
+    if (this.taskActionBusy) return;
+    this.mobileDetailsOpen = true;
     this.selectTaskById(task.id);
+    this.scheduleEnsureDetailsPanelVisible();
   }
 
   private selectTaskById(taskId: string): void {
@@ -395,6 +504,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     }
 
     this.selectedTaskId = taskId;
+    this.deleteConfirmation = false;
+    this.resultView = 'formatted';
     this.selectedTask = null;
     this.detailsError = null;
     this.analyticsInProgress = false;
@@ -408,7 +519,6 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.updateRenderedMarkdown(null);
     this.resetFullscreenState();
     this.startPolling();
-    this.scheduleEnsureDetailsPanelVisible();
   }
 
   private startPolling(): void {
@@ -426,7 +536,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
           this.detailsLoading = false;
           this.detailsError = null;
           this.applyTaskUpdate(task);
-          if (task.done || task.status === OpenAiTranscriptionStatus.Error) {
+          if (task.done || task.status === OpenAiTranscriptionStatus.Done || task.status === OpenAiTranscriptionStatus.Error) {
             this.stopPolling();
           }
         },
@@ -446,17 +556,24 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   }
 
   handleUploadSuccess(task: OpenAiTranscriptionTaskDto): void {
+    this.listSubscription?.unsubscribe();
+    this.listLoading = false;
+    this.initialListLoaded = true;
+    this.uploadExpanded = false;
+    this.clearFilters();
+    this.sortOrder = 'newest';
+    this.mobileDetailsOpen = true;
     this.limitResponse = null;
     this.loadSubscriptionSummary();
     this.tasks = [task, ...this.tasks.filter((t) => t.id !== task.id)];
     this.selectTaskById(task.id);
+    this.scheduleEnsureDetailsPanelVisible();
   }
 
   private applyTaskUpdate(task: OpenAiTranscriptionTaskDetailsDto): void {
     this.selectedTask = task;
     this.syncContinueFromSegmentNumber(task);
     this.updateRenderedMarkdown(task);
-    this.scheduleEnsureDetailsPanelVisible();
 
     this.tasks = this.tasks.map((existing) =>
       existing.id === task.id
@@ -506,17 +623,8 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const rect = container.getBoundingClientRect();
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-    const offset = 24;
-
-    if (rect.top < offset) {
-      window.scrollBy({ top: rect.top - offset, behavior: 'smooth' });
-      return;
-    }
-
-    if (rect.bottom > viewportHeight) {
-      window.scrollBy({ top: rect.bottom - viewportHeight + offset, behavior: 'smooth' });
+    if (window.innerWidth <= 900 && this.mobileDetailsOpen) {
+      container.scrollIntoView({ block: 'start', behavior: 'auto' });
     }
   }
 
@@ -1095,15 +1203,16 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   }
 
   isContinueFromSegmentNumberInvalid(task: OpenAiTranscriptionTaskDetailsDto | null): boolean {
-    if (!task || !this.canContinueFromSegment(task) || this.continueFromSegmentNumber == null) {
+    if (!task || !this.canContinueFromSegment(task)) {
       return false;
     }
 
-    return this.continueFromSegmentNumber < 1 || this.continueFromSegmentNumber > task.segmentsTotal;
+    return this.continueFromSegmentNumber == null || !Number.isInteger(this.continueFromSegmentNumber)
+      || this.continueFromSegmentNumber < 1 || this.continueFromSegmentNumber > task.segmentsTotal;
   }
 
   onContinueFromSegmentNumberInput(value: string): void {
-    const parsed = Number.parseInt(value, 10);
+    const parsed = value.trim() ? Number(value) : NaN;
     this.continueFromSegmentNumber = Number.isFinite(parsed) ? parsed : null;
   }
 
@@ -1112,13 +1221,15 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       !this.selectedTaskId ||
       !this.selectedTask ||
       !this.canContinueFromSegment(this.selectedTask) ||
-      this.continueFromSegmentInProgress ||
-      this.continueInProgress
+      this.taskActionBusy || this.uploading || this.isContinueFromSegmentNumberInvalid(this.selectedTask)
     ) {
       return;
     }
 
     const segmentNumber = this.resolveContinueFromSegmentNumber(this.selectedTask);
+    this.listSubscription?.unsubscribe();
+    this.listLoading = false;
+    this.deleteConfirmation = false;
 
     this.continueFromSegmentInProgress = true;
     this.continueFromSegmentError = null;
@@ -1146,10 +1257,13 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   }
 
   continueTask(): void {
-    if (!this.selectedTaskId || this.continueInProgress || this.continueFromSegmentInProgress) {
+    if (!this.selectedTaskId || this.selectedTask?.status !== OpenAiTranscriptionStatus.Error || this.taskActionBusy || this.uploading) {
       return;
     }
 
+    this.listSubscription?.unsubscribe();
+    this.listLoading = false;
+    this.deleteConfirmation = false;
     this.continueInProgress = true;
     this.continueError = null;
     this.continueFromSegmentError = null;
@@ -1185,11 +1299,13 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   }
 
   deleteTask(): void {
-    if (!this.selectedTaskId || this.deleteInProgress || !this.canDeleteSelectedTask()) {
+    if (!this.selectedTaskId || this.taskActionBusy || this.uploading || !this.canDeleteSelectedTask() || !this.deleteConfirmation) {
       return;
     }
 
     const taskId = this.selectedTaskId;
+    this.listSubscription?.unsubscribe();
+    this.listLoading = false;
     this.deleteInProgress = true;
     this.deleteError = null;
     this.continueError = null;
@@ -1198,13 +1314,15 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     this.transcriptionService.deleteTask(taskId).subscribe({
       next: () => {
         this.deleteInProgress = false;
+        this.deleteConfirmation = false;
+        this.resetFullscreenState();
         this.stopPolling();
         this.selectedTaskId = null;
         this.selectedTask = null;
         this.tasks = this.tasks.filter((task) => task.id !== taskId);
-        if (this.tasks.length > 0) {
-          this.selectTask(this.tasks[0]);
-        }
+        const nextTask = this.filteredTasks[0];
+        if (nextTask) this.selectTaskById(nextTask.id);
+        else this.mobileDetailsOpen = false;
         this.snackBar.open('Задача удалена.', 'OK', { duration: 3000 });
       },
       error: (error) => {
@@ -1215,7 +1333,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   }
 
   openAnalyticsDialog(): void {
-    if (!this.selectedTaskId || !this.selectedTask) {
+    if (!this.selectedTaskId || !this.selectedTask || !this.isTaskCompleted(this.selectedTask) || this.taskActionBusy || this.uploading) {
       return;
     }
 
@@ -1229,7 +1347,10 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
       OpenAiTranscriptionAnalyticsDialogData,
       OpenAiTranscriptionAnalyticsDialogResult | undefined
     >(OpenAiTranscriptionAnalyticsDialogComponent, {
-      width: '520px',
+      width: '600px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      panelClass: 'transcription-dialog-panel',
       autoFocus: false,
       restoreFocus: false,
       disableClose: true,

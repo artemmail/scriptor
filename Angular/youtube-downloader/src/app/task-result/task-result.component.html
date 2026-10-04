@@ -1,136 +1,67 @@
-<div class="recognized-card" *ngIf="youtubeTask as task">
-  <div class="video-summary">
-    <div class="video-summary-left">
-      <button
-        *ngIf="isAuthenticated"
-        class="yt-logo-button"
-        type="button"
-        (click)="openVideoDialog(task)"
-        aria-label="Открыть видео"
-      >
-        <img src="assets/yt.webp" alt="YouTube" class="youtube-logo" />
-      </button>
-      <div class="video-text">
-        <span class="promo-tagline">{{ promoText }}</span>
-        <h1 class="video-title" *ngIf="task.title; else defaultTitle">{{ task.title }}</h1>
-        <ng-template #defaultTitle>
-          <h1 class="video-title">Результат распознавания</h1>
-        </ng-template>
-        <div class="video-meta">
-          <span *ngIf="task.channelName">Канал: {{ task.channelName }}</span>
-          <span *ngIf="task.uploadDate">· Видео от {{ task.uploadDate | localTime: 'yyyy-MM-dd' }}</span>
-          <span *ngIf="task.createdAt">· Обновлено {{ task.createdAt | localTime: 'yyyy-MM-dd HH:mm' }}</span>
-          <span *ngIf="selectedTrackLabel">· Дорожка: {{ selectedTrackLabel }}</span>
+<div class="ap-page rr-page" *ngIf="youtubeTask as task">
+  <header class="rr-heading">
+    <div class="rr-kicker"><span class="rr-ready"><i aria-hidden="true"></i>Готово к чтению</span><span>СКРИПТОРИЙ / ДОКУМЕНТ</span></div>
+    <h1>{{ task.title || 'Расшифровка записи' }}</h1>
+    <div class="rr-meta">
+      <span *ngIf="task.channelName"><mat-icon aria-hidden="true">smart_display</mat-icon>{{ task.channelName }}</span>
+      <span *ngIf="task.uploadDate">Видео от {{ task.uploadDate | localTime:'dd.MM.yyyy' }}</span>
+      <span *ngIf="selectedTrackLabel">{{ selectedTrackLabel }}</span>
+    </div>
+    <div class="rr-source-actions"><button *ngIf="isAuthenticated && videoId" class="ap-button ap-button-outline" type="button" (click)="openVideoDialog(task)"><mat-icon aria-hidden="true">play_arrow</mat-icon>Смотреть оригинал</button><a *ngIf="!isAuthenticated && videoId" class="ap-button ap-button-outline" [href]="'https://www.youtube.com/watch?v=' + videoId" target="_blank" rel="noopener">Открыть в YouTube ↗</a><span *ngIf="hasResultText">≈ {{ readingMinutes }} мин на чтение <i aria-hidden="true">·</i> {{ wordCount | number:'1.0-0' }} слов</span></div>
+  </header>
+
+  <div class="rr-layout">
+    <section class="rr-document" [class.rr-fullscreen]="isResultFullscreen" [cdkTrapFocus]="isResultFullscreen" aria-label="Текст расшифровки">
+      <div class="rr-toolbar">
+        <div class="rr-toolbar-title"><span aria-hidden="true">≋</span><h2>Расшифровка</h2></div>
+        <div class="rr-reading-tools">
+          <div class="rr-font-control" aria-label="Размер текста"><button type="button" [disabled]="fontSize <= 16" (click)="changeFontSize(-2)" aria-label="Уменьшить шрифт">A−</button><span>{{ fontSize }}</span><button type="button" [disabled]="fontSize >= 24" (click)="changeFontSize(2)" aria-label="Увеличить шрифт">A+</button></div>
+          <button class="rr-icon-button" type="button" [matMenuTriggerFor]="copyMenu" [disabled]="isCopying || !hasAnyCopyOption" aria-label="Копировать расшифровку" title="Копировать"><mat-icon aria-hidden="true">content_copy</mat-icon></button>
+          <button class="rr-icon-button" type="button" [matMenuTriggerFor]="downloadMenu" [disabled]="isDownloading || !hasAnyDownloadOption" aria-label="Скачать расшифровку" title="Скачать"><mat-icon aria-hidden="true">download</mat-icon></button>
+          <button class="rr-icon-button" type="button" (click)="toggleFullscreen()" [attr.aria-pressed]="isResultFullscreen" [attr.aria-label]="isResultFullscreen ? 'Закрыть режим чтения' : 'Открыть режим чтения'" [title]="isResultFullscreen ? 'Закрыть · Esc' : 'Режим чтения'"><mat-icon aria-hidden="true">{{ isResultFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon></button>
         </div>
       </div>
-    </div>
+      <div class="rr-document-note"><span>{{ isResultFullscreen ? 'РЕЖИМ ЧТЕНИЯ' : 'ТЕКСТ ЗАПИСИ' }}</span><span>{{ isResultFullscreen ? 'Esc — вернуться к странице' : 'Выделяйте важное. Возвращайтесь к идеям.' }}</span></div>
+      <p class="rr-alert" *ngIf="task.error">{{ task.error }}</p>
+      <p class="rr-alert" *ngIf="exportError" role="alert">{{ exportError }}</p>
+      <p class="rr-operation" *ngIf="isDownloading || isCopying" role="status">{{ isDownloading ? 'Подготавливаем файл…' : 'Копируем…' }}</p>
+      <div class="rr-prose" #markdownContent [style.font-size.px]="fontSize" [innerHTML]="processedMarkdown" *ngIf="hasResultText; else emptyState"></div>
+      <ng-template #emptyState><div class="rr-empty"><mat-icon aria-hidden="true">article</mat-icon><h3>В этой задаче пока нет текста</h3><p>Вернитесь в библиотеку, чтобы выбрать другой материал.</p><a routerLink="/Scriptorium">Открыть Скрипторий →</a></div></ng-template>
+      <div class="rr-document-end" *ngIf="hasResultText"><span aria-hidden="true">●</span><span>Конец расшифровки</span><button type="button" [disabled]="isCopying" (click)="copyPlainTextToClipboard()">{{ isCopying ? 'Копируем…' : 'Скопировать текст' }} ↗</button></div>
+    </section>
+
+    <aside class="rr-sidebar" aria-label="Действия с документом">
+      <section class="rr-export">
+        <p class="ap-eyebrow">СОХРАНИТЕ ГЛАВНОЕ</p>
+        <h2>Текст, с которым<br><em>удобно работать.</em></h2>
+        <p>Заберите документ в нужном формате или скопируйте текст в свои заметки.</p>
+        <button class="ap-button ap-button-dark" type="button" (click)="downloadAsPdf()" [disabled]="isDownloading || !canDownloadFromServer"><mat-icon aria-hidden="true">picture_as_pdf</mat-icon>Скачать PDF <span aria-hidden="true">↗</span></button>
+        <button class="ap-button ap-button-outline" type="button" (click)="downloadAsWord()" [disabled]="isDownloading || !canDownloadFromServer"><mat-icon aria-hidden="true">description</mat-icon>Скачать Word</button>
+        <button class="rr-other-formats" type="button" [matMenuTriggerFor]="downloadMenu" [disabled]="isDownloading || !hasAnyDownloadOption">Все форматы: TXT, MD, SRT <span aria-hidden="true">↓</span></button>
+        <p class="rr-export-feedback" *ngIf="isDownloading">Подготавливаем документ…</p>
+        <p class="rr-export-error" *ngIf="exportError">{{ exportError }}</p>
+        <div class="rr-sidebar-divider"></div>
+        <button class="rr-side-action" type="button" (click)="copyPlainTextToClipboard()" [disabled]="isCopying || !hasResultText"><mat-icon aria-hidden="true">content_copy</mat-icon>{{ isCopying ? 'Копируем…' : 'Скопировать текст' }}</button>
+        <a class="rr-side-action" *ngIf="task.id && hasResultText" [routerLink]="['/markdown-converter', task.id]"><mat-icon aria-hidden="true">edit_note</mat-icon>Открыть в редакторе ↗</a>
+      </section>
+      <div class="rr-document-details"><p class="ap-eyebrow">О ДОКУМЕНТЕ</p><dl><div *ngIf="task.createdAt"><dt>Создан</dt><dd>{{ task.createdAt | localTime:'dd.MM.yyyy' }}</dd></div><div *ngIf="task.modifiedAt"><dt>Обновлён</dt><dd>{{ task.modifiedAt | localTime:'dd.MM.yyyy HH:mm' }}</dd></div><div *ngIf="hasResultText"><dt>Объём</dt><dd>{{ wordCount | number:'1.0-0' }} слов</dd></div></dl></div>
+      <a class="rr-next-link" routerLink="/Scriptorium"><span>ЕЩЁ ОДНА ХОРОШАЯ МЫСЛЬ</span><strong>За новым материалом<br>в Скрипторий <b aria-hidden="true">↗</b></strong></a>
+    </aside>
   </div>
+  <div class="rr-ad"><app-yandex-ad></app-yandex-ad></div>
 
-  <section class="result-block" [class.fullscreen]="isResultFullscreen">
-    <div class="result-header">
-      <h2>Результат</h2>
-      <div class="result-actions">
-        <a
-          class="btn btn-outline"
-          *ngIf="task.id"
-          [routerLink]="['/markdown-converter', task.id]"
-          aria-label="Редактировать"
-        >
-          <mat-icon>edit</mat-icon>
-          <span>Редактировать</span>
-        </a>
-        <button
-          class="btn btn-outline"
-          type="button"
-          [matMenuTriggerFor]="downloadMenu"
-          [disabled]="isDownloading || !hasAnyDownloadOption"
-          aria-label="Скачать"
-        >
-          <mat-icon>download</mat-icon>
-          <span>Скачать</span>
-        </button>
-        <button
-          class="btn btn-outline"
-          type="button"
-          [matMenuTriggerFor]="copyMenu"
-          [disabled]="isCopying || !hasAnyCopyOption"
-          aria-label="Копировать"
-        >
-          <mat-icon>content_copy</mat-icon>
-          <span>Копировать</span>
-        </button>
-        <button
-          class="btn btn-outline"
-          type="button"
-          (click)="toggleFullscreen()"
-          [attr.aria-pressed]="isResultFullscreen"
-          [attr.aria-label]="isResultFullscreen ? 'Свернуть результат' : 'Открыть результат на весь экран'"
-        >
-          <mat-icon>{{ isResultFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
-          <span>{{ isResultFullscreen ? 'Свернуть' : 'На весь экран' }}</span>
-        </button>
-      </div>
-    </div>
-
-    <mat-menu #downloadMenu="matMenu" actionMenuPanel>
-      <button mat-menu-item (click)="downloadAsMd()" [disabled]="isDownloading || !hasResultText">
-        <mat-icon>article</mat-icon>
-        <span>Markdown (.md)</span>
-      </button>
-      <button mat-menu-item (click)="downloadAsTxt()" [disabled]="isDownloading || !hasResultText">
-        <mat-icon>notes</mat-icon>
-        <span>Текст (.txt)</span>
-      </button>
-      <button mat-menu-item (click)="downloadAsPdf()" [disabled]="isDownloading || !canDownloadFromServer">
-        <mat-icon>picture_as_pdf</mat-icon>
-        <span>PDF</span>
-      </button>
-      <button mat-menu-item (click)="downloadAsWord()" [disabled]="isDownloading || !canDownloadFromServer">
-        <mat-icon>description</mat-icon>
-        <span>Word (.docx)</span>
-      </button>
-      <button mat-menu-item (click)="downloadAsSrt()" [disabled]="isDownloading || !canDownloadFromServer">
-        <mat-icon>subtitles</mat-icon>
-        <span>SRT субтитры</span>
-      </button>
-    </mat-menu>
-
-    <mat-menu #copyMenu="matMenu" actionMenuPanel>
-      <button mat-menu-item (click)="copyPlainTextToClipboard()" [disabled]="isCopying || !canCopyPlainText">
-        <mat-icon>notes</mat-icon>
-        <span>Текст (plain)</span>
-      </button>
-      <button mat-menu-item (click)="copyMarkdownToClipboard()" [disabled]="isCopying || !canCopyMarkdown">
-        <mat-icon>code</mat-icon>
-        <span>Markdown</span>
-      </button>
-      <button mat-menu-item (click)="copyHtmlToClipboard()" [disabled]="isCopying || !canCopyHtml">
-        <mat-icon>language</mat-icon>
-        <span>HTML</span>
-      </button>
-      <button mat-menu-item (click)="copyBbcodeToClipboard()" [disabled]="isCopying || !canCopyBbcode">
-        <mat-icon>format_quote</mat-icon>
-        <span>BBCode</span>
-      </button>
-      <button mat-menu-item (click)="copySrtToClipboard()" [disabled]="isCopying || !canCopySrt">
-        <mat-icon>subtitles</mat-icon>
-        <span>SRT субтитры</span>
-      </button>
-    </mat-menu>
-
-    <div class="result-alert" *ngIf="task.error">{{ task.error }}</div>
-
-    <app-yandex-ad></app-yandex-ad>
-
-    <div
-      class="markdown-content"
-      #markdownContent
-      [innerHTML]="processedMarkdown"
-      *ngIf="hasResultText; else emptyState"
-    ></div>
-
-    <ng-template #emptyState>
-      <div class="empty-state">Расшифровка пока недоступна.</div>
-    </ng-template>
-  </section>
+  <mat-menu #downloadMenu="matMenu" class="tx-action-menu" actionMenuPanel>
+    <button mat-menu-item (click)="downloadAsPdf()" [disabled]="isDownloading || !canDownloadFromServer"><mat-icon>picture_as_pdf</mat-icon><span>PDF — готовый документ</span></button>
+    <button mat-menu-item (click)="downloadAsWord()" [disabled]="isDownloading || !canDownloadFromServer"><mat-icon>description</mat-icon><span>Word (.docx)</span></button>
+    <button mat-menu-item (click)="downloadAsTxt()" [disabled]="isDownloading || !hasResultText"><mat-icon>notes</mat-icon><span>Обычный текст (.txt)</span></button>
+    <button mat-menu-item (click)="downloadAsMd()" [disabled]="isDownloading || !hasResultText"><mat-icon>article</mat-icon><span>Markdown (.md)</span></button>
+    <button mat-menu-item (click)="downloadAsSrt()" [disabled]="isDownloading || !canDownloadFromServer"><mat-icon>subtitles</mat-icon><span>Субтитры (.srt)</span></button>
+  </mat-menu>
+  <mat-menu #copyMenu="matMenu" class="tx-action-menu" actionMenuPanel>
+    <button mat-menu-item (click)="copyPlainTextToClipboard()" [disabled]="isCopying || !canCopyPlainText"><mat-icon>notes</mat-icon><span>Обычный текст</span></button>
+    <button mat-menu-item (click)="copyMarkdownToClipboard()" [disabled]="isCopying || !canCopyMarkdown"><mat-icon>code</mat-icon><span>Markdown</span></button>
+    <button mat-menu-item (click)="copyHtmlToClipboard()" [disabled]="isCopying || !canCopyHtml"><mat-icon>language</mat-icon><span>HTML</span></button>
+    <button mat-menu-item (click)="copyBbcodeToClipboard()" [disabled]="isCopying || !canCopyBbcode"><mat-icon>format_quote</mat-icon><span>BBCode</span></button>
+    <button mat-menu-item (click)="copySrtToClipboard()" [disabled]="isCopying || !canCopySrt"><mat-icon>subtitles</mat-icon><span>Субтитры SRT</span></button>
+  </mat-menu>
 </div>

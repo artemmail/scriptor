@@ -1,4 +1,5 @@
-import { Component, DestroyRef, ElementRef, Input, OnDestroy, ViewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, Input, OnChanges, OnDestroy, ViewChild } from '@angular/core';
+import { A11yModule } from '@angular/cdk/a11y';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { MarkdownModule } from 'ngx-markdown';
@@ -22,6 +23,7 @@ import { ActionMenuPanelDirective } from '../shared/action-menu-panel.directive'
   standalone: true,
   imports: [
     CommonModule,
+    A11yModule,
     MarkdownModule,
     RouterModule,
     MatIconModule,
@@ -32,9 +34,9 @@ import { ActionMenuPanelDirective } from '../shared/action-menu-panel.directive'
     ActionMenuPanelDirective
   ],
   templateUrl: './task-result.component.html',
-  styleUrls: ['./task-result.component.css']
+  styleUrls: ['../shared/account-page.css', './task-result.component.css']
 })
-export class TaskResultComponent implements OnDestroy {
+export class TaskResultComponent implements OnDestroy, OnChanges {
   @Input() youtubeTask: YoutubeCaptionTaskDto | null = null;
   @ViewChild('markdownContent') private markdownContentRef?: ElementRef<HTMLElement>;
   isDownloading = false;
@@ -42,9 +44,11 @@ export class TaskResultComponent implements OnDestroy {
   isResultFullscreen = false;
   private originalBodyOverflow: string | null = null;
   isAuthenticated = false;
-
-  private englishPromo = 'YouScriptor: Accurate transcription from YouTube videos to PDF and MS Word with markup and formula display for free.';
-  private russianPromo = 'YouScriptor: Точная транскрипция с YouTube видео в PDF и MS Word с разметкой и отображением формул бесплатно.';
+  fontSize = 18;
+  wordCount = 0;
+  readingMinutes = 0;
+  processedMarkdown: SafeHtml = '';
+  exportError = '';
 
   constructor(
     private mk: MarkdownRendererService1,
@@ -62,11 +66,26 @@ export class TaskResultComponent implements OnDestroy {
       });
   }
 
-  get promoText(): string {
-    if (!this.youtubeTask?.result) {
-      return this.englishPromo;
-    }
-    return this.hasCyrillic(this.youtubeTask.result) ? this.russianPromo : this.englishPromo;
+  ngOnChanges(): void {
+    const content = this.youtubeTask?.result || '';
+    this.processedMarkdown = content ? this.sanitizer.bypassSecurityTrustHtml(this.renderMath(content)) : '';
+    this.wordCount = this.stripMarkdown(content).trim().split(/\s+/).filter(Boolean).length;
+    this.readingMinutes = Math.max(1, Math.ceil(this.wordCount / 200));
+    this.exportError = '';
+  }
+
+  get videoId(): string | null {
+    const value = this.youtubeTask?.videoId || this.youtubeTask?.id || '';
+    return /^[a-zA-Z0-9_-]{11}$/.test(value) ? value : null;
+  }
+
+  changeFontSize(delta: number): void {
+    this.fontSize = Math.min(24, Math.max(16, this.fontSize + delta));
+  }
+
+  @HostListener('document:keydown.escape')
+  closeReadingMode(): void {
+    if (this.isResultFullscreen) this.toggleFullscreen();
   }
 
   get selectedTrackLabel(): string | null {
@@ -118,27 +137,14 @@ export class TaskResultComponent implements OnDestroy {
     return this.canDownloadFromServer;
   }
 
-  private hasCyrillic(text: string): boolean {
-    return /[\u0400-\u04FF]/.test(text);
-  }
-
-  get processedMarkdown(): SafeHtml {
-    if (!this.youtubeTask?.result) {
-      return '';
-    }
-    return this.sanitizer.bypassSecurityTrustHtml(
-      this.renderMath(this.youtubeTask.result)
-    );
-  }
-
   private renderMath(content: string): string {
     return this.mk.renderMath(content);
   }
 
   openVideoDialog(task: YoutubeCaptionTaskDto | null): void {
-    if (!task || !this.isAuthenticated) return;
+    if (!task || !this.isAuthenticated || !this.videoId) return;
     const data: VideoDialogData = {
-      videoId: task.videoId || task.id,
+      videoId: this.videoId,
       title: task.title,
       channelName: task.channelName,
       channelId: task.channelId,
@@ -146,6 +152,9 @@ export class TaskResultComponent implements OnDestroy {
     };
     this.dialog.open(VideoDialogComponent, {
       width: '800px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      panelClass: 'library-dialog-panel',
       data
     });
   }
@@ -154,9 +163,10 @@ export class TaskResultComponent implements OnDestroy {
     if (this.isDownloading || !this.youtubeTask?.id) return;
     this.isDownloading = true;
     const base = this.getFileBaseName();
-    this.subtitleService.generatePdf(this.youtubeTask.id).subscribe({
+    this.exportError = '';
+    this.subtitleService.generatePdf(this.youtubeTask.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (blob) => this.finishDownload(blob, `${base}.pdf`),
-      error: () => (this.isDownloading = false)
+      error: () => this.onExportError()
     });
   }
 
@@ -164,9 +174,10 @@ export class TaskResultComponent implements OnDestroy {
     if (this.isDownloading || !this.youtubeTask?.id) return;
     this.isDownloading = true;
     const base = this.getFileBaseName();
-    this.subtitleService.generateWord(this.youtubeTask.id).subscribe({
+    this.exportError = '';
+    this.subtitleService.generateWord(this.youtubeTask.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (blob) => this.finishDownload(blob, `${base}.docx`),
-      error: () => (this.isDownloading = false)
+      error: () => this.onExportError()
     });
   }
 
@@ -232,7 +243,7 @@ export class TaskResultComponent implements OnDestroy {
     }
 
     this.isCopying = true;
-    this.subtitleService.generateBbcodeFromMarkdown(this.youtubeTask.id, this.youtubeTask.result).subscribe({
+    this.subtitleService.generateBbcodeFromMarkdown(this.youtubeTask.id, this.youtubeTask.result).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (blob) => {
         blob.text().then((text) => {
           if (!text.trim()) {
@@ -261,7 +272,7 @@ export class TaskResultComponent implements OnDestroy {
     }
 
     this.isCopying = true;
-    this.subtitleService.generateSrt(this.youtubeTask.id).subscribe({
+    this.subtitleService.generateSrt(this.youtubeTask.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (blob) => {
         blob.text().then((text) => {
           if (!text.trim()) {
@@ -328,6 +339,11 @@ export class TaskResultComponent implements OnDestroy {
     successMessage: string,
     errorMessage = 'Не удалось скопировать в буфер обмена'
   ): void {
+    if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+      this.isCopying = false;
+      this.snackBar.open('Буфер обмена недоступен. Скачайте документ в TXT или Markdown.', 'Закрыть', { duration: 5000 });
+      return;
+    }
     navigator.clipboard.writeText(text)
       .then(() => {
         this.snackBar.open(successMessage, '', { duration: 2000 });
@@ -358,14 +374,15 @@ downloadAsSrt(lang?: string): void {
   if (this.isDownloading || !this.youtubeTask?.id) return;
   this.isDownloading = true;
 
-  this.subtitleService.generateSrt(this.youtubeTask.id, lang).subscribe({
+  this.exportError = '';
+  this.subtitleService.generateSrt(this.youtubeTask.id, lang).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
     next: (blob) => {
       const title = this.youtubeTask?.title?.trim() || 'subtitles';
       const base = this.sanitizeFileName(title);
       const filename = lang ? `${base}.${lang}.srt` : `${base}.srt`;
       this.finishDownload(blob, filename);
     },
-    error: () => { this.isDownloading = false; }
+    error: () => this.onExportError()
   });
 }
 
@@ -377,6 +394,11 @@ downloadAsSrt(lang?: string): void {
       .replace(/\s+/g, ' ')
       .trim()
       .substring(0, 120);
+  }
+
+  private onExportError(): void {
+    this.isDownloading = false;
+    this.exportError = 'Не удалось подготовить файл. Попробуйте снова или выберите другой формат.';
   }
 
   private getFileBaseName(): string {

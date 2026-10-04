@@ -1,31 +1,17 @@
-<h2 mat-dialog-title>{{ data.title }}</h2>
-
-<mat-dialog-content>
-  <!-- Встроенное YouTube-видео -->
+<header class="video-dialog-header">
+  <div><p>ПРОСМОТР ОРИГИНАЛА</p><h2 mat-dialog-title>{{ data.title || 'YouTube-видео' }}</h2></div>
+  <button type="button" class="video-close" (click)="onClose()" aria-label="Закрыть">×</button>
+</header>
+<mat-dialog-content class="video-dialog-content">
   <div class="video-wrapper">
-    <iframe
-      [src]="safeVideoUrl"
-      frameborder="0"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowfullscreen
-    >
-    </iframe>
+    <iframe [src]="safeVideoUrl" title="YouTube-видео" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
   </div>
-
-  <p>Channel link: <a [href]="'https://www.youtube.com/channel/' + data.channelId" target="_blank">{{ data.channelName }}</a></p>
-
-  <p>UploadDate: {{ data.uploadDate |  localTime: 'yyyy-MM-dd HH:mm:ss' }} </p>
-
-
-  
-
-  <p>YouTube link: 
-    <a [href]="'https://www.youtube.com/watch?v=' + data.videoId" target="_blank">
-      https://www.youtube.com/watch?v={{ data.videoId }}
-    </a>
-  </p>
+  <div class="video-meta">
+    <span *ngIf="data.channelName">Канал: <a *ngIf="data.channelId; else noChannelLink" [href]="'https://www.youtube.com/channel/' + data.channelId" target="_blank" rel="noopener">{{ data.channelName }}</a><ng-template #noChannelLink>{{ data.channelName }}</ng-template></span>
+    <span *ngIf="data.uploadDate">Опубликовано: {{ data.uploadDate | localTime: 'dd.MM.yyyy' }}</span>
+  </div>
 </mat-dialog-content>
-
-<mat-dialog-actions align="end">
-  <button mat-button color="primary" (click)="onClose()">Close</button>
+<mat-dialog-actions class="video-dialog-actions">
+  <a mat-button [href]="'https://www.youtube.com/watch?v=' + data.videoId" target="_blank" rel="noopener">Открыть в YouTube ↗</a>
+  <button mat-flat-button type="button" (click)="onClose()">Готово</button>
 </mat-dialog-actions>

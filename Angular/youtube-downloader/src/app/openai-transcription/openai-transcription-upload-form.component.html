@@ -1,172 +1,31 @@
-<ng-container *ngIf="isDialogLayout; else cardLayout">
-  <h2 mat-dialog-title>Новая расшифровка</h2>
-  <mat-dialog-content class="dialog-content">
-    <p class="dialog-hint">
-      Выберите способ загрузки: добавьте файл или укажите ссылку. После распознавания запись появится в списке
-      задач.
-    </p>
-    <ng-container *ngTemplateOutlet="formContent"></ng-container>
-  </mat-dialog-content>
-  <mat-dialog-actions align="end">
-    <button mat-button type="button" (click)="onCancel()" [disabled]="uploading">Отмена</button>
-    <button mat-raised-button color="primary" type="button" (click)="onSubmit()" [disabled]="!canSubmit() || uploading">
-      <mat-icon>cloud_upload</mat-icon>
-      <span>Отправить</span>
-    </button>
-  </mat-dialog-actions>
-</ng-container>
-
-<ng-template #cardLayout>
-  <section class="card-layout" [class.drag-over]="dragOver">
-    <header class="card-header">
-      <h3>Транскрибация аудио/видео</h3>    
-    </header>
-    <div class="card-body" (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
-      <ng-container *ngTemplateOutlet="formContent"></ng-container>
+<section class="uf-shell" [class.uf-dialog]="isDialogLayout">
+  <header class="uf-header"><div><p class="uf-eyebrow">ИЗ ЗАПИСИ — В ГОТОВЫЙ МАТЕРИАЛ</p><h2 *ngIf="isDialogLayout" mat-dialog-title>Новая расшифровка</h2><h2 *ngIf="!isDialogLayout">Что расшифруем сегодня?</h2></div><span class="uf-header-glyph" aria-hidden="true">≋</span></header>
+  <form class="uf-form" (ngSubmit)="onSubmit()" [attr.aria-busy]="uploading">
+    <div class="uf-columns">
+      <section class="uf-source" aria-labelledby="upload-source-title">
+        <h3 id="upload-source-title"><span>01</span> Добавьте запись</h3>
+        <div class="uf-source-switch" aria-label="Источник записи"><button type="button" (click)="chooseSource(0)" [class.uf-selected]="selectedTab === 0" [attr.aria-pressed]="selectedTab === 0" [disabled]="uploading || disabled"><mat-icon aria-hidden="true">computer</mat-icon>С устройства</button><button type="button" (click)="chooseSource(1)" [class.uf-selected]="selectedTab === 1" [attr.aria-pressed]="selectedTab === 1" [disabled]="uploading || disabled"><mat-icon aria-hidden="true">link</mat-icon>Яндекс Диск</button></div>
+        <div *ngIf="selectedTab === 0" class="uf-dropzone" [class.uf-drag-over]="dragOver" [class.uf-has-file]="selectedFile" (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+          <input #filePicker type="file" hidden [accept]="fileAccept" (change)="onFileSelected($event)" [disabled]="uploading || disabled">
+          <ng-container *ngIf="selectedFile; else chooseFile"><span class="uf-file-icon" aria-hidden="true"><mat-icon>audio_file</mat-icon></span><strong>{{ selectedFile.name }}</strong><span class="uf-file-size">{{ selectedFileSize }} · Готов к загрузке</span><div class="uf-file-actions"><button class="uf-text-button" type="button" (click)="filePicker.click()" [disabled]="uploading || disabled">Заменить</button><button class="uf-text-button" type="button" (click)="removeFile()" [disabled]="uploading || disabled">Убрать</button></div></ng-container>
+          <ng-template #chooseFile><span class="uf-file-icon" aria-hidden="true"><mat-icon>upload_file</mat-icon></span><strong>Перетащите аудио или видео</strong><p>Лекция, интервью, встреча — начните с того, что у вас есть.</p><button class="uf-button uf-button-outline" type="button" (click)="filePicker.click()" [disabled]="uploading || disabled">Выбрать файл <span aria-hidden="true">↗</span></button><small>MP3, WAV, M4A, MP4 и другие форматы</small></ng-template>
+        </div>
+        <div class="uf-link-source" *ngIf="selectedTab === 1"><span class="uf-file-icon" aria-hidden="true"><mat-icon>cloud_download</mat-icon></span><label for="transcription-file-url">Публичная ссылка на запись</label><input id="transcription-file-url" #linkField="ngModel" type="url" name="fileUrl" [(ngModel)]="fileUrl" [disabled]="uploading || disabled" placeholder="https://disk.yandex.ru/i/…" autocomplete="off" aria-describedby="transcription-url-hint"><p id="transcription-url-hint">Откройте доступ к файлу на Яндекс Диске и вставьте ссылку сюда.</p><p class="uf-error" *ngIf="fileUrl && linkField.touched && !validFileUrl">Укажите полную ссылку, начинающуюся с https:// или http://.</p></div>
+      </section>
+      <section class="uf-processing" aria-labelledby="upload-processing-title">
+        <h3 id="upload-processing-title"><span>02</span> Выберите результат</h3><p class="uf-processing-intro">Профиль задаёт, как оформить текст и какие выводы получить из разговора.</p>
+        <div class="uf-field"><label for="transcription-profile">Профиль постобработки</label><select id="transcription-profile" name="profile" [ngModel]="selectedProfileId" (ngModelChange)="onProfileSelectionChanged($event)" [disabled]="uploading || disabled || profilesLoading || !profiles.length" aria-describedby="transcription-profile-hint"><option [ngValue]="null" disabled>{{ profilesLoading ? 'Загружаем профили…' : 'Выберите профиль' }}</option><option *ngFor="let profile of profiles" [ngValue]="profile.id">{{ profile.displayedName || profile.name }}</option></select></div>
+        <p class="uf-profile-hint" id="transcription-profile-hint">{{ selectedProfile?.hint || 'Выберите подходящий сценарий из доступных профилей. Это поможет получить нужную структуру документа.' }}</p>
+        <div class="uf-error" *ngIf="profilesError" role="alert">{{ profilesError }}<button class="uf-text-button" type="button" (click)="loadRecognitionProfiles()" [disabled]="profilesLoading">Повторить загрузку</button></div>
+        <details class="uf-instructions"><summary>Свои указания <span>необязательно</span></summary><div class="uf-field"><label for="transcription-clarification">Что важно учесть?</label><textarea id="transcription-clarification" name="clarification" rows="3" [(ngModel)]="clarification" [disabled]="uploading || disabled" [placeholder]="clarificationPlaceholder"></textarea></div><p *ngIf="clarificationHint">{{ clarificationHint }}</p></details>
+        <div class="uf-output-note"><mat-icon aria-hidden="true">description</mat-icon><p>Готовый текст можно редактировать, копировать и сохранять в документ.</p></div>
+      </section>
     </div>
-    <footer class="card-footer">
-      <button class="btn btn-primary" type="button" (click)="onSubmit()" [disabled]="!canSubmit() || uploading">
-        <mat-icon>cloud_upload</mat-icon>
-        <span>Начать загрузку</span>
-      </button>      
-    </footer>
-  </section>
-</ng-template>
-
-<ng-template #formContent>
-  <mat-progress-bar *ngIf="profilesLoading" mode="indeterminate"></mat-progress-bar>
-  <div class="error" *ngIf="profilesError">{{ profilesError }}</div>
-
-  <div class="profile-select">
-    <label class="profile-select__label" id="recognition-profile-label">
-      Выберите формат и аналитику итогового документа
-      <span aria-hidden="true" class="profile-select__required">*</span>
-    </label>
-    <mat-select
-      class="profile-select__control"
-      [(ngModel)]="selectedProfileId"
-      (selectionChange)="onProfileSelectionChanged($event.value)"
-      [disabled]="uploading || profilesLoading || !profiles.length"
-      [panelClass]="'profile-select__panel'"
-      [attr.aria-describedby]="selectedProfile?.hint ? 'recognition-profile-hint' : null"
-      [attr.aria-labelledby]="'recognition-profile-label'"
-      name="recognitionProfile"
-      required
-    >
-      <mat-select-trigger>
-        <div
-          class="profile-select__field"
-          [class.profile-select__field--placeholder]="!selectedProfile"
-        >
-          <mat-icon aria-hidden="true">account_circle</mat-icon>
-          <span class="profile-select__value">
-            {{ selectedProfile?.displayedName || 'Выберите профиль' }}
-          </span>
-          <mat-icon aria-hidden="true" class="profile-select__arrow">expand_more</mat-icon>
-        </div>
-      </mat-select-trigger>
-      <mat-option *ngFor="let profile of profiles" [value]="profile.id">
-        {{ profile.displayedName }}
-      </mat-option>
-    </mat-select>
-  </div>
-
-  <div class="error" *ngIf="!profilesLoading && profiles.length && selectedProfileId == null">
-    Нужно выбрать способ анализа аудио-потока
-  </div>
-
-  <div class="profile-hint" *ngIf="selectedProfile?.hint" id="recognition-profile-hint">
-    {{ selectedProfile?.hint }}
-  </div>
-
-  <mat-tab-group
-    [(selectedIndex)]="selectedTab"
-    class="upload-tabs"
-    [class.uploading]="uploading || profilesLoading"
-  >
-    <mat-tab label="Файл">
-      <div
-        class="tab-content dropzone"
-        (dragover)="onDragOver($event)"
-        (dragleave)="onDragLeave($event)"
-        (drop)="onDrop($event)"
-        [class.drag-over]="dragOver"
-      >
-        <label class="file-select" [class.disabled]="uploading || profilesLoading">
-          <input
-            type="file"
-            (change)="onFileSelected($event)"
-            accept="audio/*,video/*"
-            [disabled]="uploading || profilesLoading"
-          />
-          <mat-icon>attach_file</mat-icon>
-          <span>Выбрать файл</span>
-        </label>
-        <div class="drop-hint">Или перетащите файл сюда</div>
-        <div class="file-name" *ngIf="selectedFile">
-          <mat-icon>insert_drive_file</mat-icon>
-          <span>{{ selectedFile.name }}</span>
-        </div>
-      </div>
-    </mat-tab>
-    <mat-tab label="Яндекс диск">
-      <div class="tab-content link-tab-content">
-        <div class="link-input">
-          <label class="link-input__label" for="yandex-link-input">Ссылка на публичный файл Яндекс Диска</label>
-          <div class="link-input__field" [class.disabled]="uploading || profilesLoading">
-            <mat-icon aria-hidden="true">link</mat-icon>
-            <input
-              #yandexLinkInput
-              id="yandex-link-input"
-              type="url"
-              [(ngModel)]="fileUrl"
-              [disabled]="uploading || profilesLoading"
-              placeholder="https://disk.yandex.ru/i/..."
-              autocomplete="off"
-            />
-            <button
-              *ngIf="fileUrl"
-              type="button"
-              class="link-input__clear"
-              (click)="clearLink(yandexLinkInput)"
-              [disabled]="uploading || profilesLoading"
-            >
-              Очистить
-            </button>
-          </div>
-        </div>
-      </div>
-    </mat-tab>
-  </mat-tab-group>
-
-  <div class="clarification-input">
-    <label class="clarification-input__label" for="clarification-input-field">Указания для дополнительного анализа:</label>
-    <div
-      class="clarification-input__field"
-      [class.disabled]="uploading || profilesLoading"
-    >
-      <mat-icon aria-hidden="true">sticky_note_2</mat-icon>
-      <textarea
-        id="clarification-input-field"
-        rows="3"
-        [(ngModel)]="clarification"
-        [disabled]="uploading || profilesLoading"
-        [placeholder]="clarificationPlaceholder"
-        autocomplete="off"
-      ></textarea>
+    <div class="uf-feedback" *ngIf="uploadError || uploading || limitResponse">
+      <div class="uf-error" *ngIf="uploadError && !limitResponse" role="alert">{{ uploadError }}</div>
+      <div class="uf-limit" *ngIf="limitResponse" role="alert"><p>{{ limitResponse.message }}</p><p *ngIf="limitResponse.maxUploadMinutes != null && limitResponse.maxUploadMinutes > 0">Можно сократить запись до {{ limitResponse.maxUploadMinutes }} мин и попробовать снова.</p><button class="uf-button uf-button-outline" type="button" (click)="confirmLimit()">Открыть тарифы ↗</button></div>
+      <div *ngIf="uploading" role="status"><p class="uf-uploading-label">Передаём запись. Дождитесь завершения загрузки, прежде чем закрыть страницу.</p><mat-progress-bar mode="indeterminate" aria-label="Загрузка записи"></mat-progress-bar></div>
     </div>
-    <div class="clarification-input__hint" *ngIf="clarificationHint">{{ clarificationHint }}</div>
-  </div>
-
-  <mat-progress-bar *ngIf="uploading" mode="indeterminate"></mat-progress-bar>
-  <div class="error" *ngIf="uploadError">{{ uploadError }}</div>
-  <div class="limit-message" *ngIf="limitResponse">
-    <p>{{ limitResponse.message }}</p>
-    <p *ngIf="limitResponse.maxUploadMinutes != null && limitResponse.maxUploadMinutes > 0">
-      Можно обрезать исходник до {{ limitResponse.maxUploadMinutes }} мин и попробовать снова.
-    </p>
-    <button mat-stroked-button color="primary" type="button" (click)="confirmLimit()">
-      Перейти к оплате
-    </button>
-  </div>
-</ng-template>
+    <footer class="uf-footer"><button *ngIf="isDialogLayout" class="uf-text-button" type="button" (click)="onCancel()" [disabled]="uploading">Отмена</button><p *ngIf="!isDialogLayout">{{ uploading ? 'Обработка начнётся после загрузки.' : canSubmit() ? 'Всё готово. Можно начинать.' : 'Добавьте запись и выберите профиль.' }}</p><button class="uf-button uf-button-primary" type="submit" [disabled]="!canSubmit()">{{ uploading ? 'Загружаем запись…' : 'Начать расшифровку' }}<span aria-hidden="true">↗</span></button></footer>
+  </form>
+</section>

@@ -1,111 +1,54 @@
-<div class="blog-page">
-  <main class="page-content">
-    <section class="hero">
-      <div class="hero-text">
-        <span class="hero-eyebrow">сообщество youtscriptor</span>
-        <h1>Блог о создании и использовании расшифровок</h1>
-        <p class="hero-lead">
-          Делимся практиками, новыми функциями и историями команд, которые ускоряют работу с аудио и видео при помощи
-          YouScriptor.
-        </p>
-        <ul class="hero-highlights">
-          <li *ngFor="let highlight of heroHighlights">{{ highlight }}</li>
-        </ul>
-        <div class="hero-actions">
-          <ng-container *ngIf="canCreateTopics; else exploreLink">
-            <a class="btn btn-primary" [routerLink]="['/blog/new']">Новая публикация</a>
-          </ng-container>
-          <ng-template #exploreLink>
-            <a class="btn btn-primary" href="#topics">Читать статьи</a>
-          </ng-template>
-          <a class="btn btn-secondary" [routerLink]="['/transcriptions']">К расшифровкам</a>
-        </div>
+<div class="ap-page bf-page">
+  <main class="ap-container">
+    <header class="bf-hero">
+      <div class="bf-hero-top"><p class="ap-eyebrow">ЖУРНАЛ YOUSCRIPTOR</p><a class="bf-news-link" routerLink="/blog">Новости сайта <span aria-hidden="true">↗</span></a></div>
+      <div class="bf-hero-body">
+        <div><h1>Больше, чем <em>текст.</em></h1><p class="bf-lead">Идеи, опыт и разговор о работе с аудио, видео и расшифровками. Читайте, находите полезное и делитесь мыслями в комментариях.</p></div>
+        <div class="bf-editorial-mark" aria-hidden="true"><span>ЗАПИСЬ</span><i>↘</i><strong>мысль</strong><i>↗</i><span>ПРАКТИКА</span></div>
       </div>
+      <div class="bf-hero-bottom"><span>Читать. Обсуждать. Применять.</span><a *ngIf="isModerator" class="ap-button ap-button-dark" routerLink="/blog/new"><mat-icon aria-hidden="true">add</mat-icon>Новая публикация</a><a *ngIf="!isModerator" class="bf-library-link" routerLink="/Scriptorium">За расшифровками — в Скрипторий ↗</a></div>
+    </header>
 
-      <div class="hero-card">
-        <div class="card-badge">Комьюнити</div>
-        <h3>Обменивайтесь опытом и идеями</h3>
-        <p>
-          Создавайте публикации, рассказывайте о кейсах внедрения и находите ответы на вопросы о работе с сервисом.
-        </p>
-        <ul class="card-list">
-          <li *ngFor="let point of cardHighlights">{{ point }}</li>
-        </ul>
-        <div class="card-actions" *ngIf="canCreateTopics">
-          <a class="btn btn-outline" [routerLink]="['/blog/new']">Опубликовать статью</a>
-        </div>
-      </div>
-    </section>
+    <section class="bf-feed" aria-labelledby="bf-feed-title" [attr.aria-busy]="loading">
+      <div class="bf-section-heading"><div><p class="ap-eyebrow">ЛЕНТА БЛОГА</p><h2 id="bf-feed-title">Свежий взгляд<span>.</span></h2></div><span class="bf-feed-order">Сначала новые публикации</span></div>
+      <p class="bf-announcement" *ngIf="announcement" role="status">{{ announcement }}</p>
 
-    <section class="feed-section" id="topics">
-      <div class="section-header">
-        <h2>Последние публикации</h2>
-        <p>Читайте новости продукта, рекомендации экспертов и инструкции по работе с расшифровками.</p>
-      </div>
+      <div class="bf-skeleton-grid" *ngIf="loading && !topics.length" role="status" aria-label="Загрузка публикаций"><div *ngFor="let skeleton of skeletons" class="bf-skeleton" aria-hidden="true"><i></i><b></b><b></b><span></span><span></span><em></em></div></div>
 
-      <div class="feed-state" *ngIf="feedError">{{ feedError }}</div>
-      <div class="feed-state" *ngIf="!loading && initialLoad && topics.length === 0 && !feedError">
-        Пока нет тем. Создайте первую!
-      </div>
-
-      <div
-        class="topics-list"
-        infiniteScroll
-        [scrollWindow]="true"
-        [infiniteScrollDistance]="2"
-        [infiniteScrollThrottle]="200"
-        [infiniteScrollDisabled]="loading || allLoaded"
-        (scrolled)="onScrollDown()"
-      >
-        <article class="topic-card" *ngFor="let topic of topics; trackBy: trackByTopicId">
-          <div class="topic-header">
-            <h3>{{ topic.header }}</h3>
-            <div class="topic-meta">
-              <span class="topic-author">{{ topic.user }}</span>
-              <span>{{ topic.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
-              <span class="topic-comments-count" *ngIf="topic.commentCount > 0">
-                Комментариев: {{ topic.commentCount }}
-              </span>
-            </div>
+      <div class="bf-grid" *ngIf="topics.length">
+        <article class="bf-card" *ngFor="let topic of topics; let i = index; trackBy: trackByTopicId" [class.bf-featured]="i === 0">
+          <div class="bf-card-top"><span class="bf-label">{{ i === 0 ? 'СВЕЖАЯ ПУБЛИКАЦИЯ' : 'ИЗ БЛОГА' }}</span><span class="bf-number" aria-hidden="true">{{ i + 1 < 10 ? '0' + (i + 1) : i + 1 }}</span></div>
+          <div class="bf-card-content">
+            <div class="bf-article-meta"><time [attr.datetime]="topic.createdAt">{{ topic.createdAt | localTime:'dd.MM.yyyy' }}</time><span aria-hidden="true">·</span><span>≈ {{ topic.readingMinutes }} мин чтения</span></div>
+            <h3><a [routerLink]="['/blog', topic.slug]">{{ topic.header || 'Публикация без заголовка' }}</a></h3>
+            <p class="bf-excerpt">{{ topic.excerpt }}</p>
           </div>
+          <div class="bf-byline"><span class="bf-author"><span class="bf-avatar" aria-hidden="true">{{ topic.authorInitial }}</span>{{ topic.user || 'Автор' }}</span><a class="bf-comments" [routerLink]="['/blog', topic.slug]" aria-label="Открыть публикацию и комментарии"><mat-icon aria-hidden="true">chat_bubble_outline</mat-icon>{{ topic.commentCount || 0 }}</a></div>
+          <footer class="bf-card-footer"><a [routerLink]="['/blog', topic.slug]" [attr.aria-label]="'Читать: ' + topic.header">Читать публикацию <span aria-hidden="true">↗</span></a><span *ngIf="i === 0" class="bf-feature-note">Новая мысль для ваших заметок</span></footer>
 
-          <div class="topic-content" [class.collapsed]="topic.collapsed" [innerHTML]="topic.renderedText"></div>
-
-          <div class="topic-actions">
-            <button
-              class="text-button toggle"
-              type="button"
-              *ngIf="topic.textIsTooLong"
-              (click)="toggleCollapse(topic)"
-            >
-              {{ topic.collapsed ? 'Развернуть' : 'Свернуть' }}
-            </button>
-            <a class="btn btn-outline" [routerLink]="['/blog', topic.slug]">Читать полностью</a>
-            <div class="moderation-actions" *ngIf="isModerator">
-              <span class="action-error" *ngIf="topic.actionError">{{ topic.actionError }}</span>
-              <button class="btn btn-outline" type="button" (click)="editTopic(topic)">Редактировать</button>
-              <button
-                class="btn btn-danger"
-                type="button"
-                (click)="deleteTopic(topic)"
-                [disabled]="topic.deleting"
-              >
-                {{ topic.deleting ? 'Удаление…' : 'Удалить' }}
-              </button>
-            </div>
+          <div class="bf-moderation" *ngIf="isModerator">
+            <ng-container *ngIf="pendingDeleteId !== topic.id; else confirmDelete">
+              <a [routerLink]="['/blog', topic.slug, 'edit']"><mat-icon aria-hidden="true">edit</mat-icon>Редактировать</a>
+              <button type="button" class="bf-delete-link" (click)="requestDelete(topic)" [disabled]="loading || deleting"><mat-icon aria-hidden="true">delete_outline</mat-icon>Удалить</button>
+            </ng-container>
+            <ng-template #confirmDelete><div class="bf-delete-confirm" role="group" [attr.aria-label]="'Удаление публикации ' + topic.header"><p>Удалить эту публикацию вместе с комментариями?</p><div><button type="button" class="bf-delete-button" (click)="deleteTopic(topic)" [disabled]="loading || deleting">{{ topic.deleting ? 'Удаляем…' : 'Да, удалить' }}</button><button type="button" (click)="cancelDelete()" [disabled]="deleting">Отмена</button></div><p class="bf-action-error" *ngIf="topic.actionError" role="alert">{{ topic.actionError }}</p></div></ng-template>
           </div>
         </article>
-
-        <div class="feed-loader" *ngIf="loading && topics.length > 0">
-          <mat-spinner diameter="36"></mat-spinner>
-        </div>
-
-        <div class="feed-end" *ngIf="allLoaded && topics.length > 0">Больше нет записей</div>
       </div>
 
-      <div class="initial-loader" *ngIf="loading && topics.length === 0">
-        <mat-spinner diameter="40"></mat-spinner>
+      <div class="bf-error" *ngIf="feedError" role="alert"><mat-icon aria-hidden="true">cloud_off</mat-icon><div><h3>Не получилось загрузить публикации</h3><p>{{ feedError }}</p></div><button class="ap-button ap-button-outline" type="button" (click)="loadTopics()" [disabled]="loading || deleting">Попробовать снова</button></div>
+      <div class="bf-empty" *ngIf="initialLoad && !loading && !topics.length && !feedError"><span aria-hidden="true">≋</span><h3>История ещё впереди</h3><p>{{ isModerator ? 'Опубликуйте первый материал — он появится здесь.' : 'В блоге пока нет публикаций. А в Скриптории уже можно найти что-то для чтения.' }}</p><a *ngIf="isModerator" class="ap-button ap-button-dark" routerLink="/blog/new">Написать публикацию ↗</a><a *ngIf="!isModerator" class="ap-button ap-button-outline" routerLink="/Scriptorium">Открыть Скрипторий ↗</a></div>
+      <div class="bf-pagination" *ngIf="topics.length">
+        <button class="ap-button ap-button-outline" *ngIf="!allLoaded && !feedError" type="button" (click)="loadTopics()" [disabled]="loading || deleting">{{ loading ? 'Загружаем публикации…' : 'Показать ещё' }} <span aria-hidden="true">↓</span></button>
+        <mat-progress-bar *ngIf="loading" mode="indeterminate" aria-label="Загрузка следующих публикаций"></mat-progress-bar>
+        <span *ngIf="!loading">{{ allLoaded ? 'Все публикации загружены.' : 'Открыто публикаций: ' + topics.length }}</span>
       </div>
     </section>
+
+    <aside class="bf-bottom-grid">
+      <div class="bf-try"><p class="ap-eyebrow">ОТ ИДЕИ К ДЕЛУ</p><h2>Ваша следующая запись.<br><em>Уже почти текст.</em></h2><p>Загрузите аудио или видео и выберите профиль постобработки для своего документа.</p><a class="ap-button ap-button-lime" routerLink="/transcriptions">Расшифровать запись <span aria-hidden="true">↗</span></a><span class="bf-try-art" aria-hidden="true">≋</span></div>
+      <a class="bf-news" routerLink="/blog"><p class="ap-eyebrow">ЖИЗНЬ ПРОЕКТА</p><h2>Что нового<br>в YouScriptor?</h2><p>Обновления и сообщения о работе сервиса — в новостях сайта.</p><span>Читать новости <b aria-hidden="true">↗</b></span></a>
+    </aside>
+    <footer class="ap-bottom"><span>YouScriptor · Идеи заслуживают продолжения</span><nav aria-label="Полезные ссылки"><a routerLink="/">Главная</a><a routerLink="/Scriptorium">Скрипторий</a><a routerLink="/down">Скачать с YouTube</a></nav></footer>
   </main>
 </div>

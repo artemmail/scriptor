@@ -1,59 +1,13 @@
-<ng-container *ngIf="youtubeTask !== null; else loading">
-  <div class="progress-card" [ngClass]="getCardClass(youtubeTask!.status)">
-    <div class="progress-header">
-      <span class="status-icon" [ngClass]="getIconClass(youtubeTask!.status)">
-        <mat-icon>{{ getStatusIcon(youtubeTask!.status) }}</mat-icon>
-      </span>
-      <div class="progress-title">
-        <h2>Задача обрабатывается</h2>
-        <p *ngIf="youtubeTask!.status !== null">
-          {{ getStatusText(youtubeTask!.status) }}
-        </p>
-      </div>
-    </div>
-
-    <app-yandex-ad></app-yandex-ad>
-
-    <div class="progress-body">
-      <div class="progress-meta">
-        <div *ngIf="youtubeTask!.createdAt">
-          <span class="meta-label">Начало</span>
-          <span class="meta-value">{{ youtubeTask!.createdAt | localTime: 'yyyy-MM-dd HH:mm:ss' }}</span>
-        </div>
-        <div *ngIf="youtubeTask!.modifiedAt">
-          <span class="meta-label">Обновлено</span>
-          <span class="meta-value">{{ youtubeTask!.modifiedAt | localTime: 'yyyy-MM-dd HH:mm:ss' }}</span>
-        </div>
-      </div>
-
-      <div class="progress-status" *ngIf="youtubeTask!.status === RecognizeStatus.Error">
-        <div class="error-message">Произошла ошибка: {{ youtubeTask!.error || 'Не удалось распознать задачу' }}</div>
-      </div>
-
-      <div
-        class="progress-status"
-        *ngIf="youtubeTask && youtubeTask.status !== RecognizeStatus.Error && !youtubeTask.done"
-      >
-        <span class="status-text">Текущий статус: {{ getStatusText(youtubeTask!.status) }}</span>
-
-        <mat-progress-bar
-          *ngIf="youtubeTask!.status === RecognizeStatus.ApplyingPunctuationSegment &&
-                  youtubeTask!.segmentsTotal !== undefined &&
-                  youtubeTask!.segmentsProcessed !== undefined"
-          mode="determinate"
-          [value]="(youtubeTask!.segmentsProcessed / youtubeTask!.segmentsTotal) * 100"
-        ></mat-progress-bar>
-
-        <p *ngIf="youtubeTask!.status === RecognizeStatus.ApplyingPunctuationSegment">
-          Обработано: {{ youtubeTask!.segmentsProcessed }} из {{ youtubeTask!.segmentsTotal }}
-        </p>
-      </div>
-    </div>
+<section class="pg-shell" aria-labelledby="pg-title">
+  <p class="pg-eyebrow">{{ unavailable ? 'МАТЕРИАЛ НЕДОСТУПЕН' : 'ИЗ ВИДЕО — В ДОКУМЕНТ' }}</p>
+  <h1 id="pg-title">{{ youtubeTask?.title || (unavailable ? 'Не удалось открыть материал' : 'Скоро здесь будет текст.') }}</h1>
+  <p class="pg-lead" *ngIf="!unavailable">Пока мы готовим расшифровку, можно заняться своими делами. Готовый документ появится здесь автоматически.</p>
+  <div class="pg-card" *ngIf="!unavailable">
+    <div class="pg-status"><span><mat-icon aria-hidden="true">graphic_eq</mat-icon></span><div><small>СЕЙЧАС</small><h2 aria-live="polite">{{ youtubeTask ? statusText : 'Загружаем задачу…' }}</h2></div></div>
+    <ol class="pg-stages" *ngIf="youtubeTask"><li *ngFor="let label of ['Очередь', 'Получение записи', 'Обработка текста', 'Готовый документ']; let i = index" [class.pg-current]="stage === i" [class.pg-past]="stage > i"><span>{{ stage > i ? '✓' : '0' + (i + 1) }}</span>{{ label }}</li></ol>
+    <mat-progress-bar [mode]="youtubeTask && youtubeTask.segmentsTotal > 0 ? 'determinate' : 'indeterminate'" [value]="segmentProgress" aria-label="Прогресс обработки"></mat-progress-bar>
+    <p class="pg-count" *ngIf="youtubeTask && youtubeTask.segmentsTotal > 0">Обработано фрагментов: {{ youtubeTask.segmentsProcessed }} из {{ youtubeTask.segmentsTotal }}</p>
+    <div class="pg-meta" *ngIf="youtubeTask"><span *ngIf="youtubeTask.createdAt">Начало: {{ youtubeTask.createdAt | localTime:'dd.MM.yyyy HH:mm' }}</span><span *ngIf="youtubeTask.modifiedAt">Обновлено: {{ youtubeTask.modifiedAt | localTime:'HH:mm' }}</span></div>
   </div>
-</ng-container>
-
-<ng-template #loading>
-  <div class="spinner-container">
-    <mat-progress-spinner mode="indeterminate" diameter="48"></mat-progress-spinner>
-  </div>
-</ng-template>
+  <div class="pg-error" *ngIf="loadError" role="alert"><p>{{ loadError }}</p><button type="button" (click)="loadTask()">Проверить снова ↗</button></div>
+</section>

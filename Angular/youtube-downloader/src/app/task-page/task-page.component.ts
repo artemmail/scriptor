@@ -1,6 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subscription } from 'rxjs';
+import { AuthService } from '../services/AuthService.service';
 import { SubtitleService, YoutubeCaptionTaskDto } from '../services/subtitle.service';
 import { TaskProgressComponent } from '../task-progress/task-progress.component';
 import { TaskResultComponent } from '../task-result/task-result.component';
@@ -15,12 +18,13 @@ import { MatIconModule } from '@angular/material/icon';
   standalone: true,
   imports: [
     CommonModule,
+    RouterModule,
     MatIconModule,
     TaskProgressComponent,
     TaskResultComponent
   ],
   templateUrl: './task-page.component.html',
-  styleUrls: ['./task-page.component.css']
+  styleUrls: ['../shared/account-page.css', './task-page.component.css']
 })
 export class TaskPageComponent implements OnInit {
   taskId!: string;
@@ -29,19 +33,28 @@ export class TaskPageComponent implements OnInit {
   taskErrorMessage: string | null = null;
   restartErrorMessage: string | null = null;
   restartInProgress = false;
+  isAuthenticated = false;
+  private restartRequest?: Subscription;
 
   constructor(
     private route: ActivatedRoute,
     private titleService: Title,
     private router: Router,
-    private subtitleService: SubtitleService
-  ) {}
+    private subtitleService: SubtitleService,
+    private readonly auth: AuthService,
+    private readonly destroyRef: DestroyRef,
+  ) {
+    this.auth.user$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(user => this.isAuthenticated = !!user);
+    this.destroyRef.onDestroy(() => this.restartRequest?.unsubscribe());
+  }
 
   ngOnInit(): void {
-    this.route.paramMap.subscribe((params) => {
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const paramId = params.get('id');
       if (paramId) {
         if (paramId !== this.taskId) {
+          this.restartRequest?.unsubscribe();
+          this.titleService.setTitle('Расшифровка — YouScriptor');
           this.taskDone = false;
           this.task = null;
           this.taskErrorMessage = null;
@@ -72,7 +85,7 @@ export class TaskPageComponent implements OnInit {
   }
 
   onTaskError(msg: string) {
-    console.warn('Task error:', msg);
+    this.taskDone = false;
     this.taskErrorMessage = msg;
     this.restartErrorMessage = null;
     // Вы можете установить заголовок на значение по умолчанию или оставить прежним
@@ -80,14 +93,15 @@ export class TaskPageComponent implements OnInit {
   }
 
   onRestartTask(): void {
-    if (!this.taskId || this.restartInProgress) {
+    if (!this.taskId || this.restartInProgress || !this.isAuthenticated) {
       return;
     }
 
     this.restartInProgress = true;
     this.restartErrorMessage = null;
 
-    this.subtitleService.restartTask(this.taskId).subscribe({
+    this.restartRequest = this.subtitleService.restartTask(this.taskId)
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (task) => {
         this.restartInProgress = false;
         this.task = task;

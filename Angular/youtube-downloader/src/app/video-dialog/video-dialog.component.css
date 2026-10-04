@@ -1,8 +1,18 @@
+:host { display: block; color: #22241f; font-family: 'Segoe UI', Arial, sans-serif; }
+
+.video-dialog-header { display: flex; align-items: start; justify-content: space-between; gap: 20px; padding: 28px 30px 11px; }
+.video-dialog-header p { margin: 0 0 8px; color: #698635; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+.video-dialog-header h2 { max-width: 690px; margin: 0; padding: 0; font-size: clamp(21px, 3vw, 27px); font-weight: 600; letter-spacing: -.9px; line-height: 1.18; }
+.video-close { display: grid; flex: 0 0 auto; width: 34px; height: 34px; place-items: center; padding: 0; border: 0; border-radius: 8px; color: #596151; background: transparent; font-size: 25px; line-height: 1; cursor: pointer; }
+.video-close:hover { color: #22241f; background: #e9f0dd; }
+.video-dialog-content { display: grid; gap: 16px; padding: 9px 30px 6px; }
 .video-wrapper {
   position: relative;
   width: 100%;
-  padding-bottom: 56.25%; /* Соотношение 16:9 */
-  margin-bottom: 1em;
+  padding-bottom: 56.25%;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #22241f;
 }
 
 .video-wrapper iframe {
@@ -10,4 +20,17 @@
   width: 100%;
   height: 100%;
   border: 0;
+}
+
+.video-meta { display: flex; flex-wrap: wrap; gap: 9px 22px; color: #6a7260; font-size: 12px; }
+.video-meta a { color: #526b2c; font-weight: 650; text-decoration: none; }
+.video-meta a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.video-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 19px 30px 28px; }
+.video-dialog-actions .mat-mdc-button { color: #526b2c; font-size: 12px; font-weight: 650; }
+.video-dialog-actions .mat-mdc-unelevated-button { min-height: 42px; border-radius: 9px; color: #22241f; background: #d4f568; font-size: 12px; font-weight: 700; }
+
+@media (max-width: 520px) {
+  .video-dialog-header { padding: 22px 20px 8px; }
+  .video-dialog-content { padding-inline: 20px; }
+  .video-dialog-actions { padding: 16px 20px 22px; }
 }

@@ -9,7 +9,7 @@ export interface QualityLabel {
 
 export interface StreamDto {
   type: 'video' | 'audio' | 'muxed';
-  qualityLabel: QualityLabel | null;
+  qualityLabel: QualityLabel | string | null;
   container: string;
   language: string | null;
   codec: string;

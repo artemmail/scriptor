@@ -58,7 +58,9 @@ export class AppComponent implements AfterViewInit {
 
   get isAccountPage(): boolean {
     const path = this.router.url.split(/[?#]/)[0];
-    return /^\/(billing|login|profile)\/?$/.test(path);
+    return /^\/(billing|login|profile|transcriptions|tasks|Scriptorium|down|youtube-downloader|y|blog)\/?$/.test(path)
+      || /^\/recognized\/[^/]+\/?$/.test(path)
+      || /^\/blog\/Content\/[^/]+\/?$/.test(path);
   }
 
   openSupport(): void {

@@ -191,6 +191,7 @@ generatePdfFromMarkdown(id: string, markdown: string): Observable<Blob> {
         ? this.dialog.open(CaptionTrackDialogComponent, {
             width: '520px',
             maxWidth: 'calc(100vw - 32px)',
+            panelClass: 'library-dialog-panel',
             data: { youtubeId, tracks },
             disableClose: true
           }).afterClosed().pipe(take(1))
@@ -225,6 +226,7 @@ generatePdfFromMarkdown(id: string, markdown: string): Observable<Blob> {
           ? this.dialog.open(CaptionTrackDialogComponent, {
               width: '520px',
               maxWidth: 'calc(100vw - 32px)',
+              panelClass: 'library-dialog-panel',
               data: { youtubeId: item, tracks },
               disableClose: true
             }).afterClosed().pipe(take(1))

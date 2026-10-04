@@ -297,12 +297,34 @@ body .app-content :is(app-png-to-webp .upload-area:hover, app-png-to-webp-batch 
   box-shadow: 0 24px 60px rgba(27, 53, 100, 0.17);
 }
 
-.cdk-overlay-pane.support-dialog-panel .mat-mdc-dialog-surface {
+.cdk-overlay-pane.support-dialog-panel .mat-mdc-dialog-surface,
+.cdk-overlay-pane.transcription-dialog-panel .mat-mdc-dialog-surface,
+.cdk-overlay-pane.library-dialog-panel .mat-mdc-dialog-surface {
   background: #f7f8f2;
   border: 1px solid #dfe2d7;
   border-radius: 22px;
   box-shadow: 0 28px 80px rgba(34, 36, 31, .22);
 }
+
+.cdk-overlay-container .mat-mdc-menu-panel.tx-action-menu {
+  --action-menu-panel-accent: #526b2c;
+  background: #f7f8f2;
+  border-color: #dfe2d7;
+  box-shadow: 0 16px 40px rgba(34, 36, 31, .14);
+}
+
+.cdk-overlay-container .tx-action-menu .mat-mdc-menu-item {
+  color: #35412a;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 13px;
+}
+
+.cdk-overlay-container .tx-action-menu .mat-mdc-menu-item:not([disabled]):hover {
+  background: #eaf2dc;
+  color: #526b2c;
+}
+
+.cdk-overlay-container .tx-action-menu .mat-icon { color: #698635; }
 
 @media (max-width: 760px) {
   body .app-content .page-content,

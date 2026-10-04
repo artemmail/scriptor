@@ -1,594 +1,376 @@
-import { Component, DestroyRef, OnInit, ViewChild } from '@angular/core';
-import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
-import { HttpClientModule, HttpErrorResponse } from '@angular/common/http';
+import { Component, DestroyRef, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
-
-import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
-import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatCardModule } from '@angular/material/card';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-
-import { MarkdownModule } from 'ngx-markdown';
-import { InfiniteScrollModule } from 'ngx-infinite-scroll';
-
-import { CommonModule } from '@angular/common';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { firstValueFrom, forkJoin, interval, Subject, Subscription } from 'rxjs';
+import { debounceTime, finalize, map } from 'rxjs/operators';
 import { LocalTimePipe } from '../pipe/local-time.pipe';
 import { SubtitleService, YoutubeCaptionTaskDto2, RecognizeStatus, YoutubeCaptionVisibility } from '../services/subtitle.service';
 import type { VideoDialogData } from '../video-dialog/video-dialog.component';
 import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../services/AuthService.service';
-import { interval, forkJoin } from 'rxjs';
-import { finalize, map } from 'rxjs/operators';
 import { extractUsageLimitResponse } from '../models/usage-limit-response';
+
+type LibrarySort = 'newest' | 'oldest' | 'title' | 'channel' | 'status';
 
 @Component({
   selector: 'app-subtitles-tasks',
   standalone: true,
   templateUrl: './subtitles-tasks.component.html',
-  styleUrls: ['./subtitles-tasks.component.css'],
-  imports: [
-    CommonModule,
-    HttpClientModule,
-    RouterModule,
-    FormsModule,
-    /* Material & CDK */
-    MatTableModule,
-    MatSortModule,
-    MatButtonModule,
-    MatIconModule,
-    MatCardModule,
-    MatProgressBarModule,
-    MatProgressSpinnerModule,
-    MatDialogModule,
-    /* 3‑rd party */
-    MarkdownModule,
-    InfiniteScrollModule,
-    /* Stand‑alone components & pipes */
-    LocalTimePipe,
-    YandexAdComponent,
-  ],
+  styleUrls: ['../shared/account-page.css', './subtitles-tasks.component.css'],
+  imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatProgressBarModule,
+    MatDialogModule, LocalTimePipe, YandexAdComponent],
 })
 export class SubtitlesTasksComponent implements OnInit {
-  displayedColumns: string[] = [];
-  dataSource = new MatTableDataSource<YoutubeCaptionTaskDto2>();
-  RecognizeStatus = RecognizeStatus;
-  Visibility = YoutubeCaptionVisibility;
-
+  readonly RecognizeStatus = RecognizeStatus;
+  readonly Visibility = YoutubeCaptionVisibility;
+  readonly pageSize = 15;
+  readonly skeletonCards = [1, 2, 3, 4, 5, 6];
+  tasks: YoutubeCaptionTaskDto2[] = [];
   totalItems = 0;
-  pageSize = 15;
   pageIndex = 0;
-  sortField = '';
-  sortOrder = '';
+  sortValue: LibrarySort = 'newest';
+  viewMode: 'cards' | 'list' = 'cards';
   filterValue = '';
   userIdFilter: string | null = null;
-  showOnlyMine = false;
   currentUserId: string | null = null;
+  showOnlyMine = false;
+  isAuthenticated = false;
+  isAdmin = false;
+  canManageVisibility = false;
+  canUseBatch = false;
+  loading = false;
+  loadingMore = false;
+  listError: string | null = null;
+  actionMessage: string | null = null;
   recognitionInput = '';
   recognitionStarting = false;
   recognitionBatchStarting = false;
   recognitionError: string | null = null;
-  canUseBatch = false;
-
-  isMobile = false;
-  loading = false;
+  recognitionNeedsPayment = false;
+  batchDialogOpening = false;
   expandedTasks = new Set<string>();
-  isAuthenticated = false;
-  canManageVisibility = false;
-  private readonly refreshIntervalMs = 10_000;
-  private refreshInProgress = false;
-  private visibilityUpdateInProgress = new Set<string>();
-
-  @ViewChild(MatSort) sort!: MatSort;
+  visibilityErrors = new Map<string, string>();
+  videoErrors = new Map<string, string>();
+  private readonly visibilityUpdating = new Set<string>();
+  private readonly videoOpening = new Set<string>();
+  private readonly searchChanges = new Subject<void>();
+  private listRequest?: Subscription;
+  private refreshRequest?: Subscription;
+  private requestVersion = 0;
+  private initialized = false;
+  private isDestroyed = false;
 
   constructor(
-    private subtitleService: SubtitleService,
-    private titleService: Title,
-    private dialog: MatDialog,
-    private breakpointObserver: BreakpointObserver,
-    private route: ActivatedRoute,
-    private router: Router,
-    private authService: AuthService,
-    private destroyRef: DestroyRef
+    private readonly subtitleService: SubtitleService,
+    private readonly titleService: Title,
+    private readonly dialog: MatDialog,
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly authService: AuthService,
+    private readonly destroyRef: DestroyRef,
   ) {
-    this.titleService.setTitle('Scriptorium — очередь расшифровок');
-
-    this.breakpointObserver
-      .observe([Breakpoints.Handset])
-      .subscribe(r => (this.isMobile = r.matches));
-
-    this.updateDisplayedColumns();
-
-    this.authService.user$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(user => {
-        const previousCanManageVisibility = this.canManageVisibility;
-        this.isAuthenticated = !!user;
-        this.currentUserId = user?.id ?? null;
-        this.canManageVisibility = !!user?.canHideCaptions;
-        this.canUseBatch = !!user?.canHideCaptions;
-        this.updateDisplayedColumns();
-
-        if (previousCanManageVisibility !== this.canManageVisibility && this.dataSource.data.length) {
-          this.loadTasks();
-        }
-
-        if (!this.currentUserId && this.userIdFilter) {
-          this.showOnlyMine = false;
-          this.router.navigate([], {
-            relativeTo: this.route,
-            queryParams: { userId: null },
-            queryParamsHandling: 'merge',
-            replaceUrl: true,
-          });
-          return;
-        }
-
-        this.updateShowOnlyMineFlag();
-      });
+    this.titleService.setTitle('Скрипторий — библиотека расшифровок YouTube');
+    this.authService.user$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(user => {
+      const oldScope = this.currentUserId + ':' + this.isAdmin + ':' + this.canManageVisibility;
+      this.isAuthenticated = !!user;
+      this.currentUserId = user?.id ?? null;
+      this.isAdmin = !!user?.roles?.some(role => role.toLowerCase() === 'admin');
+      this.canManageVisibility = this.isAdmin || !!user?.canHideCaptions;
+      this.canUseBatch = !!user?.canHideCaptions;
+      this.showOnlyMine = !!this.currentUserId && this.userIdFilter === this.currentUserId;
+      if (this.initialized && oldScope !== this.currentUserId + ':' + this.isAdmin + ':' + this.canManageVisibility) {
+        this.reloadTasks();
+      }
+    });
+    this.destroyRef.onDestroy(() => {
+      this.isDestroyed = true;
+      this.listRequest?.unsubscribe();
+      this.refreshRequest?.unsubscribe();
+    });
   }
 
   ngOnInit(): void {
-    this.setupAutoRefresh();
-    this.route.queryParamMap.subscribe(params => {
-      const newUserId = params.get('userId');
-      const hasChanged = this.userIdFilter !== newUserId;
-      this.userIdFilter = newUserId;
-      this.updateShowOnlyMineFlag();
-
-      if (hasChanged) {
-        this.pageIndex = 0;
-        this.expandedTasks.clear();
-        this.loadTasks();
-      } else if (!this.dataSource.data.length) {
-        this.loadTasks();
-      }
+    this.initialized = true;
+    this.searchChanges.pipe(debounceTime(350), takeUntilDestroyed(this.destroyRef)).subscribe(() => this.reloadTasks());
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
+      this.userIdFilter = params.get('userId');
+      this.showOnlyMine = !!this.currentUserId && this.userIdFilter === this.currentUserId;
+      this.reloadTasks();
     });
+    interval(10000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.refreshActiveTasks());
   }
 
-  private setupAutoRefresh(): void {
-    interval(this.refreshIntervalMs)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.refreshTasksInProgress());
+  get sort(): { field: string; order: string } {
+    switch (this.sortValue) {
+      case 'oldest': return { field: 'createdAt', order: 'asc' };
+      case 'title': return { field: 'title', order: 'asc' };
+      case 'channel': return { field: 'channelName', order: 'asc' };
+      case 'status': return { field: 'status', order: 'asc' };
+      default: return { field: 'createdAt', order: 'desc' };
+    }
   }
-
-  private shouldIncludeHiddenTasks(): boolean {
-    return this.canManageVisibility;
+  get includeHidden(): boolean {
+    return this.isAdmin || (this.canManageVisibility && !!this.currentUserId && this.userIdFilter === this.currentUserId);
   }
+  get canManageCurrentScope(): boolean { return this.isAdmin || (this.canManageVisibility && this.showOnlyMine); }
+  get completedTasksCount(): number { return this.tasks.filter(task => this.isCompleted(task)).length; }
+  get inProgressTasksCount(): number { return this.tasks.filter(task => this.isTaskInProgress(task)).length; }
+  get failedTasksCount(): number { return this.tasks.filter(task => task.status === RecognizeStatus.Error).length; }
+  get hasMore(): boolean { return this.tasks.length < this.totalItems; }
+  get recognitionBusy(): boolean { return this.recognitionStarting || this.recognitionBatchStarting || this.batchDialogOpening; }
 
-  private loadTasks(append = false): void {
+  isCompleted(task: YoutubeCaptionTaskDto2): boolean {
+    return task.status !== RecognizeStatus.Error && (task.done || task.status === RecognizeStatus.Done);
+  }
+  isTaskInProgress(task: YoutubeCaptionTaskDto2): boolean {
+    return !this.isCompleted(task) && task.status !== RecognizeStatus.Error;
+  }
+  trackTask(_: number, task: YoutubeCaptionTaskDto2): string { return task.id; }
+  taskLink(task: YoutubeCaptionTaskDto2): string { return task.slug || task.id; }
+
+  onSearchChange(): void {
+    // Cancel immediately, before the debounce, so an older query cannot replace the new results.
+    this.cancelRequests();
     this.loading = true;
-    const page = this.pageIndex + 1;
-    const filter = this.filterValue.trim().toLowerCase();
-    this.subtitleService
-      .getTasks(
-        page,
-        this.pageSize,
-        this.sortField,
-        this.sortOrder,
-        filter,
-        this.userIdFilter,
-        this.shouldIncludeHiddenTasks()
-      )
-      .subscribe({
-        next: res => {
-          if (!append) {
-            this.expandedTasks.clear();
-          }
-          this.dataSource.data = append
-            ? this.dataSource.data.concat(res.items)
-            : res.items;
-          this.totalItems = res.totalCount;
-          this.loading = false;
-        },
-        error: err => {
-          console.error('Error loading tasks', err);
-          this.loading = false;
-        },
-      });
+    this.loadingMore = false;
+    this.listError = null;
+    this.searchChanges.next();
   }
-
-  private refreshTasksInProgress(): void {
-    if (this.loading || this.refreshInProgress) {
-      return;
-    }
-
-    const pagesToRefresh = this.collectPagesWithActiveTasks();
-    if (!pagesToRefresh.length) {
-      return;
-    }
-
-    const filter = this.filterValue.trim().toLowerCase();
-    this.refreshInProgress = true;
-
-    const requests = pagesToRefresh.map(page =>
-      this.subtitleService
-        .getTasks(
-          page + 1,
-          this.pageSize,
-          this.sortField,
-          this.sortOrder,
-          filter,
-          this.userIdFilter,
-          this.shouldIncludeHiddenTasks()
-        )
-        .pipe(map(res => ({ page, res })))
-    );
-
-    forkJoin(requests)
-      .pipe(finalize(() => {
-        this.refreshInProgress = false;
-      }))
-      .subscribe({
-        next: responses => {
-          const updatedData = [...this.dataSource.data];
-
-          const totalCountUpdate = responses.find(({ res }) => typeof res.totalCount === 'number')?.res.totalCount;
-          if (typeof totalCountUpdate === 'number') {
-            this.totalItems = totalCountUpdate;
-          }
-
-          responses.forEach(({ page, res }) => {
-            res.items.forEach((item, itemIndex) => {
-              const globalIndex = page * this.pageSize + itemIndex;
-              if (globalIndex < updatedData.length && updatedData[globalIndex].id === item.id) {
-                updatedData[globalIndex] = item;
-              } else {
-                const existingIndex = updatedData.findIndex(t => t.id === item.id);
-                if (existingIndex !== -1) {
-                  updatedData[existingIndex] = item;
-                }
-              }
-            });
-          });
-
-          this.dataSource.data = updatedData;
-        },
-        error: err => {
-          console.error('Error refreshing tasks', err);
-        },
-      });
-  }
-
-  private collectPagesWithActiveTasks(): number[] {
-    const activePages = new Set<number>();
-
-    this.dataSource.data.forEach((task, index) => {
-      if (!this.isTaskInProgress(task)) {
-        return;
-      }
-      activePages.add(Math.floor(index / this.pageSize));
-    });
-
-    return Array.from(activePages.values()).sort((a, b) => a - b);
-  }
-
-  private isTaskInProgress(task: YoutubeCaptionTaskDto2): boolean {
-    return !task.done && task.status !== RecognizeStatus.Error;
-  }
-
-  applyFilter(evt: Event): void {
-    this.filterValue = (evt.target as HTMLInputElement).value;
-    this.pageIndex = 0;
-    this.loadTasks();
-  }
-
-  clearFilter(input: HTMLInputElement): void {
+  clearFilter(input?: HTMLInputElement): void {
     this.filterValue = '';
-    this.pageIndex = 0;
-    this.loadTasks();
-    input.focus();
+    this.onSearchChange();
+    input?.focus();
   }
-
-  onShowOnlyMineChange(evt: Event): void {
-    const checkbox = evt.target as HTMLInputElement;
-
-    if (!this.currentUserId) {
-      checkbox.checked = false;
-      this.showOnlyMine = false;
-      return;
-    }
-
-    const shouldShowMine = checkbox.checked;
-    this.showOnlyMine = shouldShowMine;
-    this.setShowOnlyMine(shouldShowMine);
+  searchChannel(channel: string): void {
+    this.filterValue = channel;
+    this.onSearchChange();
   }
-
-  private setShowOnlyMine(show: boolean): void {
-    if (!this.currentUserId) {
-      this.showOnlyMine = false;
-      return;
-    }
-
-    const targetUserId = show ? this.currentUserId : null;
-    if (targetUserId === this.userIdFilter) {
-      this.updateShowOnlyMineFlag();
-      return;
-    }
-
+  setShowOnlyMine(show: boolean): void {
+    if (show && !this.currentUserId) return;
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { userId: targetUserId },
+      queryParams: { userId: show ? this.currentUserId : null },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
   }
 
-  private updateShowOnlyMineFlag(): void {
-    this.showOnlyMine = !!this.currentUserId && this.userIdFilter === this.currentUserId;
+  private cancelRequests(): void {
+    this.requestVersion++;
+    this.listRequest?.unsubscribe();
+    this.refreshRequest?.unsubscribe();
   }
 
-  onSortChange(sort: Sort): void {
-    this.sortField = sort.active;
-    this.sortOrder = sort.direction;
-    this.pageIndex = 0;
-    this.loadTasks();
+  reloadTasks(): void {
+    this.loadPage(0, false);
+  }
+  loadMore(): void {
+    if (this.loading || this.loadingMore || !this.hasMore) return;
+    this.loadPage(this.pageIndex + 1, true);
+  }
+  retryList(): void {
+    if (this.tasks.length && this.hasMore) this.loadMore();
+    else this.reloadTasks();
   }
 
-  onScrollDown(): void {
-    if (this.loading) return;
-    if (this.dataSource.data.length >= this.totalItems) return;
-
-    this.pageIndex++;
-    this.loadTasks(true);
-  }
-
-  taskProgress(t: YoutubeCaptionTaskDto2): number {
-    if (!t.segmentsTotal) return 0;
-    return (t.segmentsProcessed / t.segmentsTotal) * 100;
-  }
-
-  isExpanded(id: string): boolean {
-    return this.expandedTasks.has(id);
-  }
-  toggleExpand(id: string): void {
-    this.isExpanded(id) ? this.expandedTasks.delete(id) : this.expandedTasks.add(id);
-  }
-
-  isVisibilityUpdating(taskId: string): boolean {
-    return this.visibilityUpdateInProgress.has(taskId);
-  }
-
-  toggleTaskVisibility(task: YoutubeCaptionTaskDto2): void {
-    if (
-      !this.canManageVisibility ||
-      this.visibilityUpdateInProgress.has(task.id) ||
-      task.visibility === YoutubeCaptionVisibility.Deleted
-    ) {
-      return;
+  private loadPage(pageIndex: number, append: boolean): void {
+    this.cancelRequests();
+    const version = this.requestVersion;
+    this.loading = !append;
+    this.loadingMore = append;
+    this.listError = null;
+    if (!append) {
+      this.tasks = [];
+      this.totalItems = 0;
+      this.pageIndex = 0;
+      this.expandedTasks.clear();
+      this.visibilityErrors.clear();
+      this.videoErrors.clear();
     }
-
-    const nextVisibility =
-      task.visibility === YoutubeCaptionVisibility.Hidden
-        ? YoutubeCaptionVisibility.Public
-        : YoutubeCaptionVisibility.Hidden;
-
-    this.visibilityUpdateInProgress.add(task.id);
-
-    this.subtitleService
-      .updateTaskVisibility(task.id, nextVisibility)
-      .pipe(finalize(() => this.visibilityUpdateInProgress.delete(task.id)))
+    this.listRequest = this.subtitleService.getTasks(pageIndex + 1, this.pageSize,
+      this.sort.field, this.sort.order, this.filterValue.trim(), this.userIdFilter, this.includeHidden)
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
-          task.visibility = nextVisibility;
-          if (!this.userIdFilter) {
-            this.loadTasks();
-          }
+        next: response => {
+          if (version !== this.requestVersion) return;
+          const items = append ? [...this.tasks, ...response.items] : response.items;
+          this.tasks = Array.from(new Map(items.map(task => [task.id, task])).values());
+          this.totalItems = response.totalCount;
+          this.pageIndex = pageIndex;
+          this.loading = false;
+          this.loadingMore = false;
         },
-        error: err => {
-          console.error('Failed to update visibility', err);
+        error: () => {
+          if (version !== this.requestVersion) return;
+          this.loading = false;
+          this.loadingMore = false;
+          this.listError = append
+            ? 'Не удалось загрузить следующие материалы. Уже открытые записи остались на странице.'
+            : 'Не удалось загрузить библиотеку. Попробуйте ещё раз.';
         },
       });
   }
 
-  getVisibilityIcon(task: YoutubeCaptionTaskDto2): string {
-    return task.visibility === YoutubeCaptionVisibility.Public ? 'visibility' : 'visibility_off';
+  private refreshActiveTasks(): void {
+    if (this.loading || this.loadingMore || (this.refreshRequest && !this.refreshRequest.closed)
+      || this.visibilityUpdating.size || !this.inProgressTasksCount) return;
+    const version = this.requestVersion;
+    const pages = Array.from(new Set(this.tasks.flatMap((task, i) =>
+      this.isTaskInProgress(task) ? [Math.floor(i / this.pageSize)] : [])));
+    this.refreshRequest = forkJoin(pages.map(page => this.subtitleService.getTasks(page + 1, this.pageSize,
+      this.sort.field, this.sort.order, this.filterValue.trim(), this.userIdFilter, this.includeHidden)
+      .pipe(map(response => response.items))))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: groups => {
+          if (version !== this.requestVersion) return;
+          const updates = new Map(groups.flat().map(task => [task.id, task]));
+          // Keep cards in place during background updates.
+          this.tasks = this.tasks.map(task => updates.get(task.id) ?? task);
+        },
+        error: () => { /* A transient refresh failure is retried on the next interval. */ },
+      });
   }
 
-  getVisibilityActionLabel(task: YoutubeCaptionTaskDto2): string {
-    if (task.visibility === YoutubeCaptionVisibility.Deleted) {
-      return 'Ролик удалён из общей ленты';
+  toggleExpand(id: string): void {
+    this.expandedTasks.has(id) ? this.expandedTasks.delete(id) : this.expandedTasks.add(id);
+  }
+  taskProgress(task: YoutubeCaptionTaskDto2): number {
+    return task.segmentsTotal > 0 ? Math.min(100, Math.max(0, task.segmentsProcessed / task.segmentsTotal * 100)) : 0;
+  }
+  getStatusText(status: RecognizeStatus | null | undefined): string {
+    switch (status) {
+      case RecognizeStatus.Created: return 'В очереди';
+      case RecognizeStatus.Converting: return 'Подготавливаем аудио';
+      case RecognizeStatus.Uploading: return 'Загружаем запись';
+      case RecognizeStatus.Recognizing: return 'Распознаём речь';
+      case RecognizeStatus.RetrievingResult: return 'Получаем результат';
+      case RecognizeStatus.ApplyingPunctuation: return 'Оформляем текст';
+      case RecognizeStatus.FetchingSubtitles: return 'Проверяем видео';
+      case RecognizeStatus.DownloadingCaptions: return 'Получаем субтитры';
+      case RecognizeStatus.SegmentingCaptions: return 'Подготавливаем текст';
+      case RecognizeStatus.ApplyingPunctuationSegment: return 'Обрабатываем текст';
+      case RecognizeStatus.Done: return 'Готово к чтению';
+      case RecognizeStatus.Error: return 'Ошибка обработки';
+      default: return 'Ожидаем обновления';
     }
-
-    return task.visibility === YoutubeCaptionVisibility.Hidden
-      ? 'Показать ролик в общей ленте'
-      : 'Скрыть ролик из общей ленты';
   }
 
-  getStatusIcon(s: RecognizeStatus | null): string {
-    switch (s) {
-      case RecognizeStatus.Done:  return 'check_circle';
-      case RecognizeStatus.Error: return 'cancel';
-      default:                    return 'loop';
-    }
-  }
-  getStatusClass(s: RecognizeStatus | null): string {
-    switch (s) {
-      case RecognizeStatus.Done:  return 'icon-status-done';
-      case RecognizeStatus.Error: return 'icon-status-error';
-      default:                    return 'icon-status-pending';
-    }
-  }
-  getStatusText(s: RecognizeStatus | null | undefined): string {
-    return this.subtitleService.getStatusText(s);
+  isVisibilityUpdating(id: string): boolean { return this.visibilityUpdating.has(id); }
+  toggleTaskVisibility(task: YoutubeCaptionTaskDto2): void {
+    if (!this.canManageCurrentScope || this.visibilityUpdating.has(task.id) || task.visibility === this.Visibility.Deleted) return;
+    const nextVisibility = task.visibility === this.Visibility.Hidden ? this.Visibility.Public : this.Visibility.Hidden;
+    this.refreshRequest?.unsubscribe();
+    this.visibilityUpdating.add(task.id);
+    this.visibilityErrors.delete(task.id);
+    this.subtitleService.updateTaskVisibility(task.id, nextVisibility)
+      .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.visibilityUpdating.delete(task.id)))
+      .subscribe({
+        next: () => {
+          this.tasks = this.tasks.map(item => item.id === task.id ? { ...item, visibility: nextVisibility } : item);
+        },
+        error: () => this.visibilityErrors.set(task.id, 'Не удалось изменить видимость. Попробуйте снова.'),
+      });
   }
 
   onStartRecognition(): void {
-    if (!this.recognitionInput.trim() || this.recognitionStarting || this.recognitionBatchStarting) {
-      return;
-    }
-
+    const query = this.recognitionInput.trim();
+    if (!query || this.recognitionBusy) return;
     this.recognitionStarting = true;
     this.recognitionError = null;
-
-    this.subtitleService
-      .startWithTrackChoice(this.recognitionInput)
-      .subscribe({
+    this.recognitionNeedsPayment = false;
+    this.subtitleService.startWithTrackChoice(query).pipe(takeUntilDestroyed(this.destroyRef),
+      finalize(() => this.recognitionStarting = false)).subscribe({
         next: response => {
-          this.recognitionStarting = false;
-          if (response?.taskId) {
-            this.router.navigate(['/recognized', response.taskId]);
-          } else {
-            this.loadTasks();
-          }
+          if (response.taskId) this.router.navigate(['/recognized', response.taskId]);
+          else this.reloadTasks();
         },
-        error: (err: HttpErrorResponse) => {
-          this.recognitionStarting = false;
-          if (err.status === 401) {
-            this.router.navigate(['/login']);
-            return;
-          }
-
-          const limit = extractUsageLimitResponse(err);
-          if (limit?.message) {
-            this.recognitionError = limit.message;
-            return;
-          }
-
-          console.error('Error starting task:', err);
-          this.recognitionError = 'Не удалось запустить задачу. Попробуйте позже.';
-        },
+        error: (error: HttpErrorResponse) => this.handleRecognitionError(error, 'Не удалось начать обработку. Проверьте ссылку и попробуйте снова.'),
       });
   }
 
   async onStartRecognitionBatch(): Promise<void> {
-    if (this.recognitionStarting || this.recognitionBatchStarting) {
-      return;
-    }
-
+    if (this.recognitionBusy || !this.isAuthenticated || !this.canUseBatch) return;
     this.recognitionError = null;
-
-    if (!this.isAuthenticated) {
-      this.recognitionError = 'Добавление списком доступно только авторизованным подписчикам.';
-      return;
+    this.batchDialogOpening = true;
+    try {
+      const { BulkVideoDialogComponent } = await import('../bulk-video-dialog/bulk-video-dialog.component');
+      if (this.isDestroyed) return;
+      const ref = this.dialog.open(BulkVideoDialogComponent, {
+        width: '640px', maxWidth: '95vw', maxHeight: '90vh', panelClass: 'library-dialog-panel', data: { value: '' },
+      });
+      ref.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((input?: string | null) => {
+        this.batchDialogOpening = false;
+        const items = Array.from(new Set((input ?? '').split(/\r?\n/).map(line => line.trim()).filter(Boolean)));
+        if (items.length) this.startRecognitionBatch(items);
+      });
+    } catch {
+      this.batchDialogOpening = false;
+      this.recognitionError = 'Не удалось открыть форму. Попробуйте снова.';
     }
-
-    if (!this.canUseBatch) {
-      this.recognitionError = 'Добавление списком доступно только подписчикам.';
-      return;
-    }
-
-    const { BulkVideoDialogComponent } = await import('../bulk-video-dialog/bulk-video-dialog.component');
-    const dialogRef = this.dialog.open(BulkVideoDialogComponent, {
-      width: '640px',
-      data: { value: '' },
-    });
-
-    dialogRef.afterClosed()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((value?: string | null) => {
-      if (!value || !value.trim()) {
-        return;
-      }
-
-      const items = this.parseBulkInput(value);
-      if (!items.length) {
-        this.recognitionError = 'Введите хотя бы одну ссылку или идентификатор.';
-        return;
-      }
-
-      this.startRecognitionBatch(items);
-    });
   }
 
   private startRecognitionBatch(items: string[]): void {
-    if (!items.length) {
-      return;
-    }
-
     this.recognitionBatchStarting = true;
+    this.recognitionNeedsPayment = false;
     this.recognitionError = null;
-
-    this.subtitleService
-      .startBatchWithTrackChoices(items)
+    this.actionMessage = null;
+    this.subtitleService.startBatchWithTrackChoices(items)
+      .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.recognitionBatchStarting = false))
       .subscribe({
         next: response => {
-          this.recognitionBatchStarting = false;
-          this.loadTasks();
-
-          if (response?.invalidItems?.length) {
-            const preview = response.invalidItems.slice(0, 3).join(', ');
-            const suffix = response.invalidItems.length > 3 ? ` и ещё ${response.invalidItems.length - 3}` : '';
-            this.recognitionError = `Некоторые строки не распознаны: ${preview}${suffix}.`;
+          const count = response.taskIds?.length ?? 0;
+          this.actionMessage = count ? `Обработка запущена. Задач: ${count}. Их можно найти в разделе «Мои материалы».` : null;
+          this.reloadTasks();
+          if (response.invalidItems?.length) {
+            this.recognitionError = 'Не удалось добавить: ' + response.invalidItems.slice(0, 3).join(', ')
+              + (response.invalidItems.length > 3 ? ` и ещё ${response.invalidItems.length - 3}.` : '.');
           }
         },
-        error: (err: HttpErrorResponse) => {
-          this.recognitionBatchStarting = false;
-          if (err.status === 401) {
-            this.router.navigate(['/login']);
-            return;
-          }
-
-          const limit = extractUsageLimitResponse(err);
-          if (limit?.message) {
-            this.recognitionError = limit.message;
-            return;
-          }
-
-          console.error('Error starting batch task:', err);
-          this.recognitionError = 'Не удалось запустить задачи. Попробуйте позже.';
-        },
+        error: (error: HttpErrorResponse) => this.handleRecognitionError(error, 'Не удалось запустить обработку списка. Попробуйте снова.'),
       });
   }
 
-  private parseBulkInput(input: string): string[] {
-    const items = input
-      .split(/\r?\n/)
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
-
-    return Array.from(new Set(items));
-  }
-
-  async openVideoDialog(t: YoutubeCaptionTaskDto2): Promise<void> {
-    if (!this.isAuthenticated) {
+  private handleRecognitionError(error: HttpErrorResponse, fallback: string): void {
+    if (error.status === 401) {
+      this.router.navigate(['/login'], { queryParams: { returnUrl: this.router.url } });
       return;
     }
-
-    const { VideoDialogComponent } = await import('../video-dialog/video-dialog.component');
-    const data: VideoDialogData = {
-      videoId: t.id,
-      title: t.title,
-      channelName: t.channelName,
-      channelId: t.channelId,
-      uploadDate: t.uploadDate,
-    };
-    this.dialog.open(VideoDialogComponent, { width: '800px', data });
+    const limit = extractUsageLimitResponse(error);
+    this.recognitionNeedsPayment = !!limit || error.status === 402;
+    const message = limit?.message ?? error.error?.message ?? error.error?.title;
+    this.recognitionError = typeof message === 'string' ? message : fallback;
   }
 
-  private updateDisplayedColumns(): void {
-    const baseColumns = ['status', 'createdAt'];
-
-    if (this.isAuthenticated) {
-      baseColumns.push('youtube');
+  isVideoOpening(id: string): boolean { return this.videoOpening.has(id); }
+  async openVideoDialog(task: YoutubeCaptionTaskDto2): Promise<void> {
+    if (!this.isAuthenticated || this.videoOpening.has(task.id)) return;
+    this.videoOpening.add(task.id);
+    this.videoErrors.delete(task.id);
+    try {
+      // A caption task may have its own ID when the video has several language tracks.
+      const details = /^[a-zA-Z0-9_-]{11}$/.test(task.id) ? null
+        : await firstValueFrom(this.subtitleService.getStatus(task.id).pipe(takeUntilDestroyed(this.destroyRef)));
+      const videoId = details?.videoId || task.id;
+      if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) throw new Error('Missing video ID');
+      const { VideoDialogComponent } = await import('../video-dialog/video-dialog.component');
+      if (this.isDestroyed) return;
+      const data: VideoDialogData = { videoId, title: task.title, channelName: task.channelName,
+        channelId: task.channelId, uploadDate: task.uploadDate };
+      this.dialog.open(VideoDialogComponent, {
+        width: '900px', maxWidth: '95vw', maxHeight: '90vh', panelClass: 'library-dialog-panel', data,
+      });
+    } catch {
+      if (!this.isDestroyed) this.videoErrors.set(task.id, 'Не удалось открыть видео. Попробуйте ещё раз.');
+    } finally {
+      this.videoOpening.delete(task.id);
     }
-
-    baseColumns.push('title', 'channelName');
-
-    if (this.canManageVisibility) {
-      baseColumns.push('visibility');
-    }
-
-    baseColumns.push('result');
-
-    this.displayedColumns = baseColumns;
-  }
-
-  get completedTasksCount(): number {
-    return this.dataSource.data.filter(task => !!task.done).length;
-  }
-
-  get inProgressTasksCount(): number {
-    return this.dataSource.data.filter(task => !task.done && task.status !== RecognizeStatus.Error).length;
-  }
-
-  get failedTasksCount(): number {
-    return this.dataSource.data.filter(task => task.status === RecognizeStatus.Error).length;
   }
 }

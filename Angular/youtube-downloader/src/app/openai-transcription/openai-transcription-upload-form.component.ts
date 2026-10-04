@@ -1,12 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatSelectModule } from '@angular/material/select';
-import { MatTabsModule } from '@angular/material/tabs';
 import {
   OpenAiRecognitionProfileOptionDto,
   OpenAiTranscriptionService,
@@ -23,17 +20,15 @@ type UploadLayout = 'dialog' | 'card';
     CommonModule,
     FormsModule,
     MatDialogModule,
-    MatButtonModule,
     MatIconModule,
-    MatSelectModule,
     MatProgressBarModule,
-    MatTabsModule,
   ],
   templateUrl: './openai-transcription-upload-form.component.html',
   styleUrls: ['./openai-transcription-upload-form.component.css'],
 })
 export class OpenAiTranscriptionUploadFormComponent implements OnInit {
   @Input() layout: UploadLayout = 'dialog';
+  @Input() disabled = false;
   @Output() cancel = new EventEmitter<void>();
   @Output() success = new EventEmitter<OpenAiTranscriptionTaskDto>();
   @Output() limit = new EventEmitter<UsageLimitResponse>();
@@ -78,6 +73,29 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
   profilesError: string | null = null;
   selectedProfileId: number | null = null;
   dragOver = false;
+  readonly fileAccept = 'audio/*,video/*,.aac,.aiff,.flac,.m4a,.m4v,.mkv,.mov,.mp3,.mp4,.oga,.ogg,.wav,.webm,.wma';
+
+  get validFileUrl(): boolean {
+    try { return ['http:', 'https:'].includes(new URL(this.fileUrl.trim()).protocol); }
+    catch { return false; }
+  }
+
+  get selectedFileSize(): string {
+    const bytes = this.selectedFile?.size ?? 0;
+    return bytes < 1024 * 1024
+      ? `${Math.max(1, Math.round(bytes / 1024))} КБ`
+      : `${(bytes / (1024 * 1024)).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} МБ`;
+  }
+
+  chooseSource(index: number): void {
+    if (this.uploading || this.disabled) return;
+    this.selectedTab = index;
+    this.resetErrors();
+  }
+
+  removeFile(): void {
+    if (!this.uploading && !this.disabled) this.handleSelectedFile(null);
+  }
 
   get isDialogLayout(): boolean {
     return this.layout === this.layouts.dialog;
@@ -97,6 +115,7 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
   }
 
   onFileSelected(event: Event): void {
+    if (this.uploading || this.disabled) return;
     const input = event.target as HTMLInputElement;
     const file = input.files && input.files.length > 0 ? input.files[0] : null;
     this.handleSelectedFile(file);
@@ -105,11 +124,16 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
 
   onDrop(event: DragEvent): void {
     event.preventDefault();
-    if (this.uploading || this.profilesLoading) {
+    if (this.uploading || this.disabled) {
       return;
     }
 
     const files = event.dataTransfer?.files;
+    if (files && files.length > 1) {
+      this.dragOver = false;
+      this.uploadError = 'Добавьте один файл. Для следующего создайте отдельную запись.';
+      return;
+    }
     if (!files || files.length === 0) {
       this.dragOver = false;
       return;
@@ -129,10 +153,10 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
   }
 
   onDragOver(event: DragEvent): void {
-    if (this.uploading || this.profilesLoading) {
+    event.preventDefault();
+    if (this.uploading || this.disabled) {
       return;
     }
-    event.preventDefault();
     this.dragOver = true;
   }
 
@@ -175,7 +199,7 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
   }
 
   canSubmit(): boolean {
-    if (this.profilesLoading || this.selectedProfileId == null) {
+    if (this.disabled || this.uploading || this.profilesLoading || !this.profiles.some(profile => profile.id === this.selectedProfileId)) {
       return false;
     }
 
@@ -183,7 +207,7 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
       return !!this.selectedFile;
     }
 
-    return !!this.fileUrl && this.fileUrl.trim().length > 0;
+    return this.validFileUrl;
   }
 
   onProfileSelectionChanged(rawValue: unknown): void {
@@ -251,6 +275,10 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
 
   private handleSuccess(task: OpenAiTranscriptionTaskDto): void {
     this.uploading = false;
+    this.selectedFile = null;
+    this.fileUrl = '';
+    this.clarification = '';
+    this.resetErrors();
     this.uploadingChange.emit(false);
     this.success.emit(task);
   }
@@ -294,6 +322,7 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
   }
 
   private validateSelectedFile(file: File): string | null {
+    if (file.size === 0) return 'Файл пустой. Выберите запись с аудио или видео.';
     const mimeType = (file.type || '').toLowerCase();
     if (mimeType.startsWith('audio/') || mimeType.startsWith('video/')) {
       return null;
@@ -336,7 +365,7 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
     return null;
   }
 
-  private loadRecognitionProfiles(): void {
+  loadRecognitionProfiles(): void {
     this.profilesLoading = true;
     this.profilesError = null;
     this.transcriptionService.listRecognitionProfiles().subscribe({
@@ -345,7 +374,7 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
         this.profiles = profiles;
         this.profilesError = profiles.length === 0 ? 'Нет доступных профилей распознавания.' : null;
         const hasCurrent = profiles.some((profile) => profile.id === this.selectedProfileId);
-        this.selectedProfileId = hasCurrent ? this.selectedProfileId : null;
+        this.selectedProfileId = hasCurrent ? this.selectedProfileId : profiles.length === 1 ? profiles[0].id : null;
         this.applySelectedProfile();
       },
       error: (error) => {

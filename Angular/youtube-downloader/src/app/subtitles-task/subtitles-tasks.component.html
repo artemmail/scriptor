@@ -1,386 +1,59 @@
-<div class="subtitles-page">
-  <main class="page-content">
-    <section class="hero" *ngIf="!isMobile">
-      <div class="hero-text">
-        <h1>Scriptorium</h1>
-        <p class="hero-lead">
-          Scriptorium(lat) - средневековая библиотека. В нашем современном аналоге вы найдете историю уже распознанных YouTube лекций, учебных материалов, подкастов и других материалов, оставленных на конспектирование скриптором.          
-        </p>
-        <ul class="hero-highlights">
-          <li>Тысячи учебных лекций в IT, философии, физике и проч.</li>          
-          <li>Поиск по названию и каналу в очереди</li>        
-          <li>Экспорт в PDF, Word, Markdown, HTML</li>          
-        </ul>
-      </div>
-      <div class="hero-card">
-        <div class="card-header">Статистика очереди</div>
-        <div class="queue-metrics">
-          <div class="metric">
-            <span class="metric-label">Всего задач</span>
-            <span class="metric-value">{{ totalItems | number:'1.0-0' }}</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Отображено</span>
-            <span class="metric-value">{{ completedTasksCount | number:'1.0-0' }}</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">В обработке</span>
-            <span class="metric-value">{{ inProgressTasksCount | number:'1.0-0' }}</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Ошибки</span>
-            <span class="metric-value">{{ failedTasksCount | number:'1.0-0' }}</span>
-          </div>
-        </div>
-        <div class="card-hint">Статистика считает элементы на текущей странице выдачи.</div>
+<div class="ap-page sl-page">
+  <main class="ap-container sl-container">
+    <header class="sl-hero">
+      <div><p class="ap-eyebrow">БИБЛИОТЕКА РАСШИФРОВОК YOUTUBE</p><h1>Скрипторий<span aria-hidden="true">.</span></h1><p class="sl-hero-line">Хорошие мысли.<br><em>Теперь их можно читать.</em></p><p class="sl-hero-description">Лекции, интервью и подкасты в текстовом формате. Найдите знакомую тему или добавьте ролик, который давно хотели разобрать.</p></div>
+      <div class="sl-library-art" aria-hidden="true"><span class="sl-art-label">С ПОЛКИ В РАБОТУ</span><div class="sl-art-book"><span>01</span><strong>Лекции,<br>которые остаются.</strong><b>↗</b></div><div class="sl-art-book"><span>02</span><strong>Разговоры,<br>к которым возвращаются.</strong><b>↗</b></div><div class="sl-art-book"><span>03</span><strong>Мысли,<br>которые становятся идеями.</strong><b>↗</b></div></div>
+    </header>
+
+    <section class="sl-launcher" aria-labelledby="new-video-title">
+      <div class="sl-launcher-copy"><p class="ap-eyebrow">ЕСТЬ СВОЙ РОЛИК?</p><h2 id="new-video-title">Из YouTube — в текст.</h2><p>Вставьте ссылку. Если дорожек субтитров несколько, вы сможете выбрать нужную.</p></div>
+      <div class="sl-launcher-form">
+        <form (ngSubmit)="onStartRecognition()" [attr.aria-busy]="recognitionBusy"><label for="library-youtube-input">Ссылка или ID YouTube-видео</label><div class="sl-launcher-input"><input id="library-youtube-input" name="recognitionInput" [(ngModel)]="recognitionInput" type="text" autocomplete="off" placeholder="https://www.youtube.com/watch?v=…" [disabled]="recognitionBusy" aria-describedby="library-recognition-hint"><button class="ap-button ap-button-lime" type="submit" [disabled]="!recognitionInput.trim() || recognitionBusy">{{ recognitionStarting ? 'Проверяем…' : 'Получить текст' }}<span aria-hidden="true">↗</span></button></div></form>
+        <div class="sl-launcher-foot"><p id="library-recognition-hint">Результат зависит от доступности видео и его субтитров.</p><button *ngIf="canUseBatch" class="sl-light-link" type="button" (click)="onStartRecognitionBatch()" [disabled]="recognitionBusy">{{ recognitionBatchStarting ? 'Запускаем список…' : 'Добавить несколько ↗' }}</button><a *ngIf="!isAuthenticated" class="sl-light-link" routerLink="/login">Войти в аккаунт ↗</a></div>
+        <p class="sl-launcher-error" *ngIf="recognitionError" role="alert">{{ recognitionError }} <a *ngIf="recognitionNeedsPayment" routerLink="/billing">Посмотреть тарифы →</a></p>
+        <mat-progress-bar *ngIf="recognitionBusy" mode="indeterminate" aria-label="Подготовка обработки"></mat-progress-bar>
       </div>
     </section>
+    <div class="sl-success" *ngIf="actionMessage" role="status"><span>{{ actionMessage }}</span><button class="sl-text-button" type="button" (click)="setShowOnlyMine(true)">Мои материалы →</button></div>
 
-    <section class="tasks-section">
-      <div class="quick-recognition">
-        <div class="quick-recognition-copy">
-          <h2>Быстрое распознавание</h2>
-          <p>Добавьте ссылку или идентификатор YouTube — задача появится в очереди.</p>
-        </div>
-        <form class="quick-recognition-form" (ngSubmit)="onStartRecognition()">
-          <label class="quick-recognition-label" for="quick-recognition-input">Ссылка или идентификатор YouTube</label>
-          <div class="quick-recognition-field">
-            <input
-              id="quick-recognition-input"
-              name="recognitionInput"
-              type="text"
-              [(ngModel)]="recognitionInput"
-              placeholder="https://youtube.com/..."
-              autocomplete="off"
-            />
-            <button
-              class="quick-recognition-button"
-              type="submit"
-              [disabled]="!recognitionInput.trim() || recognitionStarting || recognitionBatchStarting"
-            >
-              {{ recognitionStarting ? 'Запуск...' : 'Запустить' }}
-            </button>
-            <button
-              class="quick-recognition-button secondary"
-              type="button"
-              (click)="onStartRecognitionBatch()"
-              [disabled]="recognitionStarting || recognitionBatchStarting"
-            >
-              {{ recognitionBatchStarting ? 'Запуск...' : 'Списком' }}
-            </button>
+    <section class="sl-catalog" aria-labelledby="catalog-title">
+      <div class="sl-catalog-heading"><div><p class="ap-eyebrow">НАХОДИТЕ. ЧИТАЙТЕ. ИСПОЛЬЗУЙТЕ.</p><h2 id="catalog-title">{{ showOnlyMine ? 'Мои материалы' : userIdFilter ? 'Подборка пользователя' : 'Откройте что-то интересное' }}</h2></div><span class="sl-catalog-total" *ngIf="!loading && !listError">{{ totalItems | number:'1.0-0' }} <small>{{ filterValue.trim() ? 'по запросу' : 'в подборке' }}</small></span></div>
+      <div class="sl-tools">
+        <div class="sl-search"><mat-icon aria-hidden="true">search</mat-icon><input #filterInput id="library-search" type="search" [(ngModel)]="filterValue" (ngModelChange)="onSearchChange()" placeholder="Тема, название ролика или канал…" autocomplete="off" aria-label="Поиск материалов по названию или каналу"><button class="sl-icon-button" type="button" *ngIf="filterValue" (click)="clearFilter(filterInput)" aria-label="Очистить поиск"><mat-icon aria-hidden="true">close</mat-icon></button></div>
+        <div class="sl-sort"><label for="library-sort">Порядок</label><select id="library-sort" [(ngModel)]="sortValue" (ngModelChange)="reloadTasks()"><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="title">По названию</option><option value="channel">По каналу</option><option value="status">По этапу обработки</option></select></div>
+        <div class="sl-view-switch" aria-label="Вид библиотеки"><button type="button" (click)="viewMode = 'cards'" [class.sl-selected]="viewMode === 'cards'" [attr.aria-pressed]="viewMode === 'cards'" aria-label="Карточки"><mat-icon aria-hidden="true">grid_view</mat-icon></button><button type="button" (click)="viewMode = 'list'" [class.sl-selected]="viewMode === 'list'" [attr.aria-pressed]="viewMode === 'list'" aria-label="Компактный список"><mat-icon aria-hidden="true">view_list</mat-icon></button></div>
+      </div>
+      <div class="sl-scope-row"><nav class="sl-scope" aria-label="Подборка материалов"><button type="button" (click)="setShowOnlyMine(false)" [class.sl-selected]="!userIdFilter" [attr.aria-pressed]="!userIdFilter">Вся библиотека</button><button *ngIf="isAuthenticated" type="button" (click)="setShowOnlyMine(true)" [class.sl-selected]="showOnlyMine" [attr.aria-pressed]="showOnlyMine">Мои материалы</button><span class="sl-user-scope" *ngIf="userIdFilter && !showOnlyMine">Выбран пользователь</span></nav><button class="sl-text-button sl-refresh" type="button" (click)="reloadTasks()" [disabled]="loading || loadingMore"><mat-icon aria-hidden="true">refresh</mat-icon>Обновить</button></div>
+      <div class="sl-list-summary" *ngIf="tasks.length && !loading"><span>Загружено {{ tasks.length }} из {{ totalItems | number:'1.0-0' }}</span><div aria-label="Состояния загруженных материалов"><span><i class="sl-dot sl-dot-ready" aria-hidden="true"></i>{{ completedTasksCount }} готовы</span><span *ngIf="inProgressTasksCount"><i class="sl-dot" aria-hidden="true"></i>{{ inProgressTasksCount }} в работе</span><span *ngIf="failedTasksCount"><i class="sl-dot sl-dot-error" aria-hidden="true"></i>{{ failedTasksCount }} с ошибкой</span></div></div>
+
+      <div class="sl-skeleton-grid" *ngIf="loading" role="status" aria-label="Загрузка библиотеки"><div class="sl-skeleton-card" *ngFor="let skeleton of skeletonCards" aria-hidden="true"><i></i><b></b><b></b><span></span><span></span><em></em></div></div>
+      <div class="sl-load-error" *ngIf="listError" role="alert"><mat-icon aria-hidden="true">cloud_off</mat-icon><div><h3>Не получилось загрузить материалы</h3><p>{{ listError }}</p></div><button class="ap-button ap-button-outline" type="button" (click)="retryList()">Попробовать снова</button></div>
+
+      <div class="sl-cards" [class.sl-list-view]="viewMode === 'list'" *ngIf="!loading && tasks.length">
+        <article class="sl-card" *ngFor="let task of tasks; trackBy: trackTask" [class.sl-card-error]="task.status === RecognizeStatus.Error">
+          <div class="sl-card-main"><div class="sl-card-top"><span class="sl-status" [class.sl-status-ready]="isCompleted(task)" [class.sl-status-error]="task.status === RecognizeStatus.Error"><i aria-hidden="true"></i>{{ isCompleted(task) ? 'Готово к чтению' : getStatusText(task.status) }}</span><button *ngIf="isAuthenticated" class="sl-play" type="button" (click)="openVideoDialog(task)" [disabled]="isVideoOpening(task.id)" [attr.aria-label]="'Смотреть видео: ' + (task.title || 'Без названия')" title="Смотреть видео"><mat-icon aria-hidden="true">{{ isVideoOpening(task.id) ? 'hourglass_top' : 'play_arrow' }}</mat-icon></button></div>
+            <h3><a [routerLink]="['/recognized', taskLink(task)]">{{ task.title || 'Видео без названия' }}</a></h3>
+            <div class="sl-card-meta"><button *ngIf="task.channelName" class="sl-channel" type="button" (click)="searchChannel(task.channelName)" [attr.aria-label]="'Найти материалы канала ' + task.channelName">{{ task.channelName }}</button><span *ngIf="!task.channelName">Канал не указан</span><span class="sl-card-date">{{ task.createdAt | localTime:'dd.MM.yyyy' }}</span></div>
+            <span class="sl-visibility-label" *ngIf="task.visibility !== Visibility.Public"><mat-icon aria-hidden="true">visibility_off</mat-icon>{{ task.visibility === Visibility.Deleted ? 'Удалено из общей ленты' : 'Скрыто из общей ленты' }}</span>
           </div>
-          <p class="quick-recognition-error" *ngIf="recognitionError">{{ recognitionError }}</p>
-        </form>
+
+          <div class="sl-card-body">
+            <ng-container *ngIf="isCompleted(task); else notComplete"><p class="sl-excerpt" [class.sl-excerpt-expanded]="expandedTasks.has(task.id)" [id]="'excerpt-' + task.id">{{ task.resultShort || 'Расшифровка готова. Откройте документ, чтобы прочитать полный текст.' }}</p><button class="sl-preview-button" *ngIf="task.resultShort && task.resultShort.length > 220" type="button" (click)="toggleExpand(task.id)" [attr.aria-expanded]="expandedTasks.has(task.id)" [attr.aria-controls]="'excerpt-' + task.id">{{ expandedTasks.has(task.id) ? 'Свернуть фрагмент' : 'Развернуть фрагмент' }}<mat-icon aria-hidden="true">{{ expandedTasks.has(task.id) ? 'expand_less' : 'expand_more' }}</mat-icon></button></ng-container>
+            <ng-template #notComplete><div *ngIf="task.status === RecognizeStatus.Error; else inProgress" class="sl-task-error"><p>Не удалось завершить обработку.</p><details *ngIf="task.error"><summary>Причина ошибки</summary><p>{{ task.error }}</p></details></div><ng-template #inProgress><div class="sl-processing"><p>Готовим текст. Статус обновится автоматически.</p><mat-progress-bar *ngIf="task.segmentsTotal > 0; else unknownProgress" mode="determinate" [value]="taskProgress(task)" aria-label="Прогресс обработки фрагментов"></mat-progress-bar><ng-template #unknownProgress><mat-progress-bar mode="indeterminate" aria-label="Обработка видео"></mat-progress-bar></ng-template><small *ngIf="task.segmentsTotal > 0">Фрагментов обработано: {{ task.segmentsProcessed }} из {{ task.segmentsTotal }}</small></div></ng-template></ng-template>
+            <p class="sl-card-action-error" *ngIf="visibilityErrors.get(task.id)" role="alert">{{ visibilityErrors.get(task.id) }}</p><p class="sl-card-action-error" *ngIf="videoErrors.get(task.id)" role="alert">{{ videoErrors.get(task.id) }}</p>
+          </div>
+
+          <footer class="sl-card-footer"><a class="sl-read-link" [routerLink]="['/recognized', taskLink(task)]">{{ isCompleted(task) ? 'Читать расшифровку' : 'Открыть задачу' }} <span aria-hidden="true">↗</span></a><button *ngIf="canManageCurrentScope" class="sl-icon-button" type="button" (click)="toggleTaskVisibility(task)" [disabled]="isVisibilityUpdating(task.id) || task.visibility === Visibility.Deleted" [attr.aria-label]="task.visibility === Visibility.Hidden ? 'Показать в общей ленте' : 'Скрыть из общей ленты'" [title]="task.visibility === Visibility.Hidden ? 'Показать в общей ленте' : 'Скрыть из общей ленты'"><mat-icon aria-hidden="true">{{ isVisibilityUpdating(task.id) ? 'hourglass_top' : task.visibility === Visibility.Hidden ? 'visibility_off' : 'visibility' }}</mat-icon></button></footer>
+        </article>
       </div>
 
-      <mat-card *ngIf="!isMobile" class="tasks-card">
-        <mat-card-header>
-          <mat-card-title>Очередь распознавания</mat-card-title>
-          <mat-card-subtitle>Отсортируйте список, воспользуйтесь поиском или раскройте карточку, чтобы увидеть превью.</mat-card-subtitle>
-        </mat-card-header>
+      <div class="sl-empty" *ngIf="!loading && !listError && !tasks.length"><span aria-hidden="true">{{ filterValue.trim() ? '↳' : '≋' }}</span><h3>{{ filterValue.trim() ? 'Пока ничего не нашли' : showOnlyMine ? 'Здесь будут ваши материалы' : 'В этой подборке пока пусто' }}</h3><p>{{ filterValue.trim() ? 'Попробуйте другое название, тему или имя канала.' : 'Добавьте ссылку на YouTube-видео, чтобы получить первую расшифровку.' }}</p><button class="ap-button ap-button-outline" *ngIf="filterValue.trim()" type="button" (click)="clearFilter(filterInput)">Сбросить поиск</button><a class="sl-text-link" *ngIf="userIdFilter" routerLink="/Scriptorium">Открыть всю библиотеку →</a></div>
 
-        <mat-card-content>
-          <div
-            class="table-scroll"
-            infiniteScroll
-            [scrollWindow]="true"
-            [infiniteScrollDistance]="1"
-            [infiniteScrollThrottle]="200"
-            (scrolled)="onScrollDown()"
-          >
-            <div class="filter-toolbar">
-              <label class="filter-label" for="tasks-filter-input">Фильтр по названию или каналу</label>
-              <div class="filter-field">
-                <input
-                  #filterInput
-                  id="tasks-filter-input"
-                  type="text"
-                  [value]="filterValue"
-                  (input)="applyFilter($event)"
-                  placeholder="Начните печатать..."
-                  autocomplete="off"
-                />
-                <button
-                  *ngIf="filterValue"
-                  type="button"
-                  class="filter-reset-btn"
-                  (click)="clearFilter(filterInput)"
-                >
-                  Очистить
-                </button>
-              </div>
-              <div class="filter-options" *ngIf="isAuthenticated">
-                <label class="filter-option">
-                  <input
-                    type="checkbox"
-                    [checked]="showOnlyMine"
-                    (change)="onShowOnlyMineChange($event)"
-                    aria-label="Показать только собственные ролики"
-                  />
-                  <span>Только мои</span>
-                </label>
-              </div>
-            </div>
-
-            <app-yandex-ad></app-yandex-ad>
-
-            <table
-              mat-table
-              [dataSource]="dataSource"
-              matSort
-              (matSortChange)="onSortChange($event)"
-              class="custom-table"
-            >
-              <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header="status">Статус</th>
-                <td mat-cell *matCellDef="let task">
-                  <mat-icon [ngClass]="getStatusClass(task.status)">{{ getStatusIcon(task.status) }}</mat-icon>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="createdAt">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header="createdAt">Создано</th>
-                <td mat-cell *matCellDef="let task">
-                  {{ task.createdAt | localTime:'yyyy-MM-dd HH:mm:ss' }}
-                </td>
-              </ng-container>
-
-              <ng-container *ngIf="isAuthenticated" matColumnDef="youtube">
-                <th mat-header-cell *matHeaderCellDef>Видео</th>
-                <td mat-cell *matCellDef="let task">
-                  <button class="youtube-logo-button" matRipple (click)="openVideoDialog(task)">
-                    <img src="assets/yt.webp" alt="YouTube" class="youtube-logo">
-                  </button>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="title">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header="title">Название видео</th>
-                <td mat-cell *matCellDef="let task">
-                  <a [routerLink]="['/recognized', task.slug]">{{ task.title }}</a>
-                </td>
-              </ng-container>
-
-              
-              <ng-container matColumnDef="channelName">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header="channelName">Канал</th>
-                <td mat-cell *matCellDef="let task">{{ task.channelName }}</td>
-              </ng-container>
-
-              <ng-container *ngIf="canManageVisibility" matColumnDef="visibility">
-                <th mat-header-cell *matHeaderCellDef>В общей ленте</th>
-                <td mat-cell *matCellDef="let task">
-                  <button
-                    type="button"
-                    class="visibility-toggle"
-                    mat-icon-button
-                    (click)="toggleTaskVisibility(task)"
-                    [disabled]="isVisibilityUpdating(task.id) || task.visibility === Visibility.Deleted"
-                    [attr.aria-label]="getVisibilityActionLabel(task)"
-                    [attr.title]="getVisibilityActionLabel(task)"
-                  >
-                    <mat-icon
-                      [ngClass]="{
-                        'visibility-hidden': task.visibility === Visibility.Hidden,
-                        'visibility-deleted': task.visibility === Visibility.Deleted
-                      }"
-                    >
-                      {{ getVisibilityIcon(task) }}
-                    </mat-icon>
-                  </button>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="result">
-                <th mat-header-cell *matHeaderCellDef>Результат</th>
-                <td mat-cell *matCellDef="let task">
-                  <ng-container *ngIf="!task.done; else doneTemplate">
-                    <ng-container *ngIf="task.status === RecognizeStatus.Error; else processingTemplate">
-                      <p class="error-text">Ошибка: {{ task.error }}</p>
-                    </ng-container>
-                    <ng-template #processingTemplate>
-                      <p class="status-text">{{ getStatusText(task.status) }}</p>
-                      <mat-progress-bar
-                        *ngIf="task.status === RecognizeStatus.ApplyingPunctuationSegment"
-                        mode="determinate"
-                        [value]="taskProgress(task)"
-                      ></mat-progress-bar>
-                      <p *ngIf="task.status === RecognizeStatus.ApplyingPunctuationSegment" class="status-progress">
-                        {{ task.segmentsProcessed }} / {{ task.segmentsTotal }}
-                      </p>
-                    </ng-template>
-                  </ng-container>
-
-                  <ng-template #doneTemplate>
-                    <div class="markdown-container" [ngClass]="{ collapsed: !isExpanded(task.id) }">
-                      <markdown [data]="task.resultShort"></markdown>
-                    </div>
-                    <div class="actions">
-                      <button
-                        type="button"
-                        class="expand-toggle"
-                        mat-icon-button
-                        (click)="toggleExpand(task.id)"
-                        [attr.aria-label]="isExpanded(task.id) ? 'Свернуть расшифровку' : 'Развернуть расшифровку'"
-                      >
-                        <mat-icon>{{ isExpanded(task.id) ? 'expand_less' : 'expand_more' }}</mat-icon>
-                      </button>
-                      <a [routerLink]="['/recognized', task.slug]" class="recognized-link">
-                        <mat-icon aria-hidden="true">open_in_new</mat-icon>
-                        <span>Полная версия</span>
-                      </a>
-                    </div>
-                  </ng-template>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-            </table>
-
-            <mat-spinner *ngIf="loading"></mat-spinner>
-          </div>
-        </mat-card-content>
-      </mat-card>
-
-      <div
-        *ngIf="isMobile"
-        class="mobile-tasks"
-        infiniteScroll
-        [scrollWindow]="true"
-        [infiniteScrollDistance]="1"
-        [infiniteScrollThrottle]="200"
-        (scrolled)="onScrollDown()"
-      >
-        <div class="mobile-header-bar">
-          <h2 class="mobile-heading">Очередь распознавания</h2>
-          <p class="mobile-subtitle">Фильтруйте список и открывайте расшифровки без лишних блоков.</p>
-        </div>
-
-        <div class="filter-toolbar mobile-toolbar">
-          <label class="filter-label" for="tasks-filter-input-mobile">Фильтр по названию или каналу</label>
-          <div class="filter-field">
-            <input
-              #mobileFilterInput
-              id="tasks-filter-input-mobile"
-              type="text"
-              [value]="filterValue"
-              (input)="applyFilter($event)"
-              placeholder="Начните печатать..."
-              autocomplete="off"
-            />
-            <button
-              *ngIf="filterValue"
-              type="button"
-              class="filter-reset-btn"
-              (click)="clearFilter(mobileFilterInput)"
-            >
-              Очистить
-            </button>
-          </div>
-          <div class="filter-options" *ngIf="isAuthenticated">
-            <label class="filter-option">
-              <input
-                type="checkbox"
-                [checked]="showOnlyMine"
-                (change)="onShowOnlyMineChange($event)"
-                aria-label="Показать только собственные ролики"
-              />
-              <span>Только мои</span>
-            </label>
-          </div>
-        </div>
-
-        <app-yandex-ad></app-yandex-ad>
-
-        <div class="mobile-list">
-          <article class="mobile-task" *ngFor="let task of dataSource.data">
-            <header class="mobile-task-header">
-              <button
-                *ngIf="isAuthenticated"
-                class="youtube-logo-button mobile-youtube-button"
-                matRipple
-                (click)="openVideoDialog(task)"
-              >
-                <img src="assets/yt.webp" alt="YouTube" class="youtube-logo">
-              </button>
-              <button
-                *ngIf="canManageVisibility"
-                class="visibility-toggle mobile-visibility-toggle"
-                type="button"
-                mat-icon-button
-                [disabled]="isVisibilityUpdating(task.id) || task.visibility === Visibility.Deleted"
-                (click)="toggleTaskVisibility(task)"
-                [attr.aria-label]="getVisibilityActionLabel(task)"
-                [attr.title]="getVisibilityActionLabel(task)"
-              >
-                <mat-icon
-                  [ngClass]="{
-                    'visibility-hidden': task.visibility === Visibility.Hidden,
-                    'visibility-deleted': task.visibility === Visibility.Deleted
-                  }"
-                >
-                  {{ getVisibilityIcon(task) }}
-                </mat-icon>
-              </button>
-              <div class="mobile-task-meta">
-                <a [routerLink]="['/recognized', task.slug]" class="mobile-task-title">{{ task.title }}</a><br>
-                <span class="mobile-task-channel">Канал: {{ task.channelName }}  </span>
-                <span class="mobile-task-date">{{ task.createdAt | localTime:'yyyy-MM-dd HH:mm' }}</span>
-                <span
-                  *ngIf="task.visibility !== Visibility.Public"
-                  class="mobile-visibility-status"
-                  [ngClass]="{ 'mobile-visibility-deleted': task.visibility === Visibility.Deleted }"
-                >
-                  {{ task.visibility === Visibility.Deleted ? 'Удалено из ленты' : 'Скрыто из ленты' }}
-                </span>
-              </div>
-            </header>
-
-            <section class="mobile-task-body">
-              <ng-container *ngIf="!task.done; else mobileDone">
-                <ng-container *ngIf="task.status === RecognizeStatus.Error; else mobileProcess">
-                  <p class="error-text">Ошибка: {{ task.error }}</p>
-                </ng-container>
-                <ng-template #mobileProcess>
-                  <p class="status-text">{{ getStatusText(task.status) }}</p>
-                  <mat-progress-bar
-                    *ngIf="task.status === RecognizeStatus.ApplyingPunctuationSegment"
-                    mode="determinate"
-                    [value]="taskProgress(task)"
-                  ></mat-progress-bar>
-                  <p *ngIf="task.status === RecognizeStatus.ApplyingPunctuationSegment" class="status-progress">
-                    {{ task.segmentsProcessed }} / {{ task.segmentsTotal }}
-                  </p>
-                </ng-template>
-              </ng-container>
-
-              <ng-template #mobileDone>
-                <div class="markdown-container" [ngClass]="{ collapsed: !isExpanded(task.id) }">
-                  <markdown [data]="task.resultShort"></markdown>
-                </div>
-                <div class="actions mobile-actions">
-                  <button
-                    type="button"
-                    class="expand-toggle"
-                    mat-icon-button
-                    (click)="toggleExpand(task.id)"
-                    [attr.aria-label]="isExpanded(task.id) ? 'Свернуть расшифровку' : 'Развернуть расшифровку'"
-                  >
-                    <mat-icon>{{ isExpanded(task.id) ? 'expand_less' : 'expand_more' }}</mat-icon>
-                  </button>
-                  <a [routerLink]="['/recognized', task.slug]" class="recognized-link">
-                    <mat-icon aria-hidden="true">open_in_new</mat-icon>
-                    <span>Полная версия</span>
-                  </a>
-                </div>
-              </ng-template>
-            </section>
-          </article>
-        </div>
-
-        <mat-spinner *ngIf="loading"></mat-spinner>
-      </div>
+      <div class="sl-pagination" *ngIf="tasks.length && !loading"><button class="ap-button ap-button-outline" *ngIf="hasMore" type="button" (click)="loadMore()" [disabled]="loadingMore">{{ loadingMore ? 'Загружаем…' : 'Показать ещё' }}<span aria-hidden="true">↓</span></button><span>{{ hasMore ? 'Вы выбираете, сколько материалов открыть.' : 'Все материалы этой подборки загружены.' }}</span><mat-progress-bar *ngIf="loadingMore" mode="indeterminate" aria-label="Загрузка следующих материалов"></mat-progress-bar></div>
     </section>
+
+    <aside class="sl-own-recording"><span aria-hidden="true">≋</span><div><h2>А если запись — ваша?</h2><p>Загрузите аудио или видео, выберите профиль постобработки и получите документ.</p></div><a class="ap-button ap-button-dark" routerLink="/transcriptions">Расшифровать свой файл <span aria-hidden="true">↗</span></a></aside>
+    <div class="sl-ad"><app-yandex-ad></app-yandex-ad></div>
+    <footer class="ap-bottom"><span>YouScriptor · Знания, к которым удобно возвращаться</span><nav aria-label="Полезные ссылки"><a routerLink="/">На главную</a><a routerLink="/transcriptions">Мои записи</a><a routerLink="/blog">Новости сайта</a></nav></footer>
   </main>
 </div>

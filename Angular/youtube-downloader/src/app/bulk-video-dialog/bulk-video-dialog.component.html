@@ -1,22 +1,13 @@
-<h2 mat-dialog-title>Добавить список видео</h2>
+<header class="bulk-dialog-header">
+  <div><p>СПИСОК РОЛИКОВ</p><h2 mat-dialog-title>Добавить несколько видео</h2></div>
+  <button type="button" class="bulk-close" (click)="cancel()" aria-label="Закрыть">×</button>
+</header>
 <div mat-dialog-content class="bulk-dialog-content">
-  <p>Вставьте ссылки или ID YouTube — по одной строке.</p>
-  <textarea
-    class="bulk-dialog-textarea"
-    rows="8"
-    [(ngModel)]="inputValue"
-    placeholder="https://youtube.com/..."
-  ></textarea>
+  <p>Вставьте ссылки или ID YouTube: один ролик на строку. Перед запуском для каждого ролика с несколькими субтитрами можно выбрать дорожку.</p>
+  <label for="bulk-video-input">Ссылки на видео</label>
+  <textarea id="bulk-video-input" class="bulk-dialog-textarea" rows="8" [(ngModel)]="inputValue" placeholder="https://youtube.com/watch?v=…&#10;https://youtube.com/watch?v=…"></textarea>
 </div>
-<div mat-dialog-actions align="end" class="bulk-dialog-actions">
+<div mat-dialog-actions class="bulk-dialog-actions">
   <button mat-button type="button" (click)="cancel()">Отмена</button>
-  <button
-    mat-raised-button
-    color="primary"
-    type="button"
-    (click)="submit()"
-    [disabled]="!inputValue.trim()"
-  >
-    Ок
-  </button>
+  <button mat-flat-button type="button" (click)="submit()" [disabled]="!inputValue.trim()">Продолжить <span aria-hidden="true">↗</span></button>
 </div>

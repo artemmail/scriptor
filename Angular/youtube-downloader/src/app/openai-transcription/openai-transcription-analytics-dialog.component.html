@@ -1,41 +1,13 @@
-<h2 mat-dialog-title>Запустить аналитику</h2>
-<div mat-dialog-content class="dialog-content">
-  <p class="dialog-description">
-    Выберите профиль пост-обработки и при необходимости укажите уточнение. Мы скопируем исходную
-    задачу и запустим новую обработку сегментов без повторного распознавания аудио.
-  </p>
-
-  <mat-form-field appearance="outline" class="full-width">
-    <mat-label>Профиль распознавания</mat-label>
-    <mat-select
-      [value]="selectedProfileId"
-      (valueChange)="onProfileSelectionChanged($event)"
-      [disabled]="profilesLoading || !profiles.length"
-    >
-      <mat-option *ngFor="let profile of profiles" [value]="profile.id">
-        {{ profile.displayedName || profile.name }}
-      </mat-option>
-    </mat-select>
-    <mat-hint *ngIf="clarificationHint">{{ clarificationHint }}</mat-hint>
-  </mat-form-field>
-
-  <mat-form-field appearance="outline" class="full-width">
-    <mat-label>Уточнение для обработки</mat-label>
-    <textarea
-      matInput
-      rows="3"
-      [(ngModel)]="clarification"
-      [placeholder]="clarificationPlaceholder"
-    ></textarea>
-  </mat-form-field>
-
-  <mat-progress-bar *ngIf="profilesLoading" mode="indeterminate"></mat-progress-bar>
-  <div class="error" *ngIf="profilesError">{{ profilesError }}</div>
-</div>
-
-<div mat-dialog-actions align="end">
-  <button mat-button type="button" (click)="onCancel()" [disabled]="profilesLoading">Отмена</button>
-  <button mat-flat-button color="primary" type="button" (click)="onConfirm()" [disabled]="!canSubmit()">
-    Запустить
-  </button>
-</div>
+<header class="ta-header"><div><p>ЕЩЁ ОДИН ВЗГЛЯД НА ЗАПИСЬ</p><h2 mat-dialog-title>Новая постобработка</h2></div><button class="ta-close" type="button" mat-dialog-close aria-label="Закрыть">×</button></header>
+<mat-dialog-content class="ta-content">
+  <p class="ta-intro">Создадим отдельную задачу на основе готовой расшифровки. Исходный результат сохранится, повторно распознавать аудио не потребуется.</p>
+  <label for="analytics-profile">Что хотите получить?</label>
+  <select id="analytics-profile" [ngModel]="selectedProfileId" (ngModelChange)="onProfileSelectionChanged($event)" [disabled]="profilesLoading || !profiles.length"><option [ngValue]="null" disabled>{{ profilesLoading ? 'Загружаем профили…' : 'Выберите профиль' }}</option><option *ngFor="let profile of profiles" [ngValue]="profile.id">{{ profile.displayedName || profile.name }}</option></select>
+  <p class="ta-profile-hint" *ngIf="selectedProfile?.hint">{{ selectedProfile?.hint }}</p>
+  <label for="analytics-clarification">Ваши указания <span>необязательно</span></label>
+  <textarea id="analytics-clarification" rows="4" [(ngModel)]="clarification" [placeholder]="clarificationPlaceholder"></textarea>
+  <p class="ta-hint" *ngIf="clarificationHint">{{ clarificationHint }}</p>
+  <mat-progress-bar *ngIf="profilesLoading" mode="indeterminate" aria-label="Загрузка профилей"></mat-progress-bar>
+  <div class="ta-error" *ngIf="profilesError" role="alert">{{ profilesError }}<button type="button" (click)="loadProfiles()" [disabled]="profilesLoading">Попробовать снова</button></div>
+</mat-dialog-content>
+<mat-dialog-actions class="ta-actions"><button type="button" class="ta-button ta-secondary" (click)="onCancel()">Отмена</button><button type="button" class="ta-button ta-primary" (click)="onConfirm()" [disabled]="!canSubmit()">Создать обработку <span aria-hidden="true">↗</span></button></mat-dialog-actions>

@@ -94,6 +94,7 @@ html, body {
 @media (max-width: 900px) {
   .account-nav a, .account-nav button { padding-inline: 10px; font-size: 12px; }
   .account-nav .account-workspace-link { display: none; }
+  .account-nav .account-scriptorium-link { display: none; }
 }
 
 @media (max-width: 600px) {

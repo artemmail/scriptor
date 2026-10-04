@@ -1,435 +1,110 @@
-<div class="transcription-page">
-  <app-transcription-hero
-    class="transcription-hero"
-    [title]="heroTitle"
-    [lead]="heroLead"
-    [highlights]="heroHighlights"
-    [showSubscriptionStatus]="true"
-    [summaryLoading]="summaryLoading"
-    [subscriptionChipClass]="subscriptionChipClass"
-    [subscriptionStatusMessage]="subscriptionStatusMessage"
-    [fullWidth]="true"
-    [cardless]="true"
-    (billingClick)="navigateToBilling()"
-  >
-    <app-openai-transcription-upload-form
-      layout="card"
-      (success)="handleUploadSuccess($event)"
-      (limit)="handleUsageLimit($event)"
-      (uploadingChange)="onUploadStateChange($event)"
-    ></app-openai-transcription-upload-form>
-  </app-transcription-hero>
+<div class="ap-page tx-page">
+  <main class="ap-container tx-container">
+    <header class="tx-header">
+      <div><p class="ap-eyebrow">ВАШИ ЗАПИСИ → ГОТОВЫЕ ДОКУМЕНТЫ</p><h1>Мои расшифровки<span class="tx-title-dot" aria-hidden="true">.</span></h1><p>Загрузите разговор. Получите текст, структуру и выводы.</p></div>
+      <div class="tx-header-actions"><a class="tx-quota" routerLink="/billing" *ngIf="summary && !summaryLoading"><span>Доступно для записей</span><strong>{{ remainingMinutesLabel }} <span aria-hidden="true">↗</span></strong></a><span class="tx-subtle" *ngIf="summaryLoading">Загружаем баланс…</span><button class="ap-button ap-button-lime" type="button" (click)="toggleUpload()" [disabled]="uploading || taskActionBusy" [attr.aria-expanded]="uploadExpanded" aria-controls="transcription-uploader"><mat-icon aria-hidden="true">{{ uploadExpanded ? 'close' : 'add' }}</mat-icon>{{ uploadExpanded ? 'Скрыть форму' : 'Новая запись' }}</button></div>
+    </header>
+    <div class="tx-notice" *ngIf="summaryError"><span>{{ summaryError }}</span><button type="button" class="tx-text-button" (click)="loadSubscriptionSummary()">Повторить</button></div>
 
-  <main class="page-content">
-    <section class="workspace">
-      <div class="section-header">
-        <h2>Рабочая область</h2>
-        <p>Следите за прогрессом распознавания, возобновляйте остановленные задачи и скачивайте готовые результаты.</p>
-      </div>
-      <div class="workspace-grid">
-        <div class="panel tasks-panel">
-          <div class="panel-header">
-            <h3>Мои расшифровки</h3>
-            <div class="panel-header-actions">
-              <button
-                class="panel-refresh-button"
-                type="button"
-                (click)="loadTasks()"
-                [disabled]="uploading || adminRestartInProgress"
-                aria-label="Обновить список"
-              >
-                <mat-icon aria-hidden="true">refresh</mat-icon>
-                <span>Обновить</span>
-              </button>
-            </div>
-          </div>
-          <div class="panel-body">
-            <div class="admin-toolbar" *ngIf="canShowAllTasks">
-              <mat-checkbox
-                class="show-all-checkbox"
-                [checked]="isShowingAllTasks"
-                (change)="onShowAllChange($event.checked)"
-              >
-                Все пользователи
-              </mat-checkbox>
-              <button
-                class="admin-toolbar__restart"
-                type="button"
-                (click)="restartStoppedTasksAsAdmin()"
-                [disabled]="uploading || adminRestartInProgress"
-              >
-                <mat-icon aria-hidden="true">restart_alt</mat-icon>
-                <span>Перезапустить остановленные</span>
-              </button>
-              <mat-progress-spinner
-                *ngIf="adminRestartInProgress"
-                mode="indeterminate"
-                diameter="20"
-                class="inline-spinner"
-              ></mat-progress-spinner>
-            </div>
-            <div class="error" *ngIf="listError">{{ listError }}</div>
-            <div class="error" *ngIf="adminRestartError">{{ adminRestartError }}</div>
-            <mat-action-list class="tasks-list" *ngIf="tasks.length; else emptyTasks">
-              <button
-                mat-list-item
-                type="button"
-                lines="3"
-                class="task-item"
-                *ngFor="let task of tasks; trackBy: trackTask"
-                (click)="selectTask(task)"
-                [class.active]="task.id === selectedTaskId"
-                [attr.aria-current]="task.id === selectedTaskId ? 'true' : null"
-              >
-                <mat-icon matListItemIcon>{{ getTaskIcon(task) }}</mat-icon>
-                <span matListItemTitle class="task-title">
-                  <span class="task-email" *ngIf="isAdmin && task.createdByEmail">{{ task.createdByEmail }}</span>
-                  <span class="task-display-name">{{ task.displayName }}</span>
-                </span>
-                <span matListItemLine class="task-summary">{{ getTaskProgressSummary(task) }}</span>
-                <span matListItemLine class="task-updated">{{ task.modifiedAt | localTime }}</span>
-              </button>
-            </mat-action-list>
-            <ng-template #emptyTasks>
-              <div class="empty-state">
-                <h4>Здесь появятся ваши файлы</h4>
-                <p>Загрузите первый документ, чтобы начать распознавание.</p>
-              </div>
-            </ng-template>
-          </div>
+    <section id="transcription-uploader" #uploadPanel class="tx-uploader" [hidden]="!uploadExpanded" aria-label="Создать расшифровку">
+      <app-openai-transcription-upload-form layout="card" [disabled]="taskActionBusy" (success)="handleUploadSuccess($event)" (limit)="handleUsageLimit($event)" (uploadingChange)="onUploadStateChange($event)"></app-openai-transcription-upload-form>
+    </section>
+
+    <section class="tx-workspace" [class.tx-mobile-detail]="mobileDetailsOpen" aria-label="Библиотека записей">
+      <aside class="tx-library" aria-labelledby="library-title">
+        <div class="tx-library-heading"><div><p class="ap-eyebrow">БИБЛИОТЕКА</p><h2 id="library-title">{{ isShowingAllTasks ? 'Все пользователи' : 'Ваши записи' }} <span>{{ tasks.length }}</span></h2></div><button class="tx-icon-button" type="button" (click)="loadTasks()" [disabled]="listLoading || taskActionBusy || adminRestartInProgress" aria-label="Обновить список"><mat-icon aria-hidden="true">refresh</mat-icon></button></div>
+        <div class="tx-search"><mat-icon aria-hidden="true">search</mat-icon><input type="search" [(ngModel)]="searchQuery" (ngModelChange)="visibleTaskLimit = 25" placeholder="Найти запись…" aria-label="Поиск по названию, файлу или профилю"></div>
+        <div class="tx-filters" aria-label="Фильтр записей по состоянию">
+          <button type="button" (click)="setTaskFilter('all')" [class.tx-filter-active]="taskFilter === 'all'" [attr.aria-pressed]="taskFilter === 'all'">Все <span>{{ tasks.length }}</span></button>
+          <button type="button" (click)="setTaskFilter('active')" [class.tx-filter-active]="taskFilter === 'active'" [attr.aria-pressed]="taskFilter === 'active'">В работе <span>{{ activeTaskCount }}</span></button>
+          <button type="button" (click)="setTaskFilter('done')" [class.tx-filter-active]="taskFilter === 'done'" [attr.aria-pressed]="taskFilter === 'done'">Готово <span>{{ doneTaskCount }}</span></button>
+          <button type="button" (click)="setTaskFilter('error')" [class.tx-filter-active]="taskFilter === 'error'" [attr.aria-pressed]="taskFilter === 'error'">Ошибки <span>{{ errorTaskCount }}</span></button>
         </div>
+        <div class="tx-list-options"><label for="task-sort">Порядок</label><select id="task-sort" [(ngModel)]="sortOrder"><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="name">По названию</option></select></div>
+        <details class="tx-admin" *ngIf="canShowAllTasks"><summary>Управление администратора</summary><label><input type="checkbox" [checked]="isShowingAllTasks" (change)="onShowAllChange($any($event.target).checked)" [disabled]="taskActionBusy || listLoading"> Задачи всех пользователей</label><button class="tx-text-button" type="button" (click)="restartStoppedTasksAsAdmin()" [disabled]="uploading || taskActionBusy || adminRestartInProgress">{{ adminRestartInProgress ? 'Перезапускаем…' : 'Перезапустить остановленные задачи' }}</button><p class="tx-error" *ngIf="adminRestartError" role="alert">{{ adminRestartError }}</p></details>
+        <p class="tx-error tx-list-error" *ngIf="listError" role="alert">{{ listError }}</p>
+        <mat-progress-bar *ngIf="listLoading" mode="indeterminate" aria-label="Обновление списка записей"></mat-progress-bar>
+        <div class="tx-list" *ngIf="tasks.length; else noTasks">
+          <button class="tx-task" type="button" *ngFor="let task of visibleTasks; trackBy: trackTask" (click)="selectTask(task)" [disabled]="taskActionBusy" [class.tx-task-selected]="task.id === selectedTaskId" [attr.aria-current]="task.id === selectedTaskId ? 'true' : null">
+            <span class="tx-task-icon" [ngClass]="getStatusClass(task.status)"><mat-icon aria-hidden="true">{{ getTaskIcon(task) }}</mat-icon></span>
+            <span class="tx-task-copy"><strong>{{ task.displayName || task.fileName }}</strong><span class="tx-task-email" *ngIf="isAdmin && task.createdByEmail">{{ task.createdByEmail }}</span><span class="tx-task-status" [ngClass]="getStatusClass(task.status)">{{ getStatusText(task.status) }}</span><small>{{ task.modifiedAt | localTime }}</small></span><span class="tx-task-arrow" aria-hidden="true">↗</span>
+          </button>
+          <div class="ap-state tx-list-empty" *ngIf="!filteredTasks.length"><mat-icon aria-hidden="true">search_off</mat-icon><h3>Ничего не нашли</h3><p>Измените запрос или фильтр.</p><button class="tx-text-button" type="button" (click)="clearFilters()">Сбросить фильтры</button></div>
+          <button class="tx-show-more" *ngIf="filteredTasks.length > visibleTaskLimit" type="button" (click)="visibleTaskLimit = visibleTaskLimit + 25">Показать ещё · {{ filteredTasks.length - visibleTaskLimit }}</button>
+        </div>
+        <ng-template #noTasks><div class="ap-state tx-list-empty" *ngIf="!listLoading && !listError"><span class="tx-empty-glyph" aria-hidden="true">≋</span><h3>Начните с одной записи</h3><p>Здесь появятся ваши аудио, видео и результаты обработки.</p><button class="tx-text-button" type="button" (click)="showUpload()">Добавить запись ↗</button></div><div class="ap-state" *ngIf="listLoading && !tasks.length" role="status">Загружаем записи…</div></ng-template>
+        <div class="tx-library-footnote"><span class="tx-live-dot" aria-hidden="true"></span> Статусы активных задач обновляются автоматически</div>
+      </aside>
 
-        <div
-          class="details-panel-container"
-          *ngIf="selectedTaskId; else selectPrompt"
-          #detailsPanelContainer
-        >
-          <div class="panel details-panel" [class.has-result]="selectedTask && isTaskCompleted(selectedTask)">
-            <ng-container *ngIf="detailsLoading; else taskDetails">
-              <div class="loading-state">
-                <mat-progress-spinner mode="indeterminate" diameter="40"></mat-progress-spinner>
-                <p>Загружаем данные задачи…</p>
-              </div>
-            </ng-container>
+      <section class="tx-detail" #detailsPanelContainer [class.tx-fullscreen]="isResultFullscreen" aria-label="Выбранная запись">
+        <button class="tx-back tx-text-button" type="button" (click)="showTaskList()">← К списку записей</button>
+        <div class="ap-state tx-detail-loading" *ngIf="detailsLoading"><mat-progress-spinner mode="indeterminate" diameter="36" aria-label="Загрузка записи"></mat-progress-spinner><p>Открываем запись…</p></div>
+        <ng-container *ngIf="!detailsLoading">
+          <ng-container *ngIf="selectedTask as task; else noSelection">
+            <header class="tx-detail-header"><div class="tx-detail-kicker"><span class="tx-badge" [ngClass]="getStatusClass(task.status)">{{ getStatusText(task.status) }}</span><span>{{ task.createdAt | localTime }}</span></div><div class="tx-detail-title"><h2>{{ task.displayName || task.fileName }}</h2><button class="tx-icon-button" *ngIf="isTaskCompleted(task)" type="button" (click)="toggleResultFullscreen()" [attr.aria-label]="isResultFullscreen ? 'Выйти из полноэкранного режима' : 'Развернуть результат'" [attr.aria-pressed]="isResultFullscreen"><mat-icon aria-hidden="true">{{ isResultFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon></button></div><p class="tx-profile-name" *ngIf="task.recognitionProfileDisplayedName"><mat-icon aria-hidden="true">auto_awesome</mat-icon>{{ task.recognitionProfileDisplayedName }}</p><details class="tx-context" *ngIf="task.clarification"><summary>Ваши указания к обработке</summary><p>{{ task.clarification }}</p></details></header>
 
-            <ng-template #taskDetails>
-              <ng-container *ngIf="selectedTask; else detailsErrorBlock">
-               
+            <div class="tx-detail-body">
+              <div class="tx-error" *ngIf="detailsError" role="alert">{{ detailsError }} <button class="tx-text-button" type="button" (click)="retrySelectedTask()">Обновить</button></div>
+              <div class="tx-delete-confirm" #deleteConfirmPanel tabindex="-1" role="region" aria-label="Подтверждение удаления записи" *ngIf="deleteConfirmation"><div><strong>Удалить эту запись?</strong><p>Задача и её результат будут удалены. Это действие нельзя отменить.</p></div><div><button class="ap-button ap-button-outline" type="button" (click)="deleteConfirmation = false" [disabled]="deleteInProgress">Оставить</button><button class="ap-button tx-danger-button" type="button" (click)="deleteTask()" [disabled]="taskActionBusy">{{ deleteInProgress ? 'Удаляем…' : 'Удалить запись' }}</button></div></div>
+              <p class="tx-error" *ngIf="deleteError" role="alert">{{ deleteError }}</p>
 
-                <div class="error" *ngIf="selectedTask.error && !isTaskCompleted(selectedTask)">{{ selectedTask.error }}</div>
-
-                
-                <ng-container *ngIf="isTaskCompleted(selectedTask); else processingView">
-
- 
-
-
-                  <section class="result-block" [class.fullscreen]="isResultFullscreen">
-                    <div class="result-header">
-                      <div class="details-title">
-                        <h4>{{ selectedTask.displayName }}</h4>
-                        <div class="clarification-display" *ngIf="selectedTask.clarification">
-                          <strong>Уточнение:</strong>
-                          <span>{{ selectedTask.clarification }}</span>
-                        </div>
-                        <div
-                          class="clarification-display recognition-profile-display"
-                          *ngIf="selectedTask.recognitionProfileDisplayedName"
-                        >
-                          <strong>Профиль:</strong>
-                          <span>{{ selectedTask.recognitionProfileDisplayedName }}</span>
-                        </div>
-                      </div>
-                      <span class="status-chip" [ngClass]="getStatusClass(selectedTask.status)">
-                        {{ getStatusText(selectedTask.status) }}
-                      </span>
-                    </div>
-
-                    <div class="result-actions">
-                      <button
-                        class="btn btn-outline"
-                        type="button"
-                        [routerLink]="['/transcriptions', selectedTask.id, 'edit']"
-                      >
-                        <mat-icon>edit</mat-icon>
-                        <span>Редактировать</span>
-                      </button>
-                      <button
-                        class="btn btn-outline"
-                        type="button"
-                        (click)="openAnalyticsDialog()"
-                        [disabled]="analyticsInProgress"
-                      >
-                        <mat-icon>insights</mat-icon>
-                        <span>Аналитика</span>
-                      </button>
-                      <mat-progress-spinner
-                        *ngIf="analyticsInProgress"
-                        mode="indeterminate"
-                        diameter="28"
-                        class="inline-spinner"
-                      ></mat-progress-spinner>
-                      <button
-                        class="btn btn-outline"
-                        type="button"
-                        [matMenuTriggerFor]="downloadMenu"
-                        [disabled]="downloadInProgress || !hasAnyDownloadOption()"
-                      >
-                        <mat-icon>download</mat-icon>
-                        <span>Скачать</span>
-                      </button>
-                      <button
-                        class="btn btn-outline"
-                        type="button"
-                        [matMenuTriggerFor]="copyMenu"
-                        [disabled]="copying || !hasAnyCopyOption()"
-                      >
-                        <mat-icon>content_copy</mat-icon>
-                        <span>Копировать</span>
-                      </button>
-                      <button
-                        class="btn btn-outline"
-                        type="button"
-                        (click)="toggleResultFullscreen()"
-                        [attr.aria-pressed]="isResultFullscreen"
-                      >
-                        <mat-icon>{{ isResultFullscreen ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
-                        <span>{{ isResultFullscreen ? 'Свернуть' : 'На весь экран' }}</span>
-                      </button>
-                      <button
-                        class="btn btn-outline"
-                        type="button"
-                        (click)="deleteTask()"
-                        [disabled]="deleteInProgress || !canDeleteSelectedTask()"
-                      >
-                        <mat-icon>delete</mat-icon>
-                        <span>Удалить</span>
-                      </button>
-                      <mat-progress-spinner
-                        *ngIf="deleteInProgress"
-                        mode="indeterminate"
-                        diameter="28"
-                        class="inline-spinner"
-                      ></mat-progress-spinner>
-                    </div>
-
-                    <mat-menu #downloadMenu="matMenu" actionMenuPanel>
-                      <button
-                        mat-menu-item
-                        (click)="onDownload('md')"
-                        [disabled]="!isDownloadFormatAvailable('md') || downloadInProgress"
-                      >
-                        <mat-icon>article</mat-icon>
-                        <span>Markdown (.md)</span>
-                      </button>
-                      <button
-                        mat-menu-item
-                        (click)="onDownload('pdf')"
-                        [disabled]="!isDownloadFormatAvailable('pdf') || downloadInProgress"
-                      >
-                        <mat-icon>picture_as_pdf</mat-icon>
-                        <span>PDF</span>
-                      </button>
-                      <button
-                        mat-menu-item
-                        (click)="onDownload('docx')"
-                        [disabled]="!isDownloadFormatAvailable('docx') || downloadInProgress"
-                      >
-                        <mat-icon>description</mat-icon>
-                        <span>Word (.docx)</span>
-                      </button>
-                      <button
-                        mat-menu-item
-                        (click)="onDownload('srt')"
-                        [disabled]="!isDownloadFormatAvailable('srt') || downloadInProgress"
-                      >
-                        <mat-icon>subtitles</mat-icon>
-                        <span>SRT субтитры</span>
-                      </button>
-                    </mat-menu>
-                    <mat-menu #copyMenu="matMenu" actionMenuPanel>
-                      <button
-                        mat-menu-item
-                        (click)="onCopy('txt')"
-                        [disabled]="!isCopyFormatAvailable('txt') || copying"
-                      >
-                        <mat-icon>notes</mat-icon>
-                        <span>Текст (plain)</span>
-                      </button>
-                      <button
-                        mat-menu-item
-                        (click)="onCopy('markdown')"
-                        [disabled]="!isCopyFormatAvailable('markdown') || copying"
-                      >
-                        <mat-icon>code</mat-icon>
-                        <span>Markdown</span>
-                      </button>
-                      <button
-                        mat-menu-item
-                        (click)="onCopy('html')"
-                        [disabled]="!isCopyFormatAvailable('html') || copying"
-                      >
-                        <mat-icon>language</mat-icon>
-                        <span>HTML</span>
-                      </button>
-                      <button
-                        mat-menu-item
-                        (click)="onCopy('bbcode')"
-                        [disabled]="!isCopyFormatAvailable('bbcode') || copying"
-                      >
-                        <mat-icon>format_quote</mat-icon>
-                        <span>BBCode</span>
-                      </button>
-                      <button
-                        mat-menu-item
-                        (click)="onCopy('srt')"
-                        [disabled]="!isCopyFormatAvailable('srt') || copying"
-                      >
-                        <mat-icon>subtitles</mat-icon>
-                        <span>SRT субтитры</span>
-                      </button>
-                    </mat-menu>
-                    <div class="error" *ngIf="analyticsError">{{ analyticsError }}</div>
-                    <div class="error" *ngIf="exportError">{{ exportError }}</div>
-                    <div class="error" *ngIf="deleteError">{{ deleteError }}</div>
-                    <div
-                      class="markdown-content"
-                      *ngIf="renderedMarkdown; else plainResult"
-                      [innerHTML]="renderedMarkdown"
-                    ></div>
-                    <ng-template #plainResult>
-                      <pre *ngIf="hasMarkdown(); else recognizedFallback">{{ markdownContent }}</pre>
-                    </ng-template>
-                    <ng-template #recognizedFallback>
-                      <pre *ngIf="selectedTask.recognizedText; else emptyResult">{{ selectedTask.recognizedText }}</pre>
-                    </ng-template>
-                    <ng-template #emptyResult>
-                      <div class="empty-state">Результат пока недоступен.</div>
-                    </ng-template>
-                  </section>
-                </ng-container>
-
-                <ng-template #processingView>
-                  <div class="details-actions" *ngIf="selectedTask.status === OpenAiTranscriptionStatus.Error">
-                    <button
-                      class="btn btn-outline"
-                      type="button"
-                      (click)="continueTask()"
-                      [disabled]="continueInProgress || deleteInProgress"
-                    >
-                      <mat-icon>play_arrow</mat-icon>
-                      <span>Продолжить задачу</span>
-                    </button>
-                    <button
-                      class="btn btn-outline"
-                      type="button"
-                      (click)="deleteTask()"
-                      [disabled]="deleteInProgress || continueInProgress || !canDeleteSelectedTask()"
-                    >
-                      <mat-icon>delete</mat-icon>
-                      <span>Удалить</span>
-                    </button>
-                    <div class="continue-from-segment" *ngIf="canContinueFromSegment(selectedTask)">
-                      <label for="continue-from-segment-number">Сегмент</label>
-                      <input
-                        id="continue-from-segment-number"
-                        type="number"
-                        min="1"
-                        [max]="selectedTask.segmentsTotal"
-                        [value]="continueFromSegmentNumber ?? ''"
-                        (input)="onContinueFromSegmentNumberInput($any($event.target).value)"
-                        [disabled]="continueFromSegmentInProgress || continueInProgress || deleteInProgress"
-                        [class.invalid]="isContinueFromSegmentNumberInvalid(selectedTask)"
-                      />
-                      <span class="continue-from-segment-hint">1-{{ selectedTask.segmentsTotal }}</span>
-                      <button
-                        class="btn btn-outline"
-                        type="button"
-                        (click)="continueTaskFromSegment()"
-                        [disabled]="
-                          continueFromSegmentInProgress ||
-                          continueInProgress ||
-                          deleteInProgress ||
-                          isContinueFromSegmentNumberInvalid(selectedTask)
-                        "
-                      >
-                        <mat-icon>replay</mat-icon>
-                        <span>Восстановить с сегмента</span>
-                      </button>
-                    </div>
-                    <mat-progress-spinner
-                      *ngIf="continueInProgress || continueFromSegmentInProgress || deleteInProgress"
-                      mode="indeterminate"
-                      diameter="28"
-                      class="inline-spinner"
-                    ></mat-progress-spinner>
-                    <div class="error" *ngIf="continueError">{{ continueError }}</div>
-                    <div class="error" *ngIf="isContinueFromSegmentNumberInvalid(selectedTask)">
-                      Укажите сегмент в диапазоне 1-{{ selectedTask.segmentsTotal }}.
-                    </div>
-                    <div class="error" *ngIf="continueFromSegmentError">{{ continueFromSegmentError }}</div>
-                    <div class="error" *ngIf="deleteError">{{ deleteError }}</div>
-                  </div>
-
-                  <section class="steps-section">
-                    <h4>Прогресс обработки</h4>
-                    <div class="workflow-summary">
-                      <div class="workflow-summary-item">
-                        <span>Выполнено шагов</span>
-                        <strong>{{ getCompletedWorkflowSteps(selectedTask) }} / {{ getWorkflowStepCount(selectedTask) }}</strong>
-                      </div>
-                      <div class="workflow-summary-item">
-                        <span>Текущий шаг</span>
-                        <strong>{{ getCurrentWorkflowStepText(selectedTask) }}</strong>
-                      </div>
-                      <div class="workflow-summary-item" *ngIf="shouldShowSegmentProgress(selectedTask)">
-                        <span>Распознано сегментов</span>
-                        <strong>{{ selectedTask.segmentsProcessed }} / {{ selectedTask.segmentsTotal }}</strong>
-                      </div>
-                    </div>
-                    <ul class="steps-list" *ngIf="selectedTask.steps.length; else noStepLog">
-                      <li *ngFor="let step of selectedTask.steps; trackBy: trackStep" [ngClass]="getStepClass(step.status)">
-                        <span class="step-icon">
-                          <mat-icon>{{ getStepIcon(step.status) }}</mat-icon>
-                        </span>
-                        <div class="step-content">
-                          <div class="step-title">{{ getStatusText(step.step) }}</div>
-                          <div class="step-meta">
-                            <span>{{ getStepStatusText(step.status) }}</span>
-                            <span *ngIf="step.startedAt">· {{ step.startedAt | localTime }}</span>
-                            <span *ngIf="step.finishedAt">· {{ step.finishedAt | localTime }}</span>
-                          </div>
-                          <div class="step-error" *ngIf="step.error">{{ step.error }}</div>
-                        </div>
-                      </li>
-                    </ul>
-                    <ng-template #noStepLog>
-                      <div class="empty-state">
-                        Подробный лог шагов появится после старта обработки.
-                      </div>
-                    </ng-template>
-                  </section>
-                </ng-template>
+              <ng-container *ngIf="isTaskCompleted(task); else processingView">
+                <div class="tx-result-tools">
+                  <a class="ap-button" [routerLink]="['/transcriptions', task.id, 'edit']"><mat-icon aria-hidden="true">edit</mat-icon>Редактировать</a>
+                  <button class="ap-button ap-button-outline" type="button" [matMenuTriggerFor]="downloadMenu" [disabled]="taskActionBusy || !hasAnyDownloadOption()"><mat-icon aria-hidden="true">download</mat-icon>{{ downloadInProgress ? 'Готовим файл…' : 'Скачать' }}</button>
+                  <button class="tx-icon-button" type="button" [matMenuTriggerFor]="moreMenu" [disabled]="taskActionBusy || uploading" aria-label="Другие действия с записью"><mat-icon aria-hidden="true">more_horiz</mat-icon></button>
+                </div>
+                <mat-menu #downloadMenu="matMenu" class="tx-action-menu" actionMenuPanel>
+                  <button mat-menu-item (click)="onDownload('docx')" [disabled]="!isDownloadFormatAvailable('docx') || taskActionBusy"><mat-icon>description</mat-icon>Word (.docx)</button>
+                  <button mat-menu-item (click)="onDownload('pdf')" [disabled]="!isDownloadFormatAvailable('pdf') || taskActionBusy"><mat-icon>picture_as_pdf</mat-icon>PDF</button>
+                  <button mat-menu-item (click)="onDownload('md')" [disabled]="!isDownloadFormatAvailable('md') || taskActionBusy"><mat-icon>article</mat-icon>Markdown (.md)</button>
+                  <button mat-menu-item (click)="onDownload('srt')" [disabled]="!isDownloadFormatAvailable('srt') || taskActionBusy"><mat-icon>subtitles</mat-icon>SRT субтитры</button>
+                </mat-menu>
+                <mat-menu #moreMenu="matMenu" class="tx-action-menu" actionMenuPanel>
+                  <button mat-menu-item (click)="openAnalyticsDialog()" [disabled]="taskActionBusy"><mat-icon>auto_awesome</mat-icon>Новая постобработка</button>
+                  <button mat-menu-item [matMenuTriggerFor]="copyMenu" [disabled]="taskActionBusy || !hasAnyCopyOption()"><mat-icon>content_copy</mat-icon>Копировать результат</button>
+                  <button mat-menu-item (click)="requestDelete()" [disabled]="taskActionBusy || !canDeleteSelectedTask()"><mat-icon>delete_outline</mat-icon>Удалить запись</button>
+                </mat-menu>
+                <mat-menu #copyMenu="matMenu" class="tx-action-menu" actionMenuPanel>
+                  <button mat-menu-item (click)="onCopy('txt')" [disabled]="!isCopyFormatAvailable('txt')">Обычный текст</button>
+                  <button mat-menu-item (click)="onCopy('markdown')" [disabled]="!isCopyFormatAvailable('markdown')">Markdown</button>
+                  <button mat-menu-item (click)="onCopy('html')" [disabled]="!isCopyFormatAvailable('html')">HTML</button>
+                  <button mat-menu-item (click)="onCopy('bbcode')" [disabled]="!isCopyFormatAvailable('bbcode')">BBCode</button>
+                  <button mat-menu-item (click)="onCopy('srt')" [disabled]="!isCopyFormatAvailable('srt')">SRT субтитры</button>
+                </mat-menu>
+                <div class="tx-reprocess"><span><mat-icon aria-hidden="true">auto_awesome</mat-icon>Нужен другой взгляд на запись?</span><button class="tx-text-button" type="button" (click)="openAnalyticsDialog()" [disabled]="taskActionBusy || uploading">{{ analyticsInProgress ? 'Создаём обработку…' : 'Выбрать постобработку ↗' }}</button></div>
+                <p class="tx-error" *ngIf="analyticsError" role="alert">{{ analyticsError }}</p><p class="tx-error" *ngIf="exportError" role="alert">{{ exportError }}</p>
+                <mat-progress-bar *ngIf="downloadInProgress || copying || analyticsInProgress" mode="indeterminate" aria-label="Выполнение действия"></mat-progress-bar>
+                <div class="tx-result-tabs" aria-label="Вид текста"><button type="button" (click)="resultView = 'formatted'" [class.tx-tab-active]="resultView === 'formatted'" [attr.aria-pressed]="resultView === 'formatted'">Готовый документ</button><button *ngIf="task.recognizedText" type="button" (click)="resultView = 'original'" [class.tx-tab-active]="resultView === 'original'" [attr.aria-pressed]="resultView === 'original'">Исходная расшифровка</button></div>
+                <div class="tx-document" *ngIf="resultView === 'formatted'; else originalText"><div *ngIf="renderedMarkdown; else plainResult" [innerHTML]="renderedMarkdown"></div><ng-template #plainResult><pre *ngIf="markdownContent; else emptyResult">{{ markdownContent }}</pre></ng-template><ng-template #emptyResult><p class="tx-subtle">Текст результата пока недоступен.</p></ng-template></div>
+                <ng-template #originalText><div class="tx-document"><pre>{{ task.recognizedText }}</pre></div></ng-template>
               </ng-container>
 
-              <ng-template #detailsErrorBlock>
-                <div class="error">{{ detailsError }}</div>
+              <ng-template #processingView>
+                <div class="tx-processing" [class.tx-processing-error]="task.status === OpenAiTranscriptionStatus.Error">
+                  <span class="tx-process-symbol" aria-hidden="true"><mat-icon>{{ task.status === OpenAiTranscriptionStatus.Error ? 'error_outline' : 'graphic_eq' }}</mat-icon></span>
+                  <p class="ap-eyebrow">{{ task.status === OpenAiTranscriptionStatus.Error ? 'ТРЕБУЕТСЯ ВАШЕ ВНИМАНИЕ' : 'ЗАПИСЬ В РАБОТЕ' }}</p>
+                  <h3>{{ task.status === OpenAiTranscriptionStatus.Error ? 'Обработка остановилась' : getCurrentWorkflowStepText(task) }}</h3>
+                  <p>{{ task.status === OpenAiTranscriptionStatus.Error ? 'Попробуйте продолжить с сохранённого этапа или удалите задачу.' : 'Можно выбрать другую запись или вернуться позже. Обработка продолжится на сервере.' }}</p>
+                  <p class="tx-error" *ngIf="task.error" role="alert">{{ task.error }}</p>
+                  <div class="tx-process-actions" *ngIf="task.status === OpenAiTranscriptionStatus.Error"><button class="ap-button ap-button-lime" type="button" (click)="continueTask()" [disabled]="taskActionBusy || uploading">{{ continueInProgress || continueFromSegmentInProgress ? 'Продолжаем…' : 'Продолжить обработку' }}<mat-icon aria-hidden="true">arrow_forward</mat-icon></button><button class="tx-text-button tx-delete-link" type="button" (click)="requestDelete()" [disabled]="taskActionBusy || uploading || !canDeleteSelectedTask()">Удалить запись</button></div>
+                  <div class="tx-progress-caption"><span>Пройдено этапов</span><strong>{{ getCompletedWorkflowSteps(task) }} из {{ getWorkflowStepCount(task) }}</strong></div>
+                  <progress class="tx-progress" [value]="getCompletedWorkflowSteps(task)" [max]="getWorkflowStepCount(task)" aria-label="Пройденные этапы обработки"></progress>
+                  <p class="tx-segments" *ngIf="shouldShowSegmentProgress(task)">Обработано фрагментов: {{ task.segmentsProcessed }} из {{ task.segmentsTotal }}</p>
+                </div>
+                <p class="tx-error" *ngIf="continueError" role="alert">{{ continueError }}</p><p class="tx-error" *ngIf="continueFromSegmentError" role="alert">{{ continueFromSegmentError }}</p>
+                <details class="tx-advanced" *ngIf="canContinueFromSegment(task)"><summary>Продолжить с определённого фрагмента</summary><p>Выберите номер фрагмента, с которого нужно повторить обработку.</p><div><label for="continue-from-segment-number">Фрагмент</label><input id="continue-from-segment-number" type="number" min="1" step="1" [max]="task.segmentsTotal" [value]="continueFromSegmentNumber ?? ''" (input)="onContinueFromSegmentNumberInput($any($event.target).value)" [disabled]="taskActionBusy" [attr.aria-invalid]="isContinueFromSegmentNumberInvalid(task)"><span>из {{ task.segmentsTotal }}</span><button class="ap-button ap-button-outline" type="button" (click)="continueTaskFromSegment()" [disabled]="taskActionBusy || uploading || isContinueFromSegmentNumberInvalid(task)">Продолжить</button></div></details>
+                <details class="tx-step-log"><summary>История этапов <span>{{ task.steps.length }}</span></summary><ol *ngIf="task.steps.length; else noStepLog"><li *ngFor="let step of task.steps; trackBy: trackStep" [ngClass]="getStepClass(step.status)"><mat-icon aria-hidden="true">{{ getStepIcon(step.status) }}</mat-icon><div><strong>{{ getStatusText(step.step) }}</strong><p>{{ getStepStatusText(step.status) }} <span *ngIf="step.startedAt">· {{ step.startedAt | localTime }}</span></p><p class="tx-step-error" *ngIf="step.error">{{ step.error }}</p></div></li></ol><ng-template #noStepLog><p class="tx-subtle">Этапы появятся после начала обработки.</p></ng-template></details>
               </ng-template>
-            </ng-template>
-          </div>
-        </div>
-
-        <ng-template #selectPrompt>
-          <div class="details-panel-container">
-            <div class="panel details-panel empty-details">
-              <div class="empty-state">
-                <h4>Выберите задачу</h4>
-                <p>Мы покажем ход обработки и готовый текст, как только вы выберете файл из списка.</p>
-              </div>
             </div>
-          </div>
-        </ng-template>
-      </div>
+          </ng-container>
+          <ng-template #noSelection>
+            <div class="ap-state tx-welcome" *ngIf="detailsError; else welcome"><mat-icon aria-hidden="true">cloud_off</mat-icon><h3>Запись не загрузилась</h3><p>{{ detailsError }}</p><button class="ap-button ap-button-outline" type="button" (click)="retrySelectedTask()">Попробовать снова</button></div>
+            <ng-template #welcome><div class="ap-state tx-welcome"><div class="tx-welcome-art" aria-hidden="true"><span>≋</span><i>↗</i><span>Аа</span></div><p class="ap-eyebrow">ОТ ГОЛОСА К МЫСЛИ</p><h2>Ваша запись.<br>Новые возможности.</h2><p>Выберите запись слева или добавьте новую. Здесь появится ход обработки и готовый документ.</p><button class="ap-button ap-button-lime" type="button" (click)="showUpload()">Загрузить запись <span aria-hidden="true">↗</span></button></div></ng-template>
+          </ng-template>
+        </ng-container>
+      </section>
     </section>
+    <footer class="ap-bottom"><span>YouScriptor · Из записи — в текст</span><nav aria-label="Полезные ссылки"><a routerLink="/tasks">Скрипторий YouTube</a><a routerLink="/billing">Тарифы</a><a routerLink="/blog">Новости</a></nav></footer>
   </main>
 </div>
