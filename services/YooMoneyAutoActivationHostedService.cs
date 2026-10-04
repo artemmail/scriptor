@@ -10,7 +10,7 @@ namespace YandexSpeech.services
 {
     public sealed class YooMoneyAutoActivationHostedService : BackgroundService
     {
-        private static readonly TimeSpan Interval = TimeSpan.FromMinutes(2);
+        private static readonly TimeSpan Interval = TimeSpan.FromMinutes(1);
 
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<YooMoneyAutoActivationHostedService> _logger;

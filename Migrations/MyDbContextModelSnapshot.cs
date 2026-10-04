@@ -645,6 +645,10 @@ namespace YandexSpeech.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ExternalOperationId")
+                        .IsUnique()
+                        .HasFilter("[Provider] = 1 AND [ExternalOperationId] IS NOT NULL");
+
                     b.HasIndex("UserId");
 
                     b.ToTable("PaymentOperations");

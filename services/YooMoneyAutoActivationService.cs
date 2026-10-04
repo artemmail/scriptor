@@ -35,40 +35,64 @@ namespace YandexSpeech.services
 
         public async Task<int> ProcessAsync(CancellationToken cancellationToken = default)
         {
-            var operationHistory = await _yooMoneyRepository
+            var pendingOperations = await _dbContext.PaymentOperations
+                .AsNoTracking()
+                .Where(p => p.Provider == PaymentProvider.YooMoney && p.Status == PaymentOperationStatus.Pending)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (pendingOperations.Count == 0)
+                return 0;
+
+            var pendingById = pendingOperations.ToDictionary(p => p.Id);
+            var recentHistory = await _yooMoneyRepository
                 .GetOperationHistoryAsync(0, HistoryBatchSize, cancellationToken)
                 .ConfigureAwait(false);
+            var candidates = (recentHistory ?? Array.Empty<OperationHistory>())
+                .Where(IsSuccessfulIncomingOperation)
+                .Where(o => HasPendingLabel(o, pendingById))
+                .ToList();
 
-            if (operationHistory == null || operationHistory.Count == 0)
+            var foundLabels = candidates
+                .Select(o => Guid.Parse(ExtractLabel(o.AdditionalData)!))
+                .ToHashSet();
+            foreach (var pending in pendingOperations.Where(p => !foundLabels.Contains(p.Id)))
             {
-                return 0;
+                try
+                {
+                    var labeledHistory = await _yooMoneyRepository
+                        .GetOperationHistoryByLabelAsync(pending.Id.ToString("D"), cancellationToken)
+                        .ConfigureAwait(false);
+                    candidates.AddRange((labeledHistory ?? Array.Empty<OperationHistory>())
+                        .Where(IsSuccessfulIncomingOperation)
+                        .Where(o => HasPendingLabel(o, pendingById)));
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to check YooMoney label for payment {OperationId}.", pending.Id);
+                }
             }
 
-            var successfulOperations = operationHistory
-                .Where(IsSuccessfulIncomingOperation)
+            var successfulOperations = candidates
                 .Where(o => !string.IsNullOrWhiteSpace(o.OperationId))
+                .GroupBy(o => o.OperationId!, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
                 .OrderBy(o => o.DateTime ?? DateTime.MinValue)
                 .ToList();
-
             if (successfulOperations.Count == 0)
-            {
                 return 0;
-            }
 
-            var externalOperationIds = successfulOperations
-                .Select(o => o.OperationId!)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            var alreadyAppliedIds = await _dbContext.PaymentOperations
-                .AsNoTracking()
+            var externalOperationIds = successfulOperations.Select(o => o.OperationId!).ToList();
+            var alreadyAppliedIds = await _dbContext.PaymentOperations.AsNoTracking()
                 .Where(p => p.Provider == PaymentProvider.YooMoney
                     && p.ExternalOperationId != null
                     && externalOperationIds.Contains(p.ExternalOperationId))
                 .Select(p => p.ExternalOperationId!)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
-
             var appliedSet = new HashSet<string>(alreadyAppliedIds, StringComparer.OrdinalIgnoreCase);
             var appliedCount = 0;
 
@@ -86,75 +110,44 @@ namespace YandexSpeech.services
                         .GetOperationDetailsAsync(externalOperationId, cancellationToken)
                         .ConfigureAwait(false);
 
-                    var label = ExtractLabel(operationDetails?.AdditionalData)
-                        ?? ExtractLabel(externalOperation.AdditionalData);
-
-                    if (!Guid.TryParse(label, out var localOperationId))
-                    {
-                        _logger.LogDebug(
-                            "Skipping YooMoney operation {ExternalOperationId} because its label is not a local GUID.",
-                            externalOperationId);
+                    var historyLabel = ExtractLabel(externalOperation.AdditionalData);
+                    if (!Guid.TryParse(historyLabel, out var localOperationId)
+                        || !pendingById.TryGetValue(localOperationId, out var localOperation))
                         continue;
-                    }
 
-                    var localOperation = await _dbContext.PaymentOperations
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(
-                            p => p.Id == localOperationId && p.Provider == PaymentProvider.YooMoney,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-
-                    if (localOperation == null)
+                    if (operationDetails == null
+                        || !string.Equals(operationDetails.OperationId, externalOperationId, StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(operationDetails.Status, "success", StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(ExtractAdditionalDataString(operationDetails.AdditionalData, "direction"), "in", StringComparison.OrdinalIgnoreCase)
+                        || !Guid.TryParse(ExtractLabel(operationDetails.AdditionalData), out var verifiedLabel)
+                        || verifiedLabel != localOperationId)
                     {
-                        _logger.LogDebug(
-                            "Skipping YooMoney operation {ExternalOperationId} because local operation {LocalOperationId} was not found.",
-                            externalOperationId,
-                            localOperationId);
-                        continue;
-                    }
-
-                    if (localOperation.Status == PaymentOperationStatus.Succeeded)
-                    {
-                        appliedSet.Add(externalOperationId);
-                        continue;
-                    }
-
-                    if (localOperation.Status == PaymentOperationStatus.Failed
-                        || localOperation.Status == PaymentOperationStatus.Cancelled)
-                    {
-                        _logger.LogDebug(
-                            "Skipping YooMoney operation {ExternalOperationId} because local operation {LocalOperationId} has status {Status}.",
-                            externalOperationId,
-                            localOperationId,
-                            localOperation.Status);
+                        _logger.LogWarning("YooMoney details did not verify payment {ExternalOperationId}.", externalOperationId);
                         continue;
                     }
 
                     var paymentPayload = PaymentOperationPayloadSerializer.Deserialize(localOperation.Payload);
-                    if (!string.Equals(paymentPayload?.Type, PaymentOperationPayloadTypes.Subscription, StringComparison.OrdinalIgnoreCase))
+                    if (paymentPayload?.Type is not (PaymentOperationPayloadTypes.Subscription or PaymentOperationPayloadTypes.Wallet)
+                        || !string.Equals(localOperation.Currency, "RUB", StringComparison.OrdinalIgnoreCase))
                     {
-                        _logger.LogDebug(
-                            "Skipping YooMoney operation {ExternalOperationId} because local operation {LocalOperationId} is not a subscription payment.",
-                            externalOperationId,
-                            localOperationId);
+                        _logger.LogWarning("Skipping YooMoney payment {OperationId} with unsupported payload or currency.", localOperationId);
                         continue;
                     }
 
-                    if (externalOperation.Amount.HasValue
-                        && localOperation.Amount > 0m
-                        && Math.Abs(localOperation.Amount - externalOperation.Amount.Value) > 0.01m)
+                    if (localOperation.Amount <= 0m
+                        || !operationDetails.Amount.HasValue
+                        || Math.Abs(localOperation.Amount - operationDetails.Amount.Value) > 0.01m)
                     {
                         _logger.LogWarning(
                             "Skipping YooMoney operation {ExternalOperationId} because amount {ActualAmount} does not match expected amount {ExpectedAmount} for local operation {LocalOperationId}.",
                             externalOperationId,
-                            externalOperation.Amount,
+                            operationDetails.Amount,
                             localOperation.Amount,
                             localOperationId);
                         continue;
                     }
 
-                    var externalPayloadSource = (object?)operationDetails ?? externalOperation;
-                    var externalPayload = JsonConvert.SerializeObject(externalPayloadSource);
+                    var externalPayload = JsonConvert.SerializeObject(operationDetails);
                     var updatedOperation = await _paymentOperationApplicationService
                         .ApplyAsync(localOperationId, externalOperationId, externalPayload, cancellationToken)
                         .ConfigureAwait(false);
@@ -187,7 +180,7 @@ namespace YandexSpeech.services
 
             if (appliedCount > 0)
             {
-                _logger.LogInformation("Auto-applied {Count} YooMoney subscription payment(s).", appliedCount);
+                _logger.LogInformation("Auto-applied {Count} YooMoney payment(s).", appliedCount);
             }
 
             return appliedCount;
@@ -211,13 +204,20 @@ namespace YandexSpeech.services
             }
 
             var direction = ExtractAdditionalDataString(operation.AdditionalData, "direction");
-            if (!string.IsNullOrWhiteSpace(direction)
-                && !string.Equals(direction, "in", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(direction, "in", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
 
             return true;
+        }
+
+        private static bool HasPendingLabel(
+            OperationHistory operation,
+            IReadOnlyDictionary<Guid, PaymentOperation> pendingById)
+        {
+            return Guid.TryParse(ExtractLabel(operation.AdditionalData), out var id)
+                && pendingById.ContainsKey(id);
         }
 
         private static string? ExtractLabel(IDictionary<string, JToken>? additionalData)

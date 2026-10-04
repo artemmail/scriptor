@@ -692,10 +692,11 @@ namespace YandexSpeech.Controllers
                 return Unauthorized();
             }
 
+            var isAdmin = User.IsInRole("Admin");
             var task = await _dbContext.OpenAiTranscriptionTasks
                 .Include(t => t.Segments)
                 .Include(t => t.Steps)
-                .FirstOrDefaultAsync(t => t.Id == id && t.CreatedBy == userId);
+                .FirstOrDefaultAsync(t => t.Id == id && (t.CreatedBy == userId || isAdmin));
 
             if (task == null)
             {

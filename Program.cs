@@ -60,6 +60,8 @@ builder.Services.AddCors(opts =>
 
 // 2. Контроллеры
 builder.Services.AddControllers();
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
+builder.Services.AddTransient<ISupportEmailSender, SmtpSupportEmailSender>();
 
 // Общий HttpClient для внешних запросов
 builder.Services.AddHttpClient();

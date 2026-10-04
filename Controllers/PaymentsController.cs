@@ -34,6 +34,7 @@ namespace YandexSpeech.Controllers
         private readonly IPaymentGatewayService _paymentGatewayService;
         private readonly ISubscriptionService _subscriptionService;
         private readonly IWalletService _walletService;
+        private readonly IPaymentOperationApplicationService _paymentOperationApplicationService;
         private readonly IOptions<YooMoneyOptions> _yooMoneyOptions;
         private readonly SubscriptionLimitsOptions _subscriptionLimits;
         private readonly ILogger<PaymentsController> _logger;
@@ -43,6 +44,7 @@ namespace YandexSpeech.Controllers
             IPaymentGatewayService paymentGatewayService,
             ISubscriptionService subscriptionService,
             IWalletService walletService,
+            IPaymentOperationApplicationService paymentOperationApplicationService,
             IOptions<YooMoneyOptions> yooMoneyOptions,
             IOptions<SubscriptionLimitsOptions> subscriptionLimits,
             ILogger<PaymentsController> logger)
@@ -51,6 +53,7 @@ namespace YandexSpeech.Controllers
             _paymentGatewayService = paymentGatewayService ?? throw new ArgumentNullException(nameof(paymentGatewayService));
             _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
             _walletService = walletService ?? throw new ArgumentNullException(nameof(walletService));
+            _paymentOperationApplicationService = paymentOperationApplicationService ?? throw new ArgumentNullException(nameof(paymentOperationApplicationService));
             _yooMoneyOptions = yooMoneyOptions ?? throw new ArgumentNullException(nameof(yooMoneyOptions));
             _subscriptionLimits = subscriptionLimits?.Value ?? new SubscriptionLimitsOptions();
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -217,6 +220,9 @@ namespace YandexSpeech.Controllers
                 return Ok();
             }
 
+            if (operation.Provider != PaymentProvider.YooMoney || string.IsNullOrWhiteSpace(notification.OperationId))
+                return BadRequest("Некорректная операция YooMoney");
+
             var payload = DeserializePayload(operation.Payload);
             if (payload == null)
             {
@@ -239,18 +245,14 @@ namespace YandexSpeech.Controllers
 
             try
             {
-                switch (payload.Type)
-                {
-                    case SubscriptionPayloadType:
-                        await HandleSubscriptionPaymentAsync(operation, payload, notification, cancellationToken).ConfigureAwait(false);
-                        break;
-                    case WalletPayloadType:
-                        await HandleWalletDepositAsync(operation, payload, notification, cancellationToken).ConfigureAwait(false);
-                        break;
-                    default:
-                        _logger.LogError("Неизвестный тип операции {Type} для {OperationId}", payload.Type, operationId);
-                        return BadRequest("Неизвестный тип операции");
-                }
+                if (payload.Type is not (SubscriptionPayloadType or WalletPayloadType))
+                    return BadRequest("Неизвестный тип операции");
+
+                await _paymentOperationApplicationService.ApplyAsync(
+                    operationId,
+                    notification.OperationId,
+                    JsonSerializer.Serialize(notification),
+                    cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -376,64 +378,6 @@ namespace YandexSpeech.Controllers
             return Ok(summary);
         }
 
-        private async Task HandleSubscriptionPaymentAsync(
-            PaymentOperation operation,
-            PaymentOperationPayload payload,
-            YooMoneyNotification notification,
-            CancellationToken cancellationToken)
-        {
-            if (payload.PlanId == null)
-            {
-                throw new InvalidOperationException("Отсутствует идентификатор плана подписки.");
-            }
-
-            var subscription = await _subscriptionService
-                .ActivateSubscriptionAsync(operation.UserId, payload.PlanId.Value, externalPaymentId: notification.OperationId, cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
-
-            var paidAt = DateTime.UtcNow;
-            var invoice = new SubscriptionInvoice
-            {
-                Id = Guid.NewGuid(),
-                UserSubscriptionId = subscription.Id,
-                Amount = notification.Amount ?? operation.Amount,
-                Currency = notification.Currency ?? operation.Currency,
-                Status = SubscriptionInvoiceStatus.Paid,
-                IssuedAt = paidAt,
-                PaidAt = paidAt,
-                PaymentProvider = PaymentProvider.YooMoney.ToString(),
-                ExternalInvoiceId = notification.OperationId,
-                Payload = JsonSerializer.Serialize(notification)
-            };
-
-            _dbContext.SubscriptionInvoices.Add(invoice);
-            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-            await _paymentGatewayService
-                .MarkSucceededAsync(operation.Id, notification.OperationId ?? string.Empty, cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
-
-            _logger.LogInformation("Активирована подписка {PlanId} для пользователя {UserId} по операции {OperationId}", payload.PlanId, operation.UserId, operation.Id);
-        }
-
-        private async Task HandleWalletDepositAsync(
-            PaymentOperation operation,
-            PaymentOperationPayload payload,
-            YooMoneyNotification notification,
-            CancellationToken cancellationToken)
-        {
-            var comment = payload.Comment ?? "Пополнение счёта";
-            var transaction = await _walletService
-                .DepositAsync(operation.UserId, notification.Amount ?? operation.Amount, notification.Currency ?? "RUB", relatedEntityId: operation.Id, reference: notification.OperationId, comment: comment, cancellationToken)
-                .ConfigureAwait(false);
-
-            await _paymentGatewayService
-                .MarkSucceededAsync(operation.Id, notification.OperationId ?? string.Empty, transaction.Id, cancellationToken)
-                .ConfigureAwait(false);
-
-            _logger.LogInformation("Пополнен кошелёк пользователя {UserId} на сумму {Amount} по операции {OperationId}", operation.UserId, notification.Amount, operation.Id);
-        }
-
         private string BuildQuickpayUrl(Guid operationId, decimal amount, string currency, string title)
         {
             var options = _yooMoneyOptions.Value;
@@ -498,7 +442,8 @@ namespace YandexSpeech.Controllers
             var secret = _yooMoneyOptions.Value.NotificationSecret;
             if (string.IsNullOrWhiteSpace(secret))
             {
-                return true; // подпись не настроена
+                _logger.LogError("Секрет уведомлений YooMoney не настроен.");
+                return false;
             }
 
             var builder = new StringBuilder();

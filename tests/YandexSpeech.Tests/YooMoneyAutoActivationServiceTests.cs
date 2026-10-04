@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,15 @@ namespace YandexSpeech.Tests
 {
     public class YooMoneyAutoActivationServiceTests
     {
+        [Fact]
+        public void UniqueExternalOperationMigrationIsDiscoverable()
+        {
+            using var db = new MyDbContext(new DbContextOptionsBuilder<MyDbContext>()
+                .UseSqlServer("Server=unused;Database=unused;Integrated Security=True")
+                .Options);
+            Assert.Contains("20261003000002_UniqueYooMoneyOperation", db.Database.GetMigrations());
+        }
+
         [Fact]
         public async Task ProcessAsync_AppliesSubscription_WhenYooMoneyLabelMatchesPendingOperation()
         {
@@ -56,6 +66,61 @@ namespace YandexSpeech.Tests
             var invoice = await dbContext.SubscriptionInvoices.FirstOrDefaultAsync();
             Assert.NotNull(invoice);
             Assert.Equal(externalOperationId, invoice!.ExternalInvoiceId);
+        }
+
+        [Fact]
+        public async Task ProcessAsync_AppliesOldWalletPaymentOnce_WhenAbsentFromRecentHistory()
+        {
+            var (dbContext, operation, _) = await CreatePendingSubscriptionOperationAsync();
+            operation.Payload = PaymentOperationPayloadSerializer.Serialize(new PaymentOperationPayload
+            {
+                Type = PaymentOperationPayloadTypes.Wallet
+            });
+            await dbContext.SaveChangesAsync();
+
+            var repository = new YooMoneyRepositoryStub(
+                new OperationHistory
+                {
+                    OperationId = "ym-wallet-1", Amount = operation.Amount, Status = "success",
+                    AdditionalData = CreateAdditionalData(operation.Id.ToString())
+                },
+                new OperationDetails
+                {
+                    OperationId = "ym-wallet-1", Amount = operation.Amount, Status = "success",
+                    AdditionalData = CreateAdditionalData(operation.Id.ToString())
+                },
+                includeInRecentHistory: false);
+
+            var service = CreateAutoActivationService(dbContext, repository);
+            Assert.Equal(1, await service.ProcessAsync());
+            Assert.Equal(0, await service.ProcessAsync());
+
+            var wallet = await dbContext.UserWallets.SingleAsync();
+            Assert.Equal(operation.Amount, wallet.Balance);
+            Assert.Single(await dbContext.WalletTransactions.ToListAsync());
+            Assert.Equal(PaymentOperationStatus.Succeeded, (await dbContext.PaymentOperations.SingleAsync()).Status);
+        }
+
+        [Fact]
+        public async Task ProcessAsync_DoesNotApply_WhenVerifiedDetailsDisagree()
+        {
+            var (dbContext, operation, _) = await CreatePendingSubscriptionOperationAsync();
+            var repository = new YooMoneyRepositoryStub(
+                new OperationHistory
+                {
+                    OperationId = "ym-unverified", Amount = operation.Amount, Status = "success",
+                    AdditionalData = CreateAdditionalData(operation.Id.ToString())
+                },
+                new OperationDetails
+                {
+                    OperationId = "ym-unverified", Amount = operation.Amount - 10m, Status = "success",
+                    AdditionalData = CreateAdditionalData(operation.Id.ToString())
+                });
+
+            var service = CreateAutoActivationService(dbContext, repository);
+            Assert.Equal(0, await service.ProcessAsync());
+            Assert.Equal(PaymentOperationStatus.Pending, (await dbContext.PaymentOperations.SingleAsync()).Status);
+            Assert.Empty(await dbContext.UserSubscriptions.ToListAsync());
         }
 
         [Fact]
@@ -209,10 +274,12 @@ namespace YandexSpeech.Tests
         {
             private readonly IReadOnlyList<OperationHistory> _operationHistory;
             private readonly Dictionary<string, OperationDetails> _operationDetails;
+            private readonly bool _includeInRecentHistory;
 
-            public YooMoneyRepositoryStub(OperationHistory operationHistory, OperationDetails operationDetails)
+            public YooMoneyRepositoryStub(OperationHistory operationHistory, OperationDetails operationDetails, bool includeInRecentHistory = true)
             {
                 _operationHistory = new[] { operationHistory };
+                _includeInRecentHistory = includeInRecentHistory;
                 _operationDetails = new Dictionary<string, OperationDetails>(StringComparer.OrdinalIgnoreCase)
                 {
                     [operationDetails.OperationId ?? string.Empty] = operationDetails
@@ -237,7 +304,16 @@ namespace YandexSpeech.Tests
 
             public Task<IReadOnlyList<OperationHistory>?> GetOperationHistoryAsync(int from, int count, System.Threading.CancellationToken cancellationToken = default)
             {
-                return Task.FromResult<IReadOnlyList<OperationHistory>?>(_operationHistory);
+                return Task.FromResult<IReadOnlyList<OperationHistory>?>(
+                    _includeInRecentHistory ? _operationHistory : Array.Empty<OperationHistory>());
+            }
+
+            public Task<IReadOnlyList<OperationHistory>?> GetOperationHistoryByLabelAsync(string label, System.Threading.CancellationToken cancellationToken = default)
+            {
+                var matching = _operationHistory
+                    .Where(operation => string.Equals(operation.AdditionalData?["label"]?.ToString(), label, StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+                return Task.FromResult<IReadOnlyList<OperationHistory>?>(matching);
             }
         }
     }

@@ -10,6 +10,8 @@ namespace YandexSpeech.services.Interface
 
         Task<IReadOnlyList<OperationHistory>?> GetOperationHistoryAsync(int from, int count, CancellationToken cancellationToken = default);
 
+        Task<IReadOnlyList<OperationHistory>?> GetOperationHistoryByLabelAsync(string label, CancellationToken cancellationToken = default);
+
         Task<string> AuthorizeAsync(CancellationToken cancellationToken = default);
 
         Task<string> ExchangeTokenAsync(string code, CancellationToken cancellationToken = default);

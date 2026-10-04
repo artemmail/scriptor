@@ -138,6 +138,11 @@ namespace YandexSpeech
                 .HasPrecision(18, 2);
 
             builder.Entity<PaymentOperation>()
+                .HasIndex(p => p.ExternalOperationId)
+                .IsUnique()
+                .HasFilter("[Provider] = 1 AND [ExternalOperationId] IS NOT NULL");
+
+            builder.Entity<PaymentOperation>()
                 .HasOne(p => p.User)
                 .WithMany()
                 .HasForeignKey(p => p.UserId)

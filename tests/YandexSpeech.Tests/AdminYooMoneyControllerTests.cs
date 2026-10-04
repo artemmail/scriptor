@@ -107,6 +107,9 @@ namespace YandexSpeech.Tests
 
             public Task<IReadOnlyList<OperationHistory>?> GetOperationHistoryAsync(int from, int count, System.Threading.CancellationToken cancellationToken = default)
                 => Task.FromResult<IReadOnlyList<OperationHistory>?>(Array.Empty<OperationHistory>());
+
+            public Task<IReadOnlyList<OperationHistory>?> GetOperationHistoryByLabelAsync(string label, System.Threading.CancellationToken cancellationToken = default)
+                => Task.FromResult<IReadOnlyList<OperationHistory>?>(Array.Empty<OperationHistory>());
         }
     }
 }

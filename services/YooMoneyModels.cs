@@ -52,6 +52,9 @@ namespace YandexSpeech.services
     {
         [JsonProperty("operations")]
         public List<OperationHistory>? Operations { get; set; }
+
+        [JsonProperty("error")]
+        public string? Error { get; set; }
     }
 
     /// <summary>

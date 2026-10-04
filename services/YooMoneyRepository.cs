@@ -93,7 +93,33 @@ namespace YandexSpeech.services
                 includeToken: true,
                 cancellationToken).ConfigureAwait(false);
 
+            return ParseHistory(responseJson);
+        }
+
+        public async Task<IReadOnlyList<OperationHistory>?> GetOperationHistoryByLabelAsync(
+            string label,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(label);
+
+            var responseJson = await PostAsync("api/operation-history",
+                new[]
+                {
+                    new KeyValuePair<string, string>("label", label),
+                    new KeyValuePair<string, string>("records", "100")
+                },
+                includeToken: true,
+                cancellationToken).ConfigureAwait(false);
+
+            return ParseHistory(responseJson);
+        }
+
+        private static IReadOnlyList<OperationHistory>? ParseHistory(string responseJson)
+        {
             var response = JsonConvert.DeserializeObject<OperationHistoryResponse>(responseJson);
+            if (!string.IsNullOrWhiteSpace(response?.Error))
+                throw new InvalidOperationException($"YooMoney operation-history failed: {response.Error}");
+
             return response?.Operations;
         }
 

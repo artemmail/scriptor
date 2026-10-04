@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -41,6 +42,24 @@ namespace YandexSpeech.services
                 throw new ArgumentException("Operation identifier is required.", nameof(operationId));
             }
 
+            if (!_dbContext.Database.IsRelational())
+                return await ApplyCoreAsync(operationId, reference, externalPayload, cancellationToken).ConfigureAwait(false);
+
+            await using var transaction = await _dbContext.Database
+                .BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+                .ConfigureAwait(false);
+            var result = await ApplyCoreAsync(operationId, reference, externalPayload, cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return result;
+        }
+
+        private async Task<PaymentOperation?> ApplyCoreAsync(
+            Guid operationId,
+            string? reference,
+            string? externalPayload,
+            CancellationToken cancellationToken)
+        {
+
             var operation = await _dbContext.PaymentOperations
                 .Include(o => o.User)
                 .FirstOrDefaultAsync(o => o.Id == operationId, cancellationToken)
@@ -50,6 +69,11 @@ namespace YandexSpeech.services
             {
                 return null;
             }
+
+            // The callback may have loaded this entity before another request applied it.
+            await _dbContext.Entry(operation).ReloadAsync(cancellationToken).ConfigureAwait(false);
+            if (_dbContext.Entry(operation).State == EntityState.Detached)
+                return null;
 
             if (operation.Status == PaymentOperationStatus.Succeeded)
             {
@@ -73,6 +97,17 @@ namespace YandexSpeech.services
 
             var payload = PaymentOperationPayloadSerializer.Deserialize(operation.Payload);
             var resolvedReference = ResolveReference(operation, reference);
+
+            if (operation.Provider == PaymentProvider.YooMoney
+                && await _dbContext.PaymentOperations.AsNoTracking().AnyAsync(
+                    p => p.Id != operation.Id
+                        && p.Provider == PaymentProvider.YooMoney
+                        && p.ExternalOperationId == resolvedReference
+                        && p.Status == PaymentOperationStatus.Succeeded,
+                    cancellationToken).ConfigureAwait(false))
+            {
+                throw new InvalidOperationException("Платёж YooMoney уже применён к другой операции.");
+            }
 
             if (payload == null || string.Equals(payload.Type, PaymentOperationPayloadTypes.Wallet, StringComparison.OrdinalIgnoreCase))
             {

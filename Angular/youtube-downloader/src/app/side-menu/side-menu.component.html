@@ -116,6 +116,10 @@
       <span matListItemLine>{{ user.displayName || user.email }}</span>
       <span matListItemLine class="profile-hint">Управление аккаунтом и выход</span>
     </a>
+    <a mat-list-item  (click)="openSupport()">
+      <mat-icon matListItemIcon>support_agent</mat-icon>
+      <span matListItemTitle>Поддержка</span>
+    </a>
   </ng-container>
   <ng-template #guestMenu>
     <a mat-list-item (click)="navigate('/recognition')">
@@ -130,6 +134,13 @@
       <mat-icon matListItemIcon>lyrics</mat-icon>
       <span matListItemTitle>Протокол совещаний</span>
     </a>
+
+    
+    <a mat-list-item  (click)="openSupport()">
+      <mat-icon matListItemIcon>support_agent</mat-icon>
+      <span matListItemTitle>Поддержка</span>
+    </a>
+
     <mat-accordion class="submenu-accordion" [multi]="true">
       <mat-expansion-panel class="submenu-panel">
         <mat-expansion-panel-header class="submenu-header">
@@ -162,4 +173,5 @@
       <span matListItemTitle>Войти</span>
     </a>
   </ng-template>
+
 </mat-nav-list>
