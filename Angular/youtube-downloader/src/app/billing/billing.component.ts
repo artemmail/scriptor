@@ -34,7 +34,7 @@ import {
     MatProgressSpinnerModule
   ],
   templateUrl: './billing.component.html',
-  styleUrls: ['./billing.component.css']
+  styleUrls: ['../shared/account-page.css', './billing.component.css']
 })
 export class BillingComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
@@ -51,6 +51,8 @@ export class BillingComponent implements OnInit, OnDestroy {
   loadingPlans = false;
   loadingWallet = false;
   loadingSummary = false;
+  plansError = false;
+  summaryError = '';
   submitting = false;
   infoMessage = '';
   readonly heroHighlights = [
@@ -83,7 +85,7 @@ export class BillingComponent implements OnInit, OnDestroy {
     private readonly route: ActivatedRoute,
     private readonly titleService: Title
   ) {
-    this.titleService.setTitle('Подписки и баланс — YouScriptor');
+    this.titleService.setTitle('Тарифы и баланс — YouScriptor');
   }
 
   ngOnInit(): void {
@@ -113,6 +115,7 @@ export class BillingComponent implements OnInit, OnDestroy {
 
   loadPlans(): void {
     this.loadingPlans = true;
+    this.plansError = false;
     this.paymentsService.getPlans().subscribe({
       next: plans => {
         this.plans = plans;
@@ -120,6 +123,7 @@ export class BillingComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.loadingPlans = false;
+        this.plansError = true;
         this.snackBar.open('Не удалось загрузить тарифы. Попробуйте позже.', 'Закрыть', { duration: 4000 });
       }
     });
@@ -201,6 +205,7 @@ export class BillingComponent implements OnInit, OnDestroy {
 
   loadSummary(): void {
     this.loadingSummary = true;
+    this.summaryError = '';
     this.paymentsService.getSubscriptionSummary().subscribe({
       next: summary => {
         this.summary = summary;
@@ -209,6 +214,7 @@ export class BillingComponent implements OnInit, OnDestroy {
       error: () => {
         this.summary = undefined;
         this.loadingSummary = false;
+        this.summaryError = 'Не удалось загрузить остаток минут и видео.';
       }
     });
   }

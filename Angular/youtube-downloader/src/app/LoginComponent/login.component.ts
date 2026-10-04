@@ -8,30 +8,8 @@ import { Title } from '@angular/platform-browser';
   standalone: true,
   selector: 'app-login',
   imports: [CommonModule, RouterModule],
-  template: `
-    <div class="login d-flex flex-column align-items-center mt-5">
-      <h2>Login</h2>
-
-      <div class="d-flex flex-column gap-2 mt-3 w-100" style="max-width: 320px;">
-        <button
-          class="btn btn-primary"
-          (click)="loginWithGoogle()">
-          Login with a Google ID
-        </button>
-
-        <button
-          class="btn btn-outline-secondary"
-          (click)="loginWithYandex()">
-          Login with a Yandex ID
-        </button>
-      </div>
-
-      <!-- Сообщение об ошибке из callback -->
-      <p *ngIf="authError" class="text-danger mt-2 text-center w-75">
-        {{ authErrorMessage }}
-      </p>
-    </div>
-  `
+  templateUrl: './login.component.html',
+  styleUrls: ['../shared/account-page.css', './login.component.css']
 })
 export class LoginComponent implements OnInit {
   authError = false;

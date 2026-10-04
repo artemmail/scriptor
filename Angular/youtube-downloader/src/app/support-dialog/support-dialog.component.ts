@@ -5,10 +5,6 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { AuthService, UserInfo } from '../services/AuthService.service';
@@ -16,8 +12,7 @@ import { AuthService, UserInfo } from '../services/AuthService.service';
 @Component({
   selector: 'app-support-dialog',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatDialogModule, MatButtonModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatIconModule, MatProgressBarModule],
+  imports: [CommonModule, FormsModule, MatDialogModule, MatIconModule, MatProgressBarModule],
   templateUrl: './support-dialog.component.html',
   styleUrls: ['./support-dialog.component.css']
 })

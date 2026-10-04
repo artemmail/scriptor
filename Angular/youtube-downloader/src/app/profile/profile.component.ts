@@ -7,7 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatListModule } from '@angular/material/list';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { PLATFORM_ID } from '@angular/core';
 
@@ -20,6 +20,7 @@ import { PaymentsService, SubscriptionSummary } from '../services/payments.servi
   standalone: true,
   imports: [
     CommonModule,
+    RouterModule,
     ReactiveFormsModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -29,7 +30,7 @@ import { PaymentsService, SubscriptionSummary } from '../services/payments.servi
     MatListModule
   ],
   templateUrl: './profile.component.html',
-  styleUrls: ['./profile.component.css']
+  styleUrls: ['../shared/account-page.css', './profile.component.css']
 })
 export class ProfileComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
@@ -105,7 +106,7 @@ export class ProfileComponent implements OnInit {
       },
       error: () => {
         this.summaryLoading = false;
-        this.summaryError = 'Не удалось загрузить сведения о подписке.';
+        this.summaryError = 'Не удалось загрузить сведения о пакете.';
       }
     });
   }
@@ -160,15 +161,7 @@ export class ProfileComponent implements OnInit {
       return '';
     }
 
-    const planName = this.summary.planName || (this.summary.hasActiveSubscription ? 'Пакет активен' : 'Стартовый пакет');
-    const remaining = `${this.formatRemainingHours(this.summary.remainingTranscriptionMinutes)} / ${this.formatRemainingVideos(this.summary.remainingVideos)}`;
-
-    if (this.summary.endsAt) {
-      const ends = new Date(this.summary.endsAt).toLocaleDateString('ru-RU');
-      return `${planName} до ${ends}: осталось ${remaining}`;
-    }
-
-    return `${planName}: осталось ${remaining}`;
+    return this.summary.planName || (this.summary.hasActiveSubscription ? 'Пакет активен' : 'Стартовый пакет');
   }
 
   get billingUrl(): string {
@@ -273,28 +266,22 @@ export class ProfileComponent implements OnInit {
   }
 
   formatRemainingHours(minutes: number | null | undefined): string {
-    if (minutes == null) {
-      return '0 ч';
-    }
-
-    if (minutes >= 2147483647) {
-      return 'безлимит ч';
-    }
-
-    const hours = Math.max(0, minutes) / 60;
-    const formatted = hours.toFixed(1).replace('.', ',').replace(',0', '');
-    return `${formatted} ч`;
+    if (minutes != null && minutes >= 2147483647) return 'Безлимит';
+    const total = Math.max(0, minutes ?? 0);
+    const hours = Math.floor(total / 60);
+    const rest = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(total % 60);
+    return hours ? `${hours} ч${total % 60 ? ` ${rest} мин` : ''}` : `${rest} мин`;
   }
 
   formatRemainingVideos(videos: number | null | undefined): string {
     if (videos == null) {
-      return '0 YouTube';
+      return '0';
     }
 
     if (videos >= 2147483647) {
-      return 'безлимит YouTube';
+      return 'Безлимит';
     }
 
-    return `${Math.max(0, videos)} YouTube`;
+    return `${Math.max(0, videos)}`;
   }
 }

@@ -7,26 +7,33 @@
     </a>
     <nav class="s-nav" aria-label="Навигация по странице">
       <a href="#features" (click)="scrollTo('features', $event)">Возможности</a>
-      <a href="#workflow" (click)="scrollTo('workflow', $event)">Как это работает</a>
-      <a href="#faq" (click)="scrollTo('faq', $event)">Вопросы</a>
+      <a href="#postprocessing" (click)="scrollTo('postprocessing', $event)">Постобработка</a>
+      <a href="#pricing" (click)="scrollTo('pricing', $event)">Цены</a>
+      <a routerLink="/ServiceNews">Новости</a>
+      <button type="button" (click)="openSupport()">Поддержка</button>
     </nav>
     <div class="s-header-actions">
       <a class="s-login" [routerLink]="(user$ | async) ? '/transcriptions' : '/login'">{{ (user$ | async) ? 'Мои записи' : 'Войти' }} <span aria-hidden="true">↗</span></a>
       <a class="s-button s-button-small s-button-dark" href="#start" (click)="scrollTo('start', $event)">Начать <span aria-hidden="true">↗</span></a>
     </div>
   </header>
+  <nav class="s-mobile-nav s-container" aria-label="Новости, цены и поддержка">
+    <a routerLink="/ServiceNews">Новости</a>
+    <a href="#pricing" (click)="scrollTo('pricing', $event)">Цены</a>
+    <button type="button" (click)="openSupport()">Поддержка</button>
+  </nav>
 
   <main id="main" tabindex="-1">
     <section class="s-hero s-container" aria-labelledby="hero-title">
       <div class="s-hero-copy">
         <p class="s-eyebrow"><span class="s-live-dot"></span> МЕНЬШЕ ПЕРЕСЛУШИВАТЬ. БОЛЬШЕ СОЗДАВАТЬ.</p>
         <h1 id="hero-title">Всё ценное<br>в записи —<br><span class="s-highlight">уже в тексте.</span></h1>
-        <p class="s-hero-description">Превратите ролик с YouTube, интервью или свою аудиозапись в текст, с которым удобно работать. Сохраните мысли, а не часы переслушивания.</p>
+        <p class="s-hero-description">Превратите ролик с YouTube, интервью или свою аудиозапись в текст. Для собственных записей выберите постобработку: она выделит участников разговора, оформит материал и поможет увидеть главное.</p>
         <div class="s-hero-actions">
           <a class="s-button s-button-lime" href="#start" (click)="scrollTo('start', $event)">Получить расшифровку <span aria-hidden="true">↗</span></a>
           <a class="s-text-link" routerLink="/tasks">Открыть скрипторий <span aria-hidden="true">→</span></a>
         </div>
-        <div class="s-hero-note"><span aria-hidden="true">✓</span> В браузере <span class="s-note-dot">·</span> Без установки программ</div>
+        <div class="s-hero-note"><span aria-hidden="true">✓</span> В браузере <span class="s-note-dot">·</span> Доступные цены <span class="s-note-dot">·</span> Без установки программ</div>
       </div>
       <div class="s-hero-visual" aria-label="Пример: из записи лекции в редактируемый текст">
         <span class="s-visual-orbit" aria-hidden="true"></span>
@@ -90,7 +97,7 @@
         <article class="s-feature s-feature-audio">
           <div class="s-feature-top"><span class="s-feature-number">02 / ВАШИ ЗАПИСИ</span><span class="s-feature-symbol" aria-hidden="true">≋</span></div>
           <div class="s-feature-art s-art-audio" aria-hidden="true"><div class="s-audio-disc"><span>≋</span></div><div class="s-audio-label">интервью.wav<small>Из речи — в текст</small></div></div>
-          <h3>Дайте записи<br>вторую жизнь.</h3><p>Загрузите интервью, лекцию или встречу. Выберите профиль обработки, задайте контекст и получите расшифровку для дальнейшей работы.</p>
+          <h3>Дайте записи<br>вторую жизнь.</h3><p>Загрузите интервью, лекцию или встречу. Выберите профиль обработки: сервис выделит участников, оформит текст и поможет разобрать содержание.</p>
           <a class="s-card-link" routerLink="/transcriptions">Расшифровать свой файл <span aria-hidden="true">↗</span></a>
         </article>
         <article class="s-feature s-feature-download">
@@ -100,6 +107,19 @@
           <a class="s-card-link" routerLink="/down">Выбрать дорожки <span aria-hidden="true">↗</span></a>
         </article>
       </div>
+    </section>
+
+    <section class="s-postprocessing s-container" id="postprocessing" aria-labelledby="postprocessing-title">
+      <div class="s-postprocessing-heading">
+        <div><p class="s-eyebrow">ПОСТОБРАБОТКА ВАШИХ ЗАПИСЕЙ</p><h2 id="postprocessing-title">Из разговора —<br><em>в готовый материал.</em></h2></div>
+        <p>Выбирайте профиль под задачу и добавляйте свои указания. Текст можно повторно обработать, если нужен другой формат или взгляд на запись.</p>
+      </div>
+      <div class="s-postprocessing-grid">
+        <article><span class="s-postprocessing-icon" aria-hidden="true">01 / ↔</span><h3>Понятно, кто говорит</h3><p>Выделение участников диалога помогает читать интервью, созвон или совещание как разговор, а не как сплошной текст.</p></article>
+        <article><span class="s-postprocessing-icon" aria-hidden="true">02 / ≡</span><h3>Структура и разметка</h3><p>Профиль может исправить орфографию, оформить текст и собрать содержание в списки, таблицы и другие удобные блоки.</p></article>
+        <article><span class="s-postprocessing-icon" aria-hidden="true">03 / ◎</span><h3>Оценка интервью</h3><p>Для собеседования можно получить итоговый разбор с двух сторон: глазами интервьюера и интервьюируемого.</p></article>
+      </div>
+      <a class="s-postprocessing-link" routerLink="/transcriptions">Обработать свою запись <span aria-hidden="true">↗</span></a>
     </section>
 
     <section class="s-workflow" id="workflow" aria-labelledby="workflow-title">
@@ -118,6 +138,11 @@
       <div class="s-library-copy"><p class="s-eyebrow">СКРИПТОРИЙ</p><h2 id="library-title">Из «где-то слышал»<br>в «вот, нашёл».</h2><p>Скрипторий собирает готовые расшифровки YouTube в одном месте. Найдите материал по названию или каналу, откройте текст и вернитесь к важной мысли без повторного просмотра.</p><a class="s-text-link" routerLink="/tasks">Заглянуть в библиотеку <span aria-hidden="true">↗</span></a><div class="s-library-footnote">Лекции, подкасты, интервью.<br>Знания, к которым удобно возвращаться.</div></div>
     </section>
 
+    <section class="s-pricing s-container" id="pricing" aria-labelledby="pricing-title">
+      <div><p class="s-eyebrow">ДОСТУПНЫЕ ЦЕНЫ</p><h2 id="pricing-title">Работать с записями<br>можно недорого.</h2></div>
+      <div class="s-pricing-copy"><p>Выбирайте пакет под свои задачи: минуты для собственных записей или количество роликов YouTube. Актуальную стоимость и остаток лимитов смотрите в тарифах.</p><a class="s-button s-button-dark" routerLink="/billing">Посмотреть тарифы <span aria-hidden="true">↗</span></a></div>
+    </section>
+
     <section class="s-faq s-container" id="faq" aria-labelledby="faq-title">
       <div><p class="s-eyebrow">ПЕРЕД ПЕРВОЙ ЗАПИСЬЮ</p><h2 id="faq-title">Хорошие вопросы.<br>Прямые ответы.</h2><a class="s-text-link" routerLink="/billing">Тарифы и баланс <span aria-hidden="true">↗</span></a></div>
       <div class="s-questions"><details *ngFor="let faq of faqs"><summary>{{ faq.question }}<span aria-hidden="true">+</span></summary><p>{{ faq.answer }}</p></details></div>
@@ -126,5 +151,5 @@
     <section class="s-final s-container" aria-labelledby="final-title"><div><p class="s-eyebrow">ХОРОШИЕ МЫСЛИ СТОИТ СОХРАНЯТЬ</p><h2 id="final-title">Пусть запись<br>работает на вас.</h2><p>Начните с одного ролика. Или с одной важной встречи.</p><a class="s-button s-button-dark" href="#start" (click)="scrollTo('start', $event)">Превратить запись в результат <span aria-hidden="true">↗</span></a></div><div class="s-final-art" aria-hidden="true"><span>≋</span><span>↗</span><span>Аа</span></div></section>
   </main>
 
-  <footer class="s-footer s-container"><a class="s-brand" routerLink="/"><span class="s-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>YouScriptor<span class="s-brand-sub">из записи — в текст</span></span></a><p>Ваши записи. Ваши мысли. Ваш следующий шаг.</p><nav aria-label="Ссылки в подвале"><a routerLink="/tasks">YouTube в текст</a><a routerLink="/transcriptions">Мои расшифровки</a><a routerLink="/down">Скачать дорожки</a></nav><div class="s-footer-bottom"><span>© YouScriptor · Скрипторий</span><span>Сделано для тех, кто ценит содержание.</span></div></footer>
+  <footer class="s-footer s-container"><a class="s-brand" routerLink="/"><span class="s-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>YouScriptor<span class="s-brand-sub">из записи — в текст</span></span></a><p>Ваши записи. Ваши мысли. Ваш следующий шаг.</p><nav aria-label="Ссылки в подвале"><a routerLink="/tasks">YouTube в текст</a><a routerLink="/transcriptions">Мои расшифровки</a><a routerLink="/down">Скачать дорожки</a><a routerLink="/billing">Тарифы</a><a routerLink="/ServiceNews">Новости сайта</a><button type="button" (click)="openSupport()">Поддержка</button></nav><div class="s-footer-bottom"><span>© YouScriptor · Скрипторий</span><span>Сделано для тех, кто ценит содержание.</span></div></footer>
 </div>

@@ -40,6 +40,7 @@ export class SideMenuComponent {
   openSupport(): void {
     this.close.emit();
     this.dialog.open(SupportDialogComponent, {
+      panelClass: 'support-dialog-panel',
       width: '640px',
       maxWidth: '95vw',
       maxHeight: '90vh',

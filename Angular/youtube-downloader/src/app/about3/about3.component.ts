@@ -4,10 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
+import { MatDialog } from '@angular/material/dialog';
 import { Subject } from 'rxjs';
 import { finalize, takeUntil } from 'rxjs/operators';
 import { SubtitleService } from '../services/subtitle.service';
 import { AuthService } from '../services/AuthService.service';
+import { SupportDialogComponent } from '../support-dialog/support-dialog.component';
 
 type SourceMode = 'youtube' | 'file' | 'download';
 
@@ -25,6 +27,7 @@ export class About3Component implements OnDestroy {
     { question: 'Как получить текст из YouTube-видео?', answer: 'Вставьте ссылку или идентификатор ролика. Сервис проверит доступные дорожки субтитров и предложит выбрать одну, если их несколько. После обработки вы получите текст, который можно читать, редактировать и экспортировать. Доступность результата зависит от доступности ролика и его субтитров.' },
     { question: 'Можно загрузить собственную запись?', answer: 'Да. В разделе «Мои расшифровки» можно загрузить аудио или видео с устройства либо указать публичную ссылку на файл Яндекс Диска. Перед запуском выберите профиль обработки и при необходимости добавьте свои указания для анализа.' },
     { question: 'Что можно сделать с готовой расшифровкой?', answer: 'Открыть её в редакторе, внести правки, скопировать текст или сохранить документ. Для собственных записей доступны Word, PDF и Markdown, а при наличии временной разметки — SRT. Результат можно повторно обработать с другим профилем аналитики.' },
+    { question: 'Что входит в постобработку записи?', answer: 'Профиль обработки помогает выделить участников разговора, исправить и разметить текст, оформить его в списки или таблицы. Для интервью можно выбрать профиль с итоговой оценкой разговора со стороны интервьюера и интервьюируемого.' },
     { question: 'Можно скачать только аудиодорожку с YouTube?', answer: 'Да. Загрузчик показывает доступные аудио- и видеопотоки, их качество, кодек и размер. Можно выбрать аудиодорожку отдельно или объединить выбранные аудио и видео. Набор дорожек зависит от конкретного ролика.' },
     { question: 'Как устроены тарифы и лимиты?', answer: 'Расшифровка собственных записей учитывается в минутах, обработка YouTube — в количестве видео. Актуальные пакеты, остаток лимитов и способы оплаты доступны в разделе «Тарифы и баланс» после входа.' },
   ];
@@ -41,6 +44,7 @@ export class About3Component implements OnDestroy {
   constructor(
     private readonly subtitleService: SubtitleService,
     private readonly router: Router,
+    private readonly dialog: MatDialog,
     authService: AuthService,
     title: Title,
     private readonly meta: Meta,
@@ -52,7 +56,19 @@ export class About3Component implements OnDestroy {
     } catch { /* The form also works when browser storage is disabled. */ }
     title.setTitle('YouScriptor — транскрибация YouTube и аудио в текст');
     this.previousDescription = meta.getTag('name="description"')?.content ?? null;
-    meta.updateTag({ name: 'description', content: 'Превратите YouTube-видео, лекции, интервью и свои аудиозаписи в удобный текст. Редактируйте расшифровки, сохраняйте Word, PDF и Markdown, скачивайте дорожки YouTube.' });
+    meta.updateTag({ name: 'description', content: 'YouScriptor превращает YouTube-видео и свои записи в текст. Постобработка своих записей выделяет участников разговора, форматирует расшифровку и помогает анализировать интервью. Скачивание дорожек YouTube и доступные тарифы.' });
+  }
+
+  openSupport(): void {
+    this.dialog.open(SupportDialogComponent, {
+      panelClass: 'support-dialog-panel',
+      width: '640px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      autoFocus: 'first-heading',
+      restoreFocus: false,
+      closeOnNavigation: false,
+    });
   }
 
   scrollTo(id: string, event?: Event): void {

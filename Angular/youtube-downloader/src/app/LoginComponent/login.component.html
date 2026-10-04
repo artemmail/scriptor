@@ -1,0 +1,30 @@
+<div class="ap-page">
+  <main class="ap-container">
+    <div class="login-layout">
+      <section class="login-story" aria-labelledby="login-story-title">
+        <p class="ap-eyebrow">ВАШЕ МЕСТО ДЛЯ ВАЖНЫХ МЫСЛЕЙ</p>
+        <h1 class="ap-title" id="login-story-title">Всё начинается<br>с одной<br><em>хорошей записи.</em></h1>
+        <p class="ap-lead">Соберите в одном аккаунте расшифровки лекций, интервью и разговоров, к которым хочется вернуться.</p>
+        <div class="login-preview" aria-hidden="true">
+          <div class="login-preview-source"><span>≋</span><div>Важный разговор<small>Из речи — в текст</small></div><b>↗</b></div>
+          <div class="login-preview-document"><div class="login-preview-label"><i></i> МЫСЛИ УЖЕ НА БУМАГЕ</div><p>Сохранить главное.<br>Освободить время.</p><div class="login-preview-lines"><i></i><i></i><i></i></div><span>Текст · Структура · Новые идеи</span></div>
+        </div>
+      </section>
+
+      <section class="login-panel ap-panel" aria-labelledby="login-title">
+        <span class="login-glyph" aria-hidden="true">↗</span>
+        <p class="ap-eyebrow">РАДЫ ВАС ВИДЕТЬ</p>
+        <h2 id="login-title">Войти в YouScriptor</h2>
+        <p class="login-description">Выберите свой аккаунт для входа или регистрации.</p>
+        <div class="login-actions">
+          <button class="login-provider" type="button" (click)="loginWithGoogle()"><span class="provider-icon provider-google" aria-hidden="true">G</span><span>Продолжить с Google</span><span class="provider-arrow" aria-hidden="true">↗</span></button>
+          <button class="login-provider" type="button" (click)="loginWithYandex()"><span class="provider-icon provider-yandex" aria-hidden="true">Я</span><span>Продолжить с Яндексом</span><span class="provider-arrow" aria-hidden="true">↗</span></button>
+        </div>
+        <p *ngIf="authError" class="ap-notice ap-error login-error" role="alert">{{ authErrorMessage }}</p>
+        <p class="login-hint">Отдельный пароль для YouScriptor не нужен. Вход выполняется через выбранный сервис.</p>
+        <div class="login-panel-bottom"><span aria-hidden="true">✓</span><p>Ваши записи и результаты<br>будут под рукой.</p></div>
+      </section>
+    </div>
+    <footer class="ap-bottom"><a routerLink="/">← На главную</a><nav aria-label="Полезные ссылки"><a routerLink="/tasks">Скрипторий</a><a routerLink="/ServiceNews">Новости сайта</a></nav></footer>
+  </main>
+</div>

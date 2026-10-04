@@ -14,6 +14,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatListModule } from '@angular/material/list';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { SupportDialogComponent } from './support-dialog/support-dialog.component';
 
 // Импорт для регистрации SVG-иконок
 import { MatIconRegistry } from '@angular/material/icon';
@@ -37,6 +39,7 @@ import { SideMenuComponent } from './side-menu/side-menu.component';
     MatButtonModule,
     MatListModule,
     MatDividerModule,
+    MatDialogModule,
     SideMenuComponent
   ],
   templateUrl: './app.component.html',
@@ -53,12 +56,29 @@ export class AppComponent implements AfterViewInit {
     return path === '/' || path === '/about3';
   }
 
+  get isAccountPage(): boolean {
+    const path = this.router.url.split(/[?#]/)[0];
+    return /^\/(billing|login|profile)\/?$/.test(path);
+  }
+
+  openSupport(): void {
+    this.dialog.open(SupportDialogComponent, {
+      panelClass: 'support-dialog-panel',
+      width: '640px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      autoFocus: 'first-heading',
+      closeOnNavigation: false,
+    });
+  }
+
   constructor(
     private router: Router,
     private auth: AuthService,
     private yaMetrika: YaMetrikaService,
     private matIconRegistry: MatIconRegistry,
-    private domSanitizer: DomSanitizer
+    private domSanitizer: DomSanitizer,
+    private readonly dialog: MatDialog
   ) {
     this.user$ = this.auth.user$;
 

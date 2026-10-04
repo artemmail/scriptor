@@ -1,148 +1,49 @@
-<div class="billing-page" *ngIf="!loadingPlans && !loadingWallet && !loadingSummary; else loadingTemplate">
-  <main class="page-content">
-    <!--section class="hero">
-      <div class="hero-text">
-        <h1>Управляйте балансом YouScriptor в одном месте</h1>
-        <p class="hero-lead">
-          Пополняйте кошелёк, выбирайте подписки и контролируйте расходы на распознавание — интерфейс создан в
-          стиле главной страницы, чтобы вам было комфортно работать каждый день.
-        </p>
-        <ul class="hero-highlights">
-          <li *ngFor="let highlight of heroHighlights">{{ highlight }}</li>
-        </ul>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="#wallet">Пополнить баланс</a>
-          <a class="btn btn-secondary" [routerLink]="['/transcriptions']">Перейти к задачам</a>
-        </div>
-      </div>
+<div class="ap-page">
+  <main class="ap-container">
+    <header class="billing-intro">
+      <div><p class="ap-eyebrow">ТАРИФЫ И БАЛАНС</p><h1 class="ap-title">Больше записей.<br><em>Больше возможностей.</em></h1><p class="ap-lead">Выберите пакет под свой ритм. Минуты — для ваших аудио и видео, ролики — для расшифровок YouTube.</p></div>
+      <a class="ap-link" routerLink="/profile">История платежей <span aria-hidden="true">↗</span></a>
+    </header>
 
-      <div class="hero-card" id="wallet">
-        <div class="card-header">Баланс кошелька</div>
-        <ng-container *ngIf="wallet; else walletUnavailable">
-          <div class="card-balance">
-            <div class="card-balance__amount">
-              {{ wallet.balance | number: '1.0-2' }}
-              <span class="card-balance__currency">{{ wallet.currency }}</span>
-            </div>
-            <div class="card-balance__hint" *ngIf="infoMessage; else defaultHint">{{ infoMessage }}</div>
-            <ng-template #defaultHint>
-              <div class="card-balance__hint">Средства списываются автоматически при обработке задач.</div>
-            </ng-template>
-          </div>
+    <div class="ap-notice billing-notice" *ngIf="infoMessage" role="status">{{ infoMessage }}</div>
 
-          <form class="deposit-form" (ngSubmit)="deposit()">
-            <mat-form-field appearance="outline">
-              <mat-label>Сумма пополнения</mat-label>
-              <input
-                matInput
-                type="number"
-                [formControl]="depositControl"
-                min="100"
-                max="100000"
-                step="100"
-                placeholder="Например, 2000"
-              />
-              <mat-hint>Минимум 100 ₽</mat-hint>
-              <mat-error *ngIf="depositControl.hasError('required')">Укажите сумму</mat-error>
-              <mat-error *ngIf="depositControl.hasError('min')">Минимальная сумма — 100 ₽</mat-error>
-              <mat-error *ngIf="depositControl.hasError('max')">Максимальная сумма — 100000 ₽</mat-error>
-            </mat-form-field>
-
-            <button class="btn btn-primary" type="submit" [disabled]="depositControl.invalid || submitting">
-              Пополнить кошелёк
-            </button>
-          </form>
-
-          <div class="info-banner" *ngIf="infoMessage" aria-live="polite">{{ infoMessage }}</div>
-        </ng-container>
-
-        <ng-template #walletUnavailable>
-          <div class="empty-state">
-            <mat-icon>account_balance_wallet</mat-icon>
-            <h4>Не удалось загрузить баланс</h4>
-            <p>Попробуйте обновить страницу или обратитесь в поддержку.</p>
-          </div>
-        </ng-template>
-      </div>
+    <section class="billing-balance" aria-labelledby="balance-title" [attr.aria-busy]="loadingSummary">
+      <div class="balance-label"><p class="ap-eyebrow">УЖЕ В ВАШЕМ АККАУНТЕ</p><h2 id="balance-title">Ваш остаток</h2><a routerLink="/transcriptions">К моим расшифровкам <span aria-hidden="true">↗</span></a></div>
+      <ng-container *ngIf="summary && !loadingSummary">
+        <div class="balance-metric"><span>Свои аудио и видео</span><strong>{{ formatRemainingMinutes(summary.remainingTranscriptionMinutes) }}</strong><small>осталось для транскрибации</small></div>
+        <div class="balance-metric"><span>Ролики YouTube</span><strong>{{ formatRemainingVideos(summary.remainingVideos) }}</strong><small>осталось для обработки</small></div>
+      </ng-container>
+      <div class="balance-state" *ngIf="loadingSummary" role="status"><mat-progress-spinner mode="indeterminate" diameter="28" aria-label="Загрузка остатка"></mat-progress-spinner><span>Загружаем остаток…</span></div>
+      <div class="balance-state" *ngIf="summaryError && !loadingSummary"><p>{{ summaryError }}</p><button class="ap-button ap-button-lime" type="button" (click)="loadSummary()">Повторить</button></div>
     </section>
 
-    <section class="billing-features">
-      <div class="section-header">
-        <h2>Биллинг, которому доверяют команды</h2>
-        <p>Понятные инструменты управления финансами, чтобы вы могли сосредоточиться на работе с расшифровками.</p>
-      </div>
-      <div class="feature-grid">
-        <article class="feature-card" *ngFor="let advantage of advantages">
-          <div class="feature-icon">
-            <mat-icon>{{ advantage.icon }}</mat-icon>
-          </div>
-          <h3>{{ advantage.title }}</h3>
-          <p>{{ advantage.description }}</p>
-        </article>
-      </div>
-    </section-->
-
-    <section class="plans">
-      <div class="section-header">
-        <h2>Пакеты минут и видео</h2>
-        <p>Покупайте кредитные пакеты: минуты списываются за транскрибацию, видео — за распознавание YouTube.</p>
-      </div>
-      <div class="remaining-balance" *ngIf="summary">
-        <div class="remaining-balance__item">
-          <span class="remaining-balance__label">Осталось минут</span>
-          <strong class="remaining-balance__value">{{ formatRemainingMinutes(summary.remainingTranscriptionMinutes) }}</strong>
+    <section class="billing-plans" aria-labelledby="plans-title" [attr.aria-busy]="loadingPlans">
+      <div class="ap-section-heading"><div><h2 id="plans-title">Пакет для ваших задач</h2><p>Сравните объём и стоимость. Выберите нужный пакет и перейдите к оплате.</p></div><span class="billing-note">Цены из актуального каталога</span></div>
+      <div class="ap-state" *ngIf="loadingPlans" role="status"><mat-progress-spinner mode="indeterminate" diameter="36" aria-label="Загрузка тарифов"></mat-progress-spinner><p>Загружаем тарифы…</p></div>
+      <ng-container *ngIf="!loadingPlans">
+        <div class="billing-plan-grid" *ngIf="plans.length; else plansEmpty">
+          <article *ngFor="let plan of plans" class="billing-plan" [class.billing-plan-welcome]="isWelcomePlan(plan)">
+            <div class="plan-top"><span class="ap-eyebrow">{{ isWelcomePlan(plan) ? 'ДЛЯ ЗНАКОМСТВА' : 'ПАКЕТ МИНУТ И ВИДЕО' }}</span><mat-icon aria-hidden="true">{{ isWelcomePlan(plan) ? 'redeem' : 'graphic_eq' }}</mat-icon></div>
+            <h3>{{ plan.name }}</h3>
+            <p class="plan-description" *ngIf="plan.description">{{ plan.description }}</p>
+            <div class="plan-price">{{ isWelcomePlan(plan) ? 'Бесплатно' : formatPrice(plan) }}</div>
+            <p class="plan-rate" *ngIf="plan.includedTranscriptionMinutes > 0 && !isWelcomePlan(plan)">{{ formatPricePerHour(plan) }} транскрибации в пакете</p>
+            <ul class="plan-credits">
+              <li><span aria-hidden="true">≋</span><div><strong>{{ formatRemainingMinutes(plan.includedTranscriptionMinutes) }}</strong><small>своих аудио и видео</small></div></li>
+              <li><span aria-hidden="true">↗</span><div><strong>{{ formatRemainingVideos(plan.includedVideos) }}</strong><small>роликов YouTube</small></div></li>
+            </ul>
+            <button class="ap-button" type="button" (click)="buyPlan(plan)" [disabled]="submitting || isWelcomePlan(plan)">{{ isWelcomePlan(plan) ? 'Выдаётся автоматически' : submitting ? 'Подготавливаем оплату…' : 'Купить пакет' }}<span *ngIf="!isWelcomePlan(plan)" aria-hidden="true">↗</span></button>
+          </article>
         </div>
-        <div class="remaining-balance__item">
-          <span class="remaining-balance__label">Осталось YouTube-видео</span>
-          <strong class="remaining-balance__value">{{ formatRemainingVideos(summary.remainingVideos) }}</strong>
-        </div>
-      </div>
-      <div class="plans__grid" *ngIf="plans.length; else plansEmpty">
-        <mat-card *ngFor="let plan of plans" class="plan-card">
-          <mat-card-header>
-            <div mat-card-avatar class="plan-card__badge">
-              <mat-icon>{{ isWelcomePlan(plan) ? 'gift' : 'workspace_premium' }}</mat-icon>
-            </div>
-            <mat-card-title>{{ plan.name }}</mat-card-title>
-            <mat-card-subtitle>{{ formatCredits(plan) }}</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content>
-            <p class="plan-card__price">
-              {{ isWelcomePlan(plan) ? 'Бесплатно' : formatPrice(plan) }}
-            </p>
-            <p class="plan-card__hourly-price">{{ formatPricePerHour(plan) }}</p>
-            <p class="plan-card__description" *ngIf="plan.description">{{ plan.description }}</p>
-            <mat-nav-list class="plan-benefits">
-              <mat-list-item>
-                <mat-icon matListItemIcon color="primary">speed</mat-icon>
-                <span matListItemTitle>{{ plan.includedTranscriptionMinutes }} минут транскрибации</span>
-              </mat-list-item>
-              <mat-list-item>
-                <mat-icon matListItemIcon color="primary">workspace_premium</mat-icon>
-                <span matListItemTitle>{{ plan.includedVideos }} видео</span>
-              </mat-list-item>
-            </mat-nav-list>
-          </mat-card-content>
-          <mat-card-actions>
-            <button class="btn btn-outline plan-card__action" type="button" (click)="buyPlan(plan)" [disabled]="submitting || isWelcomePlan(plan)">
-              {{ isWelcomePlan(plan) ? 'Выдаётся автоматически' : 'Купить пакет' }}
-            </button>
-          </mat-card-actions>
-        </mat-card>
-      </div>
-      <ng-template #plansEmpty>
-        <div class="empty-state plans-empty">
-          <mat-icon>inventory_2</mat-icon>
-          <h4>Тарифы временно недоступны</h4>
-          <p>Мы уже работаем над обновлением предложений. Попробуйте открыть страницу позднее.</p>
-        </div>
-      </ng-template>
+        <ng-template #plansEmpty><div class="ap-panel ap-state"><mat-icon aria-hidden="true">inventory_2</mat-icon><h3>{{ plansError ? 'Не удалось загрузить тарифы' : 'Пакеты пока недоступны' }}</h3><p>Попробуйте обновить список через некоторое время.</p><button class="ap-button ap-button-outline" type="button" (click)="loadPlans()">Обновить список</button></div></ng-template>
+      </ng-container>
     </section>
+
+    <section class="billing-explainer" aria-label="Как использовать пакет">
+      <article><span class="ap-eyebrow">01 / СВОИ ЗАПИСИ</span><h3>Минуты для важных разговоров</h3><p>Загружайте аудио или видео, выбирайте профиль постобработки и получайте структурированный текст.</p></article>
+      <article><span class="ap-eyebrow">02 / YOUTUBE</span><h3>Ролики, к которым удобно вернуться</h3><p>Получайте текст из доступных субтитров и работайте с готовыми расшифровками в скриптории.</p></article>
+      <article><span class="ap-eyebrow">03 / ПОСЛЕ ОПЛАТЫ</span><h3>Всё видно в аккаунте</h3><p>Остаток минут и видео — наверху этой страницы. Суммы, даты и статусы платежей — в профиле.</p></article>
+    </section>
+    <footer class="ap-bottom"><span>YouScriptor · Из записи — в текст</span><nav aria-label="Полезные ссылки"><a routerLink="/">На главную</a><a routerLink="/profile">Профиль</a><a routerLink="/ServiceNews">Новости</a></nav></footer>
   </main>
 </div>
-
-<ng-template #loadingTemplate>
-  <div class="loading">
-    <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
-  </div>
-</ng-template>

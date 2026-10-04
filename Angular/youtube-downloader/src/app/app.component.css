@@ -20,6 +20,90 @@ html, body {
   background: linear-gradient(180deg, #f8fbff 0%, #eef2ff 100%);
 }
 
+.app-content.account-theme {
+  background: #f7f8f2;
+}
+
+.app-header.app-header-account {
+  position: relative;
+  height: 88px;
+  gap: 18px;
+  padding-inline: max(28px, calc((100% - 1280px) / 2));
+  background: #f7f8f2;
+  color: #22241f;
+  border-bottom: 1px solid #dfe2d7;
+  box-shadow: none;
+  backdrop-filter: none;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.app-header.app-header-account .mat-mdc-icon-button {
+  color: #526b2c;
+  flex-shrink: 0;
+}
+
+.app-header.app-header-account .mat-mdc-icon-button:hover {
+  color: #22241f;
+  background: #eaf0e1;
+}
+
+.account-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  color: #22241f;
+  font-size: 24px;
+  font-weight: 750;
+  letter-spacing: -.8px;
+  line-height: 1.15;
+  text-decoration: none;
+}
+
+.account-brand small {
+  display: block;
+  color: #666d5c;
+  font-size: 10px;
+  letter-spacing: 1.1px;
+  font-weight: 500;
+  margin-top: 5px;
+}
+
+.account-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 43px;
+  height: 43px;
+  border-radius: 12px;
+  background: #22241f;
+  transform: rotate(-4deg);
+}
+
+.account-mark i { width: 4px; height: 12px; border-radius: 3px; background: #d4f568; }
+.account-mark i:nth-child(2) { height: 25px; }
+.account-mark i:nth-child(3) { height: 18px; }
+.account-mark i:nth-child(4) { height: 29px; }
+
+.account-nav { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 13px; line-height: 1.4; }
+.account-nav a, .account-nav button { display: inline-flex; align-items: center; gap: 9px; padding: 11px 15px; border-radius: 8px; color: #666d5c; text-decoration: none; font: inherit; font-weight: 600; }
+.account-nav button { border: 0; background: none; cursor: pointer; }
+.account-nav .account-nav-active { color: #35412a; background: #e9f0dd; }
+.account-nav a:hover, .account-nav button:hover { color: #35412a; background: #edf2e5; }
+
+@media (max-width: 900px) {
+  .account-nav a, .account-nav button { padding-inline: 10px; font-size: 12px; }
+  .account-nav .account-workspace-link { display: none; }
+}
+
+@media (max-width: 600px) {
+  .app-header.app-header-account { height: auto; min-height: 88px; padding: 14px 20px 0; gap: 10px; flex-wrap: wrap; }
+  .account-brand { font-size: 22px; }
+  .account-mark { width: 38px; height: 38px; }
+  .account-nav { width: 100%; justify-content: space-between; margin-top: 4px; border-top: 1px solid #dfe2d7; padding-block: 7px; }
+  .account-nav a, .account-nav button { font-size: 12px; }
+}
+
 
 .app-header {
   position: sticky;

@@ -42,6 +42,11 @@ body .app-content > :not(.app-header):not(router-outlet) {
   background: transparent;
 }
 
+body .app-content.account-theme :is(a, button, input):focus-visible {
+  outline: 3px solid #8fa95d;
+  outline-offset: 3px;
+}
+
 body .app-content :is(
   .about-page,
   .landing-page,
@@ -290,6 +295,13 @@ body .app-content :is(app-png-to-webp .upload-area:hover, app-png-to-webp-batch 
   border: 1px solid var(--site-border);
   border-radius: 18px;
   box-shadow: 0 24px 60px rgba(27, 53, 100, 0.17);
+}
+
+.cdk-overlay-pane.support-dialog-panel .mat-mdc-dialog-surface {
+  background: #f7f8f2;
+  border: 1px solid #dfe2d7;
+  border-radius: 22px;
+  box-shadow: 0 28px 80px rgba(34, 36, 31, .22);
 }
 
 @media (max-width: 760px) {

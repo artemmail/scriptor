@@ -8,16 +8,18 @@
     <app-side-menu (close)="drawer.close()"></app-side-menu>
   </mat-sidenav>
 
-  <mat-sidenav-content class="app-content">
+  <mat-sidenav-content class="app-content" [class.account-theme]="isAccountPage">
     <mat-toolbar
       *ngIf="!isLandingPage"
       class="app-header"
-      [class.hidden]="hideToolbar"
+      [class.app-header-account]="isAccountPage"
+      [class.hidden]="hideToolbar && !isAccountPage"
     >
-      <button mat-icon-button (click)="drawer.toggle()">
+      <button mat-icon-button (click)="drawer.toggle()" aria-label="Открыть меню">
         <mat-icon>menu</mat-icon>
       </button>
-      <div class="app-bra1nd">
+      <a *ngIf="isAccountPage" class="account-brand" routerLink="/" aria-label="YouScriptor — главная"><span class="account-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>YouScriptor<small>из записи — в текст</small></span></a>
+      <div class="app-bra1nd" *ngIf="!isAccountPage">
         <img
           class="app-logo"
           src="assets/logo.webp"
@@ -29,6 +31,13 @@
           <span id="hAI1">YouScriptor</span>
         </span>
       </div>
+      <nav *ngIf="isAccountPage" class="account-nav" aria-label="Основная навигация">
+        <a class="account-workspace-link" routerLink="/transcriptions" routerLinkActive="account-nav-active">Мои записи</a>
+        <a routerLink="/billing" routerLinkActive="account-nav-active" ariaCurrentWhenActive="page">Тарифы</a>
+        <a *ngIf="user$ | async; else loginLink" routerLink="/profile" routerLinkActive="account-nav-active" ariaCurrentWhenActive="page">Профиль</a>
+        <ng-template #loginLink><a routerLink="/login" routerLinkActive="account-nav-active" ariaCurrentWhenActive="page">Войти</a></ng-template>
+        <button type="button" (click)="openSupport()">Поддержка <span aria-hidden="true">↗</span></button>
+      </nav>
     </mat-toolbar>
 
     <router-outlet></router-outlet>
