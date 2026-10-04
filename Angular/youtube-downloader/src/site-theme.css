@@ -1,0 +1,323 @@
+/* Shared visual language for the public pages and the application workspace. */
+:root {
+  --site-bg: #f6f8fc;
+  --site-surface: #ffffff;
+  --site-surface-soft: #f5f8fd;
+  --site-text: #172744;
+  --site-muted: #566780;
+  --site-border: #e1e8f2;
+  --site-primary: #245dcc;
+  --site-primary-hover: #174db8;
+  --site-radius: 20px;
+  --site-shadow: 0 18px 48px rgba(27, 53, 100, 0.08), 0 2px 9px rgba(27, 53, 100, 0.03);
+
+  --mat-sys-primary: #245dcc;
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: #e9f0ff;
+  --mat-sys-on-primary-container: #153f94;
+  --mat-sys-background: #f6f8fc;
+  --mat-sys-surface: #ffffff;
+  --mat-sys-on-surface: #172744;
+  --mat-sys-surface-container-low: #f5f8fd;
+  --mat-sys-outline: #8190a7;
+  --mat-sys-outline-variant: #d6e0ed;
+}
+
+html,
+body {
+  color: var(--site-text);
+  background: var(--site-bg);
+}
+
+body {
+  font-family: Roboto, 'Segoe UI', sans-serif;
+}
+
+body .app-content {
+  background: var(--site-bg);
+}
+
+body .app-content > :not(.app-header):not(router-outlet) {
+  color: var(--site-text);
+  background: transparent;
+}
+
+body .app-content :is(
+  .about-page,
+  .landing-page,
+  .YouScriptor-page,
+  .about3-page,
+  .billing-page,
+  .blog-page,
+  .profile-page,
+  .transcription-page,
+  .subtitles-page,
+  .tasks-page,
+  .recognition-page
+) {
+  background: transparent;
+}
+
+body .app-content .page-content {
+  gap: 76px;
+  padding: 48px clamp(16px, 4vw, 56px) 96px;
+}
+
+body .app-content .page-content > section {
+  width: min(100%, 1200px);
+  min-width: 0;
+}
+
+body .app-content :is(.about-page, .landing-page, .YouScriptor-page) {
+  gap: 76px;
+  padding: 48px clamp(16px, 4vw, 56px) 96px;
+}
+
+body .app-content .section-header {
+  margin-bottom: 26px;
+}
+
+body .app-content .section-header h2 {
+  color: var(--site-text);
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+body .app-content .section-header p {
+  color: var(--site-muted);
+  line-height: 1.6;
+}
+
+body .app-content :is(app-recognition-control, app-recognition-tasks, app-subtitles-tasks, app-billing, app-blog-feed, app-profile) .hero-text h1 {
+  color: var(--site-text);
+  font-size: clamp(2.5rem, 4.4vw, 3.8rem);
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+body .app-content :is(app-recognition-control, app-recognition-tasks, app-subtitles-tasks, app-billing, app-blog-feed, app-profile) .hero-lead {
+  max-width: 640px;
+  color: var(--site-muted);
+  line-height: 1.65;
+}
+
+body .app-content :is(app-recognition-control, app-recognition-tasks, app-subtitles-tasks, app-billing, app-blog-feed) .hero-highlights li {
+  border: 1px solid #dce6f7;
+  border-radius: 12px;
+  background: #f8faff;
+  color: #29466c;
+}
+
+body .app-content :is(
+  .panel,
+  .mat-mdc-card,
+  .page-header,
+  .progress-card,
+  .recognized-card,
+  .info-panel,
+  .table-card,
+  .list-card,
+  .form-card,
+  .converter-card
+) {
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius);
+  background: var(--site-surface);
+  box-shadow: var(--site-shadow);
+}
+
+body .app-content :is(.hero-card, .recognition-card, .upload-card, .subscription-card) {
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius);
+  box-shadow: var(--site-shadow);
+}
+
+body .app-content :is(.panel-header h3, .mat-mdc-card-title, .card-header h2, .card-header h3) {
+  color: var(--site-text);
+}
+
+body .app-content :is(.empty-state, .loading-state) {
+  border: 1px dashed #d6e1ef;
+  border-radius: 14px;
+  background: #f9fbfe;
+  color: var(--site-muted);
+}
+
+body .app-content .error {
+  border: 1px solid #f4c7c7;
+  border-radius: 12px;
+  background: #fff5f5;
+  color: #a92323;
+}
+
+body .app-content :is(.table-wrapper, .table-container, .history-table) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+body .app-content .mat-mdc-table {
+  background: #fff;
+}
+
+body .app-content .mat-mdc-table .mat-mdc-header-row {
+  background: #f5f8fd;
+}
+
+body .app-content .mat-mdc-table .mat-mdc-header-cell {
+  color: #4d5f7b;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.015em;
+}
+
+body .app-content .mat-mdc-table .mat-mdc-cell {
+  border-bottom-color: #e9eef6;
+  color: var(--site-text);
+}
+
+body .app-content .mat-mdc-table .mat-mdc-row:hover .mat-mdc-cell {
+  background: #f8faff;
+}
+
+body .app-content :is(.mat-mdc-form-field, .mat-mdc-button-base) {
+  --mdc-outlined-text-field-outline-color: #cdd8e8;
+  --mdc-outlined-text-field-focus-outline-color: #245dcc;
+  --mdc-filled-button-container-color: #245dcc;
+  --mdc-filled-button-label-text-color: #ffffff;
+  --mdc-outlined-button-outline-color: #c5d3e7;
+}
+
+body .app-content .mat-mdc-unelevated-button:not([disabled]),
+body .app-content .mat-mdc-raised-button:not([disabled]) {
+  border-radius: 10px;
+}
+
+body .app-content :is(app-about3, app-billing, app-recognition-control, app-recognition-tasks, app-youtube-downloader, app-blog-feed, app-blog-topic-detail, app-blog-topic-create) .btn-primary {
+  border: 1px solid #2359c4;
+  border-radius: 11px;
+  background: var(--site-primary);
+  box-shadow: 0 9px 20px rgba(36, 93, 204, 0.18);
+  color: #fff;
+}
+
+body .app-content :is(app-about3, app-billing, app-recognition-control, app-recognition-tasks, app-youtube-downloader, app-blog-feed, app-blog-topic-detail, app-blog-topic-create) .btn-primary:hover:not(:disabled) {
+  background: var(--site-primary-hover);
+  box-shadow: 0 12px 24px rgba(36, 93, 204, 0.23);
+}
+
+body .app-content a:focus-visible,
+body .app-content button:focus-visible,
+body .app-content [role='button']:focus-visible,
+body .app-content input:focus-visible,
+body .app-content textarea:focus-visible,
+body .app-content select:focus-visible {
+  outline: 3px solid rgba(36, 93, 204, 0.48);
+  outline-offset: 3px;
+}
+
+body .app-content button,
+body .app-content input,
+body .app-content textarea,
+body .app-content select {
+  font: inherit;
+}
+
+body .app-content app-about3 :is(
+  .advantage-card,
+  .workflow-card,
+  .feature-card,
+  .business-card,
+  .pricing-card,
+  .logo-card,
+  .cta-card
+) {
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius);
+  box-shadow: var(--site-shadow);
+}
+
+body .app-content app-about3 .pricing {
+  border: 1px solid var(--site-border);
+  border-radius: 24px;
+  box-shadow: var(--site-shadow);
+}
+
+body .app-content :is(app-about-business, app-about1, app-about2) :is(.feature, .pillar, .case, .preview-card, .pricing-card) {
+  border-radius: var(--site-radius);
+  box-shadow: var(--site-shadow);
+}
+
+body .app-content :is(app-admin-users, app-admin-payments, app-admin-billing-plans, app-admin-recognition-profiles) {
+  padding: 32px clamp(16px, 3vw, 48px) 80px;
+}
+
+body .app-content :is(app-png-to-webp, app-png-to-webp-batch) {
+  padding: 32px clamp(16px, 3vw, 48px) 80px;
+}
+
+body .app-content app-png-to-webp .page {
+  max-width: 1120px;
+  gap: 24px;
+}
+
+body .app-content app-png-to-webp h1 {
+  color: var(--site-text);
+  font-size: clamp(1.9rem, 3vw, 2.4rem);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+
+body .app-content app-png-to-webp .description {
+  color: var(--site-muted);
+  line-height: 1.6;
+}
+
+body .app-content :is(app-png-to-webp .upload-area, app-png-to-webp-batch .dropzone) {
+  border: 2px dashed #c7d7eb;
+  border-radius: 18px;
+  background: #f8fbff;
+}
+
+body .app-content :is(app-png-to-webp .upload-area:hover, app-png-to-webp-batch .dropzone:hover) {
+  border-color: #5a87d7;
+}
+
+.cdk-overlay-container .mat-mdc-dialog-surface,
+.cdk-overlay-container .mat-mdc-menu-panel {
+  border: 1px solid var(--site-border);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(27, 53, 100, 0.17);
+}
+
+@media (max-width: 760px) {
+  body .app-content .page-content,
+  body .app-content :is(.about-page, .landing-page, .YouScriptor-page) {
+    gap: 56px;
+    padding: 28px 16px 64px;
+  }
+
+  body .app-content :is(app-admin-users, app-admin-payments, app-admin-billing-plans, app-admin-recognition-profiles, app-png-to-webp, app-png-to-webp-batch) {
+    padding: 20px 12px 56px;
+  }
+
+  body .app-content :is(.panel, .mat-mdc-card, .page-header, .progress-card, .recognized-card, .info-panel) {
+    border-radius: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  body .app-content *,
+  body .app-content *::before,
+  body .app-content *::after {
+    scroll-behavior: auto;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

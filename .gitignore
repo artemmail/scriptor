@@ -49,7 +49,7 @@ pnpm-debug.log*
 *.sln.ide
 *.nupkg
 *.snupkg
-packages/            # если где-то ещё используются packages.config
+packages/
 
 # Паблиш-артефакты
 PublishProfiles/
@@ -66,6 +66,11 @@ appsettings.*.local.json
 # Или игнорируй конкретные подпапки, если они генерируются сборкой:
 # wwwroot/assets/
 # wwwroot/*.map
+
+### Generated application and local SDK data ###
+/wwwroot/
+/App_Data/
+/.dotnet-home/
 
 # secrets
 

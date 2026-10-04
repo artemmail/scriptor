@@ -1,0 +1,73 @@
+<h2 mat-dialog-title>Поддержка YouScriptor</h2>
+
+<ng-container *ngIf="sent; else compose">
+  <mat-dialog-content>
+    <p role="status">Сообщение отправлено в поддержку.</p>
+    <p *ngIf="user?.email">Ответ придёт на почту {{ user?.email }}.</p>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-flat-button mat-dialog-close>Готово</button>
+  </mat-dialog-actions>
+</ng-container>
+
+<ng-template #compose>
+  <form *ngIf="user; else guest" (ngSubmit)="submit()">
+    <mat-dialog-content class="support-content">
+      <p class="hint">Опишите проблему или задайте вопрос. Можно приложить файл или вставить скриншот из буфера обмена.</p>
+      <p class="hint" *ngIf="user.email">Почта для ответа: {{ user.email }}</p>
+      <p class="hint" *ngIf="!user.email">Укажите в тексте почту, на которую можно прислать ответ.</p>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Тип обращения</mat-label>
+        <mat-select [(ngModel)]="messageType" name="messageType" required [disabled]="sending">
+          <mat-option *ngFor="let type of messageTypes" [value]="type">{{ type }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Тема</mat-label>
+        <input matInput [(ngModel)]="header" name="header" required maxlength="200" [disabled]="sending" />
+        <mat-hint align="end">{{ header.length }}/200</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Сообщение</mat-label>
+        <textarea matInput [(ngModel)]="text" name="text" required maxlength="10000" rows="7"
+          [disabled]="sending" (paste)="onPaste($event)"></textarea>
+        <mat-hint align="end">{{ text.length }}/10 000</mat-hint>
+      </mat-form-field>
+
+      <div class="attachment">
+        <input #fileInput type="file" hidden (change)="onFileChange($event)" [disabled]="sending" />
+        <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="sending">
+          <mat-icon>attach_file</mat-icon>{{ uploadedFile ? 'Заменить файл' : 'Прикрепить файл' }}
+        </button>
+        <span class="hint">Один файл до 10 МБ</span>
+        <div *ngIf="uploadedFile" class="file-name">
+          <span>{{ uploadedFile.name }}</span>
+          <button mat-icon-button type="button" aria-label="Удалить вложение" (click)="removeFile()" [disabled]="sending">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <p *ngIf="fileError" class="error" role="alert">{{ fileError }}</p>
+      </div>
+      <p *ngIf="error" class="error" role="alert">{{ error }}</p>
+      <mat-progress-bar *ngIf="sending" mode="indeterminate" aria-label="Отправка сообщения"></mat-progress-bar>
+    </mat-dialog-content>
+
+    <mat-dialog-actions align="end">
+      <button mat-button type="button" mat-dialog-close [disabled]="sending">Отмена</button>
+      <button mat-flat-button type="submit" [disabled]="!canSubmit">
+        <mat-icon>send</mat-icon>{{ sending ? 'Отправка…' : 'Отправить' }}
+      </button>
+    </mat-dialog-actions>
+  </form>
+</ng-template>
+
+<ng-template #guest>
+  <mat-dialog-content><p>Войдите в аккаунт, чтобы написать в поддержку.</p></mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button mat-dialog-close>Закрыть</button>
+    <button mat-flat-button (click)="login()">Войти</button>
+  </mat-dialog-actions>
+</ng-template>

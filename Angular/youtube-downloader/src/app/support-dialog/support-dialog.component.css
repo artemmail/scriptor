@@ -1,0 +1,9 @@
+:host { display: block; }
+.support-content { display: flex; flex-direction: column; gap: 12px; }
+mat-form-field { width: 100%; }
+textarea { resize: vertical; }
+.hint { color: var(--mat-sys-on-surface-variant, #555); font-size: 14px; margin: 0; }
+.attachment { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.file-name { display: flex; align-items: center; gap: 8px; max-width: 100%; }
+.file-name span { overflow-wrap: anywhere; }
+.error { color: var(--mat-sys-error, #b3261e); margin: 0; }

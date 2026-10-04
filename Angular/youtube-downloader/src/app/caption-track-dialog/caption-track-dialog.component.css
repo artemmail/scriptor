@@ -1,0 +1,23 @@
+.track-list {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.track-list button {
+  display: flex;
+  justify-content: space-between;
+  min-height: 48px;
+  width: 100%;
+  text-align: left;
+}
+
+.track-list small {
+  color: #64748b;
+  margin-left: 16px;
+}
+
+.timer-hint {
+  color: #64748b;
+  font-size: 0.9rem;
+}
