@@ -10,6 +10,7 @@
 
   <mat-sidenav-content class="app-content">
     <mat-toolbar
+      *ngIf="!isLandingPage"
       class="app-header"
       [class.hidden]="hideToolbar"
     >

@@ -1,518 +1,112 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
+import { Component, Inject, OnDestroy } from '@angular/core';
+import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
-import { Title } from '@angular/platform-browser';
-import { MatExpansionModule } from '@angular/material/expansion';
-import { SubtitleService } from '../services/subtitle.service';
-import { PaymentsService, SubscriptionSummary } from '../services/payments.service';
-import { UsageLimitResponse, extractUsageLimitResponse } from '../models/usage-limit-response';
-import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
-import { AuthService } from '../services/AuthService.service';
-import { TranscriptionHeroComponent } from '../shared/transcription-hero/transcription-hero.component';
-import { OpenAiTranscriptionUploadFormComponent } from '../openai-transcription/openai-transcription-upload-form.component';
-import { OpenAiTranscriptionTaskDto } from '../services/openai-transcription.service';
+import { Meta, Title } from '@angular/platform-browser';
 import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { finalize, takeUntil } from 'rxjs/operators';
+import { SubtitleService } from '../services/subtitle.service';
+import { AuthService } from '../services/AuthService.service';
 
-interface WorkflowStep {
-  readonly title: string;
-  readonly description: string;
-  readonly image: string;
-}
-
-interface GalleryItem {
-  readonly title: string;
-  readonly image: string;
-  readonly alt: string;
-}
-
-interface AdvantageItem {
-  readonly icon: string;
-  readonly title: string;
-  readonly description: string;
-}
-
-interface BusinessFeature {
-  readonly title: string;
-  readonly description: string;
-  readonly image: string;
-}
-
-type RouterCommand = string | string[];
-
-interface PricingPlan {
-  readonly title: string;
-  readonly description: string;
-  readonly perks: readonly string[];
-  readonly link: RouterCommand;
-  readonly cta: string;
-}
-
-interface TrustedCompany {
-  readonly src: string;
-  readonly alt: string;
-}
-
-interface FaqItem {
-  readonly question: string;
-  readonly answer: string;
-}
+type SourceMode = 'youtube' | 'file' | 'download';
 
 @Component({
   selector: 'app-about3',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    RouterModule,
-    MatExpansionModule,
-    YandexAdComponent,
-    TranscriptionHeroComponent,
-    OpenAiTranscriptionUploadFormComponent,
-  ],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './about3.component.html',
   styleUrls: ['./about3.component.css'],
 })
-export class About3Component implements OnInit, OnDestroy {
-  constructor(
-    private readonly subtitleService: SubtitleService,
-    private readonly router: Router,
-    private readonly paymentsService: PaymentsService,
-    private readonly authService: AuthService,
-    private readonly titleService: Title,
-  ) {
-    this.titleService.setTitle('YouScriptor — сервис транскрибации аудио и видео');
-  }
-
-  readonly uploadRoute: RouterCommand = '/transcriptions';
-  readonly trialRoute: RouterCommand = '/billing';
-
-  readonly heroTitle = 'Преобразовать аудио и видео в текст';
-  readonly heroLead =
-    'Online-сервис автоматической транскрибации помогает за считанные минуты превратить записи интервью, созвонов и лекций в структурированный текст.';
-  readonly heroHighlights: readonly string[] = [
-    'Выделение участников разговора',
-    'Исправление орфографии, разметка и форматирование',
-    'Структурирование в документе в виде таблиц, списков, формул',
-    'Формирование готового к печати документа в Word и PDF',
-    'Профили распознавания — переговоры, совещание, собеседование, презентация и другие',
+export class About3Component implements OnDestroy {
+  readonly user$: AuthService['user$'];
+  readonly waveform = [18, 28, 43, 25, 56, 72, 44, 28, 53, 82, 62, 40, 66, 90, 55, 32, 48, 75, 96, 62, 38, 58, 84, 47, 25, 50, 72, 38, 61, 82, 48, 29, 43, 66, 37, 20];
+  readonly faqs = [
+    { question: 'Как получить текст из YouTube-видео?', answer: 'Вставьте ссылку или идентификатор ролика. Сервис проверит доступные дорожки субтитров и предложит выбрать одну, если их несколько. После обработки вы получите текст, который можно читать, редактировать и экспортировать. Доступность результата зависит от доступности ролика и его субтитров.' },
+    { question: 'Можно загрузить собственную запись?', answer: 'Да. В разделе «Мои расшифровки» можно загрузить аудио или видео с устройства либо указать публичную ссылку на файл Яндекс Диска. Перед запуском выберите профиль обработки и при необходимости добавьте свои указания для анализа.' },
+    { question: 'Что можно сделать с готовой расшифровкой?', answer: 'Открыть её в редакторе, внести правки, скопировать текст или сохранить документ. Для собственных записей доступны Word, PDF и Markdown, а при наличии временной разметки — SRT. Результат можно повторно обработать с другим профилем аналитики.' },
+    { question: 'Можно скачать только аудиодорожку с YouTube?', answer: 'Да. Загрузчик показывает доступные аудио- и видеопотоки, их качество, кодек и размер. Можно выбрать аудиодорожку отдельно или объединить выбранные аудио и видео. Набор дорожек зависит от конкретного ролика.' },
+    { question: 'Как устроены тарифы и лимиты?', answer: 'Расшифровка собственных записей учитывается в минутах, обработка YouTube — в количестве видео. Актуальные пакеты, остаток лимитов и способы оплаты доступны в разделе «Тарифы и баланс» после входа.' },
   ];
 
+  mode: SourceMode = 'youtube';
   searchValue = '';
   isStarting = false;
   startError: string | null = null;
-  limitResponse: UsageLimitResponse | null = null;
-  remainingVideos: number | null = null;
-  summary: SubscriptionSummary | null = null;
-  summaryLoading = false;
-  summaryError: string | null = null;
-  isAuthenticated = false;
+  quotaExceeded = false;
   private readonly destroy$ = new Subject<void>();
-  private hasRequestedSummary = false;
-  readonly guestSummaryDescription =
-    'После регистрации доступен стартовый пакет минут и видео.';
+  private readonly previousDescription: string | null;
+  private readonly draftKey = 'youscriptor.landing.youtube';
 
-  ngOnInit(): void {
-    this.authService.user$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(user => {
-        this.isAuthenticated = !!user;
+  constructor(
+    private readonly subtitleService: SubtitleService,
+    private readonly router: Router,
+    authService: AuthService,
+    title: Title,
+    private readonly meta: Meta,
+    @Inject(DOCUMENT) private readonly document: Document,
+  ) {
+    this.user$ = authService.user$;
+    try {
+      this.searchValue = this.document.defaultView?.sessionStorage.getItem(this.draftKey) ?? '';
+    } catch { /* The form also works when browser storage is disabled. */ }
+    title.setTitle('YouScriptor — транскрибация YouTube и аудио в текст');
+    this.previousDescription = meta.getTag('name="description"')?.content ?? null;
+    meta.updateTag({ name: 'description', content: 'Превратите YouTube-видео, лекции, интервью и свои аудиозаписи в удобный текст. Редактируйте расшифровки, сохраняйте Word, PDF и Markdown, скачивайте дорожки YouTube.' });
+  }
 
-        if (!this.isAuthenticated) {
-          this.summaryLoading = false;
-          this.summaryError = null;
-          this.summary = null;
-          this.remainingVideos = null;
-          this.hasRequestedSummary = false;
-          return;
-        }
+  scrollTo(id: string, event?: Event): void {
+    event?.preventDefault();
+    const target = this.document.getElementById(id);
+    target?.scrollIntoView({ block: 'start' });
+    if (id === 'main') target?.focus({ preventScroll: true });
+  }
 
-        if (!this.hasRequestedSummary) {
-          this.hasRequestedSummary = true;
-          this.loadSubscriptionSummary();
-        }
+  chooseMode(mode: SourceMode): void {
+    this.mode = mode;
+    this.startError = null;
+    this.quotaExceeded = false;
+  }
+
+  startRecognition(): void {
+    const query = this.searchValue.trim();
+    if (!query || this.isStarting) return;
+
+    this.isStarting = true;
+    this.startError = null;
+    this.quotaExceeded = false;
+    try {
+      this.document.defaultView?.sessionStorage.setItem(this.draftKey, query);
+    } catch { /* Browser storage is optional. */ }
+    this.subtitleService.startWithTrackChoice(query)
+      .pipe(takeUntil(this.destroy$), finalize(() => this.isStarting = false))
+      .subscribe({
+        next: response => {
+          if (response.taskId) {
+            try {
+              this.document.defaultView?.sessionStorage.removeItem(this.draftKey);
+            } catch { /* Browser storage is optional. */ }
+            this.router.navigate(['/recognized', response.taskId]);
+          }
+        },
+        error: (error: HttpErrorResponse) => {
+          if (error.status === 401) {
+            this.router.navigate(['/login'], { queryParams: { returnUrl: '/' } });
+            return;
+          }
+          this.quotaExceeded = error.status === 402;
+          const message = error.error?.message ?? error.error?.title;
+          this.startError = typeof message === 'string'
+            ? message
+            : 'Не удалось начать обработку. Проверьте ссылку и попробуйте ещё раз.';
+        },
       });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-  }
-
-  readonly trustedCompanies: readonly TrustedCompany[] = [
-    {
-      src: 'assets/about3/YouScriptor/avito-seeklogocom_12.png',
-      alt: 'Логотип Авито — клиент сервиса расшифровки аудио и видео в текст',
-    },
-    {
-      src: 'assets/about3/YouScriptor/VK_Full_Logo_12x.png',
-      alt: 'Логотип ВКонтакте — клиент сервиса расшифровки аудио и видео в текст',
-    },
-    {
-      src: 'assets/about3/YouScriptor/beeline_logo.png',
-      alt: 'Логотип Билайн — клиент сервиса расшифровки аудио и видео в текст',
-    },
-    {
-      src: 'assets/about3/YouScriptor/Samok_12x.png',
-      alt: 'Логотип Самокат — клиент сервиса расшифровки аудио и видео в текст',
-    },
-    {
-      src: 'assets/about3/YouScriptor/Lenta_New_Logo_22x.png',
-      alt: 'Логотип Лента — клиент сервиса расшифровки аудио и видео в текст',
-    },
-    {
-      src: 'assets/about3/YouScriptor/Skyeng_Base_12x.png',
-      alt: 'Логотип Skyeng — клиент сервиса расшифровки аудио и видео в текст',
-    },
-    {
-      src: 'assets/about3/YouScriptor/Skillbox_12x.png',
-      alt: 'Логотип Skillbox — клиент сервиса расшифровки аудио и видео в текст',
-    },
-    {
-      src: 'assets/about3/YouScriptor/CIAN_BIG 1.png',
-      alt: 'Логотип Циан — клиент сервиса расшифровки аудио и видео в текст',
-    },
-    {
-      src: 'assets/about3/YouScriptor/Skolkovo_Foundation_.png',
-      alt: 'Логотип Сколково — клиент сервиса расшифровки аудио и видео в текст',
-    },
-    {
-      src: 'assets/about3/YouScriptor/logo-sber.png',
-      alt: 'Логотип Сбер — клиент сервиса расшифровки аудио и видео в текст',
-    },
-    {
-      src: 'assets/about3/YouScriptor/Untitled_12x.png',
-      alt: 'Логотип РБК — клиент сервиса расшифровки аудио и видео в текст',
-    },
-  ];
-
-  readonly workflowSteps: readonly WorkflowStep[] = [
-    {
-      title: 'Загрузите файл',
-      description:
-        'Загрузите или перетащите файл в указанную область. Чем лучше качество аудио, тем понятнее будет итоговая расшифровка.',
-      image: 'assets/about3/YouScriptor/upload_frame-600x.png',
-    },
-    {
-      title: 'Дождитесь окончания расшифровки',
-      description:
-        'Сервису нужно 3−5% времени от длительности записи, чтобы перевести ваше аудио в текст.',
-      image: 'assets/about3/YouScriptor/files_frame-600x.png',
-    },
-    {
-      title: 'Редактируйте прямо в браузере',
-      description:
-        'Проверьте расшифровку, прослушайте фрагменты и внесите правки через встроенный онлайн-редактор.',
-      image: 'assets/about3/YouScriptor/transcript_frame-600x.png',
-    },
-    {
-      title: 'Скачайте результат',
-      description:
-        'Сохраните результат на устройство в формате DOCX, XLSX или SRT и поделитесь с коллегами.',
-      image: 'assets/about3/YouScriptor/export_frame-600x.png',
-    },
-  ];
-
-  readonly transcriptionFeatures: readonly string[] = [
-    'Поддержка всех современных аудио/видео форматов',
-    'Разметка с разделением на абзацы, таблицы, списки',
-    'Поддержка математических формул и подсветки кода',
-    'Сохранение в форматах Word/PDF, Markdown-редактор',
-    'Профили распознавания для документооборота:',
-    'Собеседование, рабочее совещание, презентация, лекция и проч.'
-  ];
-
-  readonly editorBlocks: readonly GalleryItem[] = [
-    {
-      title: 'Прослушивайте материал',
-      image: 'assets/about3/YouScriptor/transcript_player-600x.png',
-      alt: 'Онлайн-редактор с возможностью прослушивания аудио во время правки текста расшифровки',
-    },
-    {
-      title: 'Выделяйте важные моменты',
-      image: 'assets/about3/YouScriptor/transcript_formatter-600x.png',
-      alt: 'Инструменты форматирования и выделения текста цветным маркером в редакторе расшифровки',
-    },
-    {
-      title: 'Подписывайте спикеров',
-      image: 'assets/about3/YouScriptor/transcript_speakers-600x.png',
-      alt: 'Точная разметка диалога с удобной сменой и переименованием спикеров',
-    },
-  ];
-
-  readonly aiFeatures: readonly string[] = [
-    'Как ChatGPT, но для ваших расшифровок',
-    'Ответит на вопросы по расшифровке',
-    'Мгновенно подготовит резюме встречи',
-    'Сделает контент на основе расшифровки — от статьи до постов в соцсетях',
-  ];
-
-  readonly YouScriptorFeatures: readonly AdvantageItem[] = [
-    {
-      icon: '①',
-      title: 'Вайб-рекрутинг',
-      description: 'Загружайте видеозапись собеседования и получите автоматический отчёт об опыте, hard- и soft-скиллах кандидата, его красных флагах.',
-    },
-    {
-      icon: '②',
-      title: 'Вайб-джобхантинг',
-      description: 'Получите анализ токсичности компании, риски выгорания, карьерных перспектив, что может скрывать работодатель и ваши навыки самопрезентации.',
-    },
-    {
-      icon: '③',
-      title: 'Вайб-менеджмент',
-      description: 'Анализируйте записи рабочих совещаний и получайте отчёт о ходе работы команды. Что сделано, где пробуксовка. Анализ переговоров с партнёрами, коммерческих предложений',
-    },
-  ];
-
-  readonly businessFeatures: readonly BusinessFeature[] = [
-    {
-      title: 'Командная работа',
-      description: 'Создайте рабочее пространство в YouScriptor и пригласите коллег для совместной работы.',
-      image: 'assets/about3/YouScriptor/workspace_card-471x.png',
-    },
-    {
-      title: 'Общий доступ к файлам',
-      description: 'Настройте уровни доступа и делитесь ссылками на расшифровки внутри команды.',
-      image: 'assets/about3/YouScriptor/files_sharing-572x.png',
-    },
-    {
-      title: 'Детализация расходов',
-      description: 'Отслеживайте баланс минут и количество загруженных файлов в реальном времени.',
-      image: 'assets/about3/YouScriptor/workspace_analytics-572x.png',
-    },
-    {
-      title: 'Доступна интеграция по API',
-      description: 'Интегрируйте распознавание речи в свои сервисы через простой REST API.',
-      image: 'assets/about3/YouScriptor/api_integration-560x.png',
-    },
-  ];
-
-  readonly pricingPlans: readonly PricingPlan[] = [
-    {
-      title: 'YouScriptor Online',
-      description: 'Попробуйте YouScriptor бесплатно и получите 15 тестовых минут. Оплачивайте с российских и зарубежных карт или со счета организации.',
-      perks: ['15 тестовых минут на старте', 'Удобная оплата картой и по счету', 'Доступ из браузера и мобильных устройств'],
-      link: this.trialRoute,
-      cta: 'Попробовать онлайн',
-    },
-    {
-      title: 'YouScriptor On-premise',
-      description:
-        'Полноценная версия сервиса разворачивается на ваших серверах. Данные обрабатываются внутри инфраструктуры компании.',
-      perks: ['Развертывание в частной сети', 'Работа без доступа к интернету', 'Персональная поддержка и SLA'],
-      link: '/about',
-      cta: 'Получить предложение',
-    },
-  ];
-
-  readonly faqs: readonly FaqItem[] = [
-    {
-      question: 'Как преобразовать видео в текст?',
-      answer:
-        'Загрузите ваш видеоролик в YouScriptor — сервис преобразует его в текст с высокой точностью. Сразу после обработки вы сможете редактировать транскрипт и экспортировать результат в DOCX, XLSX или SRT.',
-    },
-    {
-      question: 'Можно ли транскрибировать аудио в текст?',
-      answer:
-        'Да. Мы поддерживаем популярные аудиоформаты, включая MP3, WAV, M4A, FLAC и другие. Просто перетащите файлы в загрузчик — обработка займёт всего несколько минут.',
-    },
-    {
-      question: 'Какие форматы файлов принимает YouScriptor?',
-      answer:
-        'Сервис работает с аудио- и видеоформатами MP3, MP4, WAV, MOV, AVI, M4A, WEBM и десятками других расширений. Если сомневаетесь, загрузите файл — мы автоматически проверим его совместимость.',
-    },
-    {
-      question: 'Можно ли получить тестовый доступ к сервису?',
-      answer:
-        'Новые пользователи получают 15 тестовых минут для оценки качества распознавания. Этого достаточно, чтобы загрузить несколько файлов, попробовать редактор и посмотреть экспорт.',
-    },
-    {
-      question: 'Как подключить сервис со счета юридического лица?',
-      answer:
-        'Оформите счёт в личном кабинете и оплатите его от имени компании. После оплаты баланс минут пополнится автоматически, а закрывающие документы будут доступны в разделе «Биллинг».',
-    },
-    {
-      question: 'Сгорают ли минуты при приобретении пакетов?',
-      answer:
-        'Минуты списываются только за фактически обработанные материалы. Вы можете пополнять баланс пакетами и расходовать их постепенно всей командой.',
-    },
-    {
-      question: 'Какую поддержку я получу от сервиса?',
-      answer:
-        'Команда YouScriptor помогает на каждом этапе — от подключения и настройки командного доступа до интеграции по API. Пишите нам в чат поддержки или на почту, и мы ответим в течение рабочего дня.',
-    },
-    {
-      question: 'Как создать корпоративный аккаунт в YouScriptor?',
-      answer:
-        'Зарегистрируйтесь на платформе и создайте рабочее пространство. Пригласите коллег по email, настройте роли и уровни доступа, а затем распределите минуты между участниками.',
-    },
-  ];
-
-  startRecognition(): void {
-    const query = this.searchValue.trim();
-    if (!query || this.isStarting) {
-      return;
-    }
-
-    this.isStarting = true;
-    this.startError = null;
-    this.limitResponse = null;
-
-    this.subtitleService.startWithTrackChoice(query).subscribe({
-      next: (response) => {
-        this.isStarting = false;
-        this.remainingVideos = response.remainingVideos ?? response.remainingQuota ?? null;
-        if (response?.taskId) {
-          this.router.navigate(['/recognized', response.taskId]);
-        }
-      },
-      error: (err: HttpErrorResponse) => {
-        this.isStarting = false;
-
-        if (err.status === 401) {
-          this.router.navigate(['/login']);
-          return;
-        }
-
-        const limit = extractUsageLimitResponse(err);
-        if (limit) {
-          this.limitResponse = limit;
-          this.remainingVideos = limit.remainingVideos ?? limit.remainingQuota ?? null;
-        } else {
-          console.error('Не удалось запустить распознавание', err);
-          this.startError = 'Не удалось запустить распознавание. Попробуйте ещё раз позже.';
-        }
-      },
-    });
-  }
-
-  loadSubscriptionSummary(): void {
-    this.summaryLoading = true;
-    this.summaryError = null;
-    this.paymentsService.getSubscriptionSummary().subscribe({
-      next: (summary) => {
-        this.summaryLoading = false;
-        this.summary = summary;
-      },
-      error: () => {
-        this.summaryLoading = false;
-        this.summaryError = 'Не удалось загрузить сведения о подписке.';
-      }
-    });
-  }
-
-  get subscriptionStatusMessage(): string {
-    if (!this.isAuthenticated) {
-      return 'Гостевой режим: попробуйте сервис бесплатно';
-    }
-
-    if (!this.summary) {
-      return '';
-    }
-
-    const planName = this.summary.planName || (this.summary.hasActiveSubscription ? 'Пакет активен' : 'Стартовый пакет');
-    const remaining = `${this.formatRemainingHours(this.summary.remainingTranscriptionMinutes)} / ${this.formatRemainingVideos(this.summary.remainingVideos)}`;
-
-    if (this.summary.endsAt) {
-      const ends = new Date(this.summary.endsAt).toLocaleDateString('ru-RU');
-      return `${planName} до ${ends}: осталось ${remaining}`;
-    }
-
-    return `${planName}: осталось ${remaining}`;
-  }
-
-  get subscriptionChipClass(): string {
-    if (!this.isAuthenticated) {
-      return 'status-trial';
-    }
-
-    if (!this.summary) {
-      return 'status-neutral';
-    }
-
-    if (this.summary.hasLifetimeAccess || this.summary.isLifetime) {
-      return 'status-success';
-    }
-
-    if (this.summary.hasActiveSubscription) {
-      return 'status-active';
-    }
-
-    return 'status-trial';
-  }
-
-  get billingUrl(): string {
-    if (this.limitResponse?.paymentUrl) {
-      return this.limitResponse.paymentUrl;
-    }
-
-    if (this.summary?.billingUrl) {
-      return this.summary.billingUrl;
-    }
-
-    return '/billing';
-  }
-
-  navigateToBilling(): void {
-    const url = this.billingUrl;
-    if (!url) {
-      return;
-    }
-
-    if (url.startsWith('http')) {
-      window.open(url, '_blank');
-      return;
-    }
-
-    this.router.navigateByUrl(url);
-  }
-
-  handleHeroUploadSuccess(_task: OpenAiTranscriptionTaskDto): void {
-    this.limitResponse = null;
-    this.loadSubscriptionSummary();
-
-    this.router.navigate(['/transcriptions']);
-  }
-
-  handleHeroUsageLimit(limit: UsageLimitResponse): void {
-    this.limitResponse = limit;
-    this.remainingVideos = limit.remainingVideos ?? limit.remainingQuota ?? null;
-  }
-
-  onHeroUploadStateChange(_: boolean): void {
-    // Карточка загрузки управляет собственным состоянием, дополнительной обработки не требуется.
-  }
-
-  get shouldShowSubscriptionCard(): boolean {
-    return this.summaryLoading || !!this.summary || !!this.summaryError || !!this.limitResponse || !this.isAuthenticated;
-  }
-
-  formatRemainingHours(minutes: number | null | undefined): string {
-    if (minutes == null) {
-      return '0 ч';
-    }
-
-    if (minutes >= 2147483647) {
-      return 'безлимит ч';
-    }
-
-    const hours = Math.max(0, minutes) / 60;
-    const formatted = hours.toFixed(1).replace('.', ',').replace(',0', '');
-    return `${formatted} ч`;
-  }
-
-  formatRemainingVideos(videos: number | null | undefined): string {
-    if (videos == null) {
-      return '0 YouTube';
-    }
-
-    if (videos >= 2147483647) {
-      return 'безлимит YouTube';
-    }
-
-    return `${Math.max(0, videos)} YouTube`;
+    if (this.previousDescription === null) this.meta.removeTag('name="description"');
+    else this.meta.updateTag({ name: 'description', content: this.previousDescription });
   }
 }

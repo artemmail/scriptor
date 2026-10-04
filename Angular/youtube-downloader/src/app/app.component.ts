@@ -48,6 +48,11 @@ export class AppComponent implements AfterViewInit {
   hideToolbar = false;
   user$!: Observable<UserInfo | null>;
 
+  get isLandingPage(): boolean {
+    const path = this.router.url.split(/[?#]/)[0];
+    return path === '/' || path === '/about3';
+  }
+
   constructor(
     private router: Router,
     private auth: AuthService,

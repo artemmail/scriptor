@@ -1,268 +1,130 @@
-<div class="about3-page">
-  <main class="page-content">
+<div class="scriptorium">
+  <a class="s-skip" href="#main" (click)="scrollTo('main', $event)">К содержимому</a>
+  <header class="s-header s-container">
+    <a class="s-brand" routerLink="/" aria-label="YouScriptor — главная">
+      <span class="s-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span>YouScriptor<span class="s-brand-sub">из записи — в текст</span></span>
+    </a>
+    <nav class="s-nav" aria-label="Навигация по странице">
+      <a href="#features" (click)="scrollTo('features', $event)">Возможности</a>
+      <a href="#workflow" (click)="scrollTo('workflow', $event)">Как это работает</a>
+      <a href="#faq" (click)="scrollTo('faq', $event)">Вопросы</a>
+    </nav>
+    <div class="s-header-actions">
+      <a class="s-login" [routerLink]="(user$ | async) ? '/transcriptions' : '/login'">{{ (user$ | async) ? 'Мои записи' : 'Войти' }} <span aria-hidden="true">↗</span></a>
+      <a class="s-button s-button-small s-button-dark" href="#start" (click)="scrollTo('start', $event)">Начать <span aria-hidden="true">↗</span></a>
+    </div>
+  </header>
 
-     
-
-    <section class="YouScriptor-advantages">
-    <app-transcription-hero
-      [title]="heroTitle"
-      [lead]="heroLead"
-      [highlights]="heroHighlights"
-      [showSubscriptionStatus]="true"
-      [summaryLoading]="summaryLoading"
-      [subscriptionChipClass]="subscriptionChipClass"
-      [subscriptionStatusMessage]="subscriptionStatusMessage"
-      (billingClick)="navigateToBilling()"
-    >
-      <app-openai-transcription-upload-form
-        layout="card"
-        (success)="handleHeroUploadSuccess($event)"
-        (limit)="handleHeroUsageLimit($event)"
-        (uploadingChange)="onHeroUploadStateChange($event)"
-      ></app-openai-transcription-upload-form>
-    </app-transcription-hero>
-     </section>
-
-    <section class="YouScriptor-advantages">
-      <div class="section-header">
-        <h1>Анализ собеседований, совещаний, переговоров</h1>
-        <p>Интеллектуальный анализ аудио- и видеозаписей митингов</p>
+  <main id="main" tabindex="-1">
+    <section class="s-hero s-container" aria-labelledby="hero-title">
+      <div class="s-hero-copy">
+        <p class="s-eyebrow"><span class="s-live-dot"></span> МЕНЬШЕ ПЕРЕСЛУШИВАТЬ. БОЛЬШЕ СОЗДАВАТЬ.</p>
+        <h1 id="hero-title">Всё ценное<br>в записи —<br><span class="s-highlight">уже в тексте.</span></h1>
+        <p class="s-hero-description">Превратите ролик с YouTube, интервью или свою аудиозапись в текст, с которым удобно работать. Сохраните мысли, а не часы переслушивания.</p>
+        <div class="s-hero-actions">
+          <a class="s-button s-button-lime" href="#start" (click)="scrollTo('start', $event)">Получить расшифровку <span aria-hidden="true">↗</span></a>
+          <a class="s-text-link" routerLink="/tasks">Открыть скрипторий <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="s-hero-note"><span aria-hidden="true">✓</span> В браузере <span class="s-note-dot">·</span> Без установки программ</div>
       </div>
-      <div class="advantage-grid">
-        <article class="advantage-card" *ngFor="let feature of YouScriptorFeatures">
-          <div class="advantage-icon" aria-hidden="true">{{ feature.icon }}</div>
-          <h3>{{ feature.title }}</h3>
-          <p [innerHTML]="feature.description"></p>
-        </article>
+      <div class="s-hero-visual" aria-label="Пример: из записи лекции в редактируемый текст">
+        <span class="s-visual-orbit" aria-hidden="true"></span>
+        <div class="s-recording">
+          <div class="s-recording-top"><span class="s-file-icon" aria-hidden="true">▶</span><div>Лекция. Искусство замечать<small>Аудио / видео → текст</small></div><span class="s-recording-menu" aria-hidden="true">···</span></div>
+          <div class="s-wave" aria-hidden="true"><span *ngFor="let height of waveform; let i = index" [style.height.%]="height" [class.s-wave-muted]="i > 23"></span></div>
+          <div class="s-player-time"><span>12:48</span><span>24:36</span></div>
+        </div>
+        <div class="s-document">
+          <div class="s-document-toolbar"><span><i class="s-live-dot"></i> РАСШИФРОВКА</span><span class="s-example-tag">Пример результата</span></div>
+          <div class="s-document-body">
+            <p class="s-document-label">ИЗ ГОЛОСА — В МЫСЛЬ</p>
+            <h2>Хорошие идеи<br>начинаются с внимания.</h2>
+            <div class="s-transcript-line"><span>00:12</span><p>Каждый день мы слышим десятки интересных мыслей. Но сколько из них мы действительно сохраняем?</p></div>
+            <div class="s-transcript-line"><span>00:28</span><p>Попробуйте <mark>превратить услышанное в текст.</mark> Так проще увидеть главное и вернуться к нему позже.</p></div>
+            <div class="s-document-bottom"><span><span aria-hidden="true">✓</span> Можно редактировать</span><span class="s-mini-cursor" aria-hidden="true">↖</span></div>
+          </div>
+        </div>
+        <div class="s-export-sticker"><span class="s-sticker-icon" aria-hidden="true">↗</span><div>Мысли — с собой.<small>Word · PDF · Markdown</small></div></div>
+        <span class="s-visual-caption">ВАША ЗАПИСЬ. НОВЫЕ ВОЗМОЖНОСТИ.</span>
       </div>
     </section>
 
-    <section class="recognition-block">
-      <div class="recognition-grid">
-        <div class="recognition-text">
-          <div class="recognition-brand">
-            <img class="recognition-logo" src="assets/logo.webp" alt="Логотип YouScriptor" />
-            <span class="recognition-title">YouScriptor</span>
-          </div>
-          <p class="recognition-tagline">Конспектируем за вас — как личный учёный писарь.</p>
-          <p class="recognition-lead">
-            Автоматически создавайте профессиональные конспекты и отчёты из YouTube-видео: с расшифровкой,
-            форматированием, разметкой, формулами и подсветкой кода.
-          </p>
+    <div class="s-format-strip s-container" aria-label="Основные возможности">
+      <span>Один сервис.<br><strong>Три способа работать с записью.</strong></span>
+      <span><b aria-hidden="true">↗</b> YouTube в текст</span>
+      <span><b aria-hidden="true">≋</b> Аудио в документ</span>
+      <span><b aria-hidden="true">↓</b> Дорожки в файл</span>
+    </div>
 
-          <div>
-            <app-yandex-ad></app-yandex-ad>
-          </div>
+    <section class="s-start s-container" id="start" aria-labelledby="start-title">
+      <div class="s-start-copy"><p class="s-eyebrow">НАЧНЁМ С ВАШЕЙ ЗАПИСИ</p><h2 id="start-title">Что превратим<br>в результат?</h2><p>Выберите источник.<br>Остальное — по шагам.</p></div>
+      <div class="s-launcher">
+        <div class="s-source-switch" aria-label="Источник записи">
+          <button type="button" [attr.aria-pressed]="mode === 'youtube'" [class.s-selected]="mode === 'youtube'" (click)="chooseMode('youtube')" [disabled]="isStarting">YouTube → текст</button>
+          <button type="button" [attr.aria-pressed]="mode === 'file'" [class.s-selected]="mode === 'file'" (click)="chooseMode('file')" [disabled]="isStarting">Мой файл</button>
+          <button type="button" [attr.aria-pressed]="mode === 'download'" [class.s-selected]="mode === 'download'" (click)="chooseMode('download')" [disabled]="isStarting">Скачать дорожки</button>
         </div>
-
-        <div class="recognition-card">
-          <h2>Запустите новую расшифровку</h2>
-          <p class="recognition-card-lead">
-            Введите идентификатор или ссылку на YouTube, чтобы получить готовый документ.
-          </p>
-          <div class="subscription-card" *ngIf="shouldShowSubscriptionCard">
-            <div class="status-row">
-              <span class="status-chip" [ngClass]="summaryLoading ? 'status-neutral' : subscriptionChipClass">
-                {{ summaryLoading ? 'Загружаем статус подписки…' : subscriptionStatusMessage }}
-              </span>
-              <button class="btn btn-tertiary" type="button" (click)="navigateToBilling()">
-                Перейти к тарифам
-              </button>
-            </div>
-            <p class="summary-error" *ngIf="summaryError">{{ summaryError }}</p>
-            <p class="quota-message" *ngIf="remainingVideos !== null && remainingVideos >= 0 && !summaryLoading">
-              Осталось видео: {{ remainingVideos }}
-            </p>
-            <p class="summary-description" *ngIf="!summaryLoading">
-              <ng-container *ngIf="isAuthenticated; else guestSummary">
-                <ng-container *ngIf="summary; else summaryFallback">
-                  Осталось: {{ formatRemainingHours(summary.remainingTranscriptionMinutes) }} / {{ formatRemainingVideos(summary.remainingVideos) }}.
-                </ng-container>
-                <ng-template #summaryFallback>
-                  Узнать актуальные условия можно в разделе биллинга.
-                </ng-template>
-              </ng-container>
-              <ng-template #guestSummary>
-                {{ guestSummaryDescription }}
-              </ng-template>
-            </p>
-            <div class="limit-message" *ngIf="limitResponse">
-              <p>{{ limitResponse.message }}</p>
-              <button class="btn btn-primary" type="button" (click)="navigateToBilling()">Оформить подписку</button>
-            </div>
-          </div>
-          <form class="recognition-form" (ngSubmit)="startRecognition()">
-            <label class="recognition-label" for="recognition-input">Введите идентификатор или ссылку YouTube</label>
-            <div class="recognition-field">
-              <input
-                id="recognition-input"
-                name="youtubeQuery"
-                type="text"
-                [(ngModel)]="searchValue"
-                placeholder="https://youtube.com/..."
-                autocomplete="off"
-                [disabled]="isStarting"
-              />
-              <button class="btn btn-primary" type="submit" [disabled]="isStarting || !searchValue.trim()">
-                <span *ngIf="!isStarting">Запустить</span>
-                <span *ngIf="isStarting">Запускаем…</span>
-              </button>
-            </div>
+        <div class="s-source-content" [ngSwitch]="mode">
+          <form *ngSwitchCase="'youtube'" (ngSubmit)="startRecognition()" [attr.aria-busy]="isStarting">
+            <label for="landing-youtube">Ссылка на YouTube-видео</label>
+            <div class="s-input-row"><input id="landing-youtube" name="youtube" type="text" [(ngModel)]="searchValue" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" [disabled]="isStarting" aria-describedby="youtube-hint"><button class="s-button s-button-dark" type="submit" [disabled]="!searchValue.trim() || isStarting">{{ isStarting ? 'Проверяем…' : 'В текст' }} <span aria-hidden="true">↗</span></button></div>
+            <p class="s-field-hint" id="youtube-hint">Подойдёт ссылка или ID ролика. Если дорожек субтитров несколько, вы сможете выбрать нужную.</p>
           </form>
-          <p class="recognition-hint">
-            Готовый результат ищите в <b><a [routerLink]="['/Scriptorium']">Scriptorium</a></b>, либо повторите тот же
-            запрос — результат сохраняется.
-          </p>
-          <p class="recognition-error" *ngIf="startError">{{ startError }}</p>
+          <div *ngSwitchCase="'file'" class="s-source-alternative"><div><h3>Ваша запись — ваш документ.</h3><p>Загрузите аудио или видео с устройства либо по ссылке Яндекс Диска. Выберите профиль обработки и добавьте свои указания.</p></div><a class="s-button s-button-dark" routerLink="/transcriptions">Загрузить запись <span aria-hidden="true">↗</span></a><span class="s-field-hint">Для работы со своими записями потребуется вход.</span></div>
+          <div *ngSwitchCase="'download'" class="s-source-alternative"><div><h3>Нужна сама запись?</h3><p>Откройте загрузчик, вставьте ссылку и выберите доступные аудио- и видеодорожки. Скачайте аудио отдельно или объедините его с видео.</p></div><a class="s-button s-button-dark" routerLink="/down">Открыть загрузчик <span aria-hidden="true">↗</span></a><span class="s-field-hint">Качество, язык и формат зависят от доступных потоков ролика.</span></div>
         </div>
+        <div *ngIf="startError" class="s-form-error" role="alert">{{ startError }} <a *ngIf="quotaExceeded" routerLink="/billing">Открыть тарифы и баланс →</a></div>
       </div>
     </section>
 
-    <section class="trusted">
-      <h2>Нам доверяют команды из топовых компаний</h2>
-      <div class="logo-grid">
-        <ng-container *ngFor="let company of trustedCompanies">
-          <div class="logo-card">
-            <img [src]="company.src" [alt]="company.alt" />
-          </div>
-        </ng-container>
-      </div>
-    </section>
-
-    <section class="workflow">
-      <h2>Как работает YouScriptor</h2>
-      <div class="workflow-grid">
-        <article class="workflow-card" *ngFor="let step of workflowSteps; let index = index">
-          <div class="workflow-image">
-            <img [src]="step.image" [alt]="step.title" />
-          </div>
-          <div class="workflow-body">
-            <p class="workflow-step">Шаг {{ index + 1 }}</p>
-            <h3>{{ step.title }}</h3>
-            <p>{{ step.description }}</p>
-          </div>
+    <section class="s-features s-container" id="features" aria-labelledby="features-title">
+      <div class="s-section-heading"><div><p class="s-eyebrow">ЗАПИСЬ — ЭТО ТОЛЬКО НАЧАЛО</p><h2 id="features-title">Услышали. Сохранили.<br><span class="s-muted">Использовали.</span></h2></div><p>Для лекций, которые хочется разобрать.<br>Для интервью, из которых получится статья.<br>Для разговоров, где важно каждое решение.</p></div>
+      <div class="s-feature-grid">
+        <article class="s-feature s-feature-youtube">
+          <div class="s-feature-top"><span class="s-feature-number">01 / YOUTUBE</span><span class="s-feature-symbol" aria-hidden="true">↗</span></div>
+          <div class="s-feature-art s-art-youtube" aria-hidden="true"><div class="s-video-tile"><span>▶</span><small>СМОТРЕТЬ</small></div><span class="s-art-arrow">→</span><div class="s-text-tile"><i></i><i></i><i></i><small>ЧИТАТЬ</small></div></div>
+          <h3>Ролик длинный.<br>Текст — под рукой.</h3><p>Получите текст из субтитров YouTube, отредактируйте его и сохраните документ. А готовые расшифровки ищите в скриптории по названию и каналу.</p>
+          <a class="s-card-link" routerLink="/tasks">Открыть скрипторий <span aria-hidden="true">↗</span></a>
+        </article>
+        <article class="s-feature s-feature-audio">
+          <div class="s-feature-top"><span class="s-feature-number">02 / ВАШИ ЗАПИСИ</span><span class="s-feature-symbol" aria-hidden="true">≋</span></div>
+          <div class="s-feature-art s-art-audio" aria-hidden="true"><div class="s-audio-disc"><span>≋</span></div><div class="s-audio-label">интервью.wav<small>Из речи — в текст</small></div></div>
+          <h3>Дайте записи<br>вторую жизнь.</h3><p>Загрузите интервью, лекцию или встречу. Выберите профиль обработки, задайте контекст и получите расшифровку для дальнейшей работы.</p>
+          <a class="s-card-link" routerLink="/transcriptions">Расшифровать свой файл <span aria-hidden="true">↗</span></a>
+        </article>
+        <article class="s-feature s-feature-download">
+          <div class="s-feature-top"><span class="s-feature-number">03 / СКАЧИВАНИЕ</span><span class="s-feature-symbol" aria-hidden="true">↓</span></div>
+          <div class="s-feature-art s-art-download" aria-hidden="true"><div><span>♫</span><b>Аудиодорожка</b><i>✓</i></div><div><span>▷</span><b>Видеодорожка</b><i>+</i></div></div>
+          <h3>Только звук?<br>Или вместе с видео?</h3><p>Выбирайте потоки по качеству, кодеку и размеру. Сохраняйте аудио отдельно или объединяйте выбранные дорожки в один файл.</p>
+          <a class="s-card-link" routerLink="/down">Выбрать дорожки <span aria-hidden="true">↗</span></a>
         </article>
       </div>
     </section>
 
-    <section class="features">
-      <h2>Что внутри</h2>
-      <div class="features-layout">
-        <article class="feature-card">
-          <div class="feature-body">
-            <h3>Транскрибация из аудио, видео</h3>
-            <p>
-              Транскрибация в формат Word/PDF с авторазметкой и исправлением ошибок.
-            </p>
-            <ul>
-              <li *ngFor="let item of transcriptionFeatures">{{ item }}</li>
-            </ul>
-          </div>
-          <div class="feature-illustration">
-            <img src="assets/about3/YouScriptor/automatic_transcription-945x.png" alt="Пример автоматической транскрибации" />
-          </div>
-        </article>
-
-        <article class="feature-card editor-card">
-          <div class="feature-body">
-            <h3>Удобный редактор</h3>
-            <p>
-              Проверяйте и дорабатывайте расшифровки прямо в браузере. Все изменения автоматически сохраняются и доступны всей
-              команде.
-            </p>
-            <div class="editor-grid">
-              <figure class="editor-block" *ngFor="let block of editorBlocks">
-                <figcaption>{{ block.title }}</figcaption>
-                <img [src]="block.image" [alt]="block.alt" />
-              </figure>
-            </div>
-          </div>
-        </article>
-
-        <article class="feature-card ai-card">
-          <div class="feature-body">
-            <h3>YouScriptor AI</h3>
-            <p>
-              Интеллектуальный помощник анализирует расшифрованный текст и помогает быстро подготовить резюме встречи или контент
-              для публикаций.
-            </p>
-            <ul>
-              <li *ngFor="let item of aiFeatures">{{ item }}</li>
-            </ul>
-          </div>
-          <div class="feature-illustration">
-            <img src="assets/about3/YouScriptor/transcript_chat-945x.png" alt="Пример работы YouScriptor AI" />
-          </div>
-        </article>
+    <section class="s-workflow" id="workflow" aria-labelledby="workflow-title">
+      <div class="s-container s-workflow-inner">
+        <div class="s-workflow-intro"><p class="s-eyebrow">ОТ ИСТОЧНИКА К РЕЗУЛЬТАТУ</p><h2 id="workflow-title">У вас — запись.<br>У неё —<br><em>новый смысл.</em></h2><a class="s-button s-button-lime" href="#start" (click)="scrollTo('start', $event)">Попробовать на своей <span aria-hidden="true">↗</span></a></div>
+        <ol class="s-steps">
+          <li><span>01</span><div><h3>Добавьте источник</h3><p>Ссылка на YouTube, файл с устройства или публичная ссылка Яндекс Диска — начните с того, что у вас уже есть.</p></div></li>
+          <li><span>02</span><div><h3>Выберите, что хотите получить</h3><p>Дорожку субтитров для YouTube или профиль обработки для своей записи. Прогресс сохранится в списке задач.</p></div></li>
+          <li><span>03</span><div><h3>Заберите результат в работу</h3><p>Проверьте текст, внесите правки в редакторе и экспортируйте документ в удобном формате.</p><div class="s-export-formats"><span>DOCX</span><span>PDF</span><span>MD</span><span>SRT<sup>*</sup></span></div><small>* Для записей с временной разметкой.</small></div></li>
+        </ol>
       </div>
     </section>
 
-
-
-    <section class="business">
-      <div class="section-header">
-        <h2>Для бизнеса</h2>
-        <p>Настраивайте совместный доступ, следите за балансом и интегрируйте сервис в корпоративные процессы.</p>
-      </div>
-      <div class="business-grid">
-        <article class="business-card" *ngFor="let item of businessFeatures">
-          <img [src]="item.image" [alt]="item.title" />
-          <div class="business-body">
-            <h3>{{ item.title }}</h3>
-            <p [innerHTML]="item.description"></p>
-          </div>
-        </article>
-      </div>
+    <section class="s-library s-container" aria-labelledby="library-title">
+      <div class="s-library-visual" aria-hidden="true"><div class="s-library-head"><span class="s-library-glyph">↳</span><span>ВАША ПОЛКА ЗНАНИЙ</span><span>↗</span></div><div class="s-book"><span>01</span><div>Лекция, к которой<br>хочется вернуться<small>ОБРАЗОВАНИЕ</small></div><b>↗</b></div><div class="s-book"><span>02</span><div>Идея из любимого<br>подкаста<small>ВДОХНОВЕНИЕ</small></div><b>↗</b></div><div class="s-book"><span>03</span><div>Объяснение, которое<br>стоит сохранить<small>ПРАКТИКА</small></div><b>↗</b></div><p>Примеры материалов для вашей работы</p></div>
+      <div class="s-library-copy"><p class="s-eyebrow">СКРИПТОРИЙ</p><h2 id="library-title">Из «где-то слышал»<br>в «вот, нашёл».</h2><p>Скрипторий собирает готовые расшифровки YouTube в одном месте. Найдите материал по названию или каналу, откройте текст и вернитесь к важной мысли без повторного просмотра.</p><a class="s-text-link" routerLink="/tasks">Заглянуть в библиотеку <span aria-hidden="true">↗</span></a><div class="s-library-footnote">Лекции, подкасты, интервью.<br>Знания, к которым удобно возвращаться.</div></div>
     </section>
 
-    <section class="pricing">
-      <h2>Сколько стоит</h2>
-      <div class="pricing-grid">
-        <article class="pricing-card" *ngFor="let plan of pricingPlans">
-          <h3>{{ plan.title }}</h3>
-          <p class="pricing-description" [innerHTML]="plan.description"></p>
-          <ul>
-            <li *ngFor="let perk of plan.perks">{{ perk }}</li>
-          </ul>
-          <a class="btn btn-primary" [routerLink]="plan.link">{{ plan.cta }}</a>
-        </article>
-      </div>
+    <section class="s-faq s-container" id="faq" aria-labelledby="faq-title">
+      <div><p class="s-eyebrow">ПЕРЕД ПЕРВОЙ ЗАПИСЬЮ</p><h2 id="faq-title">Хорошие вопросы.<br>Прямые ответы.</h2><a class="s-text-link" routerLink="/billing">Тарифы и баланс <span aria-hidden="true">↗</span></a></div>
+      <div class="s-questions"><details *ngFor="let faq of faqs"><summary>{{ faq.question }}<span aria-hidden="true">+</span></summary><p>{{ faq.answer }}</p></details></div>
     </section>
 
-    <section class="cta">
-      <div class="cta-card">
-        <div class="cta-text">
-          <h2>Загрузите файл и оцените работу YouScriptor</h2>
-          <p>
-            Получите 15 тестовых минут, чтобы протестировать скорость и точность сервиса. Перетащите файл или загрузите его с
-            устройства — мы сразу начнём обработку.
-          </p>
-          <a class="btn btn-primary" [routerLink]="uploadRoute">Загрузить файл</a>
-        </div>
-        <div class="cta-preview">
-          <h3>Перетащите файлы сюда</h3>
-          <img src="assets/about3/YouScriptor/upload_frame-600x.png" alt="Загрузка аудио или видео" />
-        </div>
-      </div>
-    </section>
-
-    <section class="cta">
-      <div class="cta-card">
-        <div class="cta-text">
-      <h2>Часто задаваемые вопросы</h2>
-      
-       </div>
-       
-        <mat-accordion class="faq-accordion" multi displayMode="flat">
-        <mat-expansion-panel *ngFor="let faq of faqs">
-          <mat-expansion-panel-header>
-            <span class="faq-question">{{ faq.question }}</span>
-          </mat-expansion-panel-header>
-          <p class="faq-answer">{{ faq.answer }}</p>
-        </mat-expansion-panel>
-      </mat-accordion>  
-      
-      </div>
-    </section>
+    <section class="s-final s-container" aria-labelledby="final-title"><div><p class="s-eyebrow">ХОРОШИЕ МЫСЛИ СТОИТ СОХРАНЯТЬ</p><h2 id="final-title">Пусть запись<br>работает на вас.</h2><p>Начните с одного ролика. Или с одной важной встречи.</p><a class="s-button s-button-dark" href="#start" (click)="scrollTo('start', $event)">Превратить запись в результат <span aria-hidden="true">↗</span></a></div><div class="s-final-art" aria-hidden="true"><span>≋</span><span>↗</span><span>Аа</span></div></section>
   </main>
+
+  <footer class="s-footer s-container"><a class="s-brand" routerLink="/"><span class="s-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>YouScriptor<span class="s-brand-sub">из записи — в текст</span></span></a><p>Ваши записи. Ваши мысли. Ваш следующий шаг.</p><nav aria-label="Ссылки в подвале"><a routerLink="/tasks">YouTube в текст</a><a routerLink="/transcriptions">Мои расшифровки</a><a routerLink="/down">Скачать дорожки</a></nav><div class="s-footer-bottom"><span>© YouScriptor · Скрипторий</span><span>Сделано для тех, кто ценит содержание.</span></div></footer>
 </div>
