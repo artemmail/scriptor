@@ -18,11 +18,11 @@
     <section class="dl-workspace" aria-labelledby="dl-form-title">
       <div class="dl-workspace-main">
         <div class="dl-step-heading"><span>01</span><div><p class="ap-eyebrow">ИСТОЧНИК</p><h2 id="dl-form-title">Начните со ссылки</h2></div></div>
-        <form (ngSubmit)="fetchStreams()" class="dl-form" [attr.aria-busy]="isLoading">
+        <form [formGroup]="searchForm" (ngSubmit)="fetchStreams()" class="dl-form" [attr.aria-busy]="isLoading">
           <label for="downloader-input">Ссылка или ID YouTube-видео</label>
           <div class="dl-url-field">
             <mat-icon aria-hidden="true">link</mat-icon>
-            <input id="downloader-input" type="text" [formControl]="videoUrlControl" [readOnly]="isMerging" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false" aria-describedby="dl-url-hint" [attr.aria-invalid]="!!errorMessage">
+            <input id="downloader-input" type="text" formControlName="videoUrl" [readOnly]="isMerging" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false" aria-describedby="dl-url-hint" [attr.aria-invalid]="!!errorMessage">
             <button class="ap-button ap-button-dark" type="submit" [disabled]="isLoading || isMerging || !videoUrlControl.value.trim()">{{ isLoading ? 'Проверяем…' : 'Найти дорожки' }} <span aria-hidden="true">↗</span></button>
           </div>
           <p id="dl-url-hint" class="dl-hint">Обычные ссылки, Shorts, youtu.be и ID ролика.</p>

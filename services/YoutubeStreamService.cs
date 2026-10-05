@@ -28,6 +28,7 @@ namespace YandexSpeech.services
         public long? Size { get; set; }
         public string? Container { get; set; }
         public string? Language { get; set; }
+        public string? LanguageCode { get; set; }
         public string? QualityLabel { get; set; }
     }
 
@@ -121,6 +122,7 @@ namespace YandexSpeech.services
                     Size = a.Size.Bytes,
                     Container = a.Container.Name,
                     Language = a.AudioLanguage?.Name,
+                    LanguageCode = a.AudioLanguage?.Code,
                     QualityLabel = null
                 });
             }
@@ -181,7 +183,12 @@ namespace YandexSpeech.services
             string type,
             string? qualityLabel,
             string? container,
-            string saveFilePath)
+            string saveFilePath,
+            string? language = null,
+            string? languageCode = null,
+            string? codec = null,
+            long? bitrate = null,
+            long? size = null)
         {
             // директория
             var dir = Path.GetDirectoryName(saveFilePath)
@@ -196,12 +203,9 @@ namespace YandexSpeech.services
 
             IStreamInfo? chosen = type.ToLowerInvariant() switch
             {
-                "audio" => manifest.GetAudioOnlyStreams()
-                                   .Where(s => qualityLabel == null
-                                        || string.Equals(s.AudioLanguage?.Name, qualityLabel, StringComparison.OrdinalIgnoreCase))
-                                   .Where(s => container == null
-                                        || s.Container.Name.Equals(container, StringComparison.OrdinalIgnoreCase))
-                                   .FirstOrDefault(),
+                "audio" => YoutubeAudioStreamSelection.Select(
+                    manifest.GetAudioOnlyStreams(), languageCode, language ?? qualityLabel,
+                    container, codec, bitrate, size),
 
                 "video" => manifest.GetVideoOnlyStreams()
                                    .Where(s => (qualityLabel == null

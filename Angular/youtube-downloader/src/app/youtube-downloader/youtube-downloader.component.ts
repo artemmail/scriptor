@@ -1,7 +1,7 @@
 import { Component, DestroyRef, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { MatIconModule } from '@angular/material/icon';
@@ -50,6 +50,7 @@ export class YoutubeDownloaderComponent implements OnInit {
   ];
   readonly waveform = [22, 42, 66, 36, 82, 54, 100, 72, 40, 88, 60, 34, 78, 96, 58, 28, 70, 44, 90, 62, 36, 52, 24];
   readonly videoUrlControl = new FormControl('', { nonNullable: true });
+  readonly searchForm = new FormGroup({ videoUrl: this.videoUrlControl });
   mode: DownloadMode = 'audio';
   streams: StreamDto[] = [];
   selectedVideo: StreamDto | null = null;

@@ -189,7 +189,12 @@ namespace YoutubeDownload.Services
                         type: s.Type ?? "audio",
                         qualityLabel: s.QualityLabel?.ToString(),
                         container: s.Container,
-                        saveFilePath: filePath
+                        saveFilePath: filePath,
+                        language: s.Language,
+                        languageCode: s.LanguageCode,
+                        codec: s.Codec,
+                        bitrate: s.Bitrate,
+                        size: s.Size
                     );
                 }
 

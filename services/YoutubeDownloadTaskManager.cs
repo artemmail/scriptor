@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using YandexSpeech.services;
 using YandexSpeech;
 using YoutubeExplode.Videos;
+using Newtonsoft.Json;
 
 using YoutubeDownload.Models;     // ваши модели
 using YoutubeDownload.Services;   // YoutubeWorkflowService и т.д.
@@ -68,11 +69,13 @@ namespace YoutubeDownload.Managers
             var dbContext = scope.ServiceProvider.GetRequiredService<MyDbContext>();
 
             var canonicalVideoId = VideoId.Parse(videoId).Value;
+            var selectedStreamsJson = JsonConvert.SerializeObject(streamsToDownload);
 
             // A task belongs to one user. Reusing another user's task would expose its id
             // and prevent the caller from creating their own download.
             var existingTask = await dbContext.YoutubeDownloadTasks.FirstOrDefaultAsync(x =>
                 x.VideoId == canonicalVideoId && x.UserId == userId &&
+                x.StreamsJson == selectedStreamsJson &&
                 !x.Done && x.Status != YoutubeWorkflowStatus.Error
             );
 

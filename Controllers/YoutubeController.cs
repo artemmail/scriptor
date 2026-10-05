@@ -84,7 +84,12 @@ namespace YourNamespace.Controllers
             [FromQuery] string videoUrlOrId,
             [FromQuery] string type,
             [FromQuery] string? qualityLabel,
-            [FromQuery] string? container)
+            [FromQuery] string? container,
+            [FromQuery] string? language = null,
+            [FromQuery] string? languageCode = null,
+            [FromQuery] string? codec = null,
+            [FromQuery] long? bitrate = null,
+            [FromQuery] long? size = null)
         {
             if (string.IsNullOrWhiteSpace(videoUrlOrId) || string.IsNullOrWhiteSpace(type))
                 return BadRequest("Параметры videoUrlOrId и type обязательны.");
@@ -112,7 +117,12 @@ namespace YourNamespace.Controllers
                     type: typeLower,
                     qualityLabel: qualityLabel,
                     container: container,
-                    saveFilePath: filePath
+                    saveFilePath: filePath,
+                    language: language,
+                    languageCode: languageCode,
+                    codec: codec,
+                    bitrate: bitrate,
+                    size: size
                 );
 
                 if (!System.IO.File.Exists(filePath))
