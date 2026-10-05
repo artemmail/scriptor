@@ -4,7 +4,7 @@ namespace YandexSpeech.services
 {
     public sealed class ServerRenderModeService
     {
-        private long _enabledUntilUnixSeconds;
+        private static long _enabledUntilUnixSeconds;
 
         public DateTimeOffset EnableFor(TimeSpan duration)
         {
