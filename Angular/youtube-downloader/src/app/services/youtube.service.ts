@@ -55,6 +55,12 @@ export class YoutubeService {
     if (stream.type === 'audio' && stream.language) {
       params = params.set('language', stream.language);
     }
+    if (stream.type === 'audio') {
+      if (stream.languageCode) params = params.set('languageCode', stream.languageCode);
+      if (stream.codec) params = params.set('codec', stream.codec);
+      if (stream.bitrate) params = params.set('bitrate', stream.bitrate.toString());
+      if (stream.size) params = params.set('size', stream.size.toString());
+    }
 
     // Настройка заголовков
     const headers = new HttpHeaders({ 'Content-Type': 'application/json' });

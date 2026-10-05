@@ -1,12 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, DestroyRef, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { AdminWorkspaceComponent } from '../shared/admin-workspace.component';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatTableModule } from '@angular/material/table';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { finalize } from 'rxjs/operators';
@@ -18,16 +16,13 @@ import { Title } from '@angular/platform-browser';
   selector: 'app-admin-recognition-profiles',
   standalone: true,
   templateUrl: './admin-recognition-profiles.component.html',
-  styleUrls: ['./admin-recognition-profiles.component.css'],
+  styleUrls: ['../shared/admin-workspace.css'],
   imports: [
     CommonModule,
+    AdminWorkspaceComponent,
     ReactiveFormsModule,
-    MatTableModule,
-    MatButtonModule,
-    MatCardModule,
     MatFormFieldModule,
     MatInputModule,
-    MatIconModule,
     MatSnackBarModule,
     MatProgressSpinnerModule
   ]
@@ -37,13 +32,14 @@ export class AdminRecognitionProfilesComponent implements OnInit {
   private readonly service = inject(RecognitionProfilesService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly titleService = inject(Title);
+  private readonly destroyRef = inject(DestroyRef);
 
   profiles: RecognitionProfile[] = [];
-  displayedColumns = ['id', 'name', 'displayedName', 'hint', 'openAiModel', 'segmentBlockSize', 'request', 'actions'];
   loading = false;
   saving = false;
   deletingId: number | null = null;
   error: string | null = null;
+  saveError: string | null = null;
 
   selectedProfile: RecognitionProfile | null = null;
   isCreating = false;
@@ -64,12 +60,13 @@ export class AdminRecognitionProfilesComponent implements OnInit {
   }
 
   loadProfiles(): void {
+    if (this.loading || this.saving || this.deletingId !== null || this.form.dirty) return;
     this.loading = true;
     this.error = null;
 
     this.service
       .list()
-      .pipe(finalize(() => (this.loading = false)))
+      .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => (this.loading = false)))
       .subscribe({
         next: profiles => {
           this.profiles = profiles;
@@ -87,7 +84,10 @@ export class AdminRecognitionProfilesComponent implements OnInit {
       });
   }
 
-  selectProfile(profile: RecognitionProfile): void {
+  selectProfile(profile: RecognitionProfile, force = false): void {
+    if (!force && (this.saving || this.deletingId !== null)) return;
+    if (!force && this.form.dirty && !confirm('Перейти к другому профилю? Несохранённые изменения будут потеряны.')) return;
+    this.saveError = null;
     this.selectedProfile = profile;
     this.isCreating = false;
     this.form.setValue({
@@ -99,9 +99,14 @@ export class AdminRecognitionProfilesComponent implements OnInit {
       openAiModel: profile.openAiModel,
       segmentBlockSize: profile.segmentBlockSize
     });
+    this.form.markAsPristine();
+    this.form.markAsUntouched();
   }
 
   startCreate(): void {
+    if (this.saving || this.deletingId !== null) return;
+    if (this.form.dirty && !confirm('Создать новый профиль? Несохранённые изменения будут потеряны.')) return;
+    this.saveError = null;
     this.selectedProfile = null;
     this.isCreating = true;
     this.form.reset({
@@ -116,6 +121,8 @@ export class AdminRecognitionProfilesComponent implements OnInit {
   }
 
   save(): void {
+    if (this.saving || this.deletingId !== null) return;
+    this.saveError = null;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -131,13 +138,18 @@ export class AdminRecognitionProfilesComponent implements OnInit {
       segmentBlockSize: Number(this.form.value.segmentBlockSize)
     };
 
+    if (!payload.name || !payload.displayedName || !payload.request || !payload.openAiModel ||
+        !Number.isInteger(payload.segmentBlockSize) || payload.segmentBlockSize < 1) {
+      this.saveError = 'Заполните обязательные поля и укажите целый размер блока больше нуля.';
+      return;
+    }
     this.saving = true;
     const request$ = this.isCreating || !this.selectedProfile
       ? this.service.create(payload)
       : this.service.update(this.selectedProfile.id, payload);
 
     request$
-      .pipe(finalize(() => (this.saving = false)))
+      .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => (this.saving = false)))
       .subscribe({
         next: profile => {
           this.snackBar.open('Профиль сохранён', 'OK', { duration: 2500 });
@@ -146,25 +158,28 @@ export class AdminRecognitionProfilesComponent implements OnInit {
           } else {
             this.profiles = this.profiles.map(p => (p.id === profile.id ? profile : p));
           }
-          this.selectProfile(profile);
+          this.selectProfile(profile, true);
         },
         error: err => {
           console.error('Failed to save recognition profile', err);
           const message = err?.error?.message || 'Не удалось сохранить профиль';
+          this.saveError = message;
           this.snackBar.open(message, 'Закрыть', { duration: 4000 });
         }
       });
   }
 
   delete(profile: RecognitionProfile): void {
-    if (!confirm(`Удалить профиль #${profile.id}?`)) {
+    if (this.saving || this.deletingId !== null) return;
+    if (!confirm(`Удалить профиль «${profile.displayedName}»? Это действие нельзя отменить.`)) {
       return;
     }
 
+    this.saveError = null;
     this.deletingId = profile.id;
     this.service
       .delete(profile.id)
-      .pipe(finalize(() => (this.deletingId = null)))
+      .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => (this.deletingId = null)))
       .subscribe({
         next: () => {
           this.snackBar.open('Профиль удалён', 'OK', { duration: 2500 });
@@ -175,6 +190,7 @@ export class AdminRecognitionProfilesComponent implements OnInit {
             this.form.reset({
               name: '',
               displayedName: '',
+              hint: '',
               request: '',
               clarificationTemplate: '',
               openAiModel: '',
@@ -185,6 +201,7 @@ export class AdminRecognitionProfilesComponent implements OnInit {
         error: err => {
           console.error('Failed to delete recognition profile', err);
           const message = err?.error?.message || 'Не удалось удалить профиль';
+          this.saveError = message;
           this.snackBar.open(message, 'Закрыть', { duration: 4000 });
         }
       });

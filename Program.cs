@@ -488,16 +488,28 @@ static async Task EnsureRolesAsync(IServiceProvider services)
     }
 }
 
+
+
 static string BuildBlogServerHtml(BlogTopic topic, string canonicalUrl)
 {
     var title = WebUtility.HtmlEncode(topic.Title);
     var canonical = WebUtility.HtmlEncode(canonicalUrl);
     var description = WebUtility.HtmlEncode(BuildBlogDescription(topic.Content));
-    var publishedAt = topic.CreatedAt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
+    var publishedAt = topic.CreatedAt.ToUniversalTime()
+        .ToString("yyyy-MM-ddTHH:mm:ssZ");
+
     var articleBody = WebUtility.HtmlDecode(topic.Content ?? string.Empty)
         .Replace("\r\n", "\n", StringComparison.Ordinal)
-        .Replace("\r", "\n", StringComparison.Ordinal)
-        .Replace("\n", "<br/>\n", StringComparison.Ordinal);
+        .Replace("\r", "\n", StringComparison.Ordinal);
+
+    // Все https://... в тексте превращаем в ссылки.
+    // Уже существующие <a href="..."> не трогаем.
+    articleBody = LinkifyHttpsUrls(articleBody);
+
+    articleBody = articleBody.Replace(
+        "\n",
+        "<br/>\n",
+        StringComparison.Ordinal);
 
     return $@"<!doctype html>
 <html lang=""ru"">
@@ -520,6 +532,78 @@ static string BuildBlogServerHtml(BlogTopic topic, string canonicalUrl)
     </article>
 </body>
 </html>";
+}
+
+static string LinkifyHttpsUrls(string html)
+{
+    if (string.IsNullOrEmpty(html))
+        return html;
+
+    // Разбиваем HTML на теги и текстовые участки.
+    var parts = Regex.Split(html, @"(<[^>]+>)");
+
+    var result = new StringBuilder(html.Length + 128);
+    var insideAnchor = false;
+
+    foreach (var part in parts)
+    {
+        if (string.IsNullOrEmpty(part))
+            continue;
+
+        if (part.StartsWith("<", StringComparison.Ordinal))
+        {
+            // Уже существующая ссылка — её содержимое не обрабатываем.
+            if (Regex.IsMatch(
+                    part,
+                    @"^<\s*a(?:\s|>)",
+                    RegexOptions.IgnoreCase))
+            {
+                insideAnchor = true;
+            }
+            else if (Regex.IsMatch(
+                         part,
+                         @"^<\s*/\s*a\s*>",
+                         RegexOptions.IgnoreCase))
+            {
+                insideAnchor = false;
+            }
+
+            result.Append(part);
+            continue;
+        }
+
+        if (insideAnchor)
+        {
+            result.Append(part);
+            continue;
+        }
+
+        var linkedText = Regex.Replace(
+            part,
+            @"https://[^\s<>""']+",
+            match =>
+            {
+                var url = match.Value;
+                var trailing = "";
+
+                // Не включаем обычную пунктуацию в конец URL.
+                while (url.Length > 0 &&
+                       ".,;:!?".Contains(url[^1]))
+                {
+                    trailing = url[^1] + trailing;
+                    url = url[..^1];
+                }
+
+                var encodedUrl = WebUtility.HtmlEncode(url);
+
+                return $@"<a href=""{encodedUrl}"">{encodedUrl}</a>{trailing}";
+            },
+            RegexOptions.IgnoreCase);
+
+        result.Append(linkedText);
+    }
+
+    return result.ToString();
 }
 
 static string BuildBlogDescription(string? content)

@@ -12,6 +12,7 @@ export interface StreamDto {
   qualityLabel: QualityLabel | string | null;
   container: string;
   language: string | null;
+  languageCode?: string | null;
   codec: string;
   bitrate: number;
   size: number;

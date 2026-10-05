@@ -34,22 +34,9 @@ export class AuthService {
     if (token) {
       this.decodeAndSaveUser(token);
     }
-    // 2) Если уже был сохранён userInfo (например, после перезагрузки)
-    const saved = this.readStorage('userInfo');
-    if (saved) {
-      const parsed = JSON.parse(saved) as Partial<UserInfo> & { name?: string };
-      const roles = Array.isArray(parsed.roles) ? parsed.roles : parsed.roles ? [parsed.roles] : [];
-      const displayName = parsed.displayName ?? parsed.name ?? '';
-      const restored: UserInfo = {
-        id: parsed.id ?? '',
-        name: displayName,
-        displayName,
-        email: parsed.email ?? '',
-        roles,
-        canHideCaptions: !!parsed.canHideCaptions,
-      };
-      this.userSubject.next(restored);
-    }
+    // userInfo is a display cache, not proof of an active session or current roles.
+    // Without an access token, showing admin links would lead to unauthorized pages.
+    else this.removeStorageItem('userInfo');
   }
 
   private saveUser(user: UserInfo | null) {
