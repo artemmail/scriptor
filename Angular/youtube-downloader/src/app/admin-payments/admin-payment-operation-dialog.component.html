@@ -1,13 +1,14 @@
-<h2 mat-dialog-title>Детали платежной операции</h2>
+<h2 mat-dialog-title class="pd-heading"><span>YOUSCRIPTOR / ПЛАТЁЖ</span>Платёжная операция<span class="pd-dot">.</span></h2>
 
 <mat-dialog-content>
-  <div class="state" *ngIf="loading">
-    <mat-progress-spinner mode="indeterminate" diameter="48"></mat-progress-spinner>
+  <div class="state" *ngIf="loading" role="status">
+    <mat-progress-spinner mode="indeterminate" diameter="28" aria-label="Загрузка платежа"></mat-progress-spinner>
   </div>
 
-  <div class="state state--error" *ngIf="!loading && error">{{ error }}</div>
+  <div class="state state--error" *ngIf="!loading && error" role="alert">{{ error }}</div>
 
   <div class="dialog-body" *ngIf="!loading && !error && details">
+    <div class="pd-receipt"><span class="pd-eyebrow">{{ details.provider || 'Платёж' }}</span><strong>{{ formatAmount(details) }}</strong><div><span>{{ details.status || 'Статус не указан' }}</span><span class="pd-applied" role="status">{{ isApplied ? '✓ Платёж применён' : 'Ожидает применения' }}</span></div></div>
     <dl class="details-list">
       <div class="details-row">
         <dt>ID операции</dt>
@@ -60,29 +61,26 @@
 
     <mat-divider *ngIf="payloadText"></mat-divider>
 
-    <section class="payload" *ngIf="payloadText">
-      <header class="payload__header">
-        <mat-icon aria-hidden="true">description</mat-icon>
-        <h3>Дополнительные данные</h3>
-      </header>
-      <pre>{{ payloadText }}</pre>
-    </section>
+    <details class="pd-technical" *ngIf="payloadText">
+      <summary>Дополнительные данные <span aria-hidden="true">⌄</span></summary>
+      <pre class="json-view">{{ payloadText }}</pre>
+    </details>
   </div>
 
-  <div class="apply-error" *ngIf="applyError">{{ applyError }}</div>
+  <div class="apply-error" *ngIf="applyError" role="alert">{{ applyError }}</div>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-  <button mat-button (click)="close()">Закрыть</button>
+  <button class="pd-button pd-button-outline" type="button" (click)="close()">Закрыть</button>
   <button
-    mat-flat-button
-    color="primary"
+    class="pd-button"
+    type="button"
     (click)="applyOperation()"
     [disabled]="loading || applying || isApplied || !details"
   >
-    Применить
+    {{ applying ? 'Применяем…' : isApplied ? 'Применено' : 'Применить платёж' }}
   </button>
-  <button mat-stroked-button color="primary" (click)="reload()" [disabled]="loading">
+  <button class="pd-button pd-button-outline" type="button" (click)="reload()" [disabled]="loading || applying">
     Обновить
   </button>
 </mat-dialog-actions>

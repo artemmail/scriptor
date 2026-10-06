@@ -10,13 +10,14 @@ import { finalize, takeUntil } from 'rxjs/operators';
 import { SubtitleService } from '../services/subtitle.service';
 import { AuthService } from '../services/AuthService.service';
 import { SupportDialogComponent } from '../support-dialog/support-dialog.component';
+import { AdminMenuComponent } from '../shared/admin-menu.component';
 
 type SourceMode = 'youtube' | 'file' | 'download';
 
 @Component({
   selector: 'app-about3',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, AdminMenuComponent],
   templateUrl: './about3.component.html',
   styleUrls: ['./about3.component.css'],
 })
@@ -57,6 +58,10 @@ export class About3Component implements OnDestroy {
     title.setTitle('YouScriptor — транскрибация YouTube и аудио в текст');
     this.previousDescription = meta.getTag('name="description"')?.content ?? null;
     meta.updateTag({ name: 'description', content: 'YouScriptor превращает YouTube-видео и свои записи в текст. Постобработка своих записей выделяет участников разговора, форматирует расшифровку и помогает анализировать интервью. Скачивание дорожек YouTube и доступные тарифы.' });
+  }
+
+  hasRole(roles: string[] | undefined, role: string): boolean {
+    return roles?.some(value => value.toLowerCase() === role) ?? false;
   }
 
   openSupport(): void {

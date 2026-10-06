@@ -1,10 +1,8 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Inject, OnInit } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
-import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AdminPaymentOperationDetails } from '../models/admin-payments.model';
 import { AdminPaymentsService } from '../services/admin-payments.service';
@@ -17,13 +15,11 @@ export interface AdminPaymentOperationDialogData {
   selector: 'app-admin-payment-operation-dialog',
   standalone: true,
   templateUrl: './admin-payment-operation-dialog.component.html',
-  styleUrls: ['./admin-payment-operation-dialog.component.css'],
+  styleUrls: ['./admin-payment-operation-dialog.component.css', './payment-dialog.css'],
   imports: [
     CommonModule,
     DatePipe,
     MatDialogModule,
-    MatButtonModule,
-    MatIconModule,
     MatDividerModule,
     MatProgressSpinnerModule
   ]

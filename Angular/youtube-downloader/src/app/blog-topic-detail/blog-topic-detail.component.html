@@ -1,144 +1,67 @@
-<div class="blog-page">
-  <main class="page-content">
-    <section class="detail-section">
-      <a class="back-link" [routerLink]="['/blog']">← Вернуться к блогу</a>
+<div class="ap-page bd-page">
+  <main class="ap-container bd-container">
+    <nav class="bd-topline" aria-label="Навигация блога"><a routerLink="/blog">← Все публикации</a><span class="ap-eyebrow">Журнал YouScriptor</span><a routerLink="/blog/new" *ngIf="isModerator" class="bd-new">Написать <span aria-hidden="true">↗</span></a></nav>
 
-      <div class="state-card error" *ngIf="loadError">{{ loadError }}</div>
+    <div class="ap-state bd-state" *ngIf="loading" role="status"><mat-spinner diameter="34"></mat-spinner><h2>Открываем историю…</h2><p>Загружаем публикацию и обсуждение.</p></div>
+    <div class="ap-state bd-state" *ngIf="loadError" role="alert"><mat-icon>article</mat-icon><p class="ap-eyebrow">Материал недоступен</p><h2>Не получилось открыть статью</h2><p>{{ loadError }}</p><div class="bd-state-actions"><button type="button" class="ap-button" (click)="retryLoad()">Попробовать снова</button><a routerLink="/blog" class="ap-button ap-button-outline">Вернуться в блог</a></div></div>
 
-      <div class="state-card loading" *ngIf="loading">
-        <mat-spinner diameter="48"></mat-spinner>
-      </div>
+    <ng-container *ngIf="!loading && topic as article">
+      <header class="bd-hero">
+        <div class="bd-kicker"><span class="ap-eyebrow"><i aria-hidden="true"></i> Идеи. Опыт. Практика.</span><span>≈ {{ article.readingMinutes }} мин чтения</span></div>
+        <h1>{{ article.header || 'Публикация без заголовка' }}</h1>
+        <div class="bd-byline"><span class="bd-avatar" aria-hidden="true">{{ initial(article.user) }}</span><div class="bd-author"><strong>{{ article.user || 'Автор' }}</strong><span>Автор публикации</span></div><time [attr.datetime]="article.createdAt">{{ article.createdAt | localTime:'dd.MM.yyyy' }}</time><button type="button" class="bd-discuss" (click)="scrollToComments()"><mat-icon>chat_bubble_outline</mat-icon>Обсудить <span>{{ article.comments.length }}</span><span aria-hidden="true">↓</span></button></div>
+      </header>
 
-      <article class="topic-card" *ngIf="!loading && topic">
-        <header class="topic-header">
-          <span class="topic-eyebrow">Публикация сообщества</span>
-          <h1>{{ topic.header }}</h1>
-          <div class="topic-meta">
-            <span class="topic-author">{{ topic.user }}</span>
-            <span>{{ topic.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
-            <span class="topic-comments" *ngIf="topic.commentCount > 0">
-              Комментариев: {{ topic.commentCount }}
-            </span>
-          </div>
-        </header>
-
-        <div class="topic-content" [innerHTML]="topic.renderedText"></div>
-
-        <div class="topic-actions" *ngIf="isModerator">
-          <span class="error" *ngIf="topic.topicActionError">{{ topic.topicActionError }}</span>
-          <span class="actions-spacer"></span>
-          <button class="btn btn-outline" type="button" (click)="editTopic(topic)">
-            Редактировать тему
-          </button>
-          <button
-            class="btn btn-danger"
-            type="button"
-            (click)="deleteTopic(topic)"
-            [disabled]="topic.deletingTopic"
-          >
-            {{ topic.deletingTopic ? 'Удаление…' : 'Удалить тему' }}
-          </button>
-        </div>
-
-        <div class="divider"></div>
-
-        <section class="comments">
-          <div class="section-header">
-            <h2>Комментарии</h2>
-            <p>Присоединяйтесь к обсуждению и делитесь своим опытом.</p>
-          </div>
-          <div class="comment" *ngFor="let comment of topic.comments; trackBy: trackByCommentId">
-            <div class="comment-header">
-              <div class="comment-author">{{ comment.user }}</div>
-              <span class="comment-date">{{ comment.createdAt | date: 'd MMM yyyy, H:mm' }}</span>
+      <div class="bd-layout">
+        <aside class="bd-sidebar" aria-label="Навигация по статье">
+          <div class="bd-sidebar-inner">
+            <nav class="bd-contents" *ngIf="contents.length" aria-label="Оглавление"><p class="ap-eyebrow">В этом материале</p><button *ngFor="let section of contents; let i = index" type="button" [class.bd-subsection]="section.sub" (click)="scrollToSection(section.id)"><span>{{ i + 1 < 10 ? '0' + (i + 1) : i + 1 }}</span>{{ section.title }}</button></nav>
+            <div class="bd-margin-note" *ngIf="!contents.length"><span aria-hidden="true">“</span><p>У каждой идеи<br><em>есть продолжение.</em></p></div>
+            <div class="bd-share"><p class="ap-eyebrow">Стоит сохранить</p><button type="button" (click)="copyLink()"><mat-icon>link</mat-icon>Скопировать ссылку <span aria-hidden="true">↗</span></button><p class="bd-share-message" role="status" *ngIf="shareMessage">{{ shareMessage }}</p><input *ngIf="shareFallback" aria-label="Ссылка на публикацию" readonly [value]="shareFallback" (focus)="$any($event.target).select()"></div>
+            <div class="bd-moderation" *ngIf="isModerator"><p class="ap-eyebrow">Управление статьёй</p><button type="button" (click)="editTopic(article)" [disabled]="busy"><mat-icon>edit_note</mat-icon>Редактировать</button><button type="button" class="bd-delete-topic bd-danger-link" (click)="requestTopicDelete()" [disabled]="busy"><mat-icon>delete_outline</mat-icon>Удалить публикацию</button>
+              <div class="bd-confirm" *ngIf="confirmTopicDelete" role="alert"><strong>Удалить публикацию?</strong><p>Статья и все комментарии будут удалены. Это действие нельзя отменить.</p><div><button type="button" class="bd-confirm-topic bd-danger-button" (click)="deleteTopic(article)" [disabled]="busy">{{ article.deletingTopic ? 'Удаляем…' : 'Да, удалить' }}</button><button type="button" (click)="confirmTopicDelete = false" [disabled]="busy">Отмена</button></div></div>
+              <p class="bd-error" role="alert" *ngIf="article.topicActionError">{{ article.topicActionError }}</p>
             </div>
-            <ng-container *ngIf="comment.editing; else viewComment">
-              <div class="comment-edit-section">
-                <label class="field-label" for="comment-{{ comment.id }}">Текст комментария</label>
-                <textarea
-                  id="comment-{{ comment.id }}"
-                  class="text-field"
-                  rows="4"
-                  maxlength="2000"
-                  [(ngModel)]="comment.editText"
-                  [ngModelOptions]="{ standalone: true }"
-                ></textarea>
-                <div class="comment-edit-actions">
-                  <span class="error" *ngIf="comment.actionError">{{ comment.actionError }}</span>
-                  <span class="controls-spacer"></span>
-                  <button
-                    class="btn btn-primary"
-                    type="button"
-                    (click)="saveComment(topic, comment)"
-                    [disabled]="comment.submittingEdit"
-                  >
-                    Сохранить
-                  </button>
-                  <button
-                    class="text-button"
-                    type="button"
-                    (click)="cancelEditComment(comment)"
-                    [disabled]="comment.submittingEdit"
-                  >
-                    Отмена
-                  </button>
-                </div>
-              </div>
-            </ng-container>
-            <ng-template #viewComment>
-              <div class="comment-text">{{ comment.text }}</div>
-              <div class="comment-controls" *ngIf="canEditComment(comment) || canDeleteComment(comment)">
-                <span class="error" *ngIf="comment.actionError">{{ comment.actionError }}</span>
-                <span class="controls-spacer"></span>
-                <button
-                  class="text-button"
-                  type="button"
-                  *ngIf="canEditComment(comment)"
-                  (click)="startEditComment(comment)"
-                  [disabled]="comment.editing"
-                >
-                  Редактировать
-                </button>
-                <button
-                  class="text-button danger"
-                  type="button"
-                  *ngIf="canDeleteComment(comment)"
-                  (click)="deleteComment(topic, comment)"
-                  [disabled]="comment.deleting"
-                >
-                  {{ comment.deleting ? 'Удаление…' : 'Удалить' }}
-                </button>
-              </div>
-            </ng-template>
           </div>
-          <div class="empty" *ngIf="topic.comments.length === 0">
-            Пока нет комментариев
-          </div>
-        </section>
+        </aside>
 
-        <div class="divider"></div>
+        <div class="bd-main-column">
+          <article class="bd-paper" aria-label="Текст публикации">
+            <div class="bd-paper-top"><span class="ap-eyebrow">Публикация сообщества</span><span aria-hidden="true">↗</span></div>
+            <markdown #articleBody class="bd-prose" [data]="article.text" katex [katexOptions]="katexOptions" (ready)="buildContents()"></markdown>
+            <div class="bd-article-end"><span aria-hidden="true">✳</span><p>Мысль продолжается<br><em>в разговоре.</em></p><button type="button" (click)="scrollToComments()" aria-label="Перейти к комментариям">↓</button></div>
+          </article>
 
-        <section class="comment-form" *ngIf="currentUser; else loginHint">
-          <label class="field-label" for="new-comment">Комментарий</label>
-          <textarea
-            id="new-comment"
-            class="text-field"
-            rows="4"
-            maxlength="2000"
-            [(ngModel)]="topic.newComment"
-            [ngModelOptions]="{ standalone: true }"
-          ></textarea>
-          <div class="comment-actions">
-            <span class="error" *ngIf="topic.commentError">{{ topic.commentError }}</span>
-            <button class="btn btn-primary" type="button" (click)="submitComment(topic)" [disabled]="topic.submittingComment">
-              Отправить
-            </button>
-          </div>
-        </section>
-        <ng-template #loginHint>
-          <div class="login-hint">Чтобы оставить комментарий, войдите в систему.</div>
-        </ng-template>
-      </article>
-    </section>
+          <section #commentsSection id="comments" class="bd-comments" aria-labelledby="comments-title">
+            <div class="bd-comments-heading"><div><p class="ap-eyebrow">Продолжим разговор</p><h2 id="comments-title">Обсуждение<span>.</span></h2></div><span class="bd-comment-count">{{ article.comments.length }}</span></div>
+            <p class="bd-comments-lead">Поделитесь своим опытом, задайте вопрос или дополните материал.</p>
+            <p class="bd-announcement" role="status" *ngIf="announcement">{{ announcement }}</p>
+
+            <form class="bd-comment-form" *ngIf="currentUser; else loginHint" (ngSubmit)="submitComment(article)">
+              <div class="bd-form-heading"><span class="bd-avatar" aria-hidden="true">{{ initial(currentUser.displayName || currentUser.email) }}</span><div><label for="new-comment">Ваш комментарий</label><small>{{ currentUser.displayName || currentUser.email || 'Вы' }}</small></div><span>{{ article.newComment.length }} / 2000</span></div>
+              <textarea id="new-comment" name="newComment" rows="4" maxlength="2000" [(ngModel)]="article.newComment" placeholder="Какая мысль откликнулась?" [disabled]="busy" aria-describedby="new-comment-error"></textarea>
+              <div class="bd-form-bottom"><span>Хороший разговор начинается с уважения.</span><button class="ap-button ap-button-lime bd-send" type="submit" [disabled]="busy || !article.newComment.trim() || article.newComment.length > 2000">{{ article.submittingComment ? 'Отправляем…' : 'Отправить' }} <span aria-hidden="true">↗</span></button></div>
+              <p id="new-comment-error" class="bd-error" role="alert" *ngIf="article.commentError">{{ article.commentError }}</p>
+            </form>
+            <ng-template #loginHint><div class="bd-login"><mat-icon>chat_bubble_outline</mat-icon><div><h3>Присоединяйтесь к разговору</h3><p>Войдите, чтобы оставить комментарий.</p></div><a class="ap-button ap-button-lime" routerLink="/login" [queryParams]="{ returnUrl: returnUrl }">Войти <span aria-hidden="true">↗</span></a></div></ng-template>
+
+            <div class="bd-comment-list">
+              <article class="bd-comment" *ngFor="let comment of article.comments; trackBy: trackByCommentId">
+                <header class="bd-comment-header"><span class="bd-avatar" aria-hidden="true">{{ initial(comment.user) }}</span><strong>{{ comment.user || 'Автор' }}</strong><span class="bd-own" *ngIf="currentUser?.id === comment.userId">Вы</span><time [attr.datetime]="comment.createdAt">{{ comment.createdAt | localTime:'dd.MM.yyyy, HH:mm' }}</time></header>
+                <ng-container *ngIf="comment.editing; else viewComment">
+                  <form class="bd-comment-edit" (ngSubmit)="saveComment(article, comment)"><label [for]="'comment-' + comment.id">Редактирование комментария <span>{{ comment.editText.length }} / 2000</span></label><textarea [id]="'comment-' + comment.id" name="editComment" rows="4" maxlength="2000" [(ngModel)]="comment.editText" [disabled]="busy"></textarea><div class="bd-comment-controls"><button class="ap-button bd-save-comment" type="submit" [disabled]="busy || !comment.editText.trim() || comment.editText.length > 2000 || comment.editText.trim() === comment.text">{{ comment.submittingEdit ? 'Сохраняем…' : 'Сохранить' }}</button><button type="button" (click)="cancelEditComment(comment)" [disabled]="busy">Отмена</button></div></form>
+                </ng-container>
+                <ng-template #viewComment><p class="bd-comment-text">{{ comment.text }}</p><div class="bd-comment-controls" *ngIf="canEditComment(comment) || canDeleteComment(comment)"><button class="bd-edit-comment" type="button" *ngIf="canEditComment(comment)" (click)="startEditComment(comment)" [disabled]="busy">Редактировать</button><button class="bd-delete-comment bd-danger-link" type="button" *ngIf="canDeleteComment(comment)" (click)="requestCommentDelete(comment)" [disabled]="busy">Удалить</button></div></ng-template>
+                <div class="bd-confirm" *ngIf="comment.confirmDelete" role="alert"><strong>Удалить этот комментарий?</strong><div><button class="bd-confirm-comment bd-danger-button" type="button" (click)="deleteComment(article, comment)" [disabled]="busy">{{ comment.deleting ? 'Удаляем…' : 'Да, удалить' }}</button><button type="button" (click)="comment.confirmDelete = false" [disabled]="busy">Оставить</button></div></div>
+                <p class="bd-error" role="alert" *ngIf="comment.actionError">{{ comment.actionError }}</p>
+              </article>
+              <div class="bd-empty" *ngIf="!article.comments.length"><span aria-hidden="true">↗</span><h3>Первое слово — за вами.</h3><p>Здесь пока тихо. Начните обсуждение этого материала.</p></div>
+            </div>
+          </section>
+          <a class="bd-next" routerLink="/blog"><div><p class="ap-eyebrow">Есть что почитать</p><h2>За следующей <em>идеей.</em></h2><p>Другие истории и находки — в блоге YouScriptor.</p></div><span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+    </ng-container>
+    <footer class="ap-bottom"><span>YouScriptor · Идеи заслуживают продолжения</span><nav aria-label="Полезные ссылки"><a routerLink="/">Главная</a><a routerLink="/blog">Блог</a><a routerLink="/transcriptions">Мои записи ↗</a></nav></footer>
   </main>
 </div>

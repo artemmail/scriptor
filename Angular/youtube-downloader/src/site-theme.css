@@ -95,7 +95,7 @@ body .app-content .section-header p {
   line-height: 1.6;
 }
 
-body .app-content :is(app-recognition-control, app-recognition-tasks, app-subtitles-tasks, app-billing, app-blog-feed, app-profile) .hero-text h1 {
+body .app-content :is(app-recognition-tasks, app-subtitles-tasks, app-billing, app-blog-feed, app-profile) .hero-text h1 {
   color: var(--site-text);
   font-size: clamp(2.5rem, 4.4vw, 3.8rem);
   font-weight: 750;
@@ -103,13 +103,13 @@ body .app-content :is(app-recognition-control, app-recognition-tasks, app-subtit
   line-height: 1.1;
 }
 
-body .app-content :is(app-recognition-control, app-recognition-tasks, app-subtitles-tasks, app-billing, app-blog-feed, app-profile) .hero-lead {
+body .app-content :is(app-recognition-tasks, app-subtitles-tasks, app-billing, app-blog-feed, app-profile) .hero-lead {
   max-width: 640px;
   color: var(--site-muted);
   line-height: 1.65;
 }
 
-body .app-content :is(app-recognition-control, app-recognition-tasks, app-subtitles-tasks, app-billing, app-blog-feed) .hero-highlights li {
+body .app-content :is(app-recognition-tasks, app-subtitles-tasks, app-billing, app-blog-feed) .hero-highlights li {
   border: 1px solid #dce6f7;
   border-radius: 12px;
   background: #f8faff;
@@ -200,7 +200,7 @@ body .app-content .mat-mdc-raised-button:not([disabled]) {
   border-radius: 10px;
 }
 
-body .app-content :is(app-about3, app-billing, app-recognition-control, app-recognition-tasks, app-youtube-downloader, app-blog-feed, app-blog-topic-detail, app-blog-topic-create) .btn-primary {
+body .app-content :is(app-about3, app-billing, app-recognition-tasks, app-youtube-downloader, app-blog-feed, app-blog-topic-detail, app-blog-topic-create) .btn-primary {
   border: 1px solid #2359c4;
   border-radius: 11px;
   background: var(--site-primary);
@@ -208,7 +208,7 @@ body .app-content :is(app-about3, app-billing, app-recognition-control, app-reco
   color: #fff;
 }
 
-body .app-content :is(app-about3, app-billing, app-recognition-control, app-recognition-tasks, app-youtube-downloader, app-blog-feed, app-blog-topic-detail, app-blog-topic-create) .btn-primary:hover:not(:disabled) {
+body .app-content :is(app-about3, app-billing, app-recognition-tasks, app-youtube-downloader, app-blog-feed, app-blog-topic-detail, app-blog-topic-create) .btn-primary:hover:not(:disabled) {
   background: var(--site-primary-hover);
   box-shadow: 0 12px 24px rgba(36, 93, 204, 0.23);
 }
@@ -256,38 +256,7 @@ body .app-content :is(app-about-business, app-about1, app-about2) :is(.feature, 
 }
 
 body .app-content :is(app-admin-users, app-admin-payments, app-admin-billing-plans, app-admin-recognition-profiles) {
-  padding: 32px clamp(16px, 3vw, 48px) 80px;
-}
-
-body .app-content :is(app-png-to-webp, app-png-to-webp-batch) {
-  padding: 32px clamp(16px, 3vw, 48px) 80px;
-}
-
-body .app-content app-png-to-webp .page {
-  max-width: 1120px;
-  gap: 24px;
-}
-
-body .app-content app-png-to-webp h1 {
-  color: var(--site-text);
-  font-size: clamp(1.9rem, 3vw, 2.4rem);
-  font-weight: 750;
-  letter-spacing: -0.03em;
-}
-
-body .app-content app-png-to-webp .description {
-  color: var(--site-muted);
-  line-height: 1.6;
-}
-
-body .app-content :is(app-png-to-webp .upload-area, app-png-to-webp-batch .dropzone) {
-  border: 2px dashed #c7d7eb;
-  border-radius: 18px;
-  background: #f8fbff;
-}
-
-body .app-content :is(app-png-to-webp .upload-area:hover, app-png-to-webp-batch .dropzone:hover) {
-  border-color: #5a87d7;
+  padding: 0;
 }
 
 .cdk-overlay-container .mat-mdc-dialog-surface,
@@ -298,6 +267,7 @@ body .app-content :is(app-png-to-webp .upload-area:hover, app-png-to-webp-batch 
 }
 
 .cdk-overlay-pane.support-dialog-panel .mat-mdc-dialog-surface,
+.cdk-overlay-pane.admin-dialog-panel .mat-mdc-dialog-surface,
 .cdk-overlay-pane.transcription-dialog-panel .mat-mdc-dialog-surface,
 .cdk-overlay-pane.library-dialog-panel .mat-mdc-dialog-surface {
   background: #f7f8f2;
@@ -333,10 +303,6 @@ body .app-content :is(app-png-to-webp .upload-area:hover, app-png-to-webp-batch 
     padding: 28px 16px 64px;
   }
 
-  body .app-content :is(app-admin-users, app-admin-payments, app-admin-billing-plans, app-admin-recognition-profiles, app-png-to-webp, app-png-to-webp-batch) {
-    padding: 20px 12px 56px;
-  }
-
   body .app-content :is(.panel, .mat-mdc-card, .page-header, .progress-card, .recognized-card, .info-panel) {
     border-radius: 16px;
   }
@@ -354,4 +320,51 @@ body .app-content :is(app-png-to-webp .upload-area:hover, app-png-to-webp-batch 
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+.admin-dialog-panel {
+  --mdc-dialog-subhead-font: 'Segoe UI', Arial, sans-serif;
+  --mdc-dialog-supporting-text-font: 'Segoe UI', Arial, sans-serif;
+  --mdc-dialog-subhead-color: #293323;
+  --mdc-dialog-supporting-text-color: #556746;
+  --mdc-filled-button-container-color: #293323;
+  --mdc-filled-button-label-text-color: #d4f568;
+  --mdc-protected-button-container-color: #293323;
+  --mdc-protected-button-label-text-color: #d4f568;
+  --mdc-text-button-label-text-color: #526b2c;
+  --mdc-circular-progress-active-indicator-color: #698635;
+  --mdc-outlined-text-field-focus-outline-color: #698635;
+  --mdc-outlined-text-field-focus-label-text-color: #526b2c;
+  --mdc-tab-indicator-active-indicator-color: #698635;
+  --mat-tab-header-active-label-text-color: #526b2c;
+  --mat-tab-header-active-focus-label-text-color: #526b2c;
+  --mat-tab-header-active-hover-label-text-color: #526b2c;
+  --mdc-checkbox-selected-icon-color: #698635;
+  --mdc-checkbox-selected-hover-icon-color: #526b2c;
+  --mdc-checkbox-selected-focus-icon-color: #526b2c;
+}
+.admin-dialog-panel .mat-mdc-dialog-title { font-size: 23px; letter-spacing: -.5px; overflow-wrap: anywhere; }
+.admin-dialog-panel :is(.tab-section, .dialog-body) { color: #435436; font-family: 'Segoe UI', Arial, sans-serif; }
+.admin-dialog-panel :is(.role-item, .summary-grid, .payload, .json-view) { padding: 12px; border: 1px solid #dce3d1; border-radius: 12px; background: #f0f4e8; }
+.admin-dialog-panel .role-item { padding: 4px 10px; }
+.admin-dialog-panel :is(.info-label, .summary-label, .details-label, .details-row dt, .payload__header) { color: #657851; }
+.admin-dialog-panel :is(.summary, .details-grid) { padding: 16px; border: 1px solid #dce3d1; border-radius: 12px; background: #fffefa; }
+.admin-dialog-panel :is(.alert, .error, .apply-error, .state--error) { border-radius: 10px; }
+.admin-dialog-panel .payments-table th { background: #edf2e4; color: #556d3d; }
+.admin-dialog-panel .mat-mdc-dialog-actions { padding: 16px 24px; border-top: 1px solid #dce3d1; gap: 8px; }
+.admin-dialog-panel :is(.mat-mdc-button, .mat-mdc-raised-button, .mat-mdc-unelevated-button) { border-radius: 9px; }
+.admin-dialog-panel :is(app-admin-payment-operation-dialog, app-admin-payment-details-dialog) { min-width: 0; }
+body app-blog-topic-create .md-editor-container { margin: 0; border: 0; }
+body app-blog-topic-create .md-editor-container .md-layout .tool-bar { background: #eef3e6; border-color: #dce3d1; }
+body app-blog-topic-create .tool-bar .btn { color: #526b2c; border-radius: 6px; }
+body app-blog-topic-create .tool-bar .btn:hover { background: #dcebc4; }
+body app-blog-topic-create .md-editor-container .md-layout .preview-container .preview-panel { padding: 20px; color: #39482e; border-color: #dce3d1; font: 14px/1.8 'Segoe UI', Arial, sans-serif; }
+body app-blog-topic-create .preview-panel img { max-width: 100%; }
+body app-blog-topic-create .preview-panel pre { overflow: auto; }
+body app-blog-topic-create .md-editor-container .editor-container > div { min-width: 0; }
+@media (max-width: 620px) {
+  .admin-dialog-panel :is(.summary, .details-grid, .details-row) { grid-template-columns: minmax(0, 1fr); }
+  .admin-dialog-panel :is(.info-row, .summary-row) { flex-direction: column; gap: 4px; }
+  .admin-dialog-panel .manual-payment-form { grid-template-columns: minmax(0, 1fr); }
+  body app-blog-topic-create .md-editor-container .md-layout .editor-container { flex-direction: column; }
+  body app-blog-topic-create .md-editor-container .md-layout .editor-container > div { min-height: 0; }
 }

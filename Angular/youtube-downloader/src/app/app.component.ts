@@ -60,7 +60,11 @@ export class AppComponent implements AfterViewInit {
     const path = this.router.url.split(/[?#]/)[0];
     return /^\/(billing|login|profile|transcriptions|tasks|Scriptorium|down|youtube-downloader|y|blog)\/?$/.test(path)
       || /^\/recognized\/[^/]+\/?$/.test(path)
-      || /^\/blog\/Content\/[^/]+\/?$/.test(path);
+      || /^\/admin\/(users|payments|billing-plans|recognition-profiles)\/?$/.test(path)
+      || /^\/blog\/[^/]+(?:\/edit)?\/?$/.test(path)
+      || /^\/blog\/Content\/[^/]+\/?$/.test(path)
+      || /^\/markdown-converter(?:\/[^/]+)?\/?$/.test(path)
+      || /^\/png-to-webp(?:\/batch)?\/?$/.test(path);
   }
 
   openSupport(): void {

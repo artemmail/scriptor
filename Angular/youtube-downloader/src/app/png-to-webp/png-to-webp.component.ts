@@ -1,14 +1,10 @@
 import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnDestroy, Signal, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatDividerModule } from '@angular/material/divider';
+import { RouterModule } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSliderModule } from '@angular/material/slider';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { EditorState, ImageEditorDialogComponent, ImageEditorDialogResult } from './image-editor-dialog.component';
 import { Title } from '@angular/platform-browser';
@@ -26,17 +22,13 @@ interface ConversionResult {
   imports: [
     CommonModule,
     FormsModule,
-    MatButtonModule,
-    MatCardModule,
+    RouterModule,
     MatDialogModule,
-    MatDividerModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatSliderModule,
-    MatSnackBarModule,
   ],
   templateUrl: './png-to-webp.component.html',
-  styleUrls: ['./png-to-webp.component.css']
+  styleUrls: ['../shared/account-page.css', './png-to-webp.component.css']
 })
 export class PngToWebpComponent implements OnDestroy {
   readonly quality = signal(0.92);
@@ -51,12 +43,23 @@ export class PngToWebpComponent implements OnDestroy {
   readonly workingFileSize = signal<number>(0);
   readonly result = signal<ConversionResult | null>(null);
   readonly error = signal<string | null>(null);
+  readonly editorOpen = signal(false);
+  readonly busy = computed(() => this.processing() || this.editorOpen());
+  readonly qualityPercent = computed(() => Math.round(this.quality() * 100));
+  readonly sizeDifference = computed(() => {
+    const size = this.workingFileSize(), result = this.result();
+    return size && result ? Math.round((size - result.size) / size * 100) : 0;
+  });
+  readonly differenceLabel = computed(() => {
+    const difference = this.sizeDifference();
+    return difference > 0 ? `На ${difference}% меньше` : difference < 0 ? `На ${Math.abs(difference)}% больше` : 'Размер почти не изменился';
+  });
+  private destroyed = false;
 
   private sourceImage: ImageBitmap | HTMLImageElement | null = null;
   private originalImage: ImageBitmap | HTMLImageElement | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private lastObjectUrls: string[] = [];
-  private pendingQuality: number | null = null;
   private currentImageBlob: Blob | null = null;
   private editorState: EditorState | null = null;
   private dragDepth = 0;
@@ -89,7 +92,6 @@ export class PngToWebpComponent implements OnDestroy {
   );
 
   constructor(
-    private snackBar: MatSnackBar,
     private dialog: MatDialog,
     private readonly titleService: Title
   ) {
@@ -98,12 +100,11 @@ export class PngToWebpComponent implements OnDestroy {
 
   @HostListener('window:paste', ['$event'])
   async onPaste(event: ClipboardEvent): Promise<void> {
-    if (!event.clipboardData) return;
+    if (!event.clipboardData || this.busy()) return;
     const file = Array.from(event.clipboardData.files).find(f => f.type === 'image/png' || f.type === 'image/x-png' || f.name.toLowerCase().endsWith('.png'));
     if (file) {
       event.preventDefault();
       await this.handleFile(file);
-      this.snackBar.open('PNG получен из буфера обмена', '', { duration: 2000 });
     }
   }
 
@@ -119,12 +120,13 @@ export class PngToWebpComponent implements OnDestroy {
     event.preventDefault();
     this.dragDepth = 0;
     this.dragOver.set(false);
+    if (this.busy()) return;
     if (event.dataTransfer?.files?.length) {
       const file = Array.from(event.dataTransfer.files).find(f => this.isPngFile(f));
       if (file) {
         await this.handleFile(file);
       } else {
-        this.snackBar.open('Перетащите PNG изображение', 'OK', { duration: 2500 });
+        this.error.set('Перетащите изображение в формате PNG.');
       }
     }
   }
@@ -151,23 +153,32 @@ export class PngToWebpComponent implements OnDestroy {
   }
 
   async handleFile(file: File): Promise<void> {
+    if (this.busy() || this.destroyed) return;
     if (!this.isPngFile(file)) {
-      this.snackBar.open('Поддерживаются только PNG изображения', 'OK', { duration: 2500 });
+      this.error.set('Поддерживаются только изображения PNG. Выберите файл с расширением .png.');
       return;
     }
 
-    this.resetState();
     this.processing.set(true);
     this.error.set(null);
 
     try {
+      const signature = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+      if (this.destroyed) return;
+      if (![137, 80, 78, 71, 13, 10, 26, 10].every((value, index) => signature[index] === value)) {
+        this.error.set('Этот файл не удалось распознать как PNG. Выберите другое изображение.');
+        return;
+      }
+      this.resetState();
       this.originalFile.set(file);
       this.originalSize.set(file.size);
       const originalUrl = URL.createObjectURL(file);
       this.registerObjectUrl(originalUrl);
       this.originalUrl.set(originalUrl);
 
-      this.sourceImage = await this.loadImage(file);
+      const loadedImage = await this.loadImage(file);
+      if (this.destroyed) { if ('close' in loadedImage) loadedImage.close(); return; }
+      this.sourceImage = loadedImage;
       this.originalImage = this.sourceImage;
       const dimensions = this.getImageDimensions(this.sourceImage);
       this.originalDimensions.set(dimensions);
@@ -186,12 +197,10 @@ export class PngToWebpComponent implements OnDestroy {
   }
 
   async onQualityChange(value: number): Promise<void> {
+    if (this.busy() || this.destroyed || !Number.isFinite(value)) return;
+    value = Math.max(0.1, Math.min(1, value));
     this.quality.set(value);
-    if (!this.originalFile()) {
-      return;
-    }
-    if (this.processing()) {
-      this.pendingQuality = value;
+    if (!this.sourceImage) {
       return;
     }
     this.processing.set(true);
@@ -202,11 +211,6 @@ export class PngToWebpComponent implements OnDestroy {
       this.error.set('Не удалось обновить WebP. Попробуйте другое качество.');
     } finally {
       this.processing.set(false);
-      const nextQuality = this.pendingQuality;
-      this.pendingQuality = null;
-      if (nextQuality !== null && nextQuality !== value) {
-        await this.onQualityChange(nextQuality);
-      }
     }
   }
 
@@ -222,7 +226,7 @@ export class PngToWebpComponent implements OnDestroy {
   downloadResult(): void {
     const res = this.result();
     const original = this.originalFile();
-    if (!res || !original) return;
+    if (!res || !original || this.busy() || this.error()) return;
 
     const link = document.createElement('a');
     const suggestedName = original.name.replace(/\.png$/i, '') + `.webp`;
@@ -232,25 +236,28 @@ export class PngToWebpComponent implements OnDestroy {
   }
 
   async openEditor(): Promise<void> {
+    if (this.busy() || !this.sourceImage || this.destroyed) return;
     const original = this.originalFile();
     const blobForEditor = original ?? this.currentImageBlob;
     if (!blobForEditor) {
       return;
     }
 
+    this.editorOpen.set(true);
     const dialogRef = this.dialog.open(ImageEditorDialogComponent, {
       data: {
         blob: blobForEditor,
         name: original?.name ?? 'image.png',
         previousState: this.editorState,
       },
-      panelClass: 'image-editor-panel',
+      panelClass: ['image-editor-panel', 'pw-editor-dialog'],
       width: 'auto',
       maxWidth: '100vw',
     });
 
     const result = await firstValueFrom(dialogRef.afterClosed());
-    if (!result) {
+    this.editorOpen.set(false);
+    if (!result || this.destroyed) {
       return;
     }
 
@@ -258,6 +265,7 @@ export class PngToWebpComponent implements OnDestroy {
   }
 
   async resetEdits(): Promise<void> {
+    if (this.busy() || this.destroyed) return;
     const file = this.originalFile();
     if (!file || !this.originalImage) {
       return;
@@ -283,10 +291,12 @@ export class PngToWebpComponent implements OnDestroy {
   }
 
   clear(): void {
+    if (this.busy()) return;
     this.resetState();
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.setEditedPreviewUrl(null);
     this.cleanupObjectUrls();
     this.releaseSourceImage();
@@ -327,7 +337,8 @@ export class PngToWebpComponent implements OnDestroy {
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', quality));
     const durationMs = performance.now() - start;
 
-    if (!blob) {
+    if (this.destroyed) return;
+    if (!blob || blob.type !== 'image/webp') {
       throw new Error('WebP не поддерживается');
     }
 
@@ -352,6 +363,7 @@ export class PngToWebpComponent implements OnDestroy {
       }
     }
 
+    if (this.destroyed) throw new Error('Конвертер закрыт');
     return await new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve(img);
@@ -390,7 +402,6 @@ export class PngToWebpComponent implements OnDestroy {
     this.workingFileSize.set(0);
     this.originalSize.set(0);
     this.canvas = null;
-    this.pendingQuality = null;
     this.currentImageBlob = null;
     this.editorState = null;
     this.dragDepth = 0;
@@ -457,6 +468,7 @@ export class PngToWebpComponent implements OnDestroy {
 
   private async setActiveImageFromBlob(blob: Blob): Promise<void> {
     const image = await this.loadImage(blob);
+    if (this.destroyed) { if ('close' in image) image.close(); return; }
     this.replaceSourceImage(image);
   }
 

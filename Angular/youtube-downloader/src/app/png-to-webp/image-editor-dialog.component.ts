@@ -554,22 +554,22 @@ export class ImageEditorDialogComponent implements AfterViewInit, OnDestroy {
       const isHover = this.hoverHandle === h.type;
 
       let fill = '#ffffff';
-      let stroke = '#3f51b5';
+      let stroke = '#698635';
       let lineW = 2;
 
       if (isActive) {
-        fill = '#e8f0ff';
-        stroke = '#2962ff';
+        fill = '#e6efcf';
+        stroke = '#526b2c';
         lineW = 3;
       } else if (isHover) {
-        fill = '#fff3f8';
-        stroke = '#ff3d71';
+        fill = '#f0f6df';
+        stroke = '#819f52';
         lineW = 3;
       }
 
       ctx.save();
       if (isHover) {
-        ctx.shadowColor = '#ff3d71';
+        ctx.shadowColor = '#819f52';
         ctx.shadowBlur = 12;
       }
       ctx.lineWidth = lineW;

@@ -1,108 +1,73 @@
-<div class="admin-users">
-  <mat-card class="table-card">
-    <mat-card-header>
-      <mat-card-title>Пользователи</mat-card-title>
-    </mat-card-header>
+<div class="ap-page users-page">
+  <main class="ap-container users-container">
+    <div class="users-topline">
+      <a routerLink="/">← На главную</a>
+      <span>YOUSCRIPTOR / УПРАВЛЕНИЕ</span>
+      <app-admin-menu label="Разделы админки"></app-admin-menu>
+    </div>
 
-    <mat-card-content
-      class="card-content"
-      infiniteScroll
-      [scrollWindow]="true"
-      [infiniteScrollDistance]="1"
-      [infiniteScrollThrottle]="200"
-      (scrolled)="onScrollDown()"
-    >
-      <mat-form-field appearance="outline" class="filter-field">
-        <mat-label>Поиск по email</mat-label>
-        <input
-          matInput
-          type="search"
-          placeholder="Введите email..."
-          (input)="applyFilter($event)"
-          [value]="filterValue"
-        />
-        <button
-          mat-icon-button
-          matSuffix
-          *ngIf="filterValue"
-          (click)="clearFilter()"
-          aria-label="Очистить фильтр"
-        >
-          <mat-icon>close</mat-icon>
-        </button>
-      </mat-form-field>
+    <header class="users-hero">
+      <div class="users-hero-copy">
+        <p class="ap-eyebrow"><span class="users-live-dot" aria-hidden="true"></span> ЛЮДИ YOUSCRIPTOR</p>
+        <h1>У каждого слова<br><em>есть автор.</em></h1>
+        <p class="users-lead">Все аккаунты в одном месте: находите пользователей, просматривайте их работу и управляйте доступом.</p>
+        <div class="users-hero-tags"><span>Аккаунты</span><span>Роли и доступ</span><span>Распознавания</span></div>
+      </div>
+      <div class="users-hero-visual" aria-label="Сводка пользователей">
+        <div class="users-visual-top"><span>01 / АУДИТОРИЯ</span><span aria-hidden="true">↗</span></div>
+        <div class="users-visual-main"><span>Пользователей в сервисе</span><strong>{{ loading && !totalCount ? '…' : totalCount }}</strong><small>в общей базе YouScriptor</small></div>
+        <div class="users-visual-bottom"><div class="users-visual-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span>ЛЮДИ · ИДЕИ · ТЕКСТ</span></div>
+      </div>
+    </header>
 
-      <div class="table-wrapper" *ngIf="dataSource.data.length; else emptyState">
-        <table
-          mat-table
-          [dataSource]="dataSource"
-          class="users-table"
-          matSort
-          [matSortActive]="sortActive"
-          [matSortDirection]="sortDirection === '' ? 'asc' : sortDirection"
-          matSortDisableClear
-          (matSortChange)="onSortChange($event)"
-        >
-          <ng-container matColumnDef="email">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header="email">Email</th>
-            <td mat-cell *matCellDef="let user" class="clickable-cell">
-              <div class="email-wrapper" [title]="user.email">{{ user.email }}</div>
-            </td>
-          </ng-container>
-
-          <ng-container matColumnDef="registeredAt">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header="registeredAt">Дата регистрации</th>
-            <td mat-cell *matCellDef="let user" class="clickable-cell">
-              {{ user.registeredAt | date: 'medium' }}
-            </td>
-          </ng-container>
-
-          <ng-container matColumnDef="recognizedVideos">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header="recognizedVideos">Распознанные видео</th>
-            <td mat-cell *matCellDef="let user" class="clickable-cell">
-              <button
-                mat-button
-                class="videos-count"
-                type="button"
-                (click)="goToUserTasks(user, $event)"
-              >
-                <mat-icon color="primary">movie</mat-icon>
-                <span>{{ user.recognizedVideos }}</span>
-              </button>
-            </td>
-          </ng-container>
-
-          <ng-container matColumnDef="roles">
-            <th mat-header-cell *matHeaderCellDef>Роли</th>
-            <td mat-cell *matCellDef="let user" class="clickable-cell roles-cell">
-              <ng-container *ngIf="user.roles?.length; else noRoles">
-                <mat-chip-set>
-                  <mat-chip *ngFor="let role of user.roles">{{ role }}</mat-chip>
-                </mat-chip-set>
-              </ng-container>
-              <ng-template #noRoles>—</ng-template>
-            </td>
-          </ng-container>
-
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr
-            mat-row
-            *matRowDef="let row; columns: displayedColumns"
-            class="clickable-row"
-            (click)="openUserDialog(row)"
-          ></tr>
-        </table>
+    <section class="users-directory" aria-labelledby="users-heading" infiniteScroll [scrollWindow]="true" [infiniteScrollDistance]="1" [infiniteScrollThrottle]="200" (scrolled)="onScrollDown()">
+      <div class="users-section-heading">
+        <div><p class="ap-eyebrow">СПИСОК АККАУНТОВ / 01</p><h2 id="users-heading">Все пользователи<span>.</span></h2><p>Найдите аккаунт по email или откройте карточку для изменения ролей и просмотра платежей.</p></div>
+        <div class="users-section-count"><strong>{{ totalCount }}</strong><span>всего аккаунтов</span></div>
       </div>
 
-      <div class="loader" *ngIf="loading">
-        <mat-progress-spinner diameter="36" mode="indeterminate"></mat-progress-spinner>
+      <div class="users-panel">
+        <div class="users-toolbar">
+          <label class="users-search" for="users-search"><mat-icon aria-hidden="true">search</mat-icon><input id="users-search" type="search" placeholder="Поиск по email" autocomplete="off" [value]="filterValue" (input)="applyFilter($event)"><button *ngIf="filterValue" type="button" (click)="clearFilter()" aria-label="Очистить поиск"><mat-icon aria-hidden="true">close</mat-icon></button></label>
+          <div class="users-toolbar-meta"><span *ngIf="!loading || users.length">Показано {{ users.length }} из {{ totalCount }}</span><span class="users-toolbar-rule" aria-hidden="true"></span><span>Нажмите на строку, чтобы открыть профиль</span></div>
+        </div>
+
+        <p class="users-notice users-error" *ngIf="roleUpdateError" role="alert">{{ roleUpdateError }}</p>
+        <p class="users-notice users-error" *ngIf="loadError" role="alert">{{ loadError }} <button type="button" (click)="retryLoad()">Повторить →</button></p>
+
+        <div class="users-table-scroll" *ngIf="dataSource.data.length">
+          <table mat-table [dataSource]="dataSource" class="users-table" matSort [matSortActive]="sortActive" [matSortDirection]="sortDirection === '' ? 'asc' : sortDirection" matSortDisableClear (matSortChange)="onSortChange($event)">
+            <ng-container matColumnDef="email">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header="email">Пользователь</th>
+              <td mat-cell *matCellDef="let user"><div class="users-identity"><span class="users-avatar" aria-hidden="true">{{ (user.displayName || user.email).slice(0, 1) | uppercase }}</span><span class="users-identity-text"><strong>{{ user.displayName || user.email }}</strong><small *ngIf="user.displayName">{{ user.email }}</small></span></div></td>
+            </ng-container>
+            <ng-container matColumnDef="registeredAt">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header="registeredAt">Зарегистрирован</th>
+              <td mat-cell *matCellDef="let user"><span class="users-date">{{ user.registeredAt | date: 'dd.MM.yyyy' }}</span></td>
+            </ng-container>
+            <ng-container matColumnDef="recognizedVideos">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header="recognizedVideos">Распознано видео</th>
+              <td mat-cell *matCellDef="let user"><button class="users-video-link" type="button" (click)="goToUserTasks(user, $event)" [attr.aria-label]="'Открыть видео пользователя ' + user.email"><mat-icon aria-hidden="true">play_circle_outline</mat-icon><span>{{ user.recognizedVideos }}</span><span aria-hidden="true">↗</span></button></td>
+            </ng-container>
+            <ng-container matColumnDef="roles">
+              <th mat-header-cell *matHeaderCellDef>Доступ</th>
+              <td mat-cell *matCellDef="let user"><div class="users-roles"><span class="users-role" *ngFor="let role of user.roles" [class.users-role-admin]="role.toLowerCase() === 'admin'">{{ role }}</span><span class="users-role users-role-empty" *ngIf="!user.roles?.length">Без роли</span></div></td>
+            </ng-container>
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef><span class="users-sr-only">Открыть профиль</span></th>
+              <td mat-cell *matCellDef="let user"><button class="users-open" type="button" (click)="$event.stopPropagation(); openUserDialog(user)" [attr.aria-label]="'Открыть профиль ' + user.email">↗</button></td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns" class="users-row" tabindex="0" (click)="openUserDialog(row)" (keydown)="onRowKeydown($event, row)" [attr.aria-label]="'Открыть профиль ' + row.email"></tr>
+          </table>
+        </div>
+
+        <div class="users-state" *ngIf="!loading && !loadError && !dataSource.data.length"><span aria-hidden="true">⌕</span><h3>{{ filterValue ? 'Никого не нашли' : 'Пользователей пока нет' }}</h3><p>{{ filterValue ? 'Проверьте адрес или попробуйте другой запрос.' : 'Когда появятся аккаунты, они будут здесь.' }}</p><button class="ap-button ap-button-outline" type="button" *ngIf="filterValue" (click)="clearFilter()">Очистить поиск</button></div>
+        <div class="users-loading" *ngIf="loading" role="status"><mat-progress-spinner diameter="28" mode="indeterminate" aria-label="Загрузка пользователей"></mat-progress-spinner><span>Загружаем пользователей…</span></div>
+        <div class="users-panel-footer" *ngIf="users.length && !loading"><span>Показано {{ users.length }} из {{ totalCount }}</span><button class="ap-button ap-button-outline" type="button" *ngIf="users.length < totalCount && !loadError" (click)="onScrollDown()">Показать ещё <span aria-hidden="true">↓</span></button><span *ngIf="users.length >= totalCount">Вы просмотрели весь список <span aria-hidden="true">✓</span></span></div>
       </div>
-    </mat-card-content>
-  </mat-card>
+    </section>
+
+    <footer class="ap-bottom"><span>YouScriptor · Управление пользователями</span><nav aria-label="Навигация"><a routerLink="/">Главная</a><a routerLink="/transcriptions">Мои записи</a><a routerLink="/blog">Новости</a></nav></footer>
+  </main>
 </div>
-
-<ng-template #emptyState>
-  <div class="empty-state" *ngIf="!loading">
-    <p>Пользователи не найдены.</p>
-  </div>
-</ng-template>

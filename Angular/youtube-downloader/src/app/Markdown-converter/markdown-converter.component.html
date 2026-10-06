@@ -1,78 +1,47 @@
-<!-- markdown-converter.component.html -->
-<div class="page-container">
+<div class="ap-page mc-page">
+  <main class="ap-container mc-container">
+    <nav class="mc-topline" aria-label="Навигация конвертера"><a routerLink="/">← На главную</a><span class="ap-eyebrow">YouScriptor / Инструменты</span><a routerLink="/Scriptorium" class="mc-library">Скрипторий <span aria-hidden="true">↗</span></a></nav>
+    <header class="mc-hero">
+      <div><p class="ap-eyebrow">Markdown → документ</p><h1 class="ap-title">Ваш текст.<br><em>В нужной форме.</em></h1><p class="ap-lead">Оформите заметки, проверьте результат и сохраните документ. Заголовки, таблицы и формулы — всё на своих местах.</p></div>
+      <div class="mc-format-note"><div><span class="ap-eyebrow">От разметки к результату</span><span aria-hidden="true">↗</span></div><p><span aria-hidden="true">#</span> Просто текст.<br><em>Больше возможностей.</em></p><div class="mc-format-strip"><span>PDF</span><span>Word</span><span>HTML</span><span>Markdown</span></div></div>
+    </header>
 
-  <mat-card class="editor-card">
-    <md-editor
-      name="contentEditor"
-      [(ngModel)]="markdownContent"
-      preview="vertical"
-      height="'100%'"
-      [options]="editorOptions"
-      [preRender]="renderWithMath">
-    </md-editor>
-  </mat-card>
+    <div class="mc-task-notice" *ngIf="taskTitle && !loadingTask"><mat-icon>task_alt</mat-icon><div><strong>{{ taskTitle }}</strong><p>Текст из задачи. Изменения здесь не меняют исходную расшифровку.</p></div><a [routerLink]="['/recognized', taskId]">К записи ↗</a></div>
+    <div class="ap-notice ap-error mc-task-error" *ngIf="taskErrorMessage" role="alert"><div>{{ taskErrorMessage }}</div><button type="button" (click)="retryTask()" [disabled]="busy || hasContent">Повторить загрузку</button><span *ngIf="hasContent">Чтобы загрузить задачу заново, сначала сохраните и очистите текущий текст.</span></div>
+    <div class="ap-state mc-loading" *ngIf="loadingTask" role="status"><mat-spinner diameter="32"></mat-spinner><p>Загружаем текст из задачи…</p></div>
 
-  <div class="actions-panel">
-    <div class="actions-header">
-      <h2>Действия</h2>
-      <div class="actions-buttons">
-        <button
-          class="btn btn-outline"
-          type="button"
-          [matMenuTriggerFor]="downloadMenu"
-          [disabled]="isDownloading || !hasContent"
-          aria-label="Скачать"
-        >
-          <mat-icon>download</mat-icon>
-          <span>Скачать</span>
-        </button>
-        <button
-          class="btn btn-outline"
-          type="button"
-          [matMenuTriggerFor]="copyMenu"
-          [disabled]="isDownloading || !hasContent"
-          aria-label="Копировать"
-        >
-          <mat-icon>content_copy</mat-icon>
-          <span>Копировать</span>
-        </button>
-      </div>
+    <div class="mc-workspace" *ngIf="!loadingTask">
+      <section class="mc-editor" aria-label="Редактор Markdown">
+        <div class="mc-editor-heading"><div><p class="ap-eyebrow">01 / Работа с текстом</p><h2>От мысли — <em>к документу.</em></h2></div><button type="button" class="mc-example" (click)="useExample()" [disabled]="busy || hasContent"><mat-icon>auto_awesome</mat-icon>Попробовать пример</button></div>
+        <div class="mc-editor-controls"><div class="mc-views" role="group" aria-label="Вид редактора"><button type="button" (click)="viewMode = 'write'" [class.active]="viewMode === 'write'" [attr.aria-pressed]="viewMode === 'write'"><mat-icon>edit_note</mat-icon>Текст</button><button type="button" (click)="viewMode = 'split'" [class.active]="viewMode === 'split'" [attr.aria-pressed]="viewMode === 'split'"><mat-icon>vertical_split</mat-icon>Рядом</button><button type="button" (click)="viewMode = 'preview'" [class.active]="viewMode === 'preview'" [attr.aria-pressed]="viewMode === 'preview'"><mat-icon>visibility</mat-icon>Результат</button></div><button type="button" class="mc-clear" (click)="confirmClear = true" [disabled]="busy || !hasContent" aria-label="Очистить редактор"><mat-icon>delete_outline</mat-icon><span>Очистить</span></button></div>
+        <div class="mc-clear-confirm" *ngIf="confirmClear" role="alert"><div><strong>Очистить весь текст?</strong><p>Сначала скачайте документ, если хотите его сохранить.</p></div><button type="button" class="mc-clear-cancel" (click)="confirmClear = false">Оставить</button><button type="button" class="mc-clear-accept" (click)="clearContent()" [disabled]="busy">Очистить</button></div>
+        <div class="mc-panes" [class.mc-split]="viewMode === 'split'">
+          <div class="mc-source" [hidden]="viewMode === 'preview'">
+            <div class="mc-pane-label"><label for="markdown-source">Исходный текст</label><span>MARKDOWN</span></div>
+            <div class="mc-toolbar" role="group" aria-label="Форматирование Markdown"><button *ngFor="let format of formats" type="button" [title]="format.label" [attr.aria-label]="format.label" (click)="insertFormat(format)" [disabled]="busy"><mat-icon>{{ format.icon }}</mat-icon></button></div>
+            <textarea #sourceEditor id="markdown-source" name="markdown" [(ngModel)]="markdownContent" (ngModelChange)="onContentChange()" [disabled]="busy" placeholder="# Начните с главного&#10;&#10;Вставьте Markdown или напишите свой текст.&#10;&#10;**Выделяйте важное**, добавляйте списки, таблицы и формулы. Результат появится в предпросмотре." spellcheck="false" aria-label="Исходный текст Markdown"></textarea>
+          </div>
+          <div class="mc-preview" [hidden]="viewMode === 'write'">
+            <div class="mc-pane-label"><span>Предпросмотр</span><span><i aria-hidden="true"></i> РЕЗУЛЬТАТ</span></div>
+            <div class="mc-preview-scroll"><markdown #renderedDocument class="mc-prose" [data]="markdownContent" katex [katexOptions]="katexOptions" (ready)="previewReady = true"></markdown><div *ngIf="!hasContent" class="mc-empty-preview"><span aria-hidden="true">Aa<span>↗</span></span><h3>Форма появится<br><em>вместе с мыслью.</em></h3><p>Добавьте текст слева или откройте пример, чтобы увидеть результат.</p><button type="button" (click)="useExample()" [disabled]="busy">Открыть пример <span aria-hidden="true">↗</span></button></div></div>
+          </div>
+        </div>
+        <div class="mc-editor-bottom"><span>Слов: <strong>{{ wordCount }}</strong></span><span>Символов: {{ markdownContent.length }}</span><span>Markdown + LaTeX</span></div>
+      </section>
+
+      <aside class="mc-sidebar" aria-label="Экспорт документа">
+        <section class="mc-export-card"><p class="ap-eyebrow">02 / Заберите с собой</p><h2>Один текст.<br><em>Четыре формата.</em></h2><p class="mc-export-lead">Выберите, как будете работать с документом дальше.</p>
+          <fieldset class="mc-formats" [disabled]="busy"><legend class="mc-sr-only">Формат скачивания</legend><label *ngFor="let format of exportFormats" [class.selected]="selectedFormat === format.id"><input type="radio" name="exportFormat" [value]="format.id" [(ngModel)]="selectedFormat"><mat-icon>{{ format.icon }}</mat-icon><span><strong>{{ format.title }}</strong><small>{{ format.description }}</small></span><span class="mc-format-extension">{{ format.extension }}</span></label></fieldset>
+          <label class="mc-filename-label" for="document-name">Название файла</label><div class="mc-filename"><input id="document-name" name="filename" [(ngModel)]="filename" maxlength="120" placeholder="Документ" [disabled]="busy"><span>.{{ selectedFormat }}</span></div>
+          <button type="button" class="ap-button ap-button-lime mc-download" (click)="download()" [disabled]="!canExport"><mat-spinner *ngIf="activeAction === 'pdf' || activeAction === 'docx'" diameter="18"></mat-spinner><mat-icon *ngIf="!activeAction">download</mat-icon>{{ activeAction === 'pdf' || activeAction === 'docx' ? 'Готовим файл…' : 'Скачать документ' }}</button><p class="mc-save-note">{{ hasContent ? 'Перед скачиванием проверьте предпросмотр.' : 'Добавьте текст, чтобы скачать документ.' }}</p>
+          <div *ngIf="error" class="ap-notice ap-error mc-status" role="alert">{{ error }}</div><div *ngIf="success" class="mc-status mc-success" role="status"><mat-icon>check_circle_outline</mat-icon>{{ success }}</div>
+        </section>
+        <section class="mc-copy-card"><p class="ap-eyebrow">Для сайта или форума</p><h3>Скопировать код</h3><div><button type="button" class="mc-copy-html" (click)="copyHtml()" [disabled]="!canExport"><mat-icon>code</mat-icon>{{ activeAction === 'html-copy' ? 'Копируем…' : 'HTML' }}</button><button type="button" class="mc-copy-bbcode" (click)="copyBbcode()" [disabled]="!canExport"><mat-icon>forum</mat-icon>{{ activeAction === 'bbcode' ? 'Готовим…' : 'BBCode' }}</button></div><p>HTML — для веб-страницы.<br>BBCode — для форумов phpBB.</p></section>
+      </aside>
+      <section class="mc-copy-fallback" *ngIf="copyFallback"><label for="copy-output">Готовый код для копирования</label><textarea id="copy-output" readonly [value]="copyFallback" (focus)="$any($event.target).select()" rows="6"></textarea></section>
     </div>
 
-    <div class="actions-status" *ngIf="isDownloading">
-      <mat-icon class="status-icon">hourglass_top</mat-icon>
-      <span>Подготавливаем файл…</span>
-    </div>
-  </div>
-
-  <mat-menu #downloadMenu="matMenu" actionMenuPanel>
-    <button mat-menu-item (click)="onDownloadMd()" [disabled]="!hasContent">
-      <mat-icon>article</mat-icon>
-      <span>Markdown (.md)</span>
-    </button>
-    <button mat-menu-item (click)="onDownloadHtml()" [disabled]="!hasContent">
-      <mat-icon>language</mat-icon>
-      <span>HTML</span>
-    </button>
-    <button mat-menu-item (click)="onDownloadPdf()" [disabled]="!hasContent || isDownloading">
-      <mat-icon>picture_as_pdf</mat-icon>
-      <span>PDF</span>
-    </button>
-    <button mat-menu-item (click)="onDownloadWord()" [disabled]="!hasContent || isDownloading">
-      <mat-icon>description</mat-icon>
-      <span>Word (.docx)</span>
-    </button>
-  </mat-menu>
-
-  <mat-menu #copyMenu="matMenu" actionMenuPanel>
-    <button mat-menu-item (click)="onCopyHtml()" [disabled]="!hasContent">
-      <mat-icon>code</mat-icon>
-      <span>HTML</span>
-    </button>
-    <button mat-menu-item (click)="onCopyBbcode()" [disabled]="!hasContent || isDownloading">
-      <mat-icon>forum</mat-icon>
-      <span>BBCode (phpBB)</span>
-    </button>
-  </mat-menu>
-
+    <section class="mc-guide"><div><p class="ap-eyebrow">Несколько простых знаков</p><h2>Смысл — ваш.<br><em>Оформление — проще.</em></h2><p>Пишите разметку вручную или используйте кнопки над текстом.</p></div><dl><div><dt>## Заголовок</dt><dd>Разделы и структура</dd></div><div><dt>**Важное**</dt><dd>Акцент на главном</dd></div><div><dt>- Пункт списка</dt><dd>Мысли по порядку</dd></div><div><dt><code>$$ E = mc^2 $$</code></dt><dd>Формулы LaTeX</dd></div></dl></section>
+    <footer class="ap-bottom"><span>YouScriptor · Из текста — в документ</span><nav aria-label="Полезные ссылки"><a routerLink="/blog">Блог</a><a routerLink="/transcriptions">Мои записи</a><a routerLink="/Scriptorium">Скрипторий ↗</a></nav></footer>
+  </main>
 </div>

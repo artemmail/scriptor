@@ -3,36 +3,32 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
+import { RouterModule } from '@angular/router';
+import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import {
-  AdminSubscriptionPlan,
-  AdminSubscriptionPlansService
-} from '../services/admin-subscription-plans.service';
+import { AdminMenuComponent } from '../shared/admin-menu.component';
+import { AdminSubscriptionPlan, AdminSubscriptionPlansService } from '../services/admin-subscription-plans.service';
 
 interface EditableAdminSubscriptionPlan extends AdminSubscriptionPlan {
-  dirty?: boolean;
+  dirty: boolean;
+  error?: string | null;
+  saved?: boolean;
 }
 
 @Component({
   selector: 'app-admin-billing-plans',
   standalone: true,
   templateUrl: './admin-billing-plans.component.html',
-  styleUrls: ['./admin-billing-plans.component.css'],
-  imports: [
-    CommonModule,
-    FormsModule,
-    MatCardModule,
-    MatButtonModule,
-    MatProgressSpinnerModule
-  ]
+  styleUrls: ['../shared/account-page.css', './admin-billing-plans.component.css'],
+  imports: [CommonModule, FormsModule, RouterModule, MatIconModule, MatProgressSpinnerModule, AdminMenuComponent]
 })
 export class AdminBillingPlansComponent implements OnInit {
   plans: EditableAdminSubscriptionPlan[] = [];
+  selectedPlanId: string | null = null;
+  search = '';
   loadingPlans = false;
   plansError: string | null = null;
-  plansSuccess: string | null = null;
+  private readonly originals = new Map<string, AdminSubscriptionPlan>();
   private readonly savingPlanIds = new Set<string>();
 
   constructor(
@@ -41,124 +37,150 @@ export class AdminBillingPlansComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.titleService.setTitle('Админка — тарифы billing');
+    this.titleService.setTitle('Тарифы — управление YouScriptor');
     this.loadPlans();
   }
 
+  get selectedPlan(): EditableAdminSubscriptionPlan | undefined {
+    return this.plans.find(plan => plan.id === this.selectedPlanId);
+  }
+
+  get filteredPlans(): EditableAdminSubscriptionPlan[] {
+    const query = this.search.trim().toLocaleLowerCase('ru');
+    return this.plans.filter(plan => !query || [plan.name, plan.code].some(value => value.toLocaleLowerCase('ru').includes(query)));
+  }
+
+  get visibleSelectedPlanId(): string | null {
+    return this.filteredPlans.some(plan => plan.id === this.selectedPlanId) ? this.selectedPlanId : null;
+  }
+
+  get activeCount(): number { return [...this.originals.values()].filter(plan => plan.isActive).length; }
+  get dirtyCount(): number { return this.plans.filter(plan => plan.dirty).length; }
+  get canReload(): boolean { return !this.loadingPlans && !this.dirtyCount && !this.savingPlanIds.size; }
+
   loadPlans(): void {
+    if (!this.canReload) return;
     this.loadingPlans = true;
     this.plansError = null;
-    this.plansSuccess = null;
-
     this.adminSubscriptionPlansService.getPlans().subscribe({
       next: plans => {
-        this.loadingPlans = false;
         this.plans = (plans ?? []).map(plan => ({ ...plan, dirty: false }));
+        this.originals.clear();
+        this.plans.forEach(plan => this.originals.set(plan.id, { ...plan }));
+        if (!this.selectedPlan) this.selectedPlanId = this.plans[0]?.id ?? null;
+        this.loadingPlans = false;
       },
       error: err => {
         this.loadingPlans = false;
-        this.plans = [];
         this.plansError = this.resolveErrorMessage(err, 'Не удалось загрузить тарифы.');
       }
     });
   }
 
+  selectPlan(planId: string): void { this.selectedPlanId = planId; }
+
   markPlanDirty(plan: EditableAdminSubscriptionPlan): void {
-    plan.dirty = true;
-    this.plansSuccess = null;
-    this.plansError = null;
+    const original = this.originals.get(plan.id);
+    const fields: (keyof AdminSubscriptionPlan)[] = [
+      'code', 'name', 'description', 'price', 'currency',
+      'includedTranscriptionMinutes', 'includedVideos', 'isActive', 'priority'
+    ];
+    plan.dirty = !original || fields.some(field => plan[field] !== original[field]);
+    plan.error = null;
+    plan.saved = false;
   }
 
-  isSavingPlan(planId: string): boolean {
-    return this.savingPlanIds.has(planId);
+  isSavingPlan(planId: string): boolean { return this.savingPlanIds.has(planId); }
+
+  revertPlan(plan: EditableAdminSubscriptionPlan): void {
+    const original = this.originals.get(plan.id);
+    if (!original || this.isSavingPlan(plan.id)) return;
+    const index = this.plans.findIndex(item => item.id === plan.id);
+    this.plans[index] = { ...original, dirty: false, error: null, saved: false };
+  }
+
+  isValidQuota(value: number): boolean {
+    return Number.isInteger(value) && value >= 0 && value <= 2147483647;
+  }
+
+  isValidPrice(price: number): boolean { return Number.isFinite(price) && price >= 0; }
+
+  isValidPriority(priority: number): boolean {
+    return Number.isInteger(priority) && priority >= -2147483648 && priority <= 2147483647;
+  }
+
+  isPlanValid(plan: EditableAdminSubscriptionPlan): boolean {
+    return !!plan.name?.trim() && plan.name.length <= 128
+      && !!plan.code?.trim() && plan.code.length <= 64
+      && !!plan.currency?.trim() && plan.currency.length <= 8
+      && (plan.description?.length ?? 0) <= 1024
+      && this.isValidPrice(plan.price)
+      && this.isValidQuota(plan.includedTranscriptionMinutes)
+      && this.isValidQuota(plan.includedVideos)
+      && this.isValidPriority(plan.priority);
   }
 
   savePlan(plan: EditableAdminSubscriptionPlan): void {
-    if (!plan || !plan.id || this.isSavingPlan(plan.id)) {
+    if (!plan.id || !plan.dirty || this.isSavingPlan(plan.id) || this.loadingPlans) return;
+    if (!this.isPlanValid(plan)) {
+      plan.error = 'Проверьте обязательные поля, стоимость и лимиты тарифа.';
       return;
     }
-
     this.savingPlanIds.add(plan.id);
-    this.plansError = null;
-    this.plansSuccess = null;
-
-    this.adminSubscriptionPlansService
-      .savePlan(plan.id, {
-        code: (plan.code || '').trim(),
-        name: (plan.name || '').trim(),
-        description: plan.description?.trim() || null,
-        price: Number.isFinite(plan.price) ? plan.price : 0,
-        currency: (plan.currency || 'RUB').trim().toUpperCase(),
-        includedTranscriptionMinutes: Math.max(0, Math.round(plan.includedTranscriptionMinutes ?? 0)),
-        includedVideos: Math.max(0, Math.round(plan.includedVideos ?? 0)),
-        isActive: !!plan.isActive,
-        priority: Math.round(plan.priority ?? 0)
-      })
-      .subscribe({
-        next: updated => {
-          this.savingPlanIds.delete(plan.id);
-          const index = this.plans.findIndex(item => item.id === updated.id);
-          if (index >= 0) {
-            this.plans[index] = { ...updated, dirty: false };
-          }
-          this.plansSuccess = `Тариф "${updated.name}" сохранён.`;
-        },
-        error: err => {
-          this.savingPlanIds.delete(plan.id);
-          this.plansError = this.resolveErrorMessage(err, 'Не удалось сохранить тариф.');
-        }
-      });
+    plan.error = null;
+    plan.saved = false;
+    this.adminSubscriptionPlansService.savePlan(plan.id, {
+      code: plan.code.trim(),
+      name: plan.name.trim(),
+      description: plan.description?.trim() || null,
+      price: plan.price,
+      currency: plan.currency.trim().toUpperCase(),
+      includedTranscriptionMinutes: plan.includedTranscriptionMinutes,
+      includedVideos: plan.includedVideos,
+      isActive: !!plan.isActive,
+      priority: plan.priority
+    }).subscribe({
+      next: updated => {
+        this.savingPlanIds.delete(plan.id);
+        this.originals.set(updated.id, { ...updated });
+        const index = this.plans.findIndex(item => item.id === updated.id);
+        if (index >= 0) this.plans[index] = { ...updated, dirty: false, saved: true };
+      },
+      error: err => {
+        this.savingPlanIds.delete(plan.id);
+        plan.error = this.resolveErrorMessage(err, 'Не удалось сохранить тариф. Ваши изменения остаются в редакторе.');
+      }
+    });
   }
 
-  trackByPlanId(_: number, plan: EditableAdminSubscriptionPlan): string {
-    return plan.id;
+  trackByPlanId(_: number, plan: AdminSubscriptionPlan): string { return plan.id; }
+
+  formatPrice(plan: AdminSubscriptionPlan): string {
+    return this.isValidPrice(plan.price) ? this.formatCurrency(plan.price, plan.currency) : '—';
   }
 
-  formatHourlyRate(plan: EditableAdminSubscriptionPlan): string {
-    const minutes = Math.max(0, Math.round(plan.includedTranscriptionMinutes ?? 0));
-    if (minutes <= 0) {
-      return '—';
-    }
-
-    const rate = (Number(plan.price) * 60) / minutes;
-    return `${this.formatCurrency(rate, plan.currency)} / час`;
+  formatHourlyRate(plan: AdminSubscriptionPlan): string {
+    if (!this.isValidPrice(plan.price) || !this.isValidQuota(plan.includedTranscriptionMinutes) || plan.includedTranscriptionMinutes === 0) return '—';
+    return this.formatCurrency(plan.price * 60 / plan.includedTranscriptionMinutes, plan.currency) + ' / час';
   }
 
   private formatCurrency(amount: number, currency: string | null | undefined): string {
-    const normalizedCurrency = (currency || 'RUB').trim().toUpperCase() || 'RUB';
+    const code = currency?.trim().toUpperCase();
+    if (!code) return amount.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
     try {
-      return new Intl.NumberFormat('ru-RU', {
-        style: 'currency',
-        currency: normalizedCurrency,
-        maximumFractionDigits: 2
-      }).format(amount);
+      return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: code, maximumFractionDigits: 2 }).format(amount);
     } catch {
-      return `${amount.toFixed(2)} ${normalizedCurrency}`;
+      return amount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + code;
     }
   }
 
   private resolveErrorMessage(error: unknown, fallback: string): string {
-    if (!error) {
+    if (typeof error === 'string') return error;
+    if (error instanceof HttpErrorResponse) {
+      if (typeof error.error === 'string' && error.error) return error.error;
+      if (typeof error.error?.message === 'string') return error.error.message;
       return fallback;
     }
-
-    if (typeof error === 'string') {
-      return error;
-    }
-
-    if (error instanceof HttpErrorResponse) {
-      const message =
-        (typeof error.error === 'string' && error.error) ||
-        (error.error && typeof error.error.message === 'string' && error.error.message) ||
-        error.statusText;
-      return message || fallback;
-    }
-
-    if (typeof (error as { message?: string }).message === 'string') {
-      return (error as { message?: string }).message as string;
-    }
-
     return fallback;
   }
 }
-

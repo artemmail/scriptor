@@ -23,6 +23,16 @@
     <button type="button" (click)="openSupport()">Поддержка</button>
   </nav>
 
+  <div class="s-member-bar s-container" *ngIf="user$ | async as user">
+    <div class="s-member-message"><span class="s-member-dot" aria-hidden="true"></span><div><strong>Вы уже с нами, {{ user.displayName || user.email || 'друг' }}.</strong><small>Ваше рабочее пространство готово.</small></div></div>
+    <nav class="s-member-actions" aria-label="Ваш аккаунт и управление сайтом">
+      <a routerLink="/transcriptions">Мои записи <span aria-hidden="true">↗</span></a>
+      <a routerLink="/profile">Профиль</a>
+      <app-admin-menu *ngIf="hasRole(user.roles, 'admin')"></app-admin-menu>
+      <a *ngIf="hasRole(user.roles, 'moderator')" routerLink="/blog/new">Новая публикация <span aria-hidden="true">↗</span></a>
+    </nav>
+  </div>
+
   <main id="main" tabindex="-1">
     <section class="s-hero s-container" aria-labelledby="hero-title">
       <div class="s-hero-copy">

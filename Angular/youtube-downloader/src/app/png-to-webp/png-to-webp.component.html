@@ -1,124 +1,37 @@
-<div class="page">
-  <h1>PNG → WebP конвертер</h1>
-  <p class="description">
-    Преобразуйте PNG изображение в WebP прямо в браузере. Загрузите файл, вставьте из буфера обмена или перетащите его в область ниже.
-    Прозрачность сохраняется, а вы сразу увидите результат и размер полученного файла.
-  </p>
+<div class="ap-page pw-page">
+  <main class="ap-container pw-container">
+    <nav class="pw-topline" aria-label="Навигация конвертера"><a routerLink="/">← На главную</a><span class="ap-eyebrow">YouScriptor / Инструменты</span><a class="pw-batch-link" routerLink="/png-to-webp/batch">Несколько файлов <span aria-hidden="true">↗</span></a></nav>
+    <header class="pw-hero">
+      <div><p class="ap-eyebrow">PNG → WebP · Прямо в браузере</p><h1 class="ap-title">Та же картинка.<br><em>Новый формат.</em></h1><p class="ap-lead">Превратите PNG в WebP, подберите качество и сравните результат. Прозрачность сохраняется, а файл обрабатывается на вашем устройстве.</p><div class="pw-benefits"><span><mat-icon>check</mat-icon>Без загрузки на сервер</span><span><mat-icon>check</mat-icon>С прозрачным фоном</span></div></div>
+      <div class="pw-visual" aria-hidden="true"><div class="pw-visual-top"><span class="ap-eyebrow">Меньше вес. Больше возможностей.</span><span>↗</span></div><div class="pw-format-art"><div class="pw-art-file"><span>PNG</span><div class="pw-landscape"><i></i><b></b></div><small>Ваш оригинал</small></div><span class="pw-art-arrow">→</span><div class="pw-art-file pw-art-webp"><span>WebP <b>✓</b></span><div class="pw-landscape"><i></i><b></b></div><small>Новый формат</small></div></div><div class="pw-visual-bottom"><span>Изображение остаётся вашим.</span><span>PNG → WEBP</span></div></div>
+    </header>
 
-  <div class="upload-area"
-       [class.drag-over]="dragOver()"
-       (dragenter)="onDragEnter($event)"
-       (dragleave)="onDragLeave($event)"
-       (drop)="onDrop($event)"
-       (dragover)="onDragOver($event)">
-    <div class="upload-content">
-      <button mat-stroked-button color="primary" (click)="fileInput.click()">
-        <mat-icon>upload_file</mat-icon>
-        Выбрать PNG
-      </button>
-      <p class="hint">или перетащите изображение сюда, или нажмите <strong>Ctrl/⌘ + V</strong> для вставки</p>
-      <input #fileInput type="file" accept="image/png" (change)="onFileInput($event)" hidden>
-    </div>
-  </div>
+    <input #fileInput class="pw-file-input" type="file" accept="image/png,.png" (change)="onFileInput($event)" [disabled]="busy()" aria-label="Выбрать PNG изображение">
+    <section class="pw-dropzone" [class.pw-drag-over]="dragOver()" [class.pw-compact]="originalFile()" [class.pw-busy]="busy()" (dragenter)="onDragEnter($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)" (dragover)="onDragOver($event)" aria-label="Загрузка PNG">
+      <div class="pw-upload-symbol" aria-hidden="true"><mat-icon>{{ dragOver() ? 'file_download' : 'add_photo_alternate' }}</mat-icon><span>PNG</span></div>
+      <div class="pw-upload-copy"><p class="ap-eyebrow">01 / Начнём с изображения</p><h2>{{ dragOver() ? 'Отпустите файл здесь' : originalFile() ? 'Попробовать другое изображение?' : 'Перетащите PNG сюда.' }}</h2><p>Или выберите файл с устройства. Можно вставить изображение через <kbd>Ctrl / ⌘ + V</kbd>.</p></div>
+      <button class="ap-button ap-button-lime pw-pick" type="button" (click)="fileInput.click()" [disabled]="busy()"><mat-icon>upload_file</mat-icon>{{ originalFile() ? 'Заменить PNG' : 'Выбрать PNG' }}<span aria-hidden="true">↗</span></button>
+    </section>
 
-  <div class="controls" *ngIf="originalFile()">
-    <div class="slider">
-      <label for="quality">Качество WebP: {{ quality() | number:'1.0-2' }}</label>
-      <mat-slider
-        id="quality"
-        min="0.1"
-        max="1"
-        step="0.01"
-        [discrete]="true">
-        <input matSliderThumb [value]="quality()" (input)="onSliderInput($event)">
-      </mat-slider>
+    <div class="ap-notice ap-error pw-error" role="alert" *ngIf="error() as message"><mat-icon>error_outline</mat-icon><p>{{ message }}</p><button type="button" (click)="error.set(null)" aria-label="Закрыть сообщение об ошибке"><mat-icon>close</mat-icon></button></div>
+
+    <div class="pw-workspace" *ngIf="originalFile() as file; else gettingStarted" [attr.aria-busy]="busy()">
+      <section class="pw-comparison" aria-label="Сравнение изображений">
+        <header class="pw-comparison-heading"><div><p class="ap-eyebrow">02 / Сравните результат</p><h2>{{ file.name }}</h2><p>{{ workingDimensionsLabel() }}<span *ngIf="hasEdits()"> · Применены правки</span></p></div><button type="button" class="pw-clear" (click)="clear()" [disabled]="busy()" aria-label="Убрать изображение"><mat-icon>close</mat-icon></button></header>
+        <div class="pw-preview-grid">
+          <div class="pw-preview"><div class="pw-preview-label"><strong>{{ hasEdits() ? 'PNG после правок' : 'Исходный PNG' }}</strong><span>{{ workingSizeLabel() }}</span></div><div class="pw-image-frame"><img *ngIf="workingPreviewUrl() as url" [src]="url" [alt]="hasEdits() ? 'PNG после редактирования' : 'Исходное изображение PNG'"><div class="pw-frame-empty" *ngIf="!workingPreviewUrl()"><mat-icon>image</mat-icon></div></div><div class="pw-preview-footer"><span>{{ workingDimensionsLabel() }}</span><span>PNG</span></div></div>
+          <div class="pw-preview pw-webp-preview"><div class="pw-preview-label"><strong>Результат WebP</strong><span>{{ processing() ? 'Обрабатываем…' : resultSizeLabel() }}</span></div><div class="pw-image-frame"><img *ngIf="result() as res" [src]="res.previewUrl" alt="Результат конвертации WebP"><div class="pw-spinner" *ngIf="processing()" role="status"><mat-spinner diameter="32"></mat-spinner><span>Готовим WebP…</span></div><div class="pw-frame-empty" *ngIf="!result() && !processing()"><mat-icon>image_not_supported</mat-icon><span>Результат появится здесь</span></div></div><div class="pw-preview-footer"><span>Качество {{ qualityPercent() }}%</span><span>WEBP</span></div></div>
+        </div>
+        <div class="pw-result-strip" *ngIf="result() && !processing()"><span class="pw-result-icon" aria-hidden="true">{{ sizeDifference() > 0 ? '↓' : '↗' }}</span><div><strong>{{ differenceLabel() }}</strong><p>{{ sizeDifference() > 0 ? 'Сравните детали на превью перед скачиванием.' : 'WebP не всегда меньше PNG. Попробуйте снизить качество.' }}</p></div><span>{{ workingSizeLabel() }} <b aria-hidden="true">→</b> {{ resultSizeLabel() }}</span></div>
+        <div class="pw-edit-actions"><button type="button" class="ap-button ap-button-outline pw-edit" (click)="openEditor()" [disabled]="busy() || !workingDimensions()"><mat-icon>crop_rotate</mat-icon>Редактировать</button><span>Обрезка, поворот и отражение</span><button class="pw-reset" type="button" *ngIf="hasEdits()" (click)="resetEdits()" [disabled]="busy()"><mat-icon>undo</mat-icon>Сбросить правки</button></div>
+        <p class="pw-original-note" *ngIf="hasEdits() && originalDimensions() as dims">Исходный PNG: {{ originalSizeLabel() }} · {{ dims.width }} × {{ dims.height }} px. Сравнение размера выполнено с PNG после правок.</p>
+      </section>
+
+      <aside class="pw-settings" aria-label="Настройки и скачивание"><p class="ap-eyebrow">03 / Последний штрих</p><h2>Баланс размера<br><em>и деталей.</em></h2><p class="pw-settings-lead">Подберите качество. Новый WebP будет готов после изменения настройки.</p><div class="pw-quality-label"><label for="quality">Качество WebP</label><output for="quality">{{ qualityPercent() }}<span>%</span></output></div><input id="quality" type="range" min="0.1" max="1" step="0.01" [value]="quality()" (change)="onSliderInput($event)" [disabled]="busy()" [attr.aria-valuetext]="qualityPercent() + ' процентов'"><div class="pw-range-labels"><span>Меньше размер</span><span>Больше деталей</span></div><div class="pw-presets" role="group" aria-label="Готовые настройки качества"><button type="button" [class.selected]="quality() === 0.65" [attr.aria-pressed]="quality() === 0.65" (click)="onQualityChange(0.65)" [disabled]="busy()">Компактно<small>65%</small></button><button type="button" [class.selected]="quality() === 0.82" [attr.aria-pressed]="quality() === 0.82" (click)="onQualityChange(0.82)" [disabled]="busy()">Баланс<small>82%</small></button><button type="button" [class.selected]="quality() === 0.92" [attr.aria-pressed]="quality() === 0.92" (click)="onQualityChange(0.92)" [disabled]="busy()">Детали<small>92%</small></button></div><p class="pw-quality-note">Даже при 100% WebP использует сжатие с потерями. Прозрачность сохраняется.</p><div class="pw-download-summary"><span>Ваш WebP</span><strong>{{ processing() ? 'Готовим…' : resultSizeLabel() }}</strong></div><button type="button" class="ap-button ap-button-lime pw-download" (click)="downloadResult()" [disabled]="busy() || !result() || !!error()"><mat-icon>download</mat-icon>Скачать WebP <span aria-hidden="true">↗</span></button><p class="pw-download-note">Сохраним с исходным именем<br>и расширением .webp.</p><div class="pw-local-note"><mat-icon>devices</mat-icon><span>Конвертация происходит в браузере. Изображение не отправляется на сервер.</span></div></aside>
     </div>
 
-    <div class="actions">
-      <button mat-flat-button color="primary" (click)="downloadResult()" [disabled]="!result()">
-        <mat-icon>download</mat-icon>
-        Скачать WebP
-      </button>
-      <button mat-stroked-button (click)="openEditor()" [disabled]="processing()">
-        <mat-icon>edit</mat-icon>
-        Редактировать
-      </button>
-      <button mat-button color="accent" (click)="resetEdits()" *ngIf="hasEdits()" [disabled]="processing()">
-        <mat-icon>undo</mat-icon>
-        Сбросить правки
-      </button>
-      <button mat-button color="warn" (click)="clear()">
-        <mat-icon>delete</mat-icon>
-        Очистить
-      </button>
-    </div>
-  </div>
-
-  <mat-card class="previews" *ngIf="originalFile()">
-    <div class="preview">
-      <h2>{{ hasEdits() ? 'PNG после редактирования' : 'Оригинал PNG' }}</h2>
-      <p class="edited-state" *ngIf="hasEdits()">Показан текущий PNG перед конвертацией</p>
-      <div class="image-frame">
-        <div class="checkerboard"></div>
-        <img
-          *ngIf="workingPreviewUrl() as previewUrl"
-          [src]="previewUrl"
-          [alt]="hasEdits() ? 'PNG после редактирования' : 'Оригинал PNG'">
-      </div>
-      <dl>
-        <div>
-          <dt>Текущий размер</dt>
-          <dd>{{ workingSizeLabel() }}</dd>
-        </div>
-        <div>
-          <dt>Текущее разрешение</dt>
-          <dd>{{ workingDimensionsLabel() }}</dd>
-        </div>
-        <div *ngIf="hasEdits()">
-          <dt>Исходный размер</dt>
-          <dd>{{ originalSizeLabel() }}</dd>
-        </div>
-        <div *ngIf="hasEdits() && originalDimensions() as dims">
-          <dt>Исходное разрешение</dt>
-          <dd>{{ dims.width }} × {{ dims.height }} px</dd>
-        </div>
-      </dl>
-    </div>
-
-    <mat-divider vertical></mat-divider>
-
-    
-    <div class="preview">
-      <h2>WebP</h2>
-      <div class="image-frame">
-        <div class="checkerboard"></div>
-        <img *ngIf="result() as res" [src]="res.previewUrl" alt="WebP результат">
-        <div class="spinner" *ngIf="processing()">
-          <mat-progress-spinner mode="indeterminate" diameter="48"></mat-progress-spinner>
-        </div>
-      </div>
-      <dl>
-        <div>
-          <dt>Размер</dt>
-          <dd>{{ resultSizeLabel() }}</dd>
-        </div>
-        <div>
-          <dt>Сжатие</dt>
-          <dd>{{ compressionRatio() }}</dd>
-        </div>
-        <div *ngIf="result() as res">
-          <dt>Время конверсии</dt>
-          <dd>{{ res.durationMs | number:'1.0-0' }} мс</dd>
-        </div>
-      </dl>
-      <p class="note" *ngIf="!result() && !processing()">
-        Выберите качество, чтобы получить WebP файл.
-      </p>
-    </div>
-  </mat-card>
-
-  <div class="error" *ngIf="error()">
-    <mat-icon>error_outline</mat-icon>
-    {{ error() }}
-  </div>
+    <ng-template #gettingStarted><section class="pw-how" aria-label="Как работает конвертер"><div><span>01</span><h3>Выберите PNG</h3><p>Файл с устройства, перетаскивание или вставка из буфера.</p></div><div><span>02</span><h3>Посмотрите на детали</h3><p>Сравните изображения. При необходимости обрежьте или поверните.</p></div><div><span>03</span><h3>Заберите WebP</h3><p>Настройте качество и скачайте результат с прозрачным фоном.</p></div></section></ng-template>
+    <aside class="pw-batch"><div><p class="ap-eyebrow">Когда изображений много</p><h2>Вся подборка.<br><em>За один подход.</em></h2></div><div><p>Откройте пакетный конвертер для работы с несколькими PNG.</p><a routerLink="/png-to-webp/batch" class="ap-button ap-button-outline">Пакетная конвертация <span aria-hidden="true">↗</span></a></div></aside>
+    <footer class="ap-bottom"><span>YouScriptor · Полезные инструменты для ваших файлов</span><nav aria-label="Полезные ссылки"><a routerLink="/markdown-converter">Markdown → документ</a><a routerLink="/blog">Блог</a></nav></footer>
+  </main>
 </div>

@@ -1,33 +1,69 @@
-<app-admin-workspace title="Профили обработки" description="Настройте, как сервис оформляет расшифровки: инструкции, модель и параметры обработки фрагментов.">
-  <button adminActions class="ad-button ad-button-primary" type="button" (click)="startCreate()" [disabled]="saving || deletingId !== null">+ Новый профиль</button>
-  <div class="ad-split">
-    <section class="ad-panel"><div class="ad-panel-heading"><h2>Профили <span class="ad-pill">{{ profiles.length }}</span></h2><button class="ad-link" type="button" (click)="loadProfiles()" [disabled]="loading || saving || form.dirty">↻ Обновить</button></div>
-      <div class="ad-state" *ngIf="loading" role="status"><mat-progress-spinner diameter="30" mode="indeterminate"></mat-progress-spinner></div>
-      <p class="ad-notice ad-error" *ngIf="error" role="alert">{{ error }}</p>
-      <div class="ad-profile-list"><button class="ad-profile" *ngFor="let profile of profiles; trackBy: trackById" type="button" [class.ad-selected]="profile.id === selectedProfile?.id" [attr.aria-pressed]="profile.id === selectedProfile?.id" (click)="selectProfile(profile)" [disabled]="saving || deletingId !== null"><strong>{{ profile.displayedName }}</strong><small>{{ profile.name }} · #{{ profile.id }}</small><p>{{ profile.hint || 'Описание не задано' }}</p><small>{{ profile.openAiModel }} · Блок {{ profile.segmentBlockSize }}</small></button></div>
-      <p class="ad-muted" *ngIf="!loading && !profiles.length && !error">Пока нет профилей. Создайте первый.</p>
+<div class="ap-page rp-page">
+  <main class="ap-container">
+    <div class="rp-topline"><a routerLink="/">← На главную</a><span>YOUSCRIPTOR / УПРАВЛЕНИЕ</span><app-admin-menu label="Разделы админки"></app-admin-menu></div>
+    <header class="rp-hero">
+      <div><p class="ap-eyebrow"><i aria-hidden="true"></i> ПРОФИЛИ ОБРАБОТКИ</p><h1>Текст —<br><span>по вашим правилам.</span></h1><p class="ap-lead">Задайте, как оформлять расшифровку: от точной записи разговора до структурированного материала. Для каждой задачи — свой профиль.</p><div class="rp-hero-actions"><button class="ap-button ap-button-lime rp-new" type="button" (click)="startCreate()" [disabled]="busy || isCreating"><span aria-hidden="true">+</span>{{ hasNewDraft ? 'Черновик нового профиля' : 'Новый профиль' }}</button><a class="ap-link" routerLink="/transcriptions">Мои записи <span aria-hidden="true">↗</span></a></div></div>
+      <aside class="rp-recipe" aria-label="Как устроен профиль">
+        <div class="rp-recipe-top"><span>ОТ ЗАПИСИ — К РЕЗУЛЬТАТУ</span><span aria-hidden="true">↗</span></div>
+        <div class="rp-recipe-title">Один профиль.<br><em>Свой подход.</em></div>
+        <div class="rp-recipe-steps"><div><span>01</span><strong>Инструкции</strong><small>Что делать с текстом</small></div><div><span>02</span><strong>Модель</strong><small>Чем обрабатывать</small></div><div><span>03</span><strong>Фрагменты</strong><small>Как разделять запись</small></div></div>
+        <div class="rp-recipe-footer"><span>{{ loading && !profiles.length ? '…' : profiles.length }} профилей в библиотеке</span><span>{{ modelCount }} моделей</span></div>
+      </aside>
+    </header>
+
+    <section class="rp-library" aria-labelledby="profiles-title" [attr.aria-busy]="loading">
+      <div class="rp-section-heading"><div><p class="ap-eyebrow">01 / БИБЛИОТЕКА НАСТРОЕК</p><h2 id="profiles-title">Профили обработки<span>.</span></h2><p>Выберите профиль или создайте новый под свою задачу.</p></div><div class="rp-refresh-wrap"><button class="ap-button ap-button-outline rp-refresh" type="button" (click)="loadProfiles()" [disabled]="!canReload"><mat-icon aria-hidden="true">refresh</mat-icon>{{ loading ? 'Обновляем…' : 'Обновить список' }}</button><small *ngIf="draftCount">Сначала сохраните или отмените правки.</small></div></div>
+      <div class="rp-draft-notice" *ngIf="draftCount"><span aria-hidden="true">●</span><p>Черновиков с изменениями: <strong>{{ draftCount }}</strong>. Правки сохраняются при переключении профилей внутри этой страницы.</p></div>
+      <div class="rp-notice rp-error" *ngIf="error" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ error }}</span><button type="button" (click)="loadProfiles()" [disabled]="!canReload">Повторить</button></div>
+      <div class="rp-loading" *ngIf="loading" role="status"><mat-progress-spinner diameter="28" mode="indeterminate" aria-label="Загрузка профилей"></mat-progress-spinner><span>Загружаем библиотеку профилей…</span></div>
+
+      <div class="rp-workspace">
+        <aside class="rp-sidebar" aria-label="Выбор профиля">
+          <div class="rp-sidebar-heading"><h3>Все профили</h3><span>{{ profiles.length }}</span></div>
+          <label class="rp-search"><mat-icon aria-hidden="true">search</mat-icon><input type="search" [(ngModel)]="search" placeholder="Название, код или модель" aria-label="Поиск профиля"><button *ngIf="search" type="button" (click)="search = ''" aria-label="Очистить поиск"><mat-icon aria-hidden="true">close</mat-icon></button></label>
+          <nav class="rp-profile-list" aria-label="Профили обработки">
+            <button class="rp-profile-option" type="button" *ngFor="let profile of filteredProfiles; trackBy: trackById" [class.rp-selected]="profile.id === selectedProfile?.id" [attr.aria-current]="profile.id === selectedProfile?.id ? 'true' : null" (click)="selectProfile(profile)" [disabled]="busy">
+              <span class="rp-option-top"><span>#{{ profile.id }}</span><span aria-hidden="true">↗</span></span><strong>{{ profile.displayedName }}</strong><small class="rp-option-name">{{ profile.name }}</small><p>{{ profile.hint || 'Подсказка не задана' }}</p><span class="rp-option-model">{{ profile.openAiModel }}</span><span *ngIf="hasDraft(profile)" class="rp-option-dirty">● Есть изменения</span>
+            </button>
+          </nav>
+          <label class="rp-mobile-select" *ngIf="filteredProfiles.length">Выберите профиль<select [ngModel]="visibleSelectedId" (ngModelChange)="selectById($event)" [disabled]="busy"><option [ngValue]="null" disabled>{{ isCreating ? 'Новый профиль' : 'Выберите профиль' }}</option><option *ngFor="let profile of filteredProfiles; trackBy: trackById" [ngValue]="profile.id">{{ profile.displayedName }}{{ hasDraft(profile) ? ' · Есть изменения' : '' }}</option></select></label>
+          <div class="rp-list-empty" *ngIf="!loading && !filteredProfiles.length"><mat-icon aria-hidden="true">{{ profiles.length ? 'search_off' : 'description' }}</mat-icon><p>{{ profiles.length ? 'Профили не найдены.' : 'Библиотека пока пуста.' }}</p><button *ngIf="search" type="button" (click)="search = ''">Сбросить поиск →</button></div>
+          <button class="rp-add-profile" type="button" (click)="startCreate()" [disabled]="busy || isCreating"><span aria-hidden="true">+</span>{{ hasNewDraft ? 'Продолжить новый профиль' : 'Добавить профиль' }}</button>
+          <p class="rp-sidebar-note">Каждый профиль хранит свои инструкции, модель и размер блока.</p>
+        </aside>
+
+        <form class="rp-editor" *ngIf="selectedProfile || isCreating; else selectState" [formGroup]="form" (ngSubmit)="save()" [attr.aria-busy]="saving || deletingId !== null">
+          <header class="rp-editor-heading"><div><p class="ap-eyebrow">{{ isCreating ? 'НОВЫЙ ПРОФИЛЬ' : 'РЕДАКТИРОВАНИЕ / #' + selectedProfile?.id }}</p><h3>{{ form.controls.displayedName.value || (isCreating ? 'Новый подход к тексту' : 'Название профиля') }}</h3></div><span class="rp-edit-status" [class.rp-edit-dirty]="form.dirty || isCreating">{{ saving ? 'Сохраняем…' : isCreating ? 'Черновик' : form.dirty ? 'Есть изменения' : 'Сохранено' }}</span></header>
+          <fieldset [disabled]="busy">
+            <section class="rp-form-section rp-presentation" aria-labelledby="rp-presentation-title">
+              <div class="rp-form-heading"><span>01</span><div><h4 id="rp-presentation-title">Как выглядит профиль</h4><p>Название и подсказка помогут пользователю выбрать нужную обработку.</p></div></div>
+              <div class="rp-presentation-grid"><div class="rp-fields">
+                <label class="rp-field rp-wide">Название для пользователя<input type="text" formControlName="displayedName" maxlength="200" placeholder="Например, Структурированный конспект" [attr.aria-invalid]="fieldInvalid('displayedName')" aria-describedby="rp-name-error"><span class="rp-field-error" id="rp-name-error" *ngIf="fieldInvalid('displayedName')">Укажите название до 200 символов.</span></label>
+                <label class="rp-field rp-wide">Системное имя<input type="text" formControlName="name" maxlength="200" placeholder="Внутреннее имя профиля" [attr.aria-invalid]="fieldInvalid('name')" aria-describedby="rp-code-hint rp-code-error"><small id="rp-code-hint">Используется сервисом для выбора профиля.</small><span class="rp-field-error" id="rp-code-error" *ngIf="fieldInvalid('name')">Укажите системное имя до 200 символов.</span></label>
+                <label class="rp-field rp-wide">Подсказка <span class="rp-optional">необязательно</span><textarea formControlName="hint" rows="3" maxlength="400" placeholder="Для каких записей подходит профиль" aria-describedby="rp-hint-counter"></textarea><small id="rp-hint-counter">{{ form.controls.hint.value.length }} / 400 символов</small></label>
+              </div><aside class="rp-preview-area" aria-label="Предпросмотр выбора профиля"><p class="ap-eyebrow">ВИДНО ПОЛЬЗОВАТЕЛЮ</p><div class="rp-preview"><div class="rp-preview-top"><mat-icon aria-hidden="true">description</mat-icon><span aria-hidden="true">✓</span></div><strong>{{ form.controls.displayedName.value || 'Название профиля' }}</strong><p>{{ form.controls.hint.value || 'Коротко опишите результат обработки. Подсказка появится здесь.' }}</p><span class="rp-preview-label">Профиль обработки</span></div><p class="rp-preview-note">Предпросмотр обновляется при вводе. Изменения применятся после сохранения.</p></aside></div>
+            </section>
+
+            <section class="rp-form-section" aria-labelledby="rp-instructions-title">
+              <div class="rp-form-heading"><span>02</span><div><h4 id="rp-instructions-title">Инструкции для текста</h4><p>Опишите структуру результата, правила оформления и работу с исходной речью.</p></div></div>
+              <div class="rp-prompt-box" [class.rp-prompt-invalid]="fieldInvalid('request')"><div class="rp-prompt-top"><label for="rp-request">ОСНОВНОЙ ЗАПРОС</label><span>{{ form.controls.request.value.length }} / 4000</span></div><textarea id="rp-request" formControlName="request" rows="11" maxlength="4000" placeholder="Опишите, что нужно сделать с расшифровкой…" spellcheck="false" [attr.aria-invalid]="fieldInvalid('request')" aria-describedby="rp-request-error"></textarea><div class="rp-prompt-bottom"><span>Применяется при обработке текста</span><span aria-hidden="true">↗</span></div></div>
+              <p class="rp-field-error" id="rp-request-error" *ngIf="fieldInvalid('request')">Заполните основной запрос. Максимум 4000 символов.</p>
+              <div class="rp-clarification"><button class="rp-disclosure" type="button" [attr.aria-expanded]="clarificationExpanded" aria-controls="rp-clarification-content" (click)="clarificationExpanded = !clarificationExpanded"><span>Шаблон уточнения <small>необязательно</small></span><span aria-hidden="true">{{ clarificationExpanded ? '−' : '+' }}</span></button><div id="rp-clarification-content" *ngIf="clarificationExpanded"><p>Добавьте <code>{{ clarificationToken }}</code> в месте, куда нужно подставить дополнительные пожелания пользователя.</p><label class="rp-field">Текст шаблона<textarea formControlName="clarificationTemplate" rows="4" placeholder="Учти дополнительные пожелания пользователя: {clarification}" spellcheck="false"></textarea><small>Если оставить пустым, сервис использует стандартное уточнение.</small></label></div></div>
+            </section>
+
+            <section class="rp-form-section" aria-labelledby="rp-settings-title"><div class="rp-form-heading"><span>03</span><div><h4 id="rp-settings-title">Модель и фрагменты</h4><p>Параметры постобработки расшифровки.</p></div></div><div class="rp-settings-grid">
+              <label class="rp-field">Модель OpenAI<input type="text" formControlName="openAiModel" maxlength="200" placeholder="Точное имя модели" [attr.aria-invalid]="fieldInvalid('openAiModel')" aria-describedby="rp-model-hint rp-model-error"><small id="rp-model-hint">Модель, которая выполняет инструкции профиля.</small><span class="rp-field-error" id="rp-model-error" *ngIf="fieldInvalid('openAiModel')">Укажите имя модели до 200 символов.</span></label>
+              <label class="rp-field">Размер блока<input type="number" formControlName="segmentBlockSize" min="1" max="2147483647" step="1" [attr.aria-invalid]="fieldInvalid('segmentBlockSize')" aria-describedby="rp-block-hint rp-block-error"><small id="rp-block-hint">Максимальное число слов в одном блоке.</small><span class="rp-field-error" id="rp-block-error" *ngIf="fieldInvalid('segmentBlockSize')">Целое число от 1 до 2 147 483 647.</span></label>
+            </div></section>
+          </fieldset>
+          <div class="rp-notice rp-error" *ngIf="saveError" role="alert">{{ saveError }}</div>
+          <div class="rp-notice rp-success" *ngIf="success" role="status"><mat-icon aria-hidden="true">check_circle_outline</mat-icon>{{ success }}</div>
+          <div class="rp-delete-confirmation" *ngIf="pendingDelete" role="alert" aria-label="Подтверждение удаления"><div><strong>Удалить «{{ pendingDelete.displayedName }}»?</strong><p>Профиль и его инструкции будут удалены. Отменить это действие нельзя.</p></div><div><button type="button" class="ap-button ap-button-outline" (click)="cancelDelete()" [disabled]="busy">Оставить профиль</button><button type="button" class="rp-confirm-delete" (click)="deleteSelected()" [disabled]="busy">{{ deletingId !== null ? 'Удаляем…' : 'Да, удалить' }}</button></div></div>
+          <footer class="rp-editor-footer"><button class="rp-delete" type="button" *ngIf="selectedProfile && !pendingDelete" (click)="requestDelete()" [disabled]="busy"><mat-icon aria-hidden="true">delete_outline</mat-icon>Удалить профиль</button><div class="rp-save-actions"><button type="button" class="rp-reset" (click)="resetChanges()" [disabled]="busy || !form.dirty">Отменить правки</button><button type="submit" class="ap-button rp-save" [disabled]="busy || form.invalid || (!isCreating && !form.dirty)">{{ saving ? 'Сохраняем…' : isCreating ? 'Создать профиль' : 'Сохранить профиль' }} <span aria-hidden="true">↗</span></button></div></footer>
+        </form>
+        <ng-template #selectState><div class="ap-state rp-select-state" *ngIf="!loading"><mat-icon aria-hidden="true">tune</mat-icon><h3>Настройте обработку текста</h3><p>Выберите профиль из библиотеки или создайте новый.</p><button class="ap-button" type="button" (click)="startCreate()" [disabled]="busy">Создать профиль ↗</button></div></ng-template>
+      </div>
     </section>
-    <section class="ad-panel">
-      <div class="ad-panel-heading"><div><h2>{{ selectedProfile && !isCreating ? selectedProfile.displayedName : 'Новый профиль' }}</h2><p>{{ selectedProfile && !isCreating ? 'Редактирование профиля #' + selectedProfile.id : 'Заполните параметры и сохраните профиль.' }}</p></div><span class="ad-pill ad-pill-warning" *ngIf="form.dirty">Есть изменения</span></div>
-      <form [formGroup]="form" (ngSubmit)="save()">
-        <fieldset [disabled]="saving" style="border:0;padding:0;margin:0;min-width:0">
-          <div class="ad-fields">
-            <mat-form-field appearance="outline"><mat-label>Системное имя</mat-label><input matInput formControlName="name"><mat-error>Укажите имя до 200 символов</mat-error></mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>Название для пользователя</mat-label><input matInput formControlName="displayedName"><mat-error>Укажите название до 200 символов</mat-error></mat-form-field>
-            <mat-form-field appearance="outline" class="ad-field-wide"><mat-label>Подсказка</mat-label><textarea matInput rows="2" formControlName="hint"></textarea><mat-hint>Видна при выборе профиля. До 400 символов.</mat-hint><mat-error>Не более 400 символов</mat-error></mat-form-field>
-          </div>
-          <div class="ad-form-section"><h3>Инструкции обработки</h3><div class="ad-fields">
-            <mat-form-field appearance="outline" class="ad-field-wide"><mat-label>Основной запрос</mat-label><textarea matInput rows="9" formControlName="request"></textarea><mat-hint>Что нужно сделать с текстом. До 4 000 символов.</mat-hint><mat-error>Заполните запрос, не более 4 000 символов</mat-error></mat-form-field>
-            <mat-form-field appearance="outline" class="ad-field-wide"><mat-label>Шаблон уточнения</mat-label><textarea matInput rows="4" formControlName="clarificationTemplate"></textarea></mat-form-field>
-          </div></div>
-          <div class="ad-form-section"><h3>Модель и фрагменты</h3><div class="ad-fields">
-            <mat-form-field appearance="outline"><mat-label>Модель OpenAI</mat-label><input matInput formControlName="openAiModel"><mat-error>Укажите модель до 200 символов</mat-error></mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>Размер блока</mat-label><input matInput type="number" min="1" step="1" formControlName="segmentBlockSize"><mat-error>Укажите размер блока от 1</mat-error></mat-form-field>
-          </div></div>
-        </fieldset>
-        <p class="ad-notice ad-error" *ngIf="saveError" role="alert">{{ saveError }}</p>
-        <div class="ad-actions"><button *ngIf="selectedProfile && !isCreating" class="ad-button ad-button-danger" type="button" (click)="delete(selectedProfile)" [disabled]="saving || deletingId !== null">{{ deletingId !== null ? 'Удаляем…' : 'Удалить профиль' }}</button><button class="ad-button ad-button-primary" type="submit" [disabled]="saving || deletingId !== null">{{ saving ? 'Сохраняем…' : 'Сохранить профиль' }}</button></div>
-      </form>
-    </section>
-  </div>
-</app-admin-workspace>
+    <footer class="ap-bottom"><span>YouScriptor · Профили обработки</span><nav aria-label="Полезные ссылки"><a routerLink="/transcriptions">Мои записи</a><a routerLink="/admin/users">Пользователи</a><a routerLink="/admin/billing-plans">Тарифы</a></nav></footer>
+  </main>
+</div>

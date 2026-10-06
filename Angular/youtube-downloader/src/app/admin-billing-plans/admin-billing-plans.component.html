@@ -1,112 +1,80 @@
-<mat-card class="table-card plans-card">
-  <mat-card-header>
-    <mat-card-title>Тарифы billing</mat-card-title>
-    <mat-card-subtitle>Редактирование карточек, которые видит пользователь на странице /billing.</mat-card-subtitle>
-  </mat-card-header>
+<div class="ap-page bp-page">
+  <main class="ap-container">
+    <div class="bp-topline"><a routerLink="/">← На главную</a><span>YOUSCRIPTOR / УПРАВЛЕНИЕ</span><app-admin-menu label="Разделы админки"></app-admin-menu></div>
 
-  <mat-card-content>
-    <div class="toolbar">
-      <button mat-stroked-button color="primary" type="button" (click)="loadPlans()" [disabled]="loadingPlans">
-        Обновить
-      </button>
-    </div>
+    <header class="bp-hero">
+      <div><p class="ap-eyebrow"><i aria-hidden="true"></i> ТАРИФЫ YOUSCRIPTOR</p><h1>Тарифы.<br><em>Всё в ваших руках.</em></h1><p class="ap-lead">От первого знакомства до больших проектов. Настройте стоимость, наполнение и подачу каждого пакета.</p><a class="ap-link" routerLink="/billing" target="_blank" rel="noopener">Посмотреть тарифы на сайте <span aria-hidden="true">↗</span><span class="bp-sr-only">, в новой вкладке</span></a></div>
+      <aside class="bp-overview" aria-label="Сохранённые тарифы">
+        <div class="bp-overview-top"><span>ВАША ТАРИФНАЯ СЕТКА</span><span aria-hidden="true">↗</span></div>
+        <div class="bp-overview-main"><strong>{{ loadingPlans && !plans.length ? '…' : plans.length }}</strong><div>пакетов<br><span>для разных задач</span></div><span class="bp-overview-symbol" aria-hidden="true">≋</span></div>
+        <div class="bp-overview-bottom"><span><i aria-hidden="true"></i> {{ activeCount }} активных</span><span>{{ plans.length - activeCount }} скрытых</span></div>
+      </aside>
+    </header>
 
-    <div class="loading-overlay" *ngIf="loadingPlans">
-      <mat-progress-spinner mode="indeterminate" diameter="36"></mat-progress-spinner>
-    </div>
+    <section class="bp-catalog" aria-labelledby="catalog-title" [attr.aria-busy]="loadingPlans">
+      <div class="bp-section-heading"><div><p class="ap-eyebrow">01 / РЕДАКТОР КАТАЛОГА</p><h2 id="catalog-title">Тарифная сетка<span>.</span></h2><p>Выберите пакет, внесите изменения и проверьте результат в предпросмотре.</p></div><div class="bp-refresh-wrap"><button class="ap-button ap-button-outline bp-refresh" type="button" (click)="loadPlans()" [disabled]="!canReload"><mat-icon aria-hidden="true">refresh</mat-icon>{{ loadingPlans ? 'Обновляем…' : 'Обновить список' }}</button><small *ngIf="dirtyCount">Сначала сохраните или отмените правки.</small></div></div>
+      <div class="bp-draft-notice" *ngIf="dirtyCount"><span class="bp-draft-dot" aria-hidden="true"></span><span>Тарифов с изменениями: <strong>{{ dirtyCount }}</strong>. Черновики сохраняются при переключении внутри этой страницы.</span></div>
+      <div class="bp-notice bp-error" *ngIf="plansError" role="alert"><mat-icon aria-hidden="true">error_outline</mat-icon><span>{{ plansError }}</span><button type="button" (click)="loadPlans()" [disabled]="!canReload">Повторить</button></div>
+      <div class="bp-loading" *ngIf="loadingPlans" role="status"><mat-progress-spinner diameter="28" mode="indeterminate" aria-label="Загрузка тарифов"></mat-progress-spinner><span>Загружаем тарифную сетку…</span></div>
 
-    <div class="plans-error" *ngIf="plansError">{{ plansError }}</div>
-    <div class="plans-success" *ngIf="plansSuccess">{{ plansSuccess }}</div>
+      <div class="bp-workspace" *ngIf="plans.length">
+        <aside class="bp-sidebar" aria-label="Выбор тарифа">
+          <div class="bp-sidebar-heading"><h3>Все пакеты</h3><span>{{ plans.length }}</span></div>
+          <label class="bp-search"><mat-icon aria-hidden="true">search</mat-icon><input type="search" [(ngModel)]="search" placeholder="Название или код" aria-label="Поиск тарифа"><button type="button" *ngIf="search" (click)="search = ''" aria-label="Очистить поиск"><mat-icon aria-hidden="true">close</mat-icon></button></label>
+          <nav class="bp-plan-list" aria-label="Тарифы">
+            <button class="bp-plan-option" type="button" *ngFor="let item of filteredPlans; trackBy: trackByPlanId" [class.bp-selected]="item.id === selectedPlanId" [attr.aria-current]="item.id === selectedPlanId ? 'true' : null" (click)="selectPlan(item.id)">
+              <span class="bp-option-top"><span>{{ item.code || 'БЕЗ КОДА' }}</span><span class="bp-option-state" [class.bp-option-hidden]="!item.isActive">{{ item.isActive ? 'Активен' : 'Скрыт' }}</span></span>
+              <strong>{{ item.name || 'Без названия' }}</strong><span class="bp-option-price">{{ formatPrice(item) }} <span aria-hidden="true">↗</span></span><small *ngIf="item.dirty" class="bp-option-dirty">● Есть изменения</small><small *ngIf="isSavingPlan(item.id)">Сохраняем…</small>
+            </button>
+          </nav>
+          <label class="bp-mobile-select" *ngIf="filteredPlans.length">Выберите тариф<select [ngModel]="visibleSelectedPlanId" (ngModelChange)="selectPlan($event)"><option [ngValue]="null" disabled>Выберите тариф</option><option *ngFor="let item of filteredPlans; trackBy: trackByPlanId" [ngValue]="item.id">{{ item.name }}{{ item.dirty ? ' · Есть изменения' : '' }}</option></select></label>
+          <div class="bp-list-empty" *ngIf="!filteredPlans.length"><p>Таких тарифов нет.</p><button type="button" (click)="search = ''">Сбросить поиск →</button></div>
+          <p class="bp-sidebar-note">Изменения каждого пакета сохраняются отдельно.</p>
+        </aside>
 
-    <div class="table-container" *ngIf="plans.length > 0; else plansEmptyState">
-      <table class="plans-table">
-        <thead>
-          <tr>
-            <th>Код</th>
-            <th>Название</th>
-            <th>Описание</th>
-            <th>Цена</th>
-            <th>Валюта</th>
-            <th>Минуты</th>
-            <th>Видео</th>
-            <th>Цена / час</th>
-            <th>Приоритет</th>
-            <th>Активен</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let plan of plans; trackBy: trackByPlanId">
-            <td>
-              <input type="text" [(ngModel)]="plan.code" (ngModelChange)="markPlanDirty(plan)" />
-            </td>
-            <td>
-              <input type="text" [(ngModel)]="plan.name" (ngModelChange)="markPlanDirty(plan)" />
-            </td>
-            <td class="description-cell">
-              <textarea rows="3" [(ngModel)]="plan.description" (ngModelChange)="markPlanDirty(plan)"></textarea>
-            </td>
-            <td>
-              <input
-                type="number"
-                step="1"
-                min="0"
-                [(ngModel)]="plan.price"
-                (ngModelChange)="markPlanDirty(plan)"
-              />
-            </td>
-            <td>
-              <input type="text" maxlength="8" [(ngModel)]="plan.currency" (ngModelChange)="markPlanDirty(plan)" />
-            </td>
-            <td>
-              <input
-                type="number"
-                step="1"
-                min="0"
-                [(ngModel)]="plan.includedTranscriptionMinutes"
-                (ngModelChange)="markPlanDirty(plan)"
-              />
-            </td>
-            <td>
-              <input
-                type="number"
-                step="1"
-                min="0"
-                [(ngModel)]="plan.includedVideos"
-                (ngModelChange)="markPlanDirty(plan)"
-              />
-            </td>
-            <td class="hourly-cell">{{ formatHourlyRate(plan) }}</td>
-            <td>
-              <input
-                type="number"
-                step="1"
-                [(ngModel)]="plan.priority"
-                (ngModelChange)="markPlanDirty(plan)"
-              />
-            </td>
-            <td class="plan-active-cell">
-              <input type="checkbox" [(ngModel)]="plan.isActive" (ngModelChange)="markPlanDirty(plan)" />
-            </td>
-            <td class="plan-actions">
-              <button
-                mat-stroked-button
-                color="primary"
-                type="button"
-                (click)="savePlan(plan)"
-                [disabled]="isSavingPlan(plan.id) || !plan.dirty"
-              >
-                {{ isSavingPlan(plan.id) ? 'Сохраняем…' : 'Сохранить' }}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+        <form class="bp-editor" *ngIf="selectedPlan as plan" #editorForm="ngForm" (ngSubmit)="savePlan(plan)" [attr.aria-busy]="isSavingPlan(plan.id)">
+          <header class="bp-editor-heading"><div><p class="ap-eyebrow">РЕДАКТИРОВАНИЕ ПАКЕТА</p><h3>{{ plan.name || 'Без названия' }}</h3></div><span class="bp-edit-status" [class.bp-edit-dirty]="plan.dirty">{{ isSavingPlan(plan.id) ? 'Сохраняем…' : plan.dirty ? 'Есть изменения' : 'Сохранено' }}</span></header>
+          <div class="bp-editor-layout">
+            <fieldset [disabled]="isSavingPlan(plan.id) || loadingPlans">
+              <section class="bp-form-section" aria-labelledby="plan-presentation"><div class="bp-form-heading"><span>01</span><h4 id="plan-presentation">Название и описание</h4></div>
+                <div class="bp-fields"><label class="bp-field bp-field-wide">Название<input type="text" name="name" maxlength="128" required [(ngModel)]="plan.name" (ngModelChange)="markPlanDirty(plan)" placeholder="Например, Для больших идей"><small>Так пакет называется на странице тарифов.</small><span class="bp-field-error" *ngIf="plan.dirty && !plan.name?.trim()">Укажите название.</span></label>
+                  <label class="bp-field bp-field-wide">Описание <span class="bp-optional">необязательно</span><textarea name="description" rows="3" maxlength="1024" [(ngModel)]="plan.description" (ngModelChange)="markPlanDirty(plan)" placeholder="Для каких задач подходит этот пакет"></textarea><small>{{ plan.description?.length || 0 }} / 1024</small></label>
+                </div>
+              </section>
+              <section class="bp-form-section" aria-labelledby="plan-pricing"><div class="bp-form-heading"><span>02</span><h4 id="plan-pricing">Стоимость и наполнение</h4></div>
+                <div class="bp-fields"><label class="bp-field">Цена пакета<input class="bp-price-input" type="number" name="price" min="0" step="0.01" required [(ngModel)]="plan.price" (ngModelChange)="markPlanDirty(plan)"><span class="bp-field-error" *ngIf="plan.dirty && !isValidPrice(plan.price)">Укажите цену от 0.</span></label>
+                  <label class="bp-field">Валюта<input type="text" name="currency" maxlength="8" required [(ngModel)]="plan.currency" (ngModelChange)="markPlanDirty(plan)" placeholder="RUB"><span class="bp-field-error" *ngIf="plan.dirty && !plan.currency?.trim()">Укажите валюту.</span></label>
+                  <label class="bp-field">Минуты транскрибации<input type="number" name="minutes" min="0" max="2147483647" step="1" required [(ngModel)]="plan.includedTranscriptionMinutes" (ngModelChange)="markPlanDirty(plan)"><small>Для собственных аудио и видео.</small><span class="bp-field-error" *ngIf="plan.dirty && !isValidQuota(plan.includedTranscriptionMinutes)">Целое число от 0 до 2 147 483 647.</span></label>
+                  <label class="bp-field">Ролики YouTube<input type="number" name="videos" min="0" max="2147483647" step="1" required [(ngModel)]="plan.includedVideos" (ngModelChange)="markPlanDirty(plan)"><small>Количество расшифровок.</small><span class="bp-field-error" *ngIf="plan.dirty && !isValidQuota(plan.includedVideos)">Целое число от 0 до 2 147 483 647.</span></label>
+                </div>
+                <div class="bp-rate"><mat-icon aria-hidden="true">schedule</mat-icon><span>Стоимость часа в пакете</span><strong>{{ formatHourlyRate(plan) }}</strong></div>
+              </section>
+              <section class="bp-form-section" aria-labelledby="plan-settings"><div class="bp-form-heading"><span>03</span><h4 id="plan-settings">Параметры и видимость</h4></div>
+                <div class="bp-fields"><label class="bp-field">Код тарифа<input type="text" name="code" maxlength="64" required [(ngModel)]="plan.code" (ngModelChange)="markPlanDirty(plan)"><small>Внутренний идентификатор пакета.</small><span class="bp-field-error" *ngIf="plan.dirty && !plan.code?.trim()">Укажите код.</span></label><label class="bp-field">Приоритет<input type="number" name="priority" min="-2147483648" max="2147483647" step="1" required [(ngModel)]="plan.priority" (ngModelChange)="markPlanDirty(plan)"><small>Меньше число — выше в списке.</small><span class="bp-field-error" *ngIf="plan.dirty && !isValidPriority(plan.priority)">Укажите целое число в допустимом диапазоне.</span></label></div>
+                <label class="bp-visibility"><input type="checkbox" name="active" [(ngModel)]="plan.isActive" (ngModelChange)="markPlanDirty(plan)"><span><strong>Показывать тариф пользователям</strong><small>{{ plan.isActive ? 'Пакет доступен на странице тарифов.' : 'Пакет скрыт на странице тарифов.' }}</small></span></label>
+              </section>
+            </fieldset>
 
-    <ng-template #plansEmptyState>
-      <div class="empty-state" *ngIf="!loadingPlans">Тарифы не найдены.</div>
-    </ng-template>
-  </mat-card-content>
-</mat-card>
-
+            <aside class="bp-preview-area" aria-label="Предпросмотр тарифа">
+              <div class="bp-preview-label"><span class="ap-eyebrow">ПРЕДПРОСМОТР</span><span class="bp-preview-dot" aria-hidden="true"></span></div>
+              <div class="bp-preview" [class.bp-preview-hidden]="!plan.isActive">
+                <div class="bp-preview-top"><span>{{ plan.price === 0 ? 'ДЛЯ ЗНАКОМСТВА' : 'ПАКЕТ МИНУТ И ВИДЕО' }}</span><span aria-hidden="true">≋</span></div>
+                <h4>{{ plan.name || 'Название тарифа' }}</h4><p class="bp-preview-description">{{ plan.description || 'Добавьте описание пакета — оно появится здесь.' }}</p>
+                <div class="bp-preview-price">{{ plan.price === 0 ? 'Бесплатно' : formatPrice(plan) }}</div>
+                <p class="bp-preview-rate" *ngIf="plan.includedTranscriptionMinutes > 0 && plan.price > 0">{{ formatHourlyRate(plan) }} транскрибации</p>
+                <ul><li><span aria-hidden="true">≋</span><div><strong>{{ isValidQuota(plan.includedTranscriptionMinutes) ? plan.includedTranscriptionMinutes : '—' }} мин</strong><small>своих аудио и видео</small></div></li><li><span aria-hidden="true">↗</span><div><strong>{{ isValidQuota(plan.includedVideos) ? plan.includedVideos : '—' }} видео</strong><small>с YouTube</small></div></li></ul>
+                <div class="bp-preview-cta" aria-hidden="true">{{ !plan.isActive ? 'Тариф скрыт' : plan.price === 0 ? 'Выдаётся автоматически' : 'Купить пакет' }} <span *ngIf="plan.isActive && plan.price > 0">↗</span></div>
+              </div>
+              <p class="bp-preview-note">Предпросмотр обновляется сразу. На сайте изменения появятся после сохранения.</p>
+            </aside>
+          </div>
+          <div class="bp-notice bp-error" *ngIf="plan.error" role="alert">{{ plan.error }}</div>
+          <div class="bp-notice bp-success" *ngIf="plan.saved" role="status">Тариф «{{ plan.name }}» сохранён.</div>
+          <footer class="bp-editor-footer"><p>{{ plan.dirty ? 'Изменения ещё не опубликованы' : 'Параметры соответствуют сохранённому тарифу' }}</p><div><button class="bp-reset" type="button" (click)="revertPlan(plan)" [disabled]="!plan.dirty || isSavingPlan(plan.id) || loadingPlans">Отменить правки</button><button class="ap-button bp-save" type="submit" [disabled]="!plan.dirty || !isPlanValid(plan) || editorForm.invalid || isSavingPlan(plan.id) || loadingPlans">{{ isSavingPlan(plan.id) ? 'Сохраняем…' : 'Сохранить тариф' }} <span aria-hidden="true">↗</span></button></div></footer>
+        </form>
+      </div>
+      <div class="ap-state bp-empty" *ngIf="!loadingPlans && !plansError && !plans.length"><mat-icon aria-hidden="true">inventory_2</mat-icon><h3>Тарифов пока нет</h3><p>Добавленные в каталог пакеты появятся здесь для настройки.</p><button class="ap-button ap-button-outline" type="button" (click)="loadPlans()">Обновить список</button></div>
+    </section>
+    <footer class="ap-bottom"><span>YouScriptor · Управление тарифами</span><nav aria-label="Полезные ссылки"><a routerLink="/admin/payments">Платежи</a><a routerLink="/admin/users">Пользователи</a><a routerLink="/billing">Тарифы на сайте</a></nav></footer>
+  </main>
+</div>

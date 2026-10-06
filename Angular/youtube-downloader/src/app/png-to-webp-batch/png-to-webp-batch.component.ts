@@ -1,15 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, HostListener, OnDestroy, Signal, computed, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatDividerModule } from '@angular/material/divider';
+import { Component, HostListener, OnDestroy, computed, signal } from '@angular/core';
+import { Title } from '@angular/platform-browser';
+import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
-import { MatListModule } from '@angular/material/list';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatSliderModule } from '@angular/material/slider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { saveAs } from 'file-saver';
-import { Title } from '@angular/platform-browser';
 import { createZipBlob } from './zip-utils';
 
 interface BatchItem {
@@ -19,331 +14,279 @@ interface BatchItem {
   readonly size: number;
   status: 'pending' | 'processing' | 'done' | 'error';
   error?: string;
-  previewUrl: string | null;
+  previewUrl: string;
+  previewFailed?: boolean;
+  resultUrl?: string;
   resultBlob?: Blob;
   resultSize?: number;
-  durationMs?: number;
+  width?: number;
+  height?: number;
 }
 
 @Component({
   selector: 'app-png-to-webp-batch',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatButtonModule,
-    MatCardModule,
-    MatDividerModule,
-    MatIconModule,
-    MatListModule,
-    MatProgressBarModule,
-    MatSliderModule,
-    MatSnackBarModule,
-  ],
+  imports: [CommonModule, RouterLink, MatIconModule, MatSnackBarModule],
   templateUrl: './png-to-webp-batch.component.html',
-  styleUrls: ['./png-to-webp-batch.component.css'],
+  styleUrls: ['../shared/account-page.css', './png-to-webp-batch.component.css'],
 })
 export class PngToWebpBatchComponent implements OnDestroy {
-  readonly quality = signal(0.9);
+  readonly quality = signal(0.82);
+  readonly qualityPercent = computed(() => Math.round(this.quality() * 100));
   readonly items = signal<BatchItem[]>([]);
   readonly converting = signal(false);
+  readonly archiving = signal(false);
+  readonly stopping = signal(false);
+  readonly busy = computed(() => this.converting() || this.archiving());
   readonly dragOver = signal(false);
+  readonly notice = signal('');
+  readonly filter = signal<'all' | 'done' | 'error'>('all');
+  readonly completedCount = computed(() => this.items().filter(item => item.status === 'done').length);
+  readonly errorCount = computed(() => this.items().filter(item => item.status === 'error').length);
+  readonly totalCount = computed(() => this.items().length);
+  readonly pendingCount = computed(() => this.items().filter(item => item.status === 'pending' || item.status === 'error').length);
+  readonly totalSize = computed(() => this.items().reduce((sum, item) => sum + item.size, 0));
+  readonly resultSize = computed(() => this.items().reduce((sum, item) => sum + (item.resultSize ?? 0), 0));
+  readonly convertedSourceSize = computed(() => this.items().filter(item => item.status === 'done').reduce((sum, item) => sum + item.size, 0));
+  readonly savings = computed(() => this.convertedSourceSize() - this.resultSize());
+  readonly savingsPercent = computed(() => this.convertedSourceSize() ? Math.round(Math.abs(this.savings()) / this.convertedSourceSize() * 100) : 0);
+  readonly overallProgress = computed(() => this.totalCount() ? Math.round((this.completedCount() + this.errorCount()) / this.totalCount() * 100) : 0);
+  readonly visibleItems = computed(() => this.items().filter(item => this.filter() === 'all' || item.status === this.filter()));
+  private destroyed = false;
+  private dragDepth = 0;
 
-  readonly completedCount: Signal<number> = computed(
-    () => this.items().filter(item => item.status === 'done').length,
-  );
-
-  readonly errorCount: Signal<number> = computed(
-    () => this.items().filter(item => item.status === 'error').length,
-  );
-
-  readonly totalCount: Signal<number> = computed(() => this.items().length);
-
-  readonly convertedReady: Signal<boolean> = computed(
-    () => this.items().some(item => item.status === 'done'),
-  );
-
-  readonly overallProgress: Signal<number> = computed(() => {
-    const total = this.totalCount();
-    if (!total) {
-      return 0;
-    }
-    const processed = this.items().filter(item => item.status === 'done' || item.status === 'error').length;
-    const currentProcessing = this.items().some(item => item.status === 'processing');
-    const baseProgress = (processed / total) * 100;
-    return currentProcessing ? Math.min(99, baseProgress + 0.5) : Math.round(baseProgress);
-  });
-
-  constructor(
-    private readonly snackBar: MatSnackBar,
-    private readonly title: Title,
-  ) {
-    this.title.setTitle('Batch PNG → WebP — конвертер изображений YouScriptor');
+  constructor(private readonly snackBar: MatSnackBar, title: Title) {
+    title.setTitle('Пакетный PNG → WebP — конвертер изображений YouScriptor');
   }
 
   @HostListener('window:paste', ['$event'])
-  async onPaste(event: ClipboardEvent): Promise<void> {
-    if (!event.clipboardData) {
-      return;
-    }
-    const files = Array.from(event.clipboardData.files).filter(file => this.isSupportedImage(file));
-    if (!files.length) {
-      return;
-    }
+  onPaste(event: ClipboardEvent): void {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('input:not([type="range"]), textarea, [contenteditable="true"]')) return;
+    const files = Array.from(event.clipboardData?.files ?? []);
+    if (!files.length) return;
     event.preventDefault();
     this.addFiles(files);
-    this.snackBar.open(`Добавлено ${files.length} изображение(-й) из буфера обмена`, '', { duration: 2000 });
   }
 
   ngOnDestroy(): void {
-    this.items().forEach(item => this.revokePreview(item));
+    this.destroyed = true;
+    this.items().forEach(item => this.revokeItem(item));
   }
 
   onFileInput(event: Event): void {
     const input = event.target as HTMLInputElement;
-    if (!input.files?.length) {
-      return;
-    }
-    this.addFiles(Array.from(input.files));
+    this.addFiles(Array.from(input.files ?? []));
     input.value = '';
+  }
+
+  onDragEnter(event: DragEvent): void {
+    event.preventDefault();
+    if (!this.busy()) { this.dragDepth++; this.dragOver.set(true); }
   }
 
   onDragOver(event: DragEvent): void {
     event.preventDefault();
-    this.dragOver.set(true);
+    if (event.dataTransfer) event.dataTransfer.dropEffect = this.busy() ? 'none' : 'copy';
   }
 
   onDragLeave(event: DragEvent): void {
-    if (event.currentTarget === event.target) {
-      this.dragOver.set(false);
-    }
+    event.preventDefault();
+    this.dragDepth = Math.max(0, this.dragDepth - 1);
+    if (!this.dragDepth) this.dragOver.set(false);
   }
 
   onDrop(event: DragEvent): void {
     event.preventDefault();
+    this.dragDepth = 0;
     this.dragOver.set(false);
-    if (!event.dataTransfer?.files?.length) {
-      return;
-    }
-    const files = Array.from(event.dataTransfer.files).filter(file => this.isSupportedImage(file));
-    if (!files.length) {
-      this.snackBar.open('Перетащите изображения в поддерживаемых форматах', 'OK', { duration: 2500 });
-      return;
-    }
-    this.addFiles(files);
+    this.addFiles(Array.from(event.dataTransfer?.files ?? []));
   }
 
   removeItem(id: string): void {
-    const [target] = this.items().filter(item => item.id === id);
-    if (target) {
-      this.revokePreview(target);
-      this.items.update(items => items.filter(item => item.id !== id));
-    }
+    if (this.busy()) return;
+    const target = this.items().find(item => item.id === id);
+    if (target) this.revokeItem(target);
+    this.items.update(items => items.filter(item => item.id !== id));
+    if (!this.totalCount()) this.filter.set('all');
   }
 
   clearAll(): void {
-    this.items().forEach(item => this.revokePreview(item));
+    if (this.busy()) return;
+    this.items().forEach(item => this.revokeItem(item));
     this.items.set([]);
-    this.converting.set(false);
+    this.filter.set('all');
+    this.notice.set('');
   }
 
-  async convertAll(): Promise<void> {
-    if (!this.items().length) {
-      this.snackBar.open('Добавьте изображения для конвертации', 'OK', { duration: 2500 });
-      return;
-    }
-    if (this.converting()) {
-      return;
-    }
+  convertAll(): Promise<void> {
+    return this.convertItems(this.items().filter(item => item.status !== 'done'));
+  }
+
+  convertSingle(item: BatchItem): Promise<void> {
+    return this.convertItems([item]);
+  }
+
+  stopConversion(): void { this.stopping.set(true); }
+
+  private async convertItems(queue: BatchItem[]): Promise<void> {
+    if (this.busy() || !queue.length) return;
     this.converting.set(true);
-
-    for (const item of this.items()) {
-      if (item.status === 'done') {
-        continue;
+    this.stopping.set(false);
+    this.notice.set('');
+    this.filter.set('all');
+    const quality = this.quality();
+    try {
+      for (const item of queue) {
+        if (this.destroyed || this.stopping()) break;
+        this.clearResult(item);
+        item.status = 'processing';
+        item.error = undefined;
+        this.refresh();
+        try {
+          const { blob, width, height } = await this.convertFile(item.file, quality);
+          if (this.destroyed) break;
+          item.resultBlob = blob;
+          item.resultSize = blob.size;
+          item.resultUrl = URL.createObjectURL(blob);
+          item.width = width;
+          item.height = height;
+          item.status = 'done';
+        } catch (error) {
+          if (this.destroyed) break;
+          item.error = error instanceof Error ? error.message : 'Не удалось преобразовать изображение.';
+          item.status = 'error';
+        }
+        this.refresh();
+        // Allow progress and the stop control to paint between files.
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
-      item.status = 'processing';
-      item.error = undefined;
-      try {
-        const { blob, duration } = await this.convertFile(item.file);
-        item.resultBlob = blob;
-        item.resultSize = blob.size;
-        item.durationMs = duration;
-        item.status = 'done';
-      } catch (err) {
-        console.error('Failed to convert file', item.file.name, err);
-        item.error = 'Ошибка конвертации. Попробуйте другое изображение.';
-        item.status = 'error';
-      }
-      this.items.update(items => [...items]);
-    }
-
-    this.converting.set(false);
-    if (this.completedCount()) {
-      this.snackBar.open('Конвертация завершена', '', { duration: 2000 });
+    } finally {
+      this.converting.set(false);
+      if (!this.destroyed) this.snackBar.open(this.stopping() ? 'Очередь остановлена. Готовые файлы можно скачать.' :
+        this.errorCount() ? 'Обработка завершена. Проверьте файлы с ошибками.' : 'Готово. Скачайте WebP по одному или в ZIP.', '', { duration: 3500 });
+      this.stopping.set(false);
     }
   }
 
   async downloadAll(): Promise<void> {
+    if (this.busy()) return;
     const ready = this.items().filter(item => item.status === 'done' && item.resultBlob);
-    if (!ready.length) {
-      this.snackBar.open('Нет готовых изображений для скачивания', 'OK', { duration: 2500 });
-      return;
-    }
-    const files = ready.map(item => ({
-      name: `${item.name.replace(/\.[^.]+$/, '')}.webp`,
-      blob: item.resultBlob!,
-    }));
-    const archive = await createZipBlob(files);
-    const timestamp = new Date()
-      .toISOString()
-      .replaceAll(':', '-')
-      .replaceAll('.', '-');
-    saveAs(archive, `webp-batch-${timestamp}.zip`);
-  }
-
-  async convertSingle(item: BatchItem): Promise<void> {
-    if (this.converting()) {
-      return;
-    }
-    item.status = 'processing';
-    item.error = undefined;
-    this.items.update(items => [...items]);
+    if (!ready.length) return;
+    this.archiving.set(true);
+    this.notice.set('');
     try {
-      const { blob, duration } = await this.convertFile(item.file);
-      item.resultBlob = blob;
-      item.resultSize = blob.size;
-      item.durationMs = duration;
-      item.status = 'done';
-      this.snackBar.open(`${item.name} преобразован`, '', { duration: 2000 });
-    } catch (err) {
-      console.error('Failed to convert file', item.file.name, err);
-      item.error = 'Ошибка конвертации. Попробуйте другое изображение.';
-      item.status = 'error';
-    }
-    this.items.update(items => [...items]);
+      const used = new Set<string>();
+      const files = ready.map(item => {
+        const base = this.baseName(item.name);
+        let name = `${base}.webp`, suffix = 2;
+        while (used.has(name.toLowerCase())) name = `${base} (${suffix++}).webp`;
+        used.add(name.toLowerCase());
+        return { name, blob: item.resultBlob! };
+      });
+      const archive = await createZipBlob(files);
+      if (!this.destroyed) saveAs(archive, `youscriptor-webp-${new Date().toISOString().slice(0, 10)}.zip`);
+    } catch {
+      if (!this.destroyed) this.notice.set('Не удалось собрать ZIP. Попробуйте скачать готовые файлы по одному.');
+    } finally { this.archiving.set(false); }
   }
 
-  async downloadSingle(item: BatchItem): Promise<void> {
-    if (item.status !== 'done' || !item.resultBlob) {
-      this.snackBar.open('Изображение ещё не готово', 'OK', { duration: 2000 });
-      return;
-    }
-    const baseName = item.name.replace(/\.[^.]+$/, '');
-    saveAs(item.resultBlob, `${baseName}.webp`);
+  downloadSingle(item: BatchItem): void {
+    if (item.status === 'done' && item.resultBlob) saveAs(item.resultBlob, `${this.baseName(item.name)}.webp`);
   }
 
-  onQualityInput(value: number | null | undefined): void {
-    if (value === null || value === undefined || Number.isNaN(value)) {
-      return;
-    }
-    this.quality.set(Math.min(1, Math.max(0.1, value)));
+  onQualityInput(value: number): void {
+    if (this.busy() || !Number.isFinite(value)) return;
+    const quality = Math.min(1, Math.max(0.1, value));
+    if (quality === this.quality()) return;
+    this.quality.set(quality);
+    const hadResults = this.completedCount() > 0;
+    this.items().forEach(item => { this.clearResult(item); item.status = 'pending'; item.error = undefined; });
+    this.filter.set('all');
+    this.refresh();
+    if (hadResults) this.snackBar.open('Качество изменено. Конвертируйте файлы заново.', '', { duration: 3000 });
   }
+
+  onSliderInput(event: Event): void { this.onQualityInput(Number((event.target as HTMLInputElement).value)); }
+
+  onPreviewError(item: BatchItem): void { item.previewFailed = true; this.refresh(); }
 
   formatBytes(size: number | undefined): string {
-    if (!size && size !== 0) {
-      return '—';
-    }
-    if (size === 0) {
-      return '0 Б';
-    }
+    if (size === undefined) return '—';
+    if (!size) return '0 Б';
     const units = ['Б', 'КБ', 'МБ', 'ГБ'];
-    const idx = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
-    const value = size / Math.pow(1024, idx);
-    return `${value.toFixed(value >= 10 || idx === 0 ? 0 : 1)} ${units[idx]}`;
+    const index = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
+    const value = size / Math.pow(1024, index);
+    return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
   }
 
-  trackById(index: number, item: BatchItem): string {
-    return item.id;
+  differenceLabel(item: BatchItem): string {
+    if (item.resultSize === undefined || !item.size) return '';
+    const percent = Math.round(Math.abs(item.size - item.resultSize) / item.size * 100);
+    return item.resultSize === item.size || percent === 0 ? 'Почти тот же размер' :
+      item.resultSize < item.size ? `Меньше на ${percent}%` : `Больше на ${percent}%`;
   }
 
+  trackById(_index: number, item: BatchItem): string { return item.id; }
+  private baseName(name: string): string { return name.replace(/\.[^.]+$/, '').replace(/[\\/\u0000-\u001f]/g, '_').trim() || 'image'; }
+  private refresh(): void { this.items.update(items => [...items]); }
   private isSupportedImage(file: File): boolean {
-    if (file.type.startsWith('image/')) {
-      return true;
-    }
-    const lower = file.name.toLowerCase();
-    return ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif', '.tiff', '.tif', '.avif', '.heic', '.heif']
-      .some(ext => lower.endsWith(ext));
+    return file.type.startsWith('image/') || /\.(png|jpe?g|webp|bmp|gif|tiff?|avif|heic|heif)$/i.test(file.name);
   }
 
   private addFiles(files: File[]): void {
-    if (!files.length) {
-      return;
-    }
-    const existingNames = new Set(this.items().map(item => `${item.name}_${item.size}`));
-    const newItems: BatchItem[] = [];
+    if (!files.length) return;
+    if (this.busy()) { this.snackBar.open('Дождитесь окончания обработки, чтобы добавить файлы.', '', { duration: 2500 }); return; }
+    const key = (file: File) => `${file.name}_${file.size}_${file.lastModified}`;
+    const existing = new Set(this.items().map(item => key(item.file)));
+    const added: BatchItem[] = [];
+    let duplicates = 0, unsupported = 0;
     for (const file of files) {
-      if (!this.isSupportedImage(file)) {
-        continue;
-      }
-      const uniqueKey = `${file.name}_${file.size}`;
-      if (existingNames.has(uniqueKey)) {
-        continue;
-      }
-      const previewUrl = URL.createObjectURL(file);
-      newItems.push({
-        id: crypto.randomUUID(),
-        file,
-        name: file.name,
-        size: file.size,
-        status: 'pending',
-        previewUrl,
-      });
-      existingNames.add(uniqueKey);
+      if (!this.isSupportedImage(file)) { unsupported++; continue; }
+      if (existing.has(key(file))) { duplicates++; continue; }
+      added.push({ id: crypto.randomUUID(), file, name: file.name, size: file.size, status: 'pending', previewUrl: URL.createObjectURL(file) });
+      existing.add(key(file));
     }
-    if (!newItems.length) {
-      this.snackBar.open('Изображения уже добавлены или не поддерживаются', 'OK', { duration: 2500 });
-      return;
-    }
-    this.items.update(items => [...items, ...newItems]);
-    this.snackBar.open(`Добавлено ${newItems.length} изображение(-й)`, '', { duration: 2000 });
+    this.items.update(items => [...items, ...added]);
+    this.filter.set('all');
+    this.notice.set(unsupported ? `Пропущено файлов: ${unsupported}. Добавляйте изображения PNG, JPEG, WebP или другие форматы, которые открывает ваш браузер.` : '');
+    const message = [added.length ? `Добавлено: ${added.length}.` : '', duplicates ? `Уже в списке: ${duplicates}.` : ''].filter(Boolean).join(' ');
+    if (message) this.snackBar.open(message, '', { duration: 2500 });
   }
 
-  private async convertFile(file: File): Promise<{ blob: Blob; duration: number }> {
-    const start = performance.now();
+  private async convertFile(file: File, quality: number): Promise<{ blob: Blob; width: number; height: number }> {
     const image = await this.loadImage(file);
     const canvas = document.createElement('canvas');
-    const width = (image as HTMLImageElement).naturalWidth || (image as HTMLImageElement).width;
-    const height = (image as HTMLImageElement).naturalHeight || (image as HTMLImageElement).height;
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      throw new Error('Не удалось создать контекст canvas');
-    }
-    ctx.drawImage(image, 0, 0);
-
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(result => {
-        if (result) {
-          resolve(result);
-        } else {
-          reject(new Error('Не удалось создать WebP'));
-        }
-      }, 'image/webp', this.quality());
-    });
-    const duration = performance.now() - start;
-    return { blob, duration };
+    try {
+      const width = image.naturalWidth, height = image.naturalHeight;
+      if (!width || !height) throw new Error('У изображения не удалось определить размеры.');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Браузеру не хватило ресурсов. Попробуйте изображение меньшего размера.');
+      context.drawImage(image, 0, 0);
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => {
+        if (!result) reject(new Error('Не удалось создать WebP. Попробуйте изображение меньшего размера.'));
+        else if (result.type !== 'image/webp') reject(new Error('Этот браузер не поддерживает создание WebP. Откройте страницу в современном браузере.'));
+        else resolve(result);
+      }, 'image/webp', quality));
+      return { blob, width, height };
+    } finally { canvas.width = 0; canvas.height = 0; image.src = ''; }
   }
 
   private loadImage(file: File): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const image = new Image();
-      const objectUrl = URL.createObjectURL(file);
-      image.onload = () => {
-        URL.revokeObjectURL(objectUrl);
-        resolve(image);
-      };
-      image.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        reject(new Error('Не удалось загрузить изображение'));
-      };
-      image.src = objectUrl;
+      const url = URL.createObjectURL(file);
+      image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+      image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Не удалось открыть изображение. Возможно, файл повреждён или его формат не поддерживается браузером.')); };
+      image.src = url;
     });
   }
 
-  private revokePreview(item: BatchItem): void {
-    if (item.previewUrl) {
-      URL.revokeObjectURL(item.previewUrl);
-      item.previewUrl = null;
-    }
+  private clearResult(item: BatchItem): void {
+    if (item.resultUrl) URL.revokeObjectURL(item.resultUrl);
+    item.resultUrl = undefined; item.resultBlob = undefined; item.resultSize = undefined;
   }
+  private revokeItem(item: BatchItem): void { URL.revokeObjectURL(item.previewUrl); this.clearResult(item); }
 }

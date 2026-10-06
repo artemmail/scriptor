@@ -1,4 +1,4 @@
-<h2 mat-dialog-title>Пользователь: {{ data.user.email }}</h2>
+<h2 mat-dialog-title class="user-dialog-heading"><span class="user-dialog-eyebrow">ПРОФИЛЬ / YOUSCRIPTOR</span><span class="user-dialog-title">Пользователь<em>.</em></span><small>{{ data.user.email }}</small></h2>
 <mat-dialog-content class="dialog-content">
   <mat-tab-group>
     <mat-tab label="Роли">
@@ -217,7 +217,7 @@
     </mat-tab>
   </mat-tab-group>
 </mat-dialog-content>
-<mat-dialog-actions align="end">
-  <button mat-button type="button" (click)="close()">Отмена</button>
-  <button mat-flat-button color="primary" type="button" (click)="save()">Сохранить</button>
+<mat-dialog-actions align="end" class="user-dialog-actions">
+  <button mat-button class="user-dialog-cancel" type="button" (click)="close()">Закрыть</button>
+  <button mat-flat-button class="user-dialog-save" color="primary" type="button" (click)="save()">Сохранить роли <span aria-hidden="true">↗</span></button>
 </mat-dialog-actions>

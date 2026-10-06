@@ -7,6 +7,37 @@
   max-width: 100%;
 }
 
+:host-context(.pw-editor-dialog) {
+  background: #f7f8f2;
+  color: #293323;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  --mdc-dialog-subhead-color: #293323;
+  --mdc-dialog-supporting-text-color: #667657;
+  --mdc-filled-button-container-color: #d4f568;
+  --mdc-filled-button-label-text-color: #293323;
+  --mdc-text-button-label-text-color: #607d38;
+  --mdc-outlined-text-field-focus-outline-color: #819e51;
+  --mdc-outlined-text-field-focus-label-text-color: #607d38;
+  --mat-select-enabled-trigger-text-color: #526b2c;
+}
+:host-context(.pw-editor-dialog) .dialog-title { font-family: 'Segoe UI', Arial, sans-serif; font-size: 22px; letter-spacing: -.5px; }
+:host-context(.pw-editor-dialog) .toolbar-action { color: #607d38; font-size: 12px; }
+:host-context(.pw-editor-dialog) .toolbar-action.active,
+:host-context(.pw-editor-dialog) .toolbar-action[color='primary'] { background: #e4edcf; }
+:host-context(.pw-editor-dialog) .toolbar-action[color='warn'] { color: #986644; background: #f6ede1; }
+:host-context(.pw-editor-dialog) .hint,
+:host-context(.pw-editor-dialog) .crop-info { color: #82906f; }
+:host-context(.pw-editor-dialog) .canvas-area { border-color: #d5dfc6; }
+:host-context(.pw-editor-dialog) .canvas-area .checkerboard { background: repeating-conic-gradient(#e2e7d8 0% 25%, #f5f7ef 0% 50%) 0/24px 24px; }
+:host-context(.pw-editor-dialog) .actions { border-top: 1px solid #dce3d0; padding: 16px 24px; }
+:host-context(.pw-editor-dialog.image-editor-dialog-fullscreen) { background: #f7f8f2; }
+@media (max-width: 600px) {
+  :host-context(.pw-editor-dialog) .dialog-title { font-size: 18px; padding-inline: 18px; }
+  :host-context(.pw-editor-dialog) .content { padding-inline: 18px; }
+  :host-context(.pw-editor-dialog) .toolbar-action { padding-inline: 8px; font-size: 11px; }
+  :host-context(.pw-editor-dialog) .toolbar-divider { display: none; }
+}
+
 :host-context(.image-editor-dialog-fullscreen) {
   width: 100vw;
   max-width: none;

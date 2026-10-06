@@ -361,3 +361,18 @@ blockquote {
   }
 }
 
+.admin-user-dialog .mat-mdc-dialog-surface,
+.admin-payment-dialog .mat-mdc-dialog-surface {
+  border: 1px solid #dbe3d2;
+  border-radius: 18px;
+  background: #fffefa;
+  box-shadow: 0 28px 80px rgba(28, 38, 22, .2);
+}
+
+.admin-user-dialog .mat-mdc-dialog-container,
+.admin-payment-dialog .mat-mdc-dialog-container {
+  --mat-sys-primary: #526b2c;
+  --mdc-dialog-container-color: #fffefa;
+  --mat-dialog-container-background-color: #fffefa;
+}
+

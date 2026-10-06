@@ -1,13 +1,8 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { AfterViewInit, Component, OnInit, ViewChild } from '@angular/core';
-import { Router } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+import { Router, RouterModule } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { InfiniteScrollModule } from 'ngx-infinite-scroll';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
@@ -16,26 +11,24 @@ import { AdminUsersService } from '../services/admin-users.service';
 import { Title } from '@angular/platform-browser';
 import { AdminUserListItem } from '../models/admin-user.model';
 import { AdminUserRoleDialogComponent } from './admin-user-role-dialog.component';
+import { AdminMenuComponent } from '../shared/admin-menu.component';
 
 @Component({
   selector: 'app-admin-users',
   standalone: true,
   templateUrl: './admin-users.component.html',
-  styleUrls: ['./admin-users.component.css'],
+  styleUrls: ['../shared/account-page.css', './admin-users.component.css'],
   imports: [
     CommonModule,
     DatePipe,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
+    RouterModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatChipsModule,
-    MatButtonModule,
     MatDialogModule,
     InfiniteScrollModule,
     MatSortModule,
-    MatTableModule
+    MatTableModule,
+    AdminMenuComponent
   ]
 })
 export class AdminUsersComponent implements OnInit, AfterViewInit {
@@ -45,12 +38,15 @@ export class AdminUsersComponent implements OnInit, AfterViewInit {
   pageIndex = 0;
   filterValue = '';
   loading = false;
+  loadError = '';
+  roleUpdateError = '';
   availableRoles: string[] = [];
-  displayedColumns: string[] = ['email', 'registeredAt', 'recognizedVideos', 'roles'];
+  displayedColumns: string[] = ['email', 'registeredAt', 'recognizedVideos', 'roles', 'actions'];
   sortActive = 'recognizedVideos';
   sortDirection: SortDirection = 'desc';
   dataSource = new MatTableDataSource<AdminUserListItem>([]);
   private ignoreNextSortEvent = false;
+  private requestId = 0;
 
   @ViewChild(MatSort) private sortDirective?: MatSort;
 
@@ -105,7 +101,7 @@ export class AdminUsersComponent implements OnInit, AfterViewInit {
   }
 
   onScrollDown(): void {
-    if (this.loading) {
+    if (this.loading || this.loadError) {
       return;
     }
 
@@ -118,8 +114,12 @@ export class AdminUsersComponent implements OnInit, AfterViewInit {
   }
 
   openUserDialog(user: AdminUserListItem): void {
+    this.roleUpdateError = '';
     const dialogRef = this.dialog.open(AdminUserRoleDialogComponent, {
-      width: '480px',
+      width: '760px',
+      maxWidth: 'calc(100vw - 32px)',
+      maxHeight: '90vh',
+      panelClass: 'admin-user-dialog',
       data: {
         user,
         availableRoles: this.availableRoles
@@ -137,6 +137,7 @@ export class AdminUsersComponent implements OnInit, AfterViewInit {
         },
         error: err => {
           console.error('Failed to update roles', err);
+          this.roleUpdateError = 'Не удалось сохранить роли пользователя. Попробуйте ещё раз.';
         }
       });
     });
@@ -144,6 +145,8 @@ export class AdminUsersComponent implements OnInit, AfterViewInit {
 
   private loadUsers(append = false): void {
     this.loading = true;
+    this.loadError = '';
+    const currentRequestId = ++this.requestId;
     const page = this.pageIndex + 1;
 
     const sortOrder = this.sortDirection === '' ? undefined : this.sortDirection;
@@ -153,13 +156,16 @@ export class AdminUsersComponent implements OnInit, AfterViewInit {
       .getUsers(page, this.pageSize, filter, this.sortActive, sortOrder)
       .subscribe({
         next: res => {
+          if (currentRequestId !== this.requestId) return;
           this.users = append ? this.users.concat(res.items) : res.items;
           this.dataSource.data = this.users;
           this.totalCount = res.totalCount;
           this.loading = false;
         },
         error: err => {
+          if (currentRequestId !== this.requestId) return;
           console.error('Failed to load users', err);
+          this.loadError = 'Не удалось загрузить пользователей. Повторите попытку.';
           this.loading = false;
         }
       });
@@ -168,6 +174,17 @@ export class AdminUsersComponent implements OnInit, AfterViewInit {
   goToUserTasks(user: AdminUserListItem, event: MouseEvent): void {
     event.stopPropagation();
     this.router.navigate(['/tasks'], { queryParams: { userId: user.id } });
+  }
+
+  retryLoad(): void {
+    this.pageIndex = 0;
+    this.loadUsers();
+  }
+
+  onRowKeydown(event: KeyboardEvent, user: AdminUserListItem): void {
+    if (event.key === 'Enter' && event.target === event.currentTarget) {
+      this.openUserDialog(user);
+    }
   }
 
   onSortChange(sort: Sort): void {

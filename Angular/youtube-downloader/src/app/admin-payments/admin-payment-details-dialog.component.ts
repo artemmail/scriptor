@@ -1,12 +1,8 @@
 import { CommonModule, DatePipe, JsonPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Inject, OnInit } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { MatDividerModule } from '@angular/material/divider';
-import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { AdminPaymentsService } from '../services/admin-payments.service';
 import {
   AdminYooMoneyBillDetails,
@@ -16,6 +12,7 @@ import {
 
 export interface AdminPaymentDetailsDialogData {
   operationId: string;
+  currency?: string | null;
   operationSummary?: AdminYooMoneyOperation | null;
 }
 
@@ -23,21 +20,18 @@ export interface AdminPaymentDetailsDialogData {
   selector: 'app-admin-payment-details-dialog',
   standalone: true,
   templateUrl: './admin-payment-details-dialog.component.html',
-  styleUrls: ['./admin-payment-details-dialog.component.css'],
+  styleUrls: ['./admin-payment-details-dialog.component.css', './payment-dialog.css'],
   imports: [
     CommonModule,
     DatePipe,
     JsonPipe,
     MatDialogModule,
-    MatButtonModule,
-    MatIconModule,
-    MatDividerModule,
-    MatTooltipModule,
     MatProgressSpinnerModule
   ]
 })
 export class AdminPaymentDetailsDialogComponent implements OnInit {
   readonly operationId: string;
+  readonly currency: string | null;
   readonly summary?: AdminYooMoneyOperation | null;
 
   operationDetails: AdminYooMoneyOperationDetails | null = null;
@@ -54,6 +48,7 @@ export class AdminPaymentDetailsDialogComponent implements OnInit {
     private readonly adminPaymentsService: AdminPaymentsService
   ) {
     this.operationId = data.operationId;
+    this.currency = data.currency ?? null;
     this.summary = data.operationSummary;
   }
 

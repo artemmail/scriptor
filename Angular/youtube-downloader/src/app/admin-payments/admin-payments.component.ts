@@ -2,14 +2,11 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
+import { RouterModule } from '@angular/router';
+import { AdminMenuComponent } from '../shared/admin-menu.component';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { AdminYooMoneyOperation } from '../models/admin-payments.model';
 import { AdminPaymentsService } from '../services/admin-payments.service';
 import {
@@ -59,35 +56,19 @@ interface EditableAdminSubscriptionPlan extends AdminSubscriptionPlan {
   selector: 'app-admin-payments',
   standalone: true,
   templateUrl: './admin-payments.component.html',
-  styleUrls: ['./admin-payments.component.css'],
+  styleUrls: ['../shared/account-page.css', './admin-payments.component.css'],
   imports: [
     CommonModule,
     FormsModule,
-    MatCardModule,
+    RouterModule,
+    AdminMenuComponent,
     DatePipe,
-    MatTableModule,
-    MatButtonModule,
-    MatPaginatorModule,
     MatIconModule,
-    MatTooltipModule,
     MatProgressSpinnerModule,
     MatDialogModule
   ]
 })
 export class AdminPaymentsComponent implements OnInit {
-  readonly displayedColumns: string[] = [
-    'operation_id',
-    'datetime',
-    'title',
-    'amount',
-    'type',
-    'direction',
-    'label',
-    'group_id',
-    'is_sbp_operation',
-    'spendingCategories'
-  ];
-  readonly dataSource = new MatTableDataSource<AdminYooMoneyOperationViewModel>();
   operations: AdminYooMoneyOperationViewModel[] = [];
   plans: EditableAdminSubscriptionPlan[] = [];
   loading = false;
@@ -97,7 +78,11 @@ export class AdminPaymentsComponent implements OnInit {
   plansSuccess: string | null = null;
   pageSize = 30;
   pageIndex = 0;
-  total = 0;
+  hasMore = false;
+  search = '';
+  directionFilter = 'all';
+  lastUpdated: Date | null = null;
+  private operationRequestId = 0;
   readonly pageSizeOptions = [10, 20, 30, 50];
   private readonly savingPlanIds = new Set<string>();
 
@@ -148,6 +133,11 @@ export class AdminPaymentsComponent implements OnInit {
       return;
     }
 
+    if (!this.isPlanValid(plan)) {
+      this.plansError = 'Проверьте название, код, валюту и числовые значения тарифа.';
+      return;
+    }
+
     this.savingPlanIds.add(plan.id);
     this.plansError = null;
     this.plansSuccess = null;
@@ -184,48 +174,69 @@ export class AdminPaymentsComponent implements OnInit {
     return plan.id;
   }
 
+  isPlanValid(plan: EditableAdminSubscriptionPlan): boolean {
+    return !!plan.code?.trim() && !!plan.name?.trim() && !!plan.currency?.trim()
+      && Number.isFinite(plan.price) && plan.price >= 0
+      && Number.isInteger(plan.includedTranscriptionMinutes) && plan.includedTranscriptionMinutes >= 0
+      && Number.isInteger(plan.includedVideos) && plan.includedVideos >= 0
+      && Number.isInteger(plan.priority);
+  }
+
+  get filteredOperations(): AdminYooMoneyOperationViewModel[] {
+    const query = this.search.trim().toLocaleLowerCase('ru');
+    return this.operations.filter(operation =>
+      (this.directionFilter === 'all' || operation.direction === this.directionFilter)
+      && (!query || [operation.operationId, operation.title, operation.label].some(value => value?.toLocaleLowerCase('ru').includes(query)))
+    );
+  }
+
+  countDirection(direction: string): number {
+    return this.operations.filter(operation => operation.direction === direction).length;
+  }
+
+  get sbpCount(): number { return this.operations.filter(operation => operation.isSbpOperation).length; }
+
+  resetFilters(): void { this.search = ''; this.directionFilter = 'all'; }
+
+  directionLabel(direction: string | null): string {
+    return direction === 'in' ? 'Поступление' : direction === 'out' ? 'Списание' : direction || 'Не указано';
+  }
+
+  statusLabel(status: string | null | undefined): string {
+    const labels: Record<string, string> = { success: 'Успешно', refused: 'Отклонено', in_progress: 'В обработке' };
+    return status ? labels[status.toLowerCase()] || status : 'Статус не указан';
+  }
+
   loadOperations(pageIndex = this.pageIndex, pageSize = this.pageSize): void {
+    const requestId = ++this.operationRequestId;
     const startRecord = pageIndex * pageSize;
     this.loading = true;
     this.error = null;
-    this.adminPaymentsService.getOperationHistory(startRecord, pageSize).subscribe({
+    this.adminPaymentsService.getOperationHistory(startRecord, pageSize + 1).subscribe({
       next: operations => {
+        if (requestId !== this.operationRequestId) return;
         const list = operations ?? [];
         if (list.length === 0 && startRecord > 0) {
           this.loading = false;
           const previousPage = Math.max(pageIndex - 1, 0);
-          this.total = startRecord;
           this.loadOperations(previousPage, pageSize);
           return;
         }
 
-        const viewModels = this.toViewModels(list);
+        const viewModels = this.toViewModels(list.slice(0, pageSize));
         this.operations = viewModels;
-        this.dataSource.data = viewModels;
         this.pageSize = pageSize;
         this.pageIndex = pageIndex;
-        const hasMore = list.length === pageSize;
-        this.total = hasMore ? (pageIndex + 2) * pageSize : startRecord + list.length;
+        this.hasMore = list.length > pageSize;
+        this.lastUpdated = new Date();
         this.loading = false;
       },
       error: err => {
+        if (requestId !== this.operationRequestId) return;
         this.loading = false;
-        this.dataSource.data = [];
-        this.operations = [];
         this.error = this.resolveErrorMessage(err, 'Не удалось загрузить операции YooMoney.');
       }
     });
-  }
-
-  onPageChange(event: PageEvent): void {
-    const sizeChanged = event.pageSize !== this.pageSize;
-    const targetPage = sizeChanged ? 0 : event.pageIndex;
-
-    if (!sizeChanged && targetPage === this.pageIndex) {
-      return;
-    }
-
-    this.loadOperations(targetPage, event.pageSize);
   }
 
   openOperationDetails(operation: AdminYooMoneyOperationViewModel, event?: MouseEvent): void {
@@ -241,12 +252,15 @@ export class AdminPaymentsComponent implements OnInit {
 
     const data: AdminPaymentDetailsDialogData = {
       operationId,
+      currency: operation.currency,
       operationSummary: operation
     };
 
     this.dialog.open(AdminPaymentDetailsDialogComponent, {
       width: '720px',
       maxWidth: '95vw',
+      maxHeight: '90vh',
+      panelClass: 'admin-payment-dialog',
       data
     });
   }
@@ -269,6 +283,8 @@ export class AdminPaymentsComponent implements OnInit {
     this.dialog.open(AdminPaymentOperationDialogComponent, {
       width: '640px',
       maxWidth: '95vw',
+      maxHeight: '90vh',
+      panelClass: 'admin-payment-dialog',
       data
     });
   }
@@ -447,7 +463,7 @@ export class AdminPaymentsComponent implements OnInit {
   }
 
   private formatNumber(value: number): string {
-    return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   private resolveErrorMessage(error: unknown, fallback: string): string {

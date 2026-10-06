@@ -2393,3 +2393,12 @@
     transition: none !important;
   }
 }
+.s-member-bar { display: flex; justify-content: space-between; align-items: center; gap: 16px 24px; flex-wrap: wrap; padding-block: 14px; border-bottom: 1px solid #dce3d1; }
+.s-member-message { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.s-member-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #8bac56; box-shadow: 0 0 0 4px #e6f1d9; }
+.s-member-message strong { display: block; overflow-wrap: anywhere; color: #384b2c; font-size: 12px; font-weight: 650; line-height: 1.4; }
+.s-member-message small { display: block; color: #748269; font-size: 10px; line-height: 1.5; }
+.s-member-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 21px; }
+.s-member-actions > a { display: inline-flex; align-items: center; gap: 7px; color: #4c6338; font-size: 12px; font-weight: 600; }
+.s-member-actions > a:hover { text-decoration: underline; text-underline-offset: 4px; }
+@media (max-width: 600px) { .s-member-bar { align-items: flex-start; } .s-member-actions { width: 100%; gap: 12px 20px; } }

@@ -17,7 +17,6 @@ import { AdminUsersComponent } from './admin-users/admin-users.component';
 import { AdminRecognitionProfilesComponent } from './admin-recognition-profiles/admin-recognition-profiles.component';
 import { AdminPaymentsComponent } from './admin-payments/admin-payments.component';
 import { AdminBillingPlansComponent } from './admin-billing-plans/admin-billing-plans.component';
-import { RecognitionControlComponent } from './app-recognition-control/recognition-control.component';
 import { TaskPageComponent } from './task-page/task-page.component';
 import { ServiceNewsComponent } from './service-news/service-news.component';
 import { AudioFilesComponent } from './audio-file/audio-files.component';
@@ -42,7 +41,6 @@ export const appRoutes: Routes = [
   { path: 'down', component: YoutubeDownloaderComponent },
   { path: 'youtube-downloader', component: YoutubeDownloaderComponent },
   { path: '', component: About3Component },
-  { path: 'recognition', component: RecognitionControlComponent },
   { path: 'recognition-tasks', component: RecognitionTasksComponent },
   { path: 'y', component: YoutubeDownloaderComponent },
   { path: 'recognized/:id', component: TaskPageComponent },
