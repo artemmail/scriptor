@@ -75,3 +75,23 @@ appsettings.*.local.json
 # secrets
 
 FoodBot/appsettings*.json
+
+
+### Android / Gradle ###
+/Android/**/.gradle/
+/Android/**/.kotlin/
+/Android/**/build/
+/Android/**/.cxx/
+/Android/**/.externalNativeBuild/
+/Android/**/captures/
+/Android/**/local.properties
+/Android/**/*.iml
+/Android/**/*.apk
+/Android/**/*.aab
+/Android/**/*.apks
+
+# Local signing configuration and private keys
+/Android/**/keystore.properties
+/Android/**/signing.properties
+/Android/**/*.jks
+/Android/**/*.keystore
