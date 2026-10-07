@@ -8,21 +8,21 @@ import { MatDialog } from '@angular/material/dialog';
 import { Subject } from 'rxjs';
 import { finalize, takeUntil } from 'rxjs/operators';
 import { SubtitleService } from '../services/subtitle.service';
-import { AuthService } from '../services/AuthService.service';
 import { SupportDialogComponent } from '../support-dialog/support-dialog.component';
-import { AdminMenuComponent } from '../shared/admin-menu.component';
+import { MatIconModule } from '@angular/material/icon';
+import { UTILITY_LINKS } from '../shared/site-navigation';
 
 type SourceMode = 'youtube' | 'file' | 'download';
 
 @Component({
   selector: 'app-about3',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, AdminMenuComponent],
+  imports: [CommonModule, FormsModule, RouterModule, MatIconModule],
   templateUrl: './about3.component.html',
   styleUrls: ['./about3.component.css'],
 })
 export class About3Component implements OnDestroy {
-  readonly user$: AuthService['user$'];
+  readonly utilities = UTILITY_LINKS;
   readonly waveform = [18, 28, 43, 25, 56, 72, 44, 28, 53, 82, 62, 40, 66, 90, 55, 32, 48, 75, 96, 62, 38, 58, 84, 47, 25, 50, 72, 38, 61, 82, 48, 29, 43, 66, 37, 20];
   readonly faqs = [
     { question: 'Как получить текст из YouTube-видео?', answer: 'Вставьте ссылку или идентификатор ролика. Сервис проверит доступные дорожки субтитров и предложит выбрать одну, если их несколько. После обработки вы получите текст, который можно читать, редактировать и экспортировать. Доступность результата зависит от доступности ролика и его субтитров.' },
@@ -46,22 +46,16 @@ export class About3Component implements OnDestroy {
     private readonly subtitleService: SubtitleService,
     private readonly router: Router,
     private readonly dialog: MatDialog,
-    authService: AuthService,
     title: Title,
     private readonly meta: Meta,
     @Inject(DOCUMENT) private readonly document: Document,
   ) {
-    this.user$ = authService.user$;
     try {
       this.searchValue = this.document.defaultView?.sessionStorage.getItem(this.draftKey) ?? '';
     } catch { /* The form also works when browser storage is disabled. */ }
     title.setTitle('YouScriptor — транскрибация YouTube и аудио в текст');
     this.previousDescription = meta.getTag('name="description"')?.content ?? null;
     meta.updateTag({ name: 'description', content: 'YouScriptor превращает YouTube-видео и свои записи в текст. Постобработка своих записей выделяет участников разговора, форматирует расшифровку и помогает анализировать интервью. Скачивание дорожек YouTube и доступные тарифы.' });
-  }
-
-  hasRole(roles: string[] | undefined, role: string): boolean {
-    return roles?.some(value => value.toLowerCase() === role) ?? false;
   }
 
   openSupport(): void {

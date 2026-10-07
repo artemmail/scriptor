@@ -9,6 +9,7 @@ import { RouterModule } from '@angular/router';
     <details class="am-menu" #menu>
       <summary>{{ label }} <span aria-hidden="true">⌄</span></summary>
       <nav class="am-dropdown" aria-label="Разделы админки">
+        <a routerLink="/ServiceNews" routerLinkActive="am-current" ariaCurrentWhenActive="page" (click)="menu.open = false">Лента материалов <span>→</span></a>
         <a routerLink="/admin/users" routerLinkActive="am-current" ariaCurrentWhenActive="page" (click)="menu.open = false">Пользователи <span>→</span></a>
         <a routerLink="/admin/payments" routerLinkActive="am-current" ariaCurrentWhenActive="page" (click)="menu.open = false">Платежи <span>→</span></a>
         <a routerLink="/admin/billing-plans" routerLinkActive="am-current" ariaCurrentWhenActive="page" (click)="menu.open = false">Тарифы <span>→</span></a>
@@ -29,7 +30,7 @@ import { RouterModule } from '@angular/router';
     .am-dropdown a { display: flex; justify-content: space-between; gap: 18px; padding: 11px 12px; border-radius: 7px; color: #435a32; font-size: 12px; font-weight: 600; line-height: 1.4; text-decoration: none; }
     .am-dropdown a:hover, .am-dropdown a.am-current { background: #eef5e3; color: #314a20; }
     .am-dropdown a span { color: #83a45b; }
-    @media (max-width: 600px) { .am-dropdown { right: auto; left: 0; } }
+    @media (max-width: 600px) { .am-dropdown { right: 0; left: auto; } }
     @media (prefers-reduced-motion: reduce) { .am-menu summary span { transition: none; } }
   `],
 })

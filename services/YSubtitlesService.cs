@@ -264,10 +264,12 @@ namespace YandexSpeech.services
                 .Select(t => new YoutubeCaptionTaskTableDto1
                 {
                     ChannelName = t.ChannelName,
-                    CreatedAt = t.CreatedAt ?? DateTime.Now,
+                    CreatedAt = t.CreatedAt,
                     UploadDate = t.UploadDate,
                     Title = t.Title,
-                    Slug = t.Slug ?? t.Id
+                    Slug = t.Slug ?? t.Id,
+                    CreatedByName = t.User != null ? t.User.DisplayName : null,
+                    CreatedByEmail = t.User != null ? t.User.Email : null
                 })
                 .ToListAsync();
 

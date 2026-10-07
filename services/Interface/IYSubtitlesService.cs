@@ -15,7 +15,7 @@ namespace YandexSpeech.services
         /// <summary>
         /// Дата создания.
         /// </summary>
-        public DateTime CreatedAt { get; set; }
+        public DateTime? CreatedAt { get; set; }
 
         /// <summary>
         /// Заголовок.
@@ -26,6 +26,8 @@ namespace YandexSpeech.services
         /// Slug для формирования ссылки (если отсутствует, используется Id).
         /// </summary>
         public string Slug { get; set; }
+        public string? CreatedByName { get; set; }
+        public string? CreatedByEmail { get; set; }
         public DateTime? UploadDate { get; internal set; }
     }
 

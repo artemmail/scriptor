@@ -237,6 +237,7 @@ namespace YandexSpeech.Controllers
         }
 
         [HttpGet("GetAllTasksTable")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "Admin")]
         public async Task<IActionResult> GetAllTasksTable()
         {
             var items = await _ySubtitlesService.GetAllTasksTableAsync();

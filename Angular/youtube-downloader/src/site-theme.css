@@ -95,7 +95,7 @@ body .app-content .section-header p {
   line-height: 1.6;
 }
 
-body .app-content :is(app-recognition-tasks, app-subtitles-tasks, app-billing, app-blog-feed, app-profile) .hero-text h1 {
+body .app-content :is(app-subtitles-tasks, app-billing, app-blog-feed, app-profile) .hero-text h1 {
   color: var(--site-text);
   font-size: clamp(2.5rem, 4.4vw, 3.8rem);
   font-weight: 750;
@@ -103,13 +103,13 @@ body .app-content :is(app-recognition-tasks, app-subtitles-tasks, app-billing, a
   line-height: 1.1;
 }
 
-body .app-content :is(app-recognition-tasks, app-subtitles-tasks, app-billing, app-blog-feed, app-profile) .hero-lead {
+body .app-content :is(app-subtitles-tasks, app-billing, app-blog-feed, app-profile) .hero-lead {
   max-width: 640px;
   color: var(--site-muted);
   line-height: 1.65;
 }
 
-body .app-content :is(app-recognition-tasks, app-subtitles-tasks, app-billing, app-blog-feed) .hero-highlights li {
+body .app-content :is(app-subtitles-tasks, app-billing, app-blog-feed) .hero-highlights li {
   border: 1px solid #dce6f7;
   border-radius: 12px;
   background: #f8faff;
@@ -200,7 +200,7 @@ body .app-content .mat-mdc-raised-button:not([disabled]) {
   border-radius: 10px;
 }
 
-body .app-content :is(app-about3, app-billing, app-recognition-tasks, app-youtube-downloader, app-blog-feed, app-blog-topic-detail, app-blog-topic-create) .btn-primary {
+body .app-content :is(app-about3, app-billing, app-youtube-downloader, app-blog-feed, app-blog-topic-detail, app-blog-topic-create) .btn-primary {
   border: 1px solid #2359c4;
   border-radius: 11px;
   background: var(--site-primary);
@@ -208,7 +208,7 @@ body .app-content :is(app-about3, app-billing, app-recognition-tasks, app-youtub
   color: #fff;
 }
 
-body .app-content :is(app-about3, app-billing, app-recognition-tasks, app-youtube-downloader, app-blog-feed, app-blog-topic-detail, app-blog-topic-create) .btn-primary:hover:not(:disabled) {
+body .app-content :is(app-about3, app-billing, app-youtube-downloader, app-blog-feed, app-blog-topic-detail, app-blog-topic-create) .btn-primary:hover:not(:disabled) {
   background: var(--site-primary-hover);
   box-shadow: 0 12px 24px rgba(36, 93, 204, 0.23);
 }
@@ -250,12 +250,7 @@ body .app-content app-about3 .pricing {
   box-shadow: var(--site-shadow);
 }
 
-body .app-content :is(app-about-business, app-about1, app-about2) :is(.feature, .pillar, .case, .preview-card, .pricing-card) {
-  border-radius: var(--site-radius);
-  box-shadow: var(--site-shadow);
-}
-
-body .app-content :is(app-admin-users, app-admin-payments, app-admin-billing-plans, app-admin-recognition-profiles) {
+body .app-content :is(app-admin-users, app-admin-payments, app-admin-billing-plans, app-admin-recognition-profiles, app-service-news) {
   padding: 0;
 }
 

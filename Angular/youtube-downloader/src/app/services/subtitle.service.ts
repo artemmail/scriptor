@@ -67,10 +67,12 @@ export interface YoutubeCaptionTaskDto2 {
 // Новая упрощённая модель для таблицы
 export interface YoutubeCaptionTaskTableDto {
   channelName: string;
-  createdAt: string;
+  createdAt: string | null;
   uploadDate: string | null;
   title: string;
   slug: string;
+  createdByName: string | null;
+  createdByEmail: string | null;
 }
 
 export interface StartSubtitleRecognitionResponse {

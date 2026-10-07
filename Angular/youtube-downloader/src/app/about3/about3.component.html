@@ -1,39 +1,6 @@
 <div class="scriptorium">
-  <a class="s-skip" href="#main" (click)="scrollTo('main', $event)">К содержимому</a>
-  <header class="s-header s-container">
-    <a class="s-brand" routerLink="/" aria-label="YouScriptor — главная">
-      <span class="s-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-      <span>YouScriptor<span class="s-brand-sub">из записи — в текст</span></span>
-    </a>
-    <nav class="s-nav" aria-label="Навигация по странице">
-      <a href="#features" (click)="scrollTo('features', $event)">Возможности</a>
-      <a href="#postprocessing" (click)="scrollTo('postprocessing', $event)">Постобработка</a>
-      <a href="#pricing" (click)="scrollTo('pricing', $event)">Цены</a>
-      <a routerLink="/blog">Новости</a>
-      <button type="button" (click)="openSupport()">Поддержка</button>
-    </nav>
-    <div class="s-header-actions">
-      <a class="s-login" [routerLink]="(user$ | async) ? '/transcriptions' : '/login'">{{ (user$ | async) ? 'Мои записи' : 'Войти' }} <span aria-hidden="true">↗</span></a>
-      <a class="s-button s-button-small s-button-dark" href="#start" (click)="scrollTo('start', $event)">Начать <span aria-hidden="true">↗</span></a>
-    </div>
-  </header>
-  <nav class="s-mobile-nav s-container" aria-label="Новости, цены и поддержка">
-    <a routerLink="/blog">Новости</a>
-    <a href="#pricing" (click)="scrollTo('pricing', $event)">Цены</a>
-    <button type="button" (click)="openSupport()">Поддержка</button>
-  </nav>
-
-  <div class="s-member-bar s-container" *ngIf="user$ | async as user">
-    <div class="s-member-message"><span class="s-member-dot" aria-hidden="true"></span><div><strong>Вы уже с нами, {{ user.displayName || user.email || 'друг' }}.</strong><small>Ваше рабочее пространство готово.</small></div></div>
-    <nav class="s-member-actions" aria-label="Ваш аккаунт и управление сайтом">
-      <a routerLink="/transcriptions">Мои записи <span aria-hidden="true">↗</span></a>
-      <a routerLink="/profile">Профиль</a>
-      <app-admin-menu *ngIf="hasRole(user.roles, 'admin')"></app-admin-menu>
-      <a *ngIf="hasRole(user.roles, 'moderator')" routerLink="/blog/new">Новая публикация <span aria-hidden="true">↗</span></a>
-    </nav>
-  </div>
-
   <main id="main" tabindex="-1">
+    <nav class="s-section-nav s-container" aria-label="На этой странице"><a href="#features" (click)="scrollTo('features', $event)">Возможности</a><a href="#utilities" (click)="scrollTo('utilities', $event)">Утилиты <span aria-hidden="true">↗</span></a><a href="#workflow" (click)="scrollTo('workflow', $event)">Как это работает</a><a href="#pricing" (click)="scrollTo('pricing', $event)">Цены</a><a href="#faq" (click)="scrollTo('faq', $event)">Вопросы и ответы</a></nav>
     <section class="s-hero s-container" aria-labelledby="hero-title">
       <div class="s-hero-copy">
         <p class="s-eyebrow"><span class="s-live-dot"></span> МЕНЬШЕ ПЕРЕСЛУШИВАТЬ. БОЛЬШЕ СОЗДАВАТЬ.</p>
@@ -148,6 +115,12 @@
       <div class="s-library-copy"><p class="s-eyebrow">СКРИПТОРИЙ</p><h2 id="library-title">Из «где-то слышал»<br>в «вот, нашёл».</h2><p>Скрипторий собирает готовые расшифровки YouTube в одном месте. Найдите материал по названию или каналу, откройте текст и вернитесь к важной мысли без повторного просмотра.</p><a class="s-text-link" routerLink="/tasks">Заглянуть в библиотеку <span aria-hidden="true">↗</span></a><div class="s-library-footnote">Лекции, подкасты, интервью.<br>Знания, к которым удобно возвращаться.</div></div>
     </section>
 
+    <section class="s-utilities s-container" id="utilities" aria-labelledby="utilities-title">
+      <div class="s-utilities-heading"><div><p class="s-eyebrow">ПОЛЕЗНО НЕ ТОЛЬКО ДЛЯ ЗАПИСЕЙ</p><h2 id="utilities-title">Маленькие инструменты.<br><em>Большая польза.</em></h2></div><p>Подготовьте документ, оптимизируйте картинку или преобразуйте целую подборку. Открывайте нужную утилиту и сразу приступайте к работе.</p></div>
+      <div class="s-utility-grid"><a class="s-utility-card" *ngFor="let tool of utilities; index as index" [routerLink]="tool.path"><div class="s-utility-top"><span class="s-utility-icon" aria-hidden="true"><mat-icon>{{ tool.icon }}</mat-icon></span><span>0{{ index + 1 }} / УТИЛИТА</span></div><div class="s-utility-format" aria-hidden="true">{{ index === 0 ? 'MD → DOC' : index === 1 ? 'PNG → WebP' : 'WebP × ZIP' }}</div><h3>{{ tool.label }}</h3><p>{{ tool.description }}</p><span class="s-utility-link">Открыть инструмент <span aria-hidden="true">↗</span></span></a></div>
+      <p class="s-utilities-note"><mat-icon aria-hidden="true">devices</mat-icon>Конвертация изображений происходит в браузере. Файлы не загружаются на сервер.</p>
+    </section>
+
     <section class="s-pricing s-container" id="pricing" aria-labelledby="pricing-title">
       <div><p class="s-eyebrow">ДОСТУПНЫЕ ЦЕНЫ</p><h2 id="pricing-title">Работать с записями<br>можно недорого.</h2></div>
       <div class="s-pricing-copy"><p>Выбирайте пакет под свои задачи: минуты для собственных записей или количество роликов YouTube. Актуальную стоимость и остаток лимитов смотрите в тарифах.</p><a class="s-button s-button-dark" routerLink="/billing">Посмотреть тарифы <span aria-hidden="true">↗</span></a></div>
@@ -161,5 +134,5 @@
     <section class="s-final s-container" aria-labelledby="final-title"><div><p class="s-eyebrow">ХОРОШИЕ МЫСЛИ СТОИТ СОХРАНЯТЬ</p><h2 id="final-title">Пусть запись<br>работает на вас.</h2><p>Начните с одного ролика. Или с одной важной встречи.</p><a class="s-button s-button-dark" href="#start" (click)="scrollTo('start', $event)">Превратить запись в результат <span aria-hidden="true">↗</span></a></div><div class="s-final-art" aria-hidden="true"><span>≋</span><span>↗</span><span>Аа</span></div></section>
   </main>
 
-  <footer class="s-footer s-container"><a class="s-brand" routerLink="/"><span class="s-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>YouScriptor<span class="s-brand-sub">из записи — в текст</span></span></a><p>Ваши записи. Ваши мысли. Ваш следующий шаг.</p><nav aria-label="Ссылки в подвале"><a routerLink="/tasks">YouTube в текст</a><a routerLink="/transcriptions">Мои расшифровки</a><a routerLink="/down">Скачать дорожки</a><a routerLink="/billing">Тарифы</a><a routerLink="/blog">Новости сайта</a><button type="button" (click)="openSupport()">Поддержка</button></nav><div class="s-footer-bottom"><span>© YouScriptor · Скрипторий</span><span>Сделано для тех, кто ценит содержание.</span></div></footer>
+  <footer class="s-footer s-container"><a class="s-brand" routerLink="/"><span class="s-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>YouScriptor<span class="s-brand-sub">из записи — в текст</span></span></a><p>Ваши записи. Ваши мысли. Ваш следующий шаг.</p><nav aria-label="Ссылки в подвале"><a routerLink="/tasks">YouTube в текст</a><a routerLink="/transcriptions">Мои расшифровки</a><a routerLink="/down">Скачать дорожки</a><a *ngFor="let tool of utilities" [routerLink]="tool.path">{{ tool.label }}</a><a routerLink="/billing">Тарифы</a><a routerLink="/blog">Новости сайта</a><button type="button" (click)="openSupport()">Поддержка</button></nav><div class="s-footer-bottom"><span>© YouScriptor · Скрипторий</span><span>Сделано для тех, кто ценит содержание.</span></div></footer>
 </div>

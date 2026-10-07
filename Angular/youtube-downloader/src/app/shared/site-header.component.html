@@ -1,0 +1,44 @@
+<header class="site-header" *ngIf="{user: user$ | async} as session">
+  <a class="site-skip" href="#app-main" (click)="skipToContent($event)">К содержимому</a>
+  <div class="site-header-inner">
+    <a class="site-brand" routerLink="/" (click)="followLink()" aria-label="YouScriptor — главная"><span class="site-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>YouScriptor<small>из записи — в текст</small></span></a>
+
+    <nav *ngIf="!mobileLayout" class="site-desktop-nav" aria-label="Основная навигация">
+      <div class="site-group" *ngFor="let group of groupsFor(session.user); trackBy: trackGroup">
+        <button type="button" class="site-nav-button" [class.site-current]="isGroupActive(group)" [attr.aria-expanded]="activePanel === group.id" [attr.aria-controls]="'site-panel-' + group.id" (click)="togglePanel(group.id, $event)">{{ group.label }}<mat-icon aria-hidden="true">expand_more</mat-icon></button>
+        <section class="site-dropdown" [class.site-dropdown-wide]="group.id === 'about'" *ngIf="activePanel === group.id" [id]="'site-panel-' + group.id" [attr.aria-label]="group.label">
+          <p class="site-panel-heading">{{ group.title }}</p>
+          <div class="site-panel-links"><ng-container *ngFor="let link of group.links"><ng-container *ngTemplateOutlet="navLink; context: {$implicit: link}"></ng-container></ng-container></div>
+          <a *ngIf="group.id === 'tools'" class="site-panel-footer" routerLink="/" fragment="utilities" (click)="followLink({label: '', path: '/', fragment: 'utilities', description: '', icon: ''})">Все утилиты на главной <span aria-hidden="true">↗</span></a>
+        </section>
+      </div>
+      <a class="site-nav-button" routerLink="/billing" routerLinkActive="site-current" ariaCurrentWhenActive="page">Тарифы</a>
+      <a class="site-nav-button" routerLink="/blog" routerLinkActive="site-current" ariaCurrentWhenActive="page">Блог</a>
+    </nav>
+
+    <div class="site-actions">
+      <button *ngIf="!mobileLayout" class="site-support" type="button" (click)="openSupport()" aria-label="Связаться с поддержкой" title="Поддержка"><mat-icon>help_outline</mat-icon></button>
+      <ng-container *ngIf="!mobileLayout">
+        <div class="site-account" *ngIf="session.user as user; else guestAccount">
+          <button class="site-account-button" type="button" [attr.aria-expanded]="activePanel === 'account'" aria-controls="site-account-panel" (click)="togglePanel('account', $event)"><mat-icon>person_outline</mat-icon><span>Аккаунт</span><mat-icon>expand_more</mat-icon></button>
+          <section class="site-account-panel" *ngIf="activePanel === 'account'" id="site-account-panel" aria-label="Ваш аккаунт"><p>{{ user.displayName || user.email }}</p><a routerLink="/profile" (click)="followLink()" routerLinkActive="site-current" ariaCurrentWhenActive="page"><mat-icon>person_outline</mat-icon>Мой профиль</a><a routerLink="/billing" (click)="followLink()"><mat-icon>account_balance_wallet</mat-icon>Тарифы и баланс</a><button type="button" (click)="logout()" [disabled]="signingOut"><mat-icon>logout</mat-icon>{{ signingOut ? 'Выходим…' : 'Выйти' }}</button></section>
+        </div>
+        <ng-template #guestAccount><a class="site-login" routerLink="/login">Войти <span aria-hidden="true">↗</span></a></ng-template>
+      </ng-container>
+      <a *ngIf="mobileLayout" class="site-mobile-account" [routerLink]="session.user ? '/profile' : '/login'" (click)="followLink()" [attr.aria-label]="session.user ? 'Мой профиль' : 'Войти'"><mat-icon>person_outline</mat-icon></a>
+      <button *ngIf="mobileLayout" class="site-mobile-toggle" type="button" [attr.aria-expanded]="mobileOpen" aria-controls="site-mobile-panel" (click)="toggleMobile($event)"><span>{{ mobileOpen ? 'Закрыть' : 'Разделы' }}</span><mat-icon>{{ mobileOpen ? 'close' : 'apps' }}</mat-icon></button>
+    </div>
+  </div>
+
+  <nav *ngIf="mobileLayout && mobileOpen" class="site-mobile-panel" id="site-mobile-panel" aria-label="Все разделы сайта">
+    <div class="site-mobile-inner">
+      <div class="site-mobile-quick"><a routerLink="/" (click)="followLink()">Главная</a><a routerLink="/billing" (click)="followLink()">Тарифы</a><a routerLink="/blog" (click)="followLink()">Блог</a><a [routerLink]="session.user ? '/profile' : '/login'" (click)="followLink()">{{ session.user ? 'Профиль' : 'Войти' }}</a></div>
+      <div class="site-mobile-groups"><section *ngFor="let group of groupsFor(session.user); trackBy: trackGroup" [attr.aria-label]="group.label"><h2>{{ group.label }}</h2><ng-container *ngFor="let link of group.links"><ng-container *ngTemplateOutlet="navLink; context: {$implicit: link}"></ng-container></ng-container></section></div>
+      <div class="site-mobile-bottom"><button type="button" (click)="openSupport()"><mat-icon>help_outline</mat-icon>Поддержка</button><button *ngIf="session.user" type="button" (click)="logout()" [disabled]="signingOut"><mat-icon>logout</mat-icon>{{ signingOut ? 'Выходим…' : 'Выйти из аккаунта' }}</button></div>
+    </div>
+  </nav>
+</header>
+
+<ng-template #navLink let-link>
+  <a class="site-menu-link" [routerLink]="link.path" [fragment]="link.fragment" routerLinkActive="site-link-current" [routerLinkActiveOptions]="activeOptions" ariaCurrentWhenActive="page" (click)="followLink(link)"><span class="site-link-icon"><mat-icon aria-hidden="true">{{ link.icon }}</mat-icon></span><span><strong>{{ link.label }}</strong><small>{{ link.description }}</small></span><span class="site-link-arrow" aria-hidden="true">↗</span></a>
+</ng-template>

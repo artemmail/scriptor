@@ -43,7 +43,7 @@
 }
 
 .scriptorium section {
-  scroll-margin-top: 30px;
+  scroll-margin-top: 112px;
 }
 
 .s-container {
@@ -1459,6 +1459,7 @@
 
 .s-footer nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 28px;
   grid-column: 1 / -1;
   font-size: 12px;
@@ -2393,6 +2394,34 @@
     transition: none !important;
   }
 }
+
+.s-section-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 28px; padding-block: 19px; border-bottom: 1px solid #e4e8db; font-size: 12px; color: #6d795e; }
+.s-section-nav a { min-height: 32px; display: inline-flex; align-items: center; gap: 8px; }
+.s-section-nav a:hover { color: #526b2c; text-decoration: underline; text-underline-offset: 4px; }
+.s-section-nav a[href="#utilities"] { color: #526b2c; font-weight: 650; }
+.s-utilities { padding-block: 64px 72px; border-top: 1px solid #dfe2d7; }
+.s-utilities-heading { display: grid; grid-template-columns: 1.2fr 1fr; gap: 45px; align-items: end; margin-bottom: 32px; }
+.s-utilities h2 { margin-top: 18px; font-size: clamp(32px, 3.5vw, 46px); line-height: 1.13; letter-spacing: -1.6px; font-weight: 600; }
+.s-utilities h2 em { font-family: Georgia, serif; font-weight: 400; color: #698635; }
+.s-utilities-heading > p { max-width: 430px; color: #717b64; font-size: 14px; line-height: 1.8; }
+.s-utility-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+.s-utility-card { display: flex; flex-direction: column; min-width: 0; padding: 26px; border: 1px solid #d8e1cd; border-radius: 19px; background: #fffefa; transition: transform .2s, border-color .2s, box-shadow .2s; }
+.s-utility-card:hover { border-color: #99b46f; transform: translateY(-4px); box-shadow: 0 14px 32px #526b2c0d; }
+.s-utility-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.s-utility-top > span:last-child { font-size: 9px; letter-spacing: 1.2px; color: #8a967c; }
+.s-utility-icon { width: 43px; height: 43px; display: grid; place-items: center; border-radius: 12px; background: #edf3e2; color: #698635; }
+.s-utility-icon mat-icon { font-size: 23px; width: 23px; height: 23px; }
+.s-utility-format { display: grid; place-items: center; min-height: 94px; margin: 22px 0; border-radius: 12px; background: #edf3e2; color: #526b2c; font-family: Georgia, serif; font-size: 28px; font-style: italic; letter-spacing: -1px; }
+.s-utility-card:nth-child(2) .s-utility-format { background: #293323; color: #d4f568; }
+.s-utility-card:nth-child(3) .s-utility-format { background: #d4f568; color: #35412a; }
+.s-utility-card h3 { font-size: 21px; line-height: 1.3; letter-spacing: -.5px; font-weight: 600; }
+.s-utility-card > p { color: #76816a; font-size: 13px; line-height: 1.75; margin: 13px 0 24px; }
+.s-utility-link { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; border-top: 1px solid #e2e8d8; padding-top: 17px; color: #526b2c; font-size: 12px; font-weight: 600; }
+.s-utility-link > span { font-size: 20px; }
+.s-utilities-note { display: flex; align-items: start; gap: 10px; margin-top: 22px !important; font-size: 12px; color: #7e8972; }
+.s-utilities-note mat-icon { font-size: 20px; width: 20px; height: 20px; flex-shrink: 0; }
+@media (max-width: 1000px) { .s-utility-grid { gap: 15px; }.s-utility-card { padding: 21px; }.s-utility-card h3 { font-size: 19px; } }
+@media (max-width: 760px) { .s-utilities-heading { grid-template-columns: 1fr; gap: 22px; }.s-utility-grid { grid-template-columns: 1fr; }.s-utility-card { padding: 25px; }.s-utility-card h3 { font-size: 23px; }.s-utility-format { min-height: 84px; }.s-utilities { padding-block: 44px; }.s-section-nav { gap: 4px 18px; font-size: 11px; padding-block: 13px; } }
 .s-member-bar { display: flex; justify-content: space-between; align-items: center; gap: 16px 24px; flex-wrap: wrap; padding-block: 14px; border-bottom: 1px solid #dce3d1; }
 .s-member-message { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .s-member-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #8bac56; box-shadow: 0 0 0 4px #e6f1d9; }

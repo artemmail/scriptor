@@ -61,8 +61,8 @@ export class PngToWebpBatchComponent implements OnDestroy {
 
   @HostListener('window:paste', ['$event'])
   onPaste(event: ClipboardEvent): void {
-    const target = event.target as HTMLElement | null;
-    if (target?.closest('input:not([type="range"]), textarea, [contenteditable="true"]')) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest('input:not([type="range"]), textarea, [contenteditable="true"]')) return;
     const files = Array.from(event.clipboardData?.files ?? []);
     if (!files.length) return;
     event.preventDefault();
@@ -136,6 +136,10 @@ export class PngToWebpBatchComponent implements OnDestroy {
     this.notice.set('');
     this.filter.set('all');
     const quality = this.quality();
+    for (const item of queue) {
+      if (item.status === 'error') { item.status = 'pending'; item.error = undefined; }
+    }
+    this.refresh();
     try {
       for (const item of queue) {
         if (this.destroyed || this.stopping()) break;
