@@ -103,7 +103,7 @@ class AuthRepository(
 
     suspend fun <T> withAuthorizedApi(block: suspend (ServerApi) -> T): T {
         if (_session.value == null && !refreshSession()) {
-            throw IllegalStateException("Sign in required. Open Settings and sign in with Google or Yandex.")
+            throw IllegalStateException("Для этого действия войдите в аккаунт.")
         }
 
         try {

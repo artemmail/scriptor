@@ -17,6 +17,9 @@ class RecorderManager(
     private var pauseStartedAtMs: Long = 0L
     private var pausedAccumulatedMs: Long = 0L
 
+    /** Peak of samples recorded since the previous read; zero when the recorder is idle. */
+    fun amplitude(): Int = runCatching { recorder?.maxAmplitude ?: 0 }.getOrDefault(0)
+
     fun start(): String {
         val dir = File(context.filesDir, "notes").apply { mkdirs() }
         val file = File(dir, "note-${UUID.randomUUID()}.m4a")

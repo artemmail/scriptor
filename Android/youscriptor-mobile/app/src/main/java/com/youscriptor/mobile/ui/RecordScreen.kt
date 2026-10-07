@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,7 +15,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -23,6 +28,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.youscriptor.mobile.data.recording.RecorderManager
 import com.youscriptor.mobile.ui.theme.ScriptorColors
 import kotlinx.coroutines.delay
+import kotlin.math.sqrt
 
 @Composable
 internal fun RecordScreen(viewModel: MainViewModel, onBack: () -> Unit) {
@@ -35,6 +41,7 @@ internal fun RecordScreen(viewModel: MainViewModel, onBack: () -> Unit) {
     var elapsed by remember { mutableLongStateOf(0L) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDiscard by remember { mutableStateOf(false) }
+    val audioLevels = remember { mutableStateListOf<Float>().apply { repeat(44) { add(0f) } } }
     val leave = { if (recording) confirmDiscard = true else onBack() }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) runCatching { recorder.start() }.onSuccess {
@@ -44,6 +51,20 @@ internal fun RecordScreen(viewModel: MainViewModel, onBack: () -> Unit) {
     }
     LaunchedEffect(recording, paused) {
         while (recording && !paused) { delay(1_000); elapsed++ }
+    }
+    LaunchedEffect(recording, paused) {
+        if (!recording) {
+            audioLevels.indices.forEach { audioLevels[it] = 0f }
+        }
+        var smoothed = audioLevels.lastOrNull() ?: 0f
+        while (recording && !paused) {
+            val peak = recorder.amplitude().coerceIn(0, 32_767)
+            val measured = sqrt(((peak - 180).coerceAtLeast(0) / 32_767f))
+            smoothed = smoothed * .28f + measured * .72f
+            audioLevels.removeAt(0)
+            audioLevels.add(smoothed)
+            delay(70)
+        }
     }
     // No background recorder service: visibly pause when the app leaves the foreground.
     DisposableEffect(lifecycle, recorder) {
@@ -77,8 +98,7 @@ internal fun RecordScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                         Icon(NoteIcons.Mic, null, Modifier.padding(18.dp).size(30.dp), tint = ScriptorColors.Lime)
                     }
                     Text(formatDuration(elapsed), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 48.sp, lineHeight = 56.sp))
-                    VoiceMotif(Modifier.fillMaxWidth().height(64.dp),
-                        if (recording && !paused) ScriptorColors.Lime else ScriptorColors.Lime.copy(alpha = .35f))
+                    LiveRecordingWaveform(audioLevels, recording, paused)
                     Text(if (!recording) "Готовы, когда будете готовы" else if (paused) "Запись на паузе" else "Идёт запись • микрофон включён",
                         color = ScriptorColors.Lime, style = MaterialTheme.typography.labelLarge)
                 }
@@ -110,6 +130,32 @@ internal fun RecordScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                 Text("Сначала сохраним аудио на устройстве. Отправить его на расшифровку можно из заметки.",
                     style = MaterialTheme.typography.bodySmall, color = ScriptorColors.Muted)
             }
+        }
+    }
+}
+
+@Composable
+private fun LiveRecordingWaveform(levels: List<Float>, recording: Boolean, paused: Boolean) {
+    val description = when {
+        paused -> "Запись на паузе, показан последний уровень звука"
+        recording -> "Уровень звука в реальном времени"
+        else -> "Микрофон выключен"
+    }
+    Canvas(Modifier.fillMaxWidth().height(64.dp).semantics { contentDescription = description }) {
+        val middle = size.height / 2f
+        drawLine(ScriptorColors.Lime.copy(alpha = .22f), Offset(0f, middle),
+            Offset(size.width, middle), strokeWidth = 1.dp.toPx())
+        val step = size.width / levels.size
+        levels.forEachIndexed { index, level ->
+            val halfHeight = (size.height * .46f * level).coerceAtLeast(1.5.dp.toPx())
+            val x = step * (index + .5f)
+            drawLine(
+                color = ScriptorColors.Lime.copy(alpha = if (paused || !recording) .42f else 1f),
+                start = Offset(x, middle - halfHeight),
+                end = Offset(x, middle + halfHeight),
+                strokeWidth = (step * .5f).coerceAtMost(4.dp.toPx()),
+                cap = StrokeCap.Round
+            )
         }
     }
 }

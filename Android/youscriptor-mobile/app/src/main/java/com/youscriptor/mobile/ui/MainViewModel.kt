@@ -50,6 +50,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _messages = MutableSharedFlow<String>()
     val messages = _messages.asSharedFlow()
+    private val _loginRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val loginRequests = _loginRequests.asSharedFlow()
+    private var pendingSyncIds: List<String> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -66,6 +69,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (error.isNullOrBlank()) {
                 emitMessage("Вы вошли в аккаунт.")
                 loadSubscriptionSummary()
+                val pending = pendingSyncIds
+                pendingSyncIds = emptyList()
+                pending.forEach { enqueueSyncNote(it) }
             } else {
                 emitMessage(error)
             }
@@ -184,30 +190,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun syncNote(noteId: String) {
         viewModelScope.launch {
-            if (session.value == null) {
-                val refreshed = container.authRepository.refreshSession()
-                if (!refreshed) {
-                    emitMessage("Для расшифровки откройте настройки и войдите через Google или Яндекс.")
-                    return@launch
-                }
-            }
-
-            val note = container.notesRepository.getNote(noteId) ?: return@launch
-            if (note.syncState == NoteSyncState.SYNC_PENDING || note.syncState == NoteSyncState.SYNCING) return@launch
-            container.notesRepository.saveNote(
-                note.copy(
-                    syncState = NoteSyncState.SYNC_PENDING,
-                    lastError = null,
-                    updatedAt = System.currentTimeMillis()
-                )
-            )
-            container.syncRepository.enqueueSync(noteId)
-            emitMessage("Запись отправлена на расшифровку.")
+            if (ensureSessionForSync(listOf(noteId))) enqueueSyncNote(noteId)
         }
     }
 
     fun syncSelectedNotes() {
-        selectedNoteIds.value.forEach(::syncNote)
+        val noteIds = selectedNoteIds.value.toList()
+        if (noteIds.isEmpty()) return
+        viewModelScope.launch {
+            if (ensureSessionForSync(noteIds)) noteIds.forEach { enqueueSyncNote(it) }
+        }
+    }
+
+    fun cancelPendingSync() { pendingSyncIds = emptyList() }
+
+    private suspend fun ensureSessionForSync(noteIds: List<String>): Boolean {
+        if (session.value != null || container.authRepository.refreshSession()) return true
+        pendingSyncIds = noteIds
+        _loginRequests.emit(Unit)
+        return false
+    }
+
+    private suspend fun enqueueSyncNote(noteId: String) {
+        val note = container.notesRepository.getNote(noteId) ?: return
+        if (note.syncState == NoteSyncState.SYNC_PENDING || note.syncState == NoteSyncState.SYNCING) return
+        container.notesRepository.saveNote(
+            note.copy(
+                syncState = NoteSyncState.SYNC_PENDING,
+                lastError = null,
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+        container.syncRepository.enqueueSync(noteId)
+        emitMessage("Запись отправлена на расшифровку.")
     }
 
     fun deleteNote(noteId: String) {

@@ -16,6 +16,17 @@ fun ScriptorMobileApp(viewModel: MainViewModel = viewModel()) {
     val snackbar = remember { SnackbarHostState() }
     val notes by viewModel.notes.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.messages.collect { snackbar.showSnackbar(it) } }
+    LaunchedEffect(viewModel, navController) {
+        viewModel.loginRequests.collect {
+            if (navController.currentDestination?.route != "login") {
+                navController.navigate("login") { launchSingleTop = true }
+            }
+        }
+    }
+    val session by viewModel.session.collectAsStateWithLifecycle()
+    LaunchedEffect(session) {
+        if (session != null && navController.currentDestination?.route == "login") navController.popBackStack()
+    }
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }, contentWindowInsets = WindowInsets.safeDrawing) { padding ->
         NavHost(navController, startDestination = "notes", modifier = Modifier
             .padding(padding).consumeWindowInsets(padding)) {
@@ -29,6 +40,10 @@ fun ScriptorMobileApp(viewModel: MainViewModel = viewModel()) {
                     viewModel) { navController.popBackStack() }
             }
             composable("settings") { SettingsScreen(viewModel) { navController.popBackStack() } }
+            composable("login") { LoginScreen(viewModel) {
+                viewModel.cancelPendingSync()
+                navController.popBackStack()
+            } }
         }
     }
 }
