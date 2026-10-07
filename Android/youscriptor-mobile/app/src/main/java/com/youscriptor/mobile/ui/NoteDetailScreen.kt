@@ -2,6 +2,7 @@ package com.youscriptor.mobile.ui
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,7 +13,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.youscriptor.mobile.data.local.NoteEntity
 import com.youscriptor.mobile.data.recording.AudioPlayerController
@@ -35,7 +40,9 @@ internal fun NoteDetailScreen(note: NoteEntity?, viewModel: MainViewModel, onBac
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val player = remember(note.id) { AudioPlayerController() }
-    var playing by remember { mutableStateOf(false) }
+    var playing by remember(note.id) { mutableStateOf(false) }
+    val playbackLevels = remember(note.id) { mutableStateListOf<Float>().apply { repeat(44) { add(0f) } } }
+    val clearPlaybackWave = { playbackLevels.indices.forEach { playbackLevels[it] = 0f } }
     var draftTitle by rememberSaveable(note.id) { mutableStateOf(note.title) }
     var draftText by rememberSaveable(note.id) { mutableStateOf(note.transcript()) }
     var titleBaseline by rememberSaveable(note.id) { mutableStateOf(note.title) }
@@ -77,15 +84,28 @@ internal fun NoteDetailScreen(note: NoteEntity?, viewModel: MainViewModel, onBac
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         FilledIconButton(onClick = {
                             runCatching {
-                                if (playing) { player.stop(); playing = false }
-                                else { player.play(note.audioLocalPath) { playing = false }; playing = true }
-                            }.onFailure { playing = false; error = "Не удалось открыть аудио. Возможно, файл был удалён." }
+                                if (playing) { player.stop(); playing = false; clearPlaybackWave() }
+                                else {
+                                    clearPlaybackWave()
+                                    player.play(note.audioLocalPath,
+                                        onLevel = { level ->
+                                            val smoothed = playbackLevels.last() * .28f + level * .72f
+                                            playbackLevels.removeAt(0)
+                                            playbackLevels.add(smoothed)
+                                        },
+                                        onComplete = { playing = false; clearPlaybackWave() })
+                                    playing = true
+                                }
+                            }.onFailure {
+                                playing = false; clearPlaybackWave()
+                                error = "Не удалось открыть аудио. Возможно, файл был удалён."
+                            }
                         }, modifier = Modifier.size(56.dp), colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = ScriptorColors.Lime, contentColor = ScriptorColors.Forest)) {
                             Icon(if (playing) NoteIcons.Stop else NoteIcons.Play,
                                 if (playing) "Остановить аудио" else "Слушать запись")
                         }
-                        VoiceMotif(Modifier.weight(1f).height(44.dp))
+                        PlaybackWaveform(playbackLevels, playing, Modifier.weight(1f).height(44.dp))
                         Text(formatDuration(note.durationSec), style = MaterialTheme.typography.labelLarge)
                     }
                     Text(if (playing) "Воспроизводится запись" else "Оригинальная аудиозапись", style = MaterialTheme.typography.bodySmall)
@@ -134,6 +154,28 @@ internal fun NoteDetailScreen(note: NoteEntity?, viewModel: MainViewModel, onBac
                 TextButton(onClick = { showRaw = !showRaw }) { Text(if (showRaw) "Скрыть исходную расшифровку" else "Исходная расшифровка") }
                 if (showRaw) PaperCard { SelectionContainer { Text(note.rawTranscript) } }
             }
+        }
+    }
+}
+
+@Composable
+private fun PlaybackWaveform(levels: List<Float>, playing: Boolean, modifier: Modifier = Modifier) {
+    val description = if (playing) "Уровень звука воспроизводимой записи" else "Воспроизведение остановлено"
+    Canvas(modifier.semantics { contentDescription = description }) {
+        val middle = size.height / 2f
+        drawLine(ScriptorColors.Lime.copy(alpha = .22f), Offset(0f, middle),
+            Offset(size.width, middle), strokeWidth = 1.dp.toPx())
+        val step = size.width / levels.size
+        levels.forEachIndexed { index, level ->
+            val halfHeight = (size.height * .46f * level).coerceAtLeast(1.5.dp.toPx())
+            val x = step * (index + .5f)
+            drawLine(
+                color = ScriptorColors.Lime.copy(alpha = if (playing) 1f else .42f),
+                start = Offset(x, middle - halfHeight),
+                end = Offset(x, middle + halfHeight),
+                strokeWidth = (step * .5f).coerceAtMost(4.dp.toPx()),
+                cap = StrokeCap.Round
+            )
         }
     }
 }

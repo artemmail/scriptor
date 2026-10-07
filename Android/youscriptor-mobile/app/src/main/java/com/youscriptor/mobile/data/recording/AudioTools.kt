@@ -3,10 +3,14 @@ package com.youscriptor.mobile.data.recording
 import android.content.Context
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.media.audiofx.Visualizer
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import com.youscriptor.mobile.data.model.RecordingDraft
 import java.io.File
 import java.util.UUID
+import kotlin.math.sqrt
 
 class RecorderManager(
     private val context: Context
@@ -96,21 +100,79 @@ class RecorderManager(
 
 class AudioPlayerController {
     private var mediaPlayer: MediaPlayer? = null
+    private var visualizer: Visualizer? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var playbackGeneration = 0
 
-    fun play(path: String, onComplete: () -> Unit) {
+    fun play(path: String, onLevel: (Float) -> Unit, onComplete: () -> Unit) {
         stop()
-        mediaPlayer = MediaPlayer().apply {
-            setDataSource(path)
-            setOnCompletionListener {
-                stop()
-                onComplete()
+        val player = MediaPlayer()
+        try {
+            player.apply {
+                setDataSource(path)
+                setOnCompletionListener {
+                    stop()
+                    onComplete()
+                }
+                prepare()
             }
-            prepare()
-            start()
+            mediaPlayer = player
+            attachWaveform(player, onLevel)
+            player.start()
+        } catch (error: Exception) {
+            val wasRegistered = mediaPlayer === player
+            stop()
+            if (!wasRegistered) player.release()
+            throw error
+        }
+    }
+
+    private fun attachWaveform(player: MediaPlayer, onLevel: (Float) -> Unit) {
+        val generation = playbackGeneration
+        var capture: Visualizer? = null
+        try {
+            capture = Visualizer(player.audioSessionId)
+            capture.captureSize = Visualizer.getCaptureSizeRange()[0]
+            val rate = minOf(20_000, Visualizer.getMaxCaptureRate())
+            if (rate <= 0) {
+                capture.release()
+                return
+            }
+            capture.setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
+                override fun onWaveFormDataCapture(
+                    visualizer: Visualizer?, waveform: ByteArray, samplingRate: Int
+                ) {
+                    if (waveform.isEmpty()) return
+                    val energy = waveform.sumOf { sample ->
+                        val signed = (sample.toInt() and 0xff) - 128
+                        signed * signed.toDouble()
+                    } / waveform.size
+                    val level = (sqrt(energy).toFloat() / 64f).coerceIn(0f, 1f)
+                    mainHandler.post {
+                        if (playbackGeneration == generation && mediaPlayer === player) onLevel(level)
+                    }
+                }
+
+                override fun onFftDataCapture(
+                    visualizer: Visualizer?, fft: ByteArray, samplingRate: Int
+                ) = Unit
+            }, rate, true, false)
+            visualizer = capture
+            capture.enabled = true
+        } catch (_: Exception) {
+            // Playback remains usable if the device cannot capture this audio session.
+            runCatching { capture?.release() }
+            visualizer = null
         }
     }
 
     fun stop() {
+        playbackGeneration++
+        visualizer?.let { capture ->
+            runCatching { capture.enabled = false }
+            capture.release()
+        }
+        visualizer = null
         mediaPlayer?.run {
             try {
                 stop()
