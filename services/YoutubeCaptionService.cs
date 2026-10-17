@@ -298,8 +298,25 @@ namespace YandexSpeech.services
 
             if (next == null)
             {
-                await CompleteTaskAsync(id);
-                return;
+                // IIS may have stopped after reserving a segment but before saving its result.
+                // A reserved segment is still unfinished and must be retried after restart.
+                var unfinished = await _dbContext.RecognizedSegments
+                    .Where(rs => rs.YoutubeCaptionTaskId == id && !rs.IsProcessed)
+                    .OrderBy(rs => rs.Order)
+                    .ToListAsync();
+
+                if (unfinished.Count > 0)
+                {
+                    foreach (var segment in unfinished)
+                        segment.IsProcessing = false;
+                    await _dbContext.SaveChangesAsync();
+                    next = unfinished[0];
+                }
+                else
+                {
+                    await CompleteTaskAsync(id);
+                    return;
+                }
             }
 
             next.IsProcessing = true;
@@ -345,6 +362,13 @@ namespace YandexSpeech.services
             var task = await _dbContext.YoutubeCaptionTasks.FirstOrDefaultAsync(t => t.Id == id);
             if (task == null) return;
 
+            var segments = await _dbContext.RecognizedSegments
+                .Where(rs => rs.YoutubeCaptionTaskId == id)
+                .OrderBy(rs => rs.Order)
+                .ToListAsync();
+            if (segments.Count == 0 || segments.Any(s => !s.IsProcessed || string.IsNullOrWhiteSpace(s.ProcessedText)))
+                throw new InvalidOperationException($"Caption task {id} has no complete text to publish.");
+
             if (!task.QuotaChargedAt.HasValue && !string.IsNullOrWhiteSpace(task.UserId))
             {
                 var charged = await _subscriptionService
@@ -367,13 +391,9 @@ namespace YandexSpeech.services
             task.Status = RecognizeStatus.Done;
             task.Done = true;
 
-            var processed = await _dbContext.RecognizedSegments
-                .Where(rs => rs.YoutubeCaptionTaskId == id && rs.IsProcessed)
-                .OrderBy(rs => rs.Order)
-                .Select(rs => rs.ProcessedText)
-                .ToListAsync();
-
-            task.Result = string.Join("\n", processed);
+            task.SegmentsTotal = segments.Count;
+            task.SegmentsProcessed = segments.Count;
+            task.Result = string.Join("\n", segments.Select(s => s.ProcessedText));
             task.Preview = CreatePreview(task.Result, 100);
             task.ModifiedAt = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();

@@ -13,10 +13,13 @@ namespace YandexSpeech.Controllers
     public class RecognitionProfilesController : ControllerBase
     {
         private readonly MyDbContext _dbContext;
+        private readonly string _openAiModel;
 
-        public RecognitionProfilesController(MyDbContext dbContext)
+        public RecognitionProfilesController(MyDbContext dbContext, IConfiguration configuration)
         {
             _dbContext = dbContext;
+            _openAiModel = configuration["OpenAI:Model"]
+                ?? throw new InvalidOperationException("OpenAI:Model is not configured.");
         }
 
         [HttpGet]
@@ -33,7 +36,7 @@ namespace YandexSpeech.Controllers
                     Hint = p.Hint,
                     Request = p.Request,
                     ClarificationTemplate = p.ClarificationTemplate,
-                    OpenAiModel = p.OpenAiModel,
+                    OpenAiModel = _openAiModel,
                     SegmentBlockSize = p.SegmentBlockSize
                 })
                 .ToListAsync(cancellationToken);
@@ -64,7 +67,7 @@ namespace YandexSpeech.Controllers
                 Hint = validationResult.Hint,
                 Request = validationResult.Request!,
                 ClarificationTemplate = validationResult.ClarificationTemplate,
-                OpenAiModel = validationResult.OpenAiModel!,
+                OpenAiModel = _openAiModel,
                 SegmentBlockSize = validationResult.SegmentBlockSize!.Value
             };
 
@@ -104,7 +107,7 @@ namespace YandexSpeech.Controllers
             profile.DisplayedName = validationResult.DisplayedName!;
             profile.Hint = validationResult.Hint;
             profile.ClarificationTemplate = validationResult.ClarificationTemplate;
-            profile.OpenAiModel = validationResult.OpenAiModel!;
+            profile.OpenAiModel = _openAiModel;
             profile.SegmentBlockSize = validationResult.SegmentBlockSize!.Value;
 
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -129,7 +132,7 @@ namespace YandexSpeech.Controllers
             return NoContent();
         }
 
-        private static RecognitionProfileDto Map(RecognitionProfile profile) => new RecognitionProfileDto
+        private RecognitionProfileDto Map(RecognitionProfile profile) => new RecognitionProfileDto
         {
             Id = profile.Id,
             Name = profile.Name,
@@ -137,7 +140,7 @@ namespace YandexSpeech.Controllers
             Hint = profile.Hint,
             Request = profile.Request,
             ClarificationTemplate = profile.ClarificationTemplate,
-            OpenAiModel = profile.OpenAiModel,
+            OpenAiModel = _openAiModel,
             SegmentBlockSize = profile.SegmentBlockSize
         };
 
@@ -183,14 +186,6 @@ namespace YandexSpeech.Controllers
                 return result;
             }
 
-            var trimmedModel = request.OpenAiModel?.Trim();
-            if (string.IsNullOrWhiteSpace(trimmedModel))
-            {
-                result.IsValid = false;
-                result.ErrorMessage = "OpenAiModel is required";
-                return result;
-            }
-
             if (request.SegmentBlockSize is null || request.SegmentBlockSize <= 0)
             {
                 result.IsValid = false;
@@ -200,7 +195,6 @@ namespace YandexSpeech.Controllers
 
             result.IsValid = true;
             result.Request = trimmedRequest;
-            result.OpenAiModel = trimmedModel;
             result.Name = trimmedName;
             result.DisplayedName = trimmedDisplayedName;
             result.Hint = string.IsNullOrWhiteSpace(request.Hint)
@@ -230,7 +224,6 @@ namespace YandexSpeech.Controllers
             public string? Hint { get; set; }
             public string? Request { get; set; }
             public string? ClarificationTemplate { get; set; }
-            public string? OpenAiModel { get; set; }
             public int? SegmentBlockSize { get; set; }
         }
     }

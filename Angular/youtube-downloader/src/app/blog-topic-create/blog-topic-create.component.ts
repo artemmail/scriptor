@@ -8,7 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
-import { MarkdownComponent } from 'ngx-markdown';
+import { MarkdownEditorComponent } from '../shared/markdown-editor/markdown-editor.component';
 import { BlogService } from '../services/blog.service';
 import { Title } from '@angular/platform-browser';
 
@@ -17,38 +17,15 @@ const nonBlank: ValidatorFn = control => String(control.value ?? '').trim() ? nu
 @Component({
   selector: 'app-blog-topic-create',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterModule, MatSnackBarModule, MatProgressSpinnerModule, MatIconModule, MarkdownComponent],
+  imports: [CommonModule, ReactiveFormsModule, RouterModule, MatSnackBarModule, MatProgressSpinnerModule, MatIconModule, MarkdownEditorComponent],
   templateUrl: './blog-topic-create.component.html',
   styleUrls: ['../shared/account-page.css', './blog-topic-create.component.css']
 })
 export class BlogTopicCreateComponent implements OnInit {
-  @ViewChild('textEditor') private textEditor?: ElementRef<HTMLTextAreaElement>;
+  @ViewChild(MarkdownEditorComponent) private markdownEditor?: MarkdownEditorComponent;
   @ViewChild('editorTop') private editorTop?: ElementRef<HTMLElement>;
 
   readonly topicForm;
-  readonly formats = [
-    { label: 'Заголовок', icon: 'title', before: '## ', after: '', sample: 'Заголовок раздела', block: true },
-    { label: 'Жирный', icon: 'format_bold', before: '**', after: '**', sample: 'Важная мысль', block: false },
-    { label: 'Курсив', icon: 'format_italic', before: '*', after: '*', sample: 'Акцент', block: false },
-    { label: 'Список', icon: 'format_list_bulleted', before: '- ', after: '', sample: 'Пункт списка', block: true },
-    { label: 'Цитата', icon: 'format_quote', before: '> ', after: '', sample: 'Текст цитаты', block: true },
-    { label: 'Ссылка', icon: 'link', before: '[', after: '](https://example.com)', sample: 'Текст ссылки', block: false },
-    { label: 'Изображение по ссылке', icon: 'image', before: '![', after: '](https://example.com/image.jpg)', sample: 'Описание изображения', block: true },
-    { label: 'Блок кода', icon: 'code', before: '```\n', after: '\n```', sample: 'Ваш код', block: true },
-    { label: 'Формула LaTeX', icon: 'functions', before: '$$\n', after: '\n$$', sample: 'E = mc^2', block: true }
-  ];
-
-  editorMode: 'write' | 'preview' = 'write';
-  readonly katexOptions = {
-    throwOnError: false,
-    trust: false,
-    delimiters: [
-      { left: '$$', right: '$$', display: true },
-      { left: '$', right: '$', display: false },
-      { left: '\\(', right: '\\)', display: false },
-      { left: '\\[', right: '\\]', display: true }
-    ]
-  };
   submitting = false;
   submitError = '';
   loadingTopic = false;
@@ -88,7 +65,6 @@ export class BlogTopicCreateComponent implements OnInit {
       this.loadError = '';
       this.submitError = '';
       this.confirmLeave = false;
-      this.editorMode = 'write';
       this.original = { title: '', text: '' };
       this.topicForm.reset(this.original);
       this.updatePageTitle();
@@ -111,29 +87,9 @@ export class BlogTopicCreateComponent implements OnInit {
     return field.invalid && (field.touched || field.dirty);
   }
 
-  setEditorMode(mode: 'write' | 'preview', scroll = false): void {
-    this.editorMode = mode;
-    if (scroll) this.editorTop?.nativeElement.scrollIntoView({ block: 'start' });
-  }
-
-  insertFormat(format: typeof this.formats[number]): void {
-    const textarea = this.textEditor?.nativeElement;
-    if (!textarea || this.submitting) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selected = this.text.slice(start, end) || format.sample;
-    const prefix = format.block && start > 0 && this.text[start - 1] !== '\n' ? '\n\n' : '';
-    const suffix = format.block && end < this.text.length && this.text[end] !== '\n' ? '\n\n' : '';
-    const content = format.block && ['- ', '> ', '## '].includes(format.before)
-      ? selected.split('\n').map(line => format.before + line).join('\n')
-      : format.before + selected + format.after;
-    this.topicForm.controls.text.setValue(this.text.slice(0, start) + prefix + content + suffix + this.text.slice(end));
-    this.topicForm.controls.text.markAsDirty();
-    // Update before restoring the selection so the native textarea keeps the intended range.
-    textarea.value = this.text;
-    textarea.focus();
-    const selectionStart = start + prefix.length + format.before.length;
-    textarea.setSelectionRange(selectionStart, selectionStart + selected.length);
+  showPreview(): void {
+    this.markdownEditor?.showPreview();
+    this.editorTop?.nativeElement.scrollIntoView({ block: 'start' });
   }
 
   onCancel(): void {

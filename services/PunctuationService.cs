@@ -21,14 +21,19 @@ namespace YandexSpeech.services
     {
         private readonly MyDbContext _dbContext;
         private readonly string _openAiApiKey;
+        private readonly string _model;
+        private readonly OpenAiBatchClient _batchClient;
         private const int MaxRetries = 20;
         private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(15);
         private readonly Dictionary<string, RecognitionProfile> _profileCache =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public PunctuationService(MyDbContext dbContext, IConfiguration configuration)
+        public PunctuationService(MyDbContext dbContext, IConfiguration configuration, OpenAiBatchClient batchClient)
         {
             _dbContext = dbContext;
+            _batchClient = batchClient;
+            _model = configuration["OpenAI:Model"]
+                ?? throw new InvalidOperationException("OpenAI:Model is not configured.");
             _openAiApiKey = configuration["OpenAI:ApiKey"]
                 ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured.");
         }
@@ -82,9 +87,6 @@ namespace YandexSpeech.services
 
             var profile = await GetProfileAsync(profileName);
 
-            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _openAiApiKey);
-
             var messages = new List<object>
             {
                 new
@@ -110,49 +112,13 @@ namespace YandexSpeech.services
 
             messages.Add(new { role = "user", content = rawText });
 
-            var payload = JsonSerializer.Serialize(new
+            var payload = new
             {
-                model = profile.OpenAiModel,
-                messages,
-                temperature = 0.0
-            });
+                model = _model,
+                messages
+            };
 
-            for (int attempt = 1; attempt <= MaxRetries; attempt++)
-            {
-                using var content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-                try
-                {
-                    var response = await client.PostAsync("https://api.openai.com/v1/chat/completions", content);
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var json = await response.Content.ReadAsStringAsync();
-                        using var doc = JsonDocument.Parse(json);
-                        var choices = doc.RootElement.GetProperty("choices");
-                        if (choices.GetArrayLength() > 0)
-                        {
-                            return choices[0]
-                                .GetProperty("message")
-                                .GetProperty("content")
-                                .GetString()!
-                                .Trim();
-                        }
-
-                        return string.Empty;
-                    }
-                }
-                catch (HttpRequestException)
-                {
-                    // Retry below.
-                }
-
-                if (attempt < MaxRetries)
-                {
-                    await Task.Delay(RetryDelay * attempt);
-                }
-            }
-
-            throw new Exception($"Не удалось получить ответ от сервера после {MaxRetries} попыток.");
+            return await _batchClient.CompleteAsync(payload);
         }
 
         private async Task<RecognitionProfile> GetProfileAsync(string profileName)

@@ -336,7 +336,34 @@ namespace YandexSpeech.services
         }
 
         public async Task ResumeIncompleteTasksAsync(CancellationToken ct = default)
-            => await ProcessQueueAsync(ct);
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+            var emptyCompleted = await db.YoutubeCaptionTasks
+                .Include(t => t.RecognizedSegments)
+                .Where(t => t.Status == RecognizeStatus.Done
+                    && (t.Result == null || t.Result == "")
+                    && t.SegmentsTotal > 0)
+                .ToListAsync(ct);
+
+            foreach (var task in emptyCompleted)
+            {
+                if (task.RecognizedSegments.Count == 0)
+                    continue;
+
+                foreach (var segment in task.RecognizedSegments.Where(s => !s.IsProcessed))
+                    segment.IsProcessing = false;
+                task.Status = RecognizeStatus.ApplyingPunctuationSegment;
+                task.Done = false;
+                task.Error = null;
+                task.SegmentsProcessed = task.RecognizedSegments.Count(s => s.IsProcessed);
+                task.ModifiedAt = DateTime.UtcNow;
+                _logger.LogWarning("Resuming caption task {TaskId} that was marked done without result text.", task.Id);
+            }
+
+            await db.SaveChangesAsync(ct);
+            await ProcessQueueAsync(ct);
+        }
 
         public async Task ProcessQueueAsync(CancellationToken ct = default)
         {

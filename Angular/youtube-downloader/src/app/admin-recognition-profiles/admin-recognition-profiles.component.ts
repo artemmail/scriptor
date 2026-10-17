@@ -62,7 +62,7 @@ export class AdminRecognitionProfilesComponent implements OnInit {
     hint: ['', [Validators.maxLength(400)]],
     request: ['', [trimmedRequired, Validators.maxLength(4000)]],
     clarificationTemplate: [''],
-    openAiModel: ['', [trimmedRequired, Validators.maxLength(200)]],
+    openAiModel: [''],
     segmentBlockSize: [600, [positiveInteger]]
   });
 

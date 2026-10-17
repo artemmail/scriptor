@@ -20,26 +20,14 @@
 .bc-paper-heading .ap-eyebrow { color: #698635; font-size: 9px; }
 .bc-title-field { padding: 28px 30px 26px; }
 .bc-field-label { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
-.bc-field-label label, .bc-editor-top > label { font-size: 12px; font-weight: 600; }
+.bc-field-label label, .bc-editor-top > span { font-size: 12px; font-weight: 600; }
 .bc-field-label > span { color: var(--ap-muted); font-size: 10px; white-space: nowrap; }
 .bc-title-field input { width: 100%; display: block; padding: 15px 0; border: 0; border-bottom: 1px solid #cbd3bd; border-radius: 0; outline: 0; background: transparent; color: var(--ap-ink); font: 600 28px/1.4 'Segoe UI', sans-serif; letter-spacing: -.7px; }
 .bc-title-field input::placeholder { color: #929a84; font-weight: 400; }
 .bc-title-field input:focus { border-bottom-color: #698635; box-shadow: 0 1px #698635; }
 .bc-title-field .bc-hint { margin-top: 10px; color: var(--ap-muted); font-size: 11px; }
 .bc-editor-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 30px 15px; }
-.bc-tabs { display: flex; gap: 3px; border: 1px solid var(--ap-line); border-radius: 9px; padding: 3px; background: #f6f7f0; }
-.bc-tabs button { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ap-muted); font-size: 11px; cursor: pointer; }
-.bc-tabs button.active { color: #364725; background: #e6efcf; }
-.bc-tabs mat-icon { width: 17px; height: 17px; font-size: 17px; }
-.bc-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; padding: 10px 24px; border-block: 1px solid var(--ap-line); background: #f1f4e9; }
-.bc-toolbar button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 6px; color: #526143; background: transparent; cursor: pointer; }
-.bc-toolbar button:hover:not(:disabled) { background: #dfe9cb; color: #293323; }
-.bc-toolbar mat-icon { width: 20px; height: 20px; font-size: 20px; }
-.bc-toolbar > span { margin-left: auto; padding-left: 8px; color: #737c66; font-size: 9px; }
-.bc-writing textarea { display: block; width: 100%; min-height: 490px; resize: vertical; padding: 28px 30px; border: 0; outline: 0; background: #fffefa; color: #343b2f; font: 14px/1.95 Consolas, 'Courier New', monospace; }
-.bc-writing textarea:focus { box-shadow: inset 3px 0 #bed397; }
-.bc-writing textarea::placeholder { color: #8a927e; }
-.bc-writing textarea:disabled, .bc-title-field input:disabled { opacity: .65; }
+.bc-title-field input:disabled { opacity: .65; }
 .bc-editor-bottom { display: flex; flex-wrap: wrap; gap: 16px; border-top: 1px solid var(--ap-line); padding: 14px 30px; color: var(--ap-muted); font-size: 10px; background: #f8f9f3; }
 .bc-editor-bottom > span:last-child { margin-left: auto; }
 .bc-sidebar { display: grid; gap: 18px; min-width: 0; }
@@ -69,23 +57,6 @@
 .bc-guide dt { color: #465b32; font: 11px/1.8 Consolas, monospace; overflow-wrap: anywhere; }
 .bc-guide dd { margin: 0 0 10px; font-size: 10px; }
 .bc-side-note { padding: 3px 10px; color: #808b71; text-align: center; font: italic 17px/1.5 Georgia, serif !important; }
-.bc-preview { padding: 34px 34px 40px; min-height: 545px; border-top: 1px solid var(--ap-line); overflow-wrap: anywhere; }
-.bc-preview > .ap-eyebrow { color: #698635; font-size: 9px; }
-.bc-preview h2 { margin-top: 17px; font-size: 32px; line-height: 1.25; font-weight: 600; letter-spacing: -.8px; }
-.bc-preview-meta { display: block; padding: 17px 0 23px; border-bottom: 1px solid var(--ap-line); color: var(--ap-muted); font-size: 11px; }
-.bc-rendered { display: block; padding-top: 25px; font-size: 15px; line-height: 1.85; }
-:host ::ng-deep .bc-rendered :is(h1,h2,h3,h4) { font-family: 'Segoe UI', sans-serif; line-height: 1.3; margin: 1.3em 0 .6em; color: #293323; }
-:host ::ng-deep .bc-rendered p { margin: 0 0 1em; }
-:host ::ng-deep .bc-rendered a { color: #526b2c; text-decoration: underline; }
-:host ::ng-deep .bc-rendered img { display: block; max-width: 100%; height: auto; border-radius: 8px; }
-:host ::ng-deep .bc-rendered blockquote { border-left: 3px solid #adc785; padding: 12px 20px; margin: 20px 0; background: #f0f4e7; }
-:host ::ng-deep .bc-rendered pre { overflow-x: auto; max-width: 100%; padding: 16px; background: #f0f3e8; border-radius: 8px; }
-:host ::ng-deep .bc-rendered :is(table,.katex-block) { display: block; max-width: 100%; overflow-x: auto; }
-:host ::ng-deep .bc-rendered :is(td,th) { padding: 8px 12px; border: 1px solid #dfe2d7; }
-.bc-preview-empty { display: flex; align-items: center; flex-direction: column; gap: 12px; padding-top: 65px; color: var(--ap-muted); text-align: center; font-size: 12px; }
-.bc-preview-empty mat-icon { width: 35px; height: 35px; font-size: 35px; color: #8da75e; }
-.bc-preview-empty p { font: italic 25px Georgia, serif; color: #526b2c; }
-.bc-preview-empty button { border: 0; padding: 10px; background: none; cursor: pointer; }
 .bc-field-error { color: #963618; font-size: 12px; margin-top: 8px !important; }
 .bc-text-error { padding: 0 30px 14px; }
 .bc-submit-error { margin-bottom: 16px; padding: 12px; font-size: 12px; }
@@ -100,7 +71,6 @@
   .bc-workspace { grid-template-columns: minmax(0, 1fr) 270px; gap: 18px; }
   .bc-note { padding: 25px; }
   .bc-note > div { flex-wrap: wrap; }
-  .bc-toolbar > span { display: none; }
   .bc-editor-top { align-items: flex-start; flex-direction: column; }
 }
 @media (max-width: 800px) {
@@ -126,14 +96,8 @@
   .bc-title-field { padding: 23px 20px; }
   .bc-title-field input { font-size: 23px; }
   .bc-editor-top { flex-direction: column; align-items: stretch; padding: 0 20px 15px; }
-  .bc-tabs button { flex: 1; min-height: 36px; }
-  .bc-toolbar { padding: 8px 14px; gap: 2px; }
-  .bc-toolbar button { width: 32px; height: 36px; }
-  .bc-writing textarea { padding: 22px 20px; min-height: 410px; font-size: 14px; }
   .bc-editor-bottom { padding: 14px 20px; gap: 6px 14px; }
   .bc-editor-bottom > span:last-child { margin-left: 0; }
-  .bc-preview { padding: 25px 20px; }
-  .bc-preview h2 { font-size: 27px; }
   .bc-leave { bottom: 12px; padding: 17px; gap: 10px; }
   .bc-leave > div { flex-basis: 100%; }
   .bc-leave .ap-button { font-size: 11px; padding: 10px 12px; min-height: 42px; }

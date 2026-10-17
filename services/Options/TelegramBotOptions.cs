@@ -24,7 +24,6 @@ namespace YandexSpeech.services.Options
 
         public bool EnableOpenAiPostProcessing { get; set; }
 
-        public string? OpenAiModel { get; set; }
 
         public string? OpenAiApiKey { get; set; }
 

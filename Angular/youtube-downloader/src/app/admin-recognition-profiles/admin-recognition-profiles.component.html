@@ -52,7 +52,7 @@
             </section>
 
             <section class="rp-form-section" aria-labelledby="rp-settings-title"><div class="rp-form-heading"><span>03</span><div><h4 id="rp-settings-title">Модель и фрагменты</h4><p>Параметры постобработки расшифровки.</p></div></div><div class="rp-settings-grid">
-              <label class="rp-field">Модель OpenAI<input type="text" formControlName="openAiModel" maxlength="200" placeholder="Точное имя модели" [attr.aria-invalid]="fieldInvalid('openAiModel')" aria-describedby="rp-model-hint rp-model-error"><small id="rp-model-hint">Модель, которая выполняет инструкции профиля.</small><span class="rp-field-error" id="rp-model-error" *ngIf="fieldInvalid('openAiModel')">Укажите имя модели до 200 символов.</span></label>
+              <label class="rp-field">Модель OpenAI<input type="text" formControlName="openAiModel" readonly aria-describedby="rp-model-hint"><small id="rp-model-hint">Задаётся в appsettings.json: OpenAI:Model.</small></label>
               <label class="rp-field">Размер блока<input type="number" formControlName="segmentBlockSize" min="1" max="2147483647" step="1" [attr.aria-invalid]="fieldInvalid('segmentBlockSize')" aria-describedby="rp-block-hint rp-block-error"><small id="rp-block-hint">Максимальное число слов в одном блоке.</small><span class="rp-field-error" id="rp-block-error" *ngIf="fieldInvalid('segmentBlockSize')">Целое число от 1 до 2 147 483 647.</span></label>
             </div></section>
           </fieldset>

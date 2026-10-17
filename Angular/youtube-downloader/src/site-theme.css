@@ -348,18 +348,8 @@ body .app-content :is(app-admin-users, app-admin-payments, app-admin-billing-pla
 .admin-dialog-panel .mat-mdc-dialog-actions { padding: 16px 24px; border-top: 1px solid #dce3d1; gap: 8px; }
 .admin-dialog-panel :is(.mat-mdc-button, .mat-mdc-raised-button, .mat-mdc-unelevated-button) { border-radius: 9px; }
 .admin-dialog-panel :is(app-admin-payment-operation-dialog, app-admin-payment-details-dialog) { min-width: 0; }
-body app-blog-topic-create .md-editor-container { margin: 0; border: 0; }
-body app-blog-topic-create .md-editor-container .md-layout .tool-bar { background: #eef3e6; border-color: #dce3d1; }
-body app-blog-topic-create .tool-bar .btn { color: #526b2c; border-radius: 6px; }
-body app-blog-topic-create .tool-bar .btn:hover { background: #dcebc4; }
-body app-blog-topic-create .md-editor-container .md-layout .preview-container .preview-panel { padding: 20px; color: #39482e; border-color: #dce3d1; font: 14px/1.8 'Segoe UI', Arial, sans-serif; }
-body app-blog-topic-create .preview-panel img { max-width: 100%; }
-body app-blog-topic-create .preview-panel pre { overflow: auto; }
-body app-blog-topic-create .md-editor-container .editor-container > div { min-width: 0; }
 @media (max-width: 620px) {
   .admin-dialog-panel :is(.summary, .details-grid, .details-row) { grid-template-columns: minmax(0, 1fr); }
   .admin-dialog-panel :is(.info-row, .summary-row) { flex-direction: column; gap: 4px; }
   .admin-dialog-panel .manual-payment-form { grid-template-columns: minmax(0, 1fr); }
-  body app-blog-topic-create .md-editor-container .md-layout .editor-container { flex-direction: column; }
-  body app-blog-topic-create .md-editor-container .md-layout .editor-container > div { min-height: 0; }
 }

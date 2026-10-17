@@ -3,10 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Net;
-using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -22,14 +18,12 @@ namespace YandexSpeech.services
     {
         private readonly MyDbContext _dbContext;
         private readonly ILogger<OpenAiTranscriptionService> _logger;
-        private readonly string _openAiApiKey;
         private readonly string _workingDirectory;
-        private const string FormattingModel = "gpt-4.1-mini";
+        private readonly string _formattingModel;
+        private readonly OpenAiBatchClient _batchClient;
         private readonly IWhisperTranscriptionService _whisperTranscriptionService;
         private readonly IPunctuationService _punctuationService;
-        private const int FormattingMaxAttempts = 5;
         private const int MaxGeneratedTitleLength = 120;
-        private static readonly TimeSpan FormattingRetryDelay = TimeSpan.FromSeconds(5);
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IYandexDiskDownloadService _yandexDiskDownloadService;
         private readonly IFfmpegService _ffmpegService;
@@ -56,8 +50,9 @@ namespace YandexSpeech.services
             _yandexDiskDownloadService = yandexDiskDownloadService;
             _ffmpegService = ffmpegService;
             _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
-            _openAiApiKey = configuration["OpenAI:ApiKey"]
-                             ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured.");
+            _formattingModel = configuration["OpenAI:Model"]
+                ?? throw new InvalidOperationException("OpenAI:Model is not configured.");
+            _batchClient = new OpenAiBatchClient(httpClientFactory, configuration);
             _workingDirectory = Path.Combine(Path.GetTempPath(), "openai-transcriptions");
             Directory.CreateDirectory(_workingDirectory);
         }
@@ -846,9 +841,9 @@ namespace YandexSpeech.services
                 ? sourceText[..5000]
                 : sourceText;
 
-            var payload = JsonSerializer.Serialize(new
+            var payload = new
             {
-                model = FormattingModel,
+                model = _formattingModel,
                 messages = new object[]
                 {
                     new
@@ -861,49 +856,10 @@ namespace YandexSpeech.services
                         role = "user",
                         content = excerpt
                     }
-                },
-                temperature = 0.2
-            });
-
-            using var client = _httpClientFactory.CreateClient();
-            client.Timeout = TimeSpan.FromMinutes(2);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _openAiApiKey);
-
-            for (int attempt = 1; attempt <= FormattingMaxAttempts; attempt++)
-            {
-                using var content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-                try
-                {
-                    using var response = await client
-                        .PostAsync("https://api.openai.com/v1/chat/completions", content)
-                        .ConfigureAwait(false);
-
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                        using var doc = JsonDocument.Parse(json);
-                        var title = doc.RootElement
-                            .GetProperty("choices")[0]
-                            .GetProperty("message")
-                            .GetProperty("content")
-                            .GetString();
-
-                        return NormalizeTaskTitle(title);
-                    }
                 }
-                catch (HttpRequestException)
-                {
-                    // Retry below.
-                }
+            };
 
-                if (attempt < FormattingMaxAttempts)
-                {
-                    await Task.Delay(FormattingRetryDelay * attempt).ConfigureAwait(false);
-                }
-            }
-
-            return null;
+            return NormalizeTaskTitle(await _batchClient.CompleteAsync(payload).ConfigureAwait(false));
         }
 
         private static string NormalizeSourceText(string? text)

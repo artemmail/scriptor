@@ -106,7 +106,8 @@ export class OpenAiTranscriptionAnalyticsDialogComponent implements OnInit {
         } else {
           const currentId = this.data?.currentProfileId ?? null;
           const current = profiles.find((profile) => profile.id === currentId);
-          this.selectedProfileId = (current ?? profiles[0]).id;
+          const automatic = profiles.find((profile) => profile.name === 'punctuation-only');
+          this.selectedProfileId = (current ?? automatic ?? profiles[0]).id;
         }
         this.applySelectedProfile();
       },

@@ -374,7 +374,10 @@ export class OpenAiTranscriptionUploadFormComponent implements OnInit {
         this.profiles = profiles;
         this.profilesError = profiles.length === 0 ? 'Нет доступных профилей распознавания.' : null;
         const hasCurrent = profiles.some((profile) => profile.id === this.selectedProfileId);
-        this.selectedProfileId = hasCurrent ? this.selectedProfileId : profiles.length === 1 ? profiles[0].id : null;
+        const automatic = profiles.find((profile) => profile.name === 'punctuation-only');
+        this.selectedProfileId = hasCurrent
+          ? this.selectedProfileId
+          : automatic?.id ?? (profiles.length === 1 ? profiles[0].id : null);
         this.applySelectedProfile();
       },
       error: (error) => {

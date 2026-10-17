@@ -298,7 +298,8 @@ public sealed class OpenAiTranscriptionServiceTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["FfmpegExePath"] = "/usr/bin/ffmpeg",
-                ["OpenAI:ApiKey"] = "fake-key"
+                ["OpenAI:ApiKey"] = "fake-key",
+                ["OpenAI:Model"] = "gpt-6-luna"
             })
             .Build();
 

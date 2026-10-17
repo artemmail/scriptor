@@ -32,27 +32,8 @@
           <p id="title-error" class="bc-field-error" *ngIf="fieldInvalid('title')">{{ topicForm.controls.title.hasError('maxlength') ? 'Не больше 256 символов.' : 'Добавьте заголовок публикации.' }}</p>
         </div>
 
-        <div class="bc-editor-top" #editorTop>
-          <label for="topic-text">Текст публикации</label>
-          <div class="bc-tabs" role="group" aria-label="Режим редактора">
-            <button type="button" [class.active]="editorMode === 'write'" [attr.aria-pressed]="editorMode === 'write'" (click)="setEditorMode('write')"><mat-icon>edit_note</mat-icon>Текст</button>
-            <button type="button" [class.active]="editorMode === 'preview'" [attr.aria-pressed]="editorMode === 'preview'" (click)="setEditorMode('preview')"><mat-icon>visibility</mat-icon>Предпросмотр</button>
-          </div>
-        </div>
-        <div class="bc-writing" [hidden]="editorMode !== 'write'">
-          <div class="bc-toolbar" role="group" aria-label="Форматирование Markdown">
-            <button *ngFor="let format of formats" type="button" [title]="format.label" [attr.aria-label]="format.label" (click)="insertFormat(format)" [disabled]="submitting"><mat-icon>{{ format.icon }}</mat-icon></button>
-            <span>Markdown + LaTeX</span>
-          </div>
-          <textarea #textEditor id="topic-text" formControlName="text" rows="18" placeholder="Начните с главного. Какую идею, опыт или открытие вы хотите передать?&#10;&#10;Разделяйте мысли абзацами, добавляйте подзаголовки и примеры. Здесь можно использовать Markdown и формулы LaTeX." [attr.aria-invalid]="fieldInvalid('text')" aria-describedby="text-error" spellcheck="true"></textarea>
-        </div>
-        <article *ngIf="editorMode === 'preview'" class="bc-preview" aria-label="Предпросмотр публикации">
-          <p class="ap-eyebrow">Предпросмотр / Блог YouScriptor</p>
-          <h2>{{ titleText.trim() || 'Здесь будет ваш заголовок' }}</h2>
-          <span class="bc-preview-meta">{{ wordCount ? '≈ ' + readingMinutes + ' мин чтения' : 'Ваш будущий материал' }}</span>
-          <markdown *ngIf="text.trim(); else emptyPreview" class="bc-rendered" [data]="text" katex [katexOptions]="katexOptions"></markdown>
-          <ng-template #emptyPreview><div class="bc-preview-empty"><mat-icon>auto_stories</mat-icon><p>У каждой истории есть начало.</p><span>Добавьте текст, чтобы увидеть, как он будет выглядеть.</span><button type="button" class="ap-link" (click)="setEditorMode('write')">Перейти к тексту →</button></div></ng-template>
-        </article>
+        <div class="bc-editor-top" #editorTop><span id="topic-text-label">Текст публикации</span></div>
+        <app-markdown-editor formControlName="text" label="Текст публикации" [attr.aria-invalid]="fieldInvalid('text')" aria-describedby="text-error"></app-markdown-editor>
         <p id="text-error" class="bc-field-error bc-text-error" *ngIf="fieldInvalid('text')">Добавьте текст публикации.</p>
         <div class="bc-editor-bottom"><span>Слов: <strong>{{ wordCount }}</strong></span><span>Символов: {{ text.length }}</span><span>{{ wordCount ? '≈ ' + readingMinutes + ' мин чтения' : 'Место для ваших идей' }}</span></div>
       </section>
@@ -66,7 +47,7 @@
             <li [class.complete]="topicForm.controls.title.valid"><span aria-hidden="true">{{ topicForm.controls.title.valid ? '✓' : '01' }}</span><div>Есть заголовок<small>Коротко о главном</small></div></li>
             <li [class.complete]="topicForm.controls.text.valid"><span aria-hidden="true">{{ topicForm.controls.text.valid ? '✓' : '02' }}</span><div>Добавлен текст<small>Идея обрела форму</small></div></li>
           </ul>
-          <button type="button" class="bc-preview-link" (click)="setEditorMode('preview', true)">Посмотреть перед публикацией <span aria-hidden="true">↗</span></button>
+          <button type="button" class="bc-preview-link" (click)="showPreview()">Посмотреть перед публикацией <span aria-hidden="true">↗</span></button>
           <div *ngIf="submitError" class="ap-notice ap-error bc-submit-error" role="alert">{{ submitError }}</div>
           <button type="submit" class="ap-button ap-button-lime bc-submit" [disabled]="!canSubmit"><mat-spinner *ngIf="submitting" diameter="18"></mat-spinner>{{ submitting ? 'Сохраняем…' : (isEditMode ? 'Сохранить изменения' : 'Опубликовать') }}<span *ngIf="!submitting" aria-hidden="true">↗</span></button>
           <p class="bc-save-note">{{ isEditMode && !hasChanges ? 'Пока всё без изменений.' : 'Текст хранится на странице до сохранения.' }}</p>

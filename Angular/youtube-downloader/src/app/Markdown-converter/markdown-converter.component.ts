@@ -1,10 +1,10 @@
-import { Component, DestroyRef, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { Component, DestroyRef, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MarkdownComponent } from 'ngx-markdown';
+import { MarkdownEditorComponent } from '../shared/markdown-editor/markdown-editor.component';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize, from, Subscription, switchMap } from 'rxjs';
 import { SubtitleService } from '../services/subtitle.service';
@@ -16,16 +16,14 @@ type ExportFormat = 'md' | 'html' | 'pdf' | 'docx';
 @Component({
   selector: 'app-markdown-converter',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, MatIconModule, MatProgressSpinnerModule, MarkdownComponent],
+  imports: [CommonModule, FormsModule, RouterModule, MatIconModule, MatProgressSpinnerModule, MarkdownEditorComponent],
   templateUrl: './markdown-converter.component.html',
   styleUrls: ['../shared/account-page.css', './markdown-converter.component.css']
 })
 export class MarkdownConverterComponent implements OnInit {
-  @ViewChild('sourceEditor') private sourceEditor?: ElementRef<HTMLTextAreaElement>;
-  @ViewChild('renderedDocument', { read: ElementRef }) private renderedDocument?: ElementRef<HTMLElement>;
+  @ViewChild(MarkdownEditorComponent) private markdownEditor?: MarkdownEditorComponent;
   markdownContent = '';
   filename = 'Документ';
-  viewMode: 'split' | 'write' | 'preview' = 'split';
   selectedFormat: ExportFormat = 'pdf';
   activeAction = '';
   loadingTask = false;
@@ -46,25 +44,6 @@ export class MarkdownConverterComponent implements OnInit {
     { id: 'html', title: 'HTML', extension: '.html', description: 'Для браузера', icon: 'code' },
     { id: 'md', title: 'Markdown', extension: '.md', description: 'Исходный текст', icon: 'notes' }
   ];
-  readonly formats = [
-    { label: 'Заголовок', icon: 'title', before: '## ', after: '', sample: 'Заголовок раздела', block: true },
-    { label: 'Жирный', icon: 'format_bold', before: '**', after: '**', sample: 'Важная мысль', block: false },
-    { label: 'Курсив', icon: 'format_italic', before: '*', after: '*', sample: 'Акцент', block: false },
-    { label: 'Список', icon: 'format_list_bulleted', before: '- ', after: '', sample: 'Пункт списка', block: true },
-    { label: 'Цитата', icon: 'format_quote', before: '> ', after: '', sample: 'Текст цитаты', block: true },
-    { label: 'Ссылка', icon: 'link', before: '[', after: '](https://example.com)', sample: 'Текст ссылки', block: false },
-    { label: 'Изображение', icon: 'image', before: '![', after: '](https://example.com/image.jpg)', sample: 'Описание изображения', block: true },
-    { label: 'Код', icon: 'code', before: '```\n', after: '\n```', sample: 'Ваш код', block: true },
-    { label: 'Формула LaTeX', icon: 'functions', before: '$$\n', after: '\n$$', sample: 'E = mc^2', block: true }
-  ];
-  readonly katexOptions = {
-    throwOnError: false, trust: false,
-    delimiters: [
-      { left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false },
-      { left: '\\(', right: '\\)', display: false }, { left: '\\[', right: '\\]', display: true }
-    ]
-  };
-
   constructor(
     private readonly subtitleService: SubtitleService,
     private readonly route: ActivatedRoute,
@@ -79,7 +58,7 @@ export class MarkdownConverterComponent implements OnInit {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
       this.taskSubscription?.unsubscribe();
       this.taskId = params.get('id');
-      this.markdownContent = '';
+      this.setContent('');
       this.filename = 'Документ';
       this.taskTitle = '';
       this.taskErrorMessage = '';
@@ -96,6 +75,12 @@ export class MarkdownConverterComponent implements OnInit {
     return !name ? 'Документ' : /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name) ? '_' + name : name;
   }
   get canExport(): boolean { return !this.busy && this.hasContent && this.previewReady; }
+  get hasMath(): boolean { return this.markdownEditor?.hasMath ?? false; }
+
+  private setContent(content: string): void {
+    this.markdownContent = content;
+    this.onContentChange();
+  }
 
   onContentChange(): void {
     this.previewReady = false;
@@ -107,32 +92,12 @@ export class MarkdownConverterComponent implements OnInit {
 
   useExample(): void {
     if (this.busy || this.hasContent) return;
-    this.markdownContent = '# Хорошие идеи заслуживают формы\n\nПревратите заметки в **понятный документ** — с заголовками, списками и формулами.\n\n## Начните с главного\n\n- Запишите ключевую мысль\n- Добавьте детали и примеры\n- Выберите формат для скачивания\n\n> Ясный текст начинается с ясной мысли.\n\n## Немного математики\n\nФормула энергии: $E = mc^2$.\n\n| Формат | Для чего |\n| --- | --- |\n| PDF | Чтение и печать |\n| Word | Редактирование |';
-    this.onContentChange();
+    this.setContent('# Хорошие идеи заслуживают формы\n\nПревратите заметки в **понятный документ** — с заголовками, списками и формулами.\n\n## Начните с главного\n\n- Запишите ключевую мысль\n- Добавьте детали и примеры\n- Выберите формат для скачивания\n\n> Ясный текст начинается с ясной мысли.\n\n## Немного математики\n\nФормула энергии: $E = mc^2$.\n\n| Формат | Для чего |\n| --- | --- |\n| PDF | Чтение и печать |\n| Word | Редактирование |');
   }
 
   clearContent(): void {
     if (this.busy || !this.confirmClear) return;
-    this.markdownContent = '';
-    this.onContentChange();
-  }
-
-  insertFormat(format: typeof this.formats[number]): void {
-    const editor = this.sourceEditor?.nativeElement;
-    if (!editor || this.busy) return;
-    const start = editor.selectionStart, end = editor.selectionEnd;
-    const selected = this.markdownContent.slice(start, end) || format.sample;
-    const prefix = format.block && start > 0 && this.markdownContent[start - 1] !== '\n' ? '\n\n' : '';
-    const suffix = format.block && end < this.markdownContent.length && this.markdownContent[end] !== '\n' ? '\n\n' : '';
-    const content = format.block && ['## ', '- ', '> '].includes(format.before)
-      ? selected.split('\n').map(line => format.before + line).join('\n')
-      : format.before + selected + format.after;
-    this.markdownContent = this.markdownContent.slice(0, start) + prefix + content + suffix + this.markdownContent.slice(end);
-    this.onContentChange();
-    editor.value = this.markdownContent;
-    editor.focus();
-    const selectionStart = start + prefix.length + format.before.length;
-    editor.setSelectionRange(selectionStart, selectionStart + selected.length);
+    this.setContent('');
   }
 
   retryTask(): void { if (this.taskId && !this.busy && !this.hasContent) this.loadTaskContent(this.taskId); }
@@ -145,10 +110,9 @@ export class MarkdownConverterComponent implements OnInit {
       .subscribe({
         next: task => {
           if (!task?.result?.trim()) { this.taskErrorMessage = 'В задаче пока нет текста. Дождитесь завершения обработки или вставьте свой Markdown.'; return; }
-          this.markdownContent = task.result;
+          this.setContent(task.result);
           this.taskTitle = task.title || 'Текст из задачи';
           this.filename = task.title || 'Документ';
-          this.onContentChange();
           this.success = 'Текст задачи загружен. Можно редактировать и скачивать.';
         },
         error: () => this.taskErrorMessage = 'Не удалось загрузить текст задачи. Повторите попытку или вставьте свой Markdown.'
@@ -180,7 +144,7 @@ export class MarkdownConverterComponent implements OnInit {
     if (!this.canExport) return;
     this.resetMessages();
     this.activeAction = 'html-copy';
-    try { await this.copyText(this.renderedDocument?.nativeElement.innerHTML || ''); }
+    try { await this.copyText(this.markdownEditor?.renderedHtml || ''); }
     finally { this.activeAction = ''; }
   }
 
@@ -213,7 +177,7 @@ export class MarkdownConverterComponent implements OnInit {
   private htmlDocument(): string {
     const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const mathStyles = new URL('assets/katex/katex.min.css', document.baseURI).href;
-    return '<!doctype html>\n<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + escape(this.safeFilename) + '</title><link rel="stylesheet" href="' + escape(mathStyles) + '"><style>body{max-width:850px;margin:40px auto;padding:0 24px;font:16px/1.8 system-ui,sans-serif;color:#293323;overflow-wrap:anywhere}h1,h2,h3{line-height:1.3}img{max-width:100%;height:auto}pre,table,.katex-display{overflow-x:auto}pre,blockquote{padding:18px;background:#f1f4e9}blockquote{margin-inline:0;border-left:3px solid #8ca656}table{display:block;border-collapse:collapse}td,th{border:1px solid #d4dcc8;padding:8px 14px}a{color:#526b2c}</style></head><body>' + (this.renderedDocument?.nativeElement.innerHTML || '') + '</body></html>';
+    return '<!doctype html>\n<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + escape(this.safeFilename) + '</title><link rel="stylesheet" href="' + escape(mathStyles) + '"><style>body{max-width:850px;margin:40px auto;padding:0 24px;font:16px/1.8 system-ui,sans-serif;color:#293323;overflow-wrap:anywhere}h1,h2,h3{line-height:1.3}img{max-width:100%;height:auto}pre,table,.katex-display{overflow-x:auto}pre,blockquote{padding:18px;background:#f1f4e9}blockquote{margin-inline:0;border-left:3px solid #8ca656}table{display:block;border-collapse:collapse}td,th{border:1px solid #d4dcc8;padding:8px 14px}a{color:#526b2c}</style></head><body>' + (this.markdownEditor?.renderedHtml || '') + '</body></html>';
   }
 
   private saveBlob(blob: Blob, filename: string): void {

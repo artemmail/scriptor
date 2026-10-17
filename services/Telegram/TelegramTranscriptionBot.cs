@@ -38,8 +38,8 @@ namespace YandexSpeech.services.Telegram
         private readonly JsonSerializerOptions _logJsonOptions;
         private readonly object _logLock = new();
         private readonly string? _globalOpenAiApiKey;
+        private readonly string _openAiModel;
 
-        private const string DefaultOpenAiModel = "gpt-4.1";
         private const int DefaultSummaryThreshold = 70;
         private const string OpenAiEndpoint = "https://api.openai.com/v1/chat/completions";
         private const string DefaultTelegramApiBaseUrl = "https://api.telegram.org";
@@ -89,6 +89,8 @@ namespace YandexSpeech.services.Telegram
             _queueClient = queueClient;
             _logger = logger;
             _ffmpegService = ffmpegService;
+            _openAiModel = configuration["OpenAI:Model"]
+                ?? throw new InvalidOperationException("OpenAI:Model is not configured.");
 
             var section = configuration.GetSection("FasterWhisper");
             _model = section.GetValue<string>("Model") ?? configuration.GetValue<string>("Whisper:Model") ?? "medium";
@@ -571,14 +573,7 @@ namespace YandexSpeech.services.Telegram
                 return new OpenAiPostProcessingResult(text, null, null, "OpenAI API key is not configured.", false);
             }
 
-            var model = string.IsNullOrWhiteSpace(options.OpenAiModel)
-                ? DefaultOpenAiModel
-                : options.OpenAiModel!.Trim();
-
-            if (string.IsNullOrWhiteSpace(model))
-            {
-                model = DefaultOpenAiModel;
-            }
+            var model = _openAiModel;
 
             var threshold = options.OpenAiSummaryWordThreshold > 0
                 ? options.OpenAiSummaryWordThreshold
@@ -590,7 +585,6 @@ namespace YandexSpeech.services.Telegram
             var payload = new
             {
                 model,
-                temperature = 0.2,
                 response_format = new { type = "json_object" },
                 messages = new object[]
                 {

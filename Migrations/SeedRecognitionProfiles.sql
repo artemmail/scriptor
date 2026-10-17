@@ -15,7 +15,7 @@ Restore punctuation, split long monologues into natural sentences and attribute 
 Use bold speaker labels followed by a colon (e.g. **Speaker 1:**) and preserve the narrative style from the
 previously formatted segment that can be provided as assistant context. Do not add explanations or commentary.',
         NULL,
-        'gpt-4.1-mini',
+        'gpt-6-luna',
         600
     );
 END;
@@ -31,7 +31,7 @@ BEGIN
 Ensure that if a previous formatted segment is provided, the style remains consistent in the new segment.
 Do not include any additional comments or explanations.',
         NULL,
-        'gpt-4.1-mini',
+        'gpt-6-luna',
         600
     );
 END;
