@@ -237,11 +237,8 @@ namespace YandexSpeech.Controllers
                 return BadRequest("Некорректная сумма");
             }
 
-            if (operation.Amount > 0 && Math.Abs(operation.Amount - amount) > 0.01m)
-            {
-                _logger.LogWarning("Сумма уведомления YooMoney {Amount} не совпадает с ожидаемой {Expected} для операции {OperationId}", amount, operation.Amount, operationId);
-                return BadRequest("Некорректная сумма операции");
-            }
+            // The signed label identifies the order. The credited amount can be
+            // lower than the order amount because YooMoney deducts its commission.
 
             try
             {

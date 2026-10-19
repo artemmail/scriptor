@@ -1,16 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using Xunit;
 using YandexSpeech;
+using YandexSpeech.Controllers;
 using YandexSpeech.models.DB;
 using YandexSpeech.services;
 using YandexSpeech.services.Interface;
+using YandexSpeech.services.Options;
 
 namespace YandexSpeech.Tests
 {
@@ -102,7 +108,7 @@ namespace YandexSpeech.Tests
         }
 
         [Fact]
-        public async Task ProcessAsync_DoesNotApply_WhenVerifiedDetailsDisagree()
+        public async Task ProcessAsync_DoesNotApply_WhenVerifiedLabelDisagrees()
         {
             var (dbContext, operation, _) = await CreatePendingSubscriptionOperationAsync();
             var repository = new YooMoneyRepositoryStub(
@@ -113,14 +119,89 @@ namespace YandexSpeech.Tests
                 },
                 new OperationDetails
                 {
-                    OperationId = "ym-unverified", Amount = operation.Amount - 10m, Status = "success",
-                    AdditionalData = CreateAdditionalData(operation.Id.ToString())
+                    OperationId = "ym-unverified", Amount = operation.Amount, Status = "success",
+                    AdditionalData = CreateAdditionalData(Guid.NewGuid().ToString())
                 });
 
             var service = CreateAutoActivationService(dbContext, repository);
             Assert.Equal(0, await service.ProcessAsync());
             Assert.Equal(PaymentOperationStatus.Pending, (await dbContext.PaymentOperations.SingleAsync()).Status);
             Assert.Empty(await dbContext.UserSubscriptions.ToListAsync());
+        }
+
+        [Theory]
+        [InlineData(false, 970)]
+        [InlineData(false, 950)]
+        [InlineData(true, 970)]
+        public async Task ProcessAsync_AppliesOrderOnce_WhenCommissionReducesCreditedAmount(bool walletPayment, int creditedAmount)
+        {
+            var (dbContext, operation, planId) = await CreatePendingSubscriptionOperationAsync();
+            await using var db = dbContext;
+            operation.Amount = 1000m;
+            (await db.SubscriptionPlans.SingleAsync()).Price = 1000m;
+            if (walletPayment)
+                operation.Payload = PaymentOperationPayloadSerializer.Serialize(new PaymentOperationPayload
+                {
+                    Type = PaymentOperationPayloadTypes.Wallet
+                });
+            await db.SaveChangesAsync();
+
+            var repository = new YooMoneyRepositoryStub(
+                new OperationHistory
+                {
+                    OperationId = "ym-commission", Amount = creditedAmount, Status = "success",
+                    AdditionalData = CreateAdditionalData(operation.Id.ToString())
+                },
+                new OperationDetails
+                {
+                    OperationId = "ym-commission", Amount = creditedAmount, Status = "success",
+                    AdditionalData = CreateAdditionalData(operation.Id.ToString())
+                });
+
+            var service = CreateAutoActivationService(db, repository);
+            Assert.Equal(1, await service.ProcessAsync());
+            Assert.Equal(0, await service.ProcessAsync());
+            Assert.Equal(PaymentOperationStatus.Succeeded, operation.Status);
+            Assert.Equal("ym-commission", operation.ExternalOperationId);
+            if (walletPayment)
+            {
+                Assert.Equal(1000m, (await db.UserWallets.SingleAsync()).Balance);
+                Assert.Single(await db.WalletTransactions.ToListAsync());
+            }
+            else
+            {
+                Assert.Equal(planId, (await db.UserSubscriptions.SingleAsync()).PlanId);
+                Assert.Equal(1000m, (await db.SubscriptionInvoices.SingleAsync()).Amount);
+            }
+        }
+
+        [Theory]
+        [InlineData("in_progress", "in", 970)]
+        [InlineData("success", "out", 970)]
+        [InlineData("success", "in", 0)]
+        [InlineData("success", "in", -1)]
+        public async Task ProcessAsync_DoesNotApply_WhenDetailsDoNotConfirmIncomingPayment(string status, string direction, int amount)
+        {
+            var (dbContext, operation, _) = await CreatePendingSubscriptionOperationAsync();
+            await using var db = dbContext;
+            var detailsData = CreateAdditionalData(operation.Id.ToString());
+            detailsData["direction"] = JToken.FromObject(direction);
+            var repository = new YooMoneyRepositoryStub(
+                new OperationHistory
+                {
+                    OperationId = "ym-invalid", Amount = 970m, Status = "success",
+                    AdditionalData = CreateAdditionalData(operation.Id.ToString())
+                },
+                new OperationDetails
+                {
+                    OperationId = "ym-invalid", Amount = amount, Status = status,
+                    AdditionalData = detailsData
+                });
+
+            Assert.Equal(0, await CreateAutoActivationService(db, repository).ProcessAsync());
+            Assert.Equal(PaymentOperationStatus.Pending, operation.Status);
+            Assert.Empty(await db.UserSubscriptions.ToListAsync());
+            Assert.Empty(await db.SubscriptionInvoices.ToListAsync());
         }
 
         [Fact]
@@ -193,6 +274,51 @@ namespace YandexSpeech.Tests
             Assert.Null(updatedOperation.ExternalOperationId);
             Assert.Empty(await dbContext.UserSubscriptions.ToListAsync());
             Assert.Empty(await dbContext.SubscriptionInvoices.ToListAsync());
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task Notification_WithCommission_RequiresValidSignatureAndAppliesOnlyOnce(bool validSignature)
+        {
+            var (dbContext, operation, _) = await CreatePendingSubscriptionOperationAsync();
+            await using var db = dbContext;
+            operation.Amount = 1000m;
+            await db.SaveChangesAsync();
+            var gateway = new PaymentGatewayService(db, NullLogger<PaymentGatewayService>.Instance);
+            var wallet = new WalletService(db, NullLogger<WalletService>.Instance);
+            var subscriptions = new SubscriptionService(db, NullLogger<SubscriptionService>.Instance);
+            var application = new PaymentOperationApplicationService(db, gateway, wallet, subscriptions,
+                NullLogger<PaymentOperationApplicationService>.Instance);
+            var controller = new PaymentsController(db, gateway, subscriptions, wallet, application,
+                Options.Create(new YooMoneyOptions { NotificationSecret = "test-secret" }),
+                Options.Create(new SubscriptionLimitsOptions()), NullLogger<PaymentsController>.Instance);
+            var notification = new PaymentsController.YooMoneyNotification
+            {
+                NotificationType = "card-incoming", OperationId = "ym-notification",
+                Amount = 970m, Currency = "643", DateTime = "2026-10-19T13:10:00Z",
+                Sender = "", Label = operation.Id.ToString()
+            };
+            var signatureInput = $"card-incoming&ym-notification&970.00&643&2026-10-19T13:10:00Z&&false&test-secret&{notification.Label}";
+            notification.Sha1Hash = validSignature
+                ? Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(signatureInput))).ToLowerInvariant()
+                : "invalid";
+
+            var result = await controller.HandleYooMoneyNotification(notification, default);
+            if (!validSignature)
+            {
+                Assert.IsType<BadRequestObjectResult>(result);
+                Assert.Equal(PaymentOperationStatus.Pending, operation.Status);
+                Assert.Empty(await db.SubscriptionInvoices.ToListAsync());
+                return;
+            }
+
+            Assert.IsType<OkResult>(result);
+            Assert.IsType<OkResult>(await controller.HandleYooMoneyNotification(notification, default));
+            Assert.Equal(PaymentOperationStatus.Succeeded, operation.Status);
+            Assert.Equal("ym-notification", operation.ExternalOperationId);
+            Assert.Equal(1000m, (await db.SubscriptionInvoices.SingleAsync()).Amount);
+            Assert.Single(await db.UserSubscriptions.ToListAsync());
         }
 
         private static YooMoneyAutoActivationService CreateAutoActivationService(

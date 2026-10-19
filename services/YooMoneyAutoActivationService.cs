@@ -134,12 +134,14 @@ namespace YandexSpeech.services
                         continue;
                     }
 
+                    // YooMoney reports the amount credited after its commission.
+                    // Match the verified incoming payment by label, not by the order's gross amount.
                     if (localOperation.Amount <= 0m
                         || !operationDetails.Amount.HasValue
-                        || Math.Abs(localOperation.Amount - operationDetails.Amount.Value) > 0.01m)
+                        || operationDetails.Amount.Value <= 0m)
                     {
                         _logger.LogWarning(
-                            "Skipping YooMoney operation {ExternalOperationId} because amount {ActualAmount} does not match expected amount {ExpectedAmount} for local operation {LocalOperationId}.",
+                            "Skipping YooMoney operation {ExternalOperationId} because credited amount {ActualAmount} or order amount {ExpectedAmount} is invalid for local operation {LocalOperationId}.",
                             externalOperationId,
                             operationDetails.Amount,
                             localOperation.Amount,
