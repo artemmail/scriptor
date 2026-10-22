@@ -98,7 +98,10 @@ namespace YandexSpeech.services
 
             if (!string.IsNullOrWhiteSpace(previousContext))
             {
-                messages.Add(new { role = "assistant", content = previousContext });
+                var context = previousContext.Length > CaptionProcessor.MaxContextCharacters
+                    ? previousContext[^CaptionProcessor.MaxContextCharacters..]
+                    : previousContext;
+                messages.Add(new { role = "assistant", content = context });
             }
 
             if (!string.IsNullOrWhiteSpace(clarification))

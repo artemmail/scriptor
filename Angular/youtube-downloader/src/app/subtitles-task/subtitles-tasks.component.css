@@ -126,6 +126,7 @@
 .sl-task-error details p { margin-top: 7px; color: #925e4c; font-size: 11px; line-height: 1.5; white-space: pre-wrap; }
 .sl-card-action-error { margin-top: 9px; color: #a44325; font-size: 11px; }
 .sl-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 14px 13px 20px; border-top: 1px solid #e5e8df; }
+.sl-card-actions { display: flex; align-items: center; gap: 3px; flex: none; }
 .sl-read-link { color: #3f5429; font-size: 12px; font-weight: 700; }
 .sl-read-link:hover { text-decoration: underline; text-underline-offset: 4px; }
 

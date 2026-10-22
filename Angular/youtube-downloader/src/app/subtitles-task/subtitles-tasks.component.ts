@@ -16,6 +16,7 @@ import type { VideoDialogData } from '../video-dialog/video-dialog.component';
 import { YandexAdComponent } from '../ydx-ad/yandex-ad.component';
 import { AuthService } from '../services/AuthService.service';
 import { extractUsageLimitResponse } from '../models/usage-limit-response';
+import { DeleteCaptionButtonComponent } from '../shared/delete-caption-button.component';
 
 type LibrarySort = 'newest' | 'oldest' | 'title' | 'channel' | 'status';
 
@@ -25,7 +26,7 @@ type LibrarySort = 'newest' | 'oldest' | 'title' | 'channel' | 'status';
   templateUrl: './subtitles-tasks.component.html',
   styleUrls: ['../shared/account-page.css', './subtitles-tasks.component.css'],
   imports: [CommonModule, RouterModule, FormsModule, MatIconModule, MatProgressBarModule,
-    MatDialogModule, LocalTimePipe, YandexAdComponent],
+    MatDialogModule, LocalTimePipe, YandexAdComponent, DeleteCaptionButtonComponent],
 })
 export class SubtitlesTasksComponent implements OnInit {
   readonly RecognizeStatus = RecognizeStatus;

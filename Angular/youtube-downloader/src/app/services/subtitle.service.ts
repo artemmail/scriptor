@@ -28,6 +28,7 @@ export enum YoutubeCaptionVisibility {
 }
 
 export interface YoutubeCaptionTaskDto {
+  canReprocess?: boolean;
   id: string;
   videoId?: string;
   captionTrackKey?: string | null;
@@ -137,7 +138,7 @@ generatePdfFromMarkdown(id: string, markdown: string): Observable<Blob> {
    * @param taskId — ID или slug задачи
    */
   deleteTask(taskId: string): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/${taskId}`);
+    return this.http.delete<void>(`${this.apiUrl}/${encodeURIComponent(taskId)}`);
   }
   
 
@@ -153,6 +154,10 @@ generatePdfFromMarkdown(id: string, markdown: string): Observable<Blob> {
 
   restartTask(taskId: string): Observable<YoutubeCaptionTaskDto> {
     return this.http.post<YoutubeCaptionTaskDto>(`${this.apiUrl}/${taskId}/restart`, null);
+  }
+
+  reprocessTask(taskId: string): Observable<YoutubeCaptionTaskDto> {
+    return this.http.post<YoutubeCaptionTaskDto>(`${this.apiUrl}/${encodeURIComponent(taskId)}/reprocess`, null);
   }
 
   getAllTasks(): Observable<YoutubeCaptionTaskDto[]> {

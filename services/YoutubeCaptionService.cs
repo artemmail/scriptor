@@ -254,7 +254,7 @@ namespace YandexSpeech.services
             var segmentBlockSize = await GetSegmentBlockSizeAsync(RecognitionProfileNames.PunctuationOnly);
             var maxWordsInSegment = segmentBlockSize.HasValue && segmentBlockSize.Value > 0
                 ? segmentBlockSize.Value
-                : int.MaxValue;
+                : CaptionProcessor.MaxBlockWords;
             var windowSize = 400;
             if (segmentBlockSize.HasValue && segmentBlockSize.Value > 0)
             {
@@ -266,6 +266,9 @@ namespace YandexSpeech.services
                 maxWordsInSegment: maxWordsInSegment,
                 windowSize: windowSize,
                 pauseThreshold: 1.0);
+
+            if (segments.Count == 0)
+                throw new InvalidOperationException("Субтитры не содержат текста для обработки.");
 
             int order = 0;
             var newSegments = segments.Select(s => new RecognizedSegment
@@ -325,10 +328,12 @@ namespace YandexSpeech.services
             // Собираем предыдущий контекст
             var prev = await _dbContext.RecognizedSegments
                 .Where(rs => rs.YoutubeCaptionTaskId == id && rs.Order < next.Order && rs.IsProcessed)
-                .OrderBy(rs => rs.Order)
+                .OrderByDescending(rs => rs.Order)
                 .Select(rs => rs.ProcessedText)
-                .ToListAsync();
-            var previousContext = string.Join("\n", prev);
+                .FirstOrDefaultAsync();
+            var previousContext = prev?.Length > CaptionProcessor.MaxContextCharacters
+                ? prev[^CaptionProcessor.MaxContextCharacters..]
+                : prev;
 
             string processed;
             try
@@ -337,10 +342,14 @@ namespace YandexSpeech.services
                     next.Text,
                     previousContext,
                     RecognitionProfileNames.PunctuationOnly);
+                if (string.IsNullOrWhiteSpace(processed))
+                    throw new InvalidOperationException("Нейросеть вернула пустой результат постобработки.");
             }
             catch
             {
-                processed = next.Text;
+                next.IsProcessing = false;
+                await _dbContext.SaveChangesAsync();
+                throw;
             }
 
             next.ProcessedText = processed;

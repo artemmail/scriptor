@@ -21,6 +21,10 @@ public class CaptionSegmentBlock
 
 public class CaptionProcessor
 {
+    public const int MaxBlockWords = 1200;
+    public const int MaxBlockCharacters = 12000;
+    public const int MaxContextCharacters = 4000;
+
     public List<string> SegmentCaptions(
         List<ClosedCaption> captions,
         int maxWordsInSegment = 50,
@@ -56,59 +60,66 @@ public class CaptionProcessor
         if (segments == null || segments.Count == 0)
             return result;
 
-        for (int i = 0; i < segments.Count - 1; i++)
+        var wordLimit = maxWordsInSegment > 0 ? Math.Min(maxWordsInSegment, MaxBlockWords) : MaxBlockWords;
+        // Keep source indices for audio timestamps, even when one caption spans many blocks.
+        var words = new List<(string Text, int Source, double Pause)>();
+        for (var i = 0; i < segments.Count; i++)
         {
-            segments[i].PauseBeforeNext = segments[i + 1].Time - segments[i].Time;
+            foreach (var word in (segments[i].Text ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+            {
+                for (var offset = 0; offset < word.Length;)
+                {
+                    var length = Math.Min(MaxBlockCharacters, word.Length - offset);
+                    if (offset + length < word.Length && char.IsHighSurrogate(word[offset + length - 1]))
+                        length--;
+                    words.Add((word.Substring(offset, length), i, 0));
+                    offset += length;
+                }
+            }
+            if (words.Count > 0 && words[^1].Source == i && i + 1 < segments.Count)
+            {
+                var last = words[^1];
+                words[^1] = (last.Text, i, Math.Max(0, segments[i + 1].Time - (segments[i].EndTime ?? segments[i].Time)));
+            }
         }
 
-        int start = 0;
-        while (start < segments.Count)
+        for (var start = 0; start < words.Count;)
         {
-            int end;
-
-            if (segments.Count - start <= maxWordsInSegment)
+            var end = start;
+            var characters = 0;
+            while (end < words.Count && end - start < wordLimit)
             {
-                end = segments.Count - 1;
+                var added = words[end].Text.Length + (end > start ? 1 : 0);
+                if (characters + added > MaxBlockCharacters)
+                    break;
+                characters += added;
+                end++;
             }
-            else
+
+            // Prefer a pause near the end, without ever exceeding either hard limit.
+            if (end < words.Count)
             {
-                var searchStart = Math.Max(start + maxWordsInSegment - windowSize, start);
-                var searchEnd = Math.Min(start + maxWordsInSegment + windowSize, segments.Count - 1);
-
-                double maxPause = double.MinValue;
-                int maxPauseIndex = searchStart;
-
-                for (int i = searchStart; i <= searchEnd; i++)
+                var searchStart = Math.Max(start + (end - start) / 2, end - Math.Max(0, windowSize));
+                var bestPause = pauseThreshold;
+                var split = end;
+                for (var i = searchStart; i < end; i++)
                 {
-                    if (segments[i].PauseBeforeNext > maxPause)
+                    if (words[i].Pause > bestPause)
                     {
-                        maxPause = segments[i].PauseBeforeNext;
-                        maxPauseIndex = i;
+                        bestPause = words[i].Pause;
+                        split = i + 1;
                     }
                 }
-
-                end = Math.Max(maxPauseIndex, start);
+                end = split;
             }
-
-            var count = end - start + 1;
-            if (count <= 0)
-            {
-                end = start;
-                count = 1;
-            }
-
-            var text = string.Join(" ", segments.Skip(start).Take(count).Select(s => s.Text))
-                .Replace("  ", " ")
-                .Trim();
 
             result.Add(new CaptionSegmentBlock
             {
-                StartIndex = start,
-                EndIndex = end,
-                Text = text
+                StartIndex = words[start].Source,
+                EndIndex = words[end - 1].Source,
+                Text = string.Join(" ", words.Skip(start).Take(end - start).Select(w => w.Text))
             });
-
-            start = end + 1;
+            start = end;
         }
 
         return result;
@@ -122,13 +133,13 @@ public class CaptionProcessor
         {
             var current = captions[i];
 
-            if (current.Parts.Count == 0 && current.Text.Split(' ').Length > 2)
+            if (current.Parts.Count == 0)
             {
                 segments.Add(new CaptionSegment
                 {
                     Text = current.Text,
                     WordCount = 1,
-                    Time = current.Offset.TotalSeconds + current.Duration.TotalSeconds,
+                    Time = current.Offset.TotalSeconds,
                     EndTime = current.Offset.TotalSeconds + current.Duration.TotalSeconds,
                     PauseBeforeNext = 0
                 });

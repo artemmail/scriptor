@@ -541,7 +541,7 @@ namespace YandexSpeech.services
                 var segmentBlockSize = await GetSegmentBlockSizeAsync(recognitionProfile);
                 var maxWordsInSegment = segmentBlockSize.HasValue && segmentBlockSize.Value > 0
                     ? segmentBlockSize.Value
-                    : int.MaxValue;
+                    : CaptionProcessor.MaxBlockWords;
                 var windowSize = 400;
                 if (segmentBlockSize.HasValue && segmentBlockSize.Value > 0)
                 {
@@ -642,25 +642,21 @@ namespace YandexSpeech.services
             {
                 var previousContext = await _dbContext.OpenAiRecognizedSegments
                     .Where(s => s.TaskId == task.Id && s.IsProcessed && s.Order < next.Order)
-                    .OrderBy(s => s.Order)
+                    .OrderByDescending(s => s.Order)
                     .Select(s => s.ProcessedText ?? s.Text)
-                    .ToListAsync();
+                    .FirstOrDefaultAsync();
 
-                string processedText;
-                try
-                {
-                    var context = string.Join("\n", previousContext);
-                    var recognitionProfile = await GetTaskRecognitionProfileNameAsync(task);
-                    processedText = await _punctuationService.FixPunctuationAsync(
-                        next.Text,
-                        context,
-                        recognitionProfile,
-                        task.Clarification);
-                }
-                catch
-                {
-                    processedText = next.Text;
-                }
+                var context = previousContext?.Length > CaptionProcessor.MaxContextCharacters
+                    ? previousContext[^CaptionProcessor.MaxContextCharacters..]
+                    : previousContext;
+                var recognitionProfile = await GetTaskRecognitionProfileNameAsync(task);
+                var processedText = await _punctuationService.FixPunctuationAsync(
+                    next.Text,
+                    context,
+                    recognitionProfile,
+                    task.Clarification);
+                if (string.IsNullOrWhiteSpace(processedText))
+                    throw new InvalidOperationException("Нейросеть вернула пустой результат постобработки.");
 
                 next.ProcessedText = processedText;
                 next.IsProcessed = true;

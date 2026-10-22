@@ -12,6 +12,7 @@ import { TaskResultComponent } from '../task-result/task-result.component';
 import { CommonModule } from '@angular/common';
 import { Title } from '@angular/platform-browser';
 import { MatIconModule } from '@angular/material/icon';
+import { DeleteCaptionButtonComponent } from '../shared/delete-caption-button.component';
 
 @Component({
   selector: 'app-task-page',
@@ -21,7 +22,8 @@ import { MatIconModule } from '@angular/material/icon';
     RouterModule,
     MatIconModule,
     TaskProgressComponent,
-    TaskResultComponent
+    TaskResultComponent,
+    DeleteCaptionButtonComponent
   ],
   templateUrl: './task-page.component.html',
   styleUrls: ['../shared/account-page.css', './task-page.component.css']
@@ -33,6 +35,7 @@ export class TaskPageComponent implements OnInit {
   taskErrorMessage: string | null = null;
   restartErrorMessage: string | null = null;
   restartInProgress = false;
+  deleting = false;
   isAuthenticated = false;
   private restartRequest?: Subscription;
 
@@ -92,15 +95,18 @@ export class TaskPageComponent implements OnInit {
     this.titleService.setTitle('Ошибка задачи');
   }
 
-  onRestartTask(): void {
-    if (!this.taskId || this.restartInProgress || !this.isAuthenticated) {
+  onRestartTask(reprocess = false): void {
+    if (!this.taskId || this.restartInProgress || this.deleting || !this.isAuthenticated) {
       return;
     }
 
     this.restartInProgress = true;
     this.restartErrorMessage = null;
 
-    this.restartRequest = this.subtitleService.restartTask(this.taskId)
+    const request = reprocess
+      ? this.subtitleService.reprocessTask(this.taskId)
+      : this.subtitleService.restartTask(this.taskId);
+    this.restartRequest = request
       .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (task) => {
         this.restartInProgress = false;
@@ -126,6 +132,8 @@ export class TaskPageComponent implements OnInit {
       this.router.navigate(['/recognized', slug], { replaceUrl: true });
     }
   }
+
+  onTaskDeleted(): void { this.router.navigate(['/Scriptorium']); }
 
   private getRestartErrorMessage(err: unknown): string {
     if (err instanceof HttpErrorResponse) {

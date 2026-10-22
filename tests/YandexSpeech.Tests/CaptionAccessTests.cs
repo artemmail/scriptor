@@ -17,6 +17,31 @@ namespace YandexSpeech.Tests;
 
 public sealed class CaptionAccessTests
 {
+    [Theory]
+    [InlineData(RecognizeStatus.Done)]
+    [InlineData(RecognizeStatus.Error)]
+    public async Task AdminCanDeleteAnotherUsersTerminalTaskAndItsContent(RecognizeStatus status)
+    {
+        using var provider = CreateProvider();
+        using (var scope = provider.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+            await SeedCaptionsAsync(db);
+            var task = await db.YoutubeCaptionTasks.SingleAsync(t => t.Id == "hidden-task");
+            task.Status = status;
+            task.Done = true;
+            await db.SaveChangesAsync();
+        }
+        var manager = CreateManager(provider);
+        Assert.True(await manager.DeleteTaskAsync("hidden-slug", "admin-user", true));
+        Assert.Null(await manager.GetTaskStatusAsync("hidden-slug"));
+        using var verify = provider.CreateScope();
+        var check = verify.ServiceProvider.GetRequiredService<MyDbContext>();
+        Assert.False(await check.YoutubeCaptionTexts.AnyAsync(t => t.Id == "hidden-task"));
+        Assert.False(await check.RecognizedSegments.AnyAsync(t => t.YoutubeCaptionTaskId == "hidden-task"));
+        Assert.True(await check.YoutubeCaptionTasks.AnyAsync(t => t.Id == "public-task"));
+    }
+
     [Fact]
     public async Task HiddenCaptionIsVisibleOnlyToOwnerAndAbsentFromPublicList()
     {

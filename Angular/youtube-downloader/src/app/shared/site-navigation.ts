@@ -18,6 +18,7 @@ export const UTILITY_LINKS: readonly SiteLink[] = [
   { label: 'Конвертер Markdown', path: '/markdown-converter', icon: 'article', description: 'Оформите текст и сохраните его в Word, PDF или HTML.' },
   { label: 'PNG → WebP', path: '/png-to-webp', icon: 'image', description: 'Настройте качество, обрежьте изображение и сравните результат.' },
   { label: 'Пакетный PNG → WebP', path: '/png-to-webp/batch', icon: 'photo_library', description: 'Преобразуйте подборку изображений и скачайте всё одним ZIP.' },
+  { label: 'FB2 Reader', path: '/fb2-reader', icon: 'menu_book', description: 'Читайте книги с оглавлением и сохраняйте в PDF, DOCX или Markdown.' },
 ];
 
 export const SITE_LINK_GROUPS: readonly SiteLinkGroup[] = [

@@ -43,6 +43,12 @@
         <div class="rr-sidebar-divider"></div>
         <button class="rr-side-action" type="button" (click)="copyPlainTextToClipboard()" [disabled]="isCopying || !hasResultText"><mat-icon aria-hidden="true">content_copy</mat-icon>{{ isCopying ? 'Копируем…' : 'Скопировать текст' }}</button>
         <a class="rr-side-action" *ngIf="task.id && hasResultText" [routerLink]="['/markdown-converter', task.id]"><mat-icon aria-hidden="true">edit_note</mat-icon>Открыть в редакторе ↗</a>
+        <div class="rr-reprocess" *ngIf="isAuthenticated && task.canReprocess">
+          <button class="rr-side-action" type="button" [disabled]="reprocessInProgress || deleting" (click)="reprocess.emit()" aria-describedby="rr-reprocess-cost"><mat-icon aria-hidden="true">replay</mat-icon>{{ reprocessInProgress ? 'Запускаем обработку…' : 'Обработать заново' }}</button>
+          <p id="rr-reprocess-cost" class="rr-reprocess-cost">1 видео-кредит за повторный запуск</p>
+          <p class="rr-reprocess-error" *ngIf="reprocessError" role="alert">{{ reprocessError }}</p>
+        </div>
+        <app-delete-caption-button [taskId]="task.id" [title]="task.title" [status]="task.status" [done]="task.done" [disabled]="reprocessInProgress" (busyChange)="deleting = $event" (deleted)="deleted.emit()"></app-delete-caption-button>
       </section>
       <div class="rr-document-details"><p class="ap-eyebrow">О ДОКУМЕНТЕ</p><dl><div *ngIf="task.createdAt"><dt>Создан</dt><dd>{{ task.createdAt | localTime:'dd.MM.yyyy' }}</dd></div><div *ngIf="task.modifiedAt"><dt>Обновлён</dt><dd>{{ task.modifiedAt | localTime:'dd.MM.yyyy HH:mm' }}</dd></div><div *ngIf="hasResultText"><dt>Объём</dt><dd>{{ wordCount | number:'1.0-0' }} слов</dd></div></dl></div>
       <a class="rr-next-link" routerLink="/Scriptorium"><span>ЕЩЁ ОДНА ХОРОШАЯ МЫСЛЬ</span><strong>За новым материалом<br>в Скрипторий <b aria-hidden="true">↗</b></strong></a>

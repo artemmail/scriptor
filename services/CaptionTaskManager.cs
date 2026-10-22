@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using YandexSpeech.models.DB;
 using YoutubeExplode.Videos; // for VideoId.TryParse
+using YandexSpeech.services.Interface;
 
 namespace YandexSpeech.services
 {
@@ -26,6 +27,7 @@ namespace YandexSpeech.services
         public DateTime? CreatedAt { get; set; }
         public DateTime? UploadDate { get; set; }
         public string? Slug { get; set; }
+        public bool CanReprocess { get; set; }
     }
 
     // -------------  INTERFACE -------------
@@ -36,6 +38,7 @@ namespace YandexSpeech.services
         Task<bool> DeleteTaskAsync(string taskId, string userId, bool isAdmin);
         Task<bool> UpdateTaskResultAsync(string taskId, string newResult, string userId, bool isAdmin);
         Task<YoutubeCaptionTaskDto?> RestartCaptionTaskAsync(string taskId, string userId, bool isAdmin);
+        Task<YoutubeCaptionTaskDto?> ReprocessCaptionTaskAsync(string taskId, string userId, bool isAdmin);
         Task<List<YoutubeCaptionTask>> GetAllTasksAsync();
         Task ResumeIncompleteTasksAsync(CancellationToken ct = default);
         Task ProcessQueueAsync(CancellationToken ct = default);
@@ -64,6 +67,7 @@ namespace YandexSpeech.services
         private static readonly ConcurrentDictionary<string, bool> _inProgress = new();
 
         private volatile bool _scanning;
+        private static readonly SemaphoreSlim _reprocessLock = new(1, 1);
 
         public CaptionTaskManager(IServiceScopeFactory scopeFactory,
                                   ILogger<CaptionTaskManager> logger,
@@ -267,64 +271,154 @@ namespace YandexSpeech.services
             return true;
         }
 
+        public async Task<YoutubeCaptionTaskDto?> ReprocessCaptionTaskAsync(string taskId, string userId, bool isAdmin)
+        {
+            await _reprocessLock.WaitAsync();
+            string? reservedId = null;
+            YoutubeCaptionTaskDto? result;
+            try
+            {
+                await using var scope = _scopeFactory.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+                await using var transaction = db.Database.IsRelational()
+                    ? await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable)
+                    : null;
+
+                var task = await db.YoutubeCaptionTasks.FirstOrDefaultAsync(t => t.Slug == taskId)
+                    ?? await db.YoutubeCaptionTasks.FirstOrDefaultAsync(t => t.PreviousSlug == taskId)
+                    ?? await db.YoutubeCaptionTasks.FindAsync(taskId);
+                if (task == null)
+                    return null;
+                if (!isAdmin && !string.Equals(task.UserId, userId, StringComparison.Ordinal))
+                    throw new UnauthorizedAccessException("User is not allowed to reprocess this task.");
+                if (task.Visibility == YoutubeCaptionVisibility.Deleted)
+                    return null;
+                if (task.Status != RecognizeStatus.Done && task.Status != RecognizeStatus.Error)
+                    throw new InvalidOperationException("Задача уже обрабатывается. Дождитесь её завершения.");
+                if (!_inProgress.TryAdd(task.Id, true))
+                    throw new InvalidOperationException("Обработка ещё завершается. Повторите через несколько секунд.");
+                reservedId = task.Id;
+
+                var subscription = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
+                if (!await subscription.TryConsumeQuotaAsync(userId, 0, 1, $"caption-reprocess:{task.Id}:{Guid.NewGuid():N}"))
+                    throw new CaptionQuotaException();
+
+                var segments = await db.RecognizedSegments.Where(s => s.YoutubeCaptionTaskId == task.Id).ToListAsync();
+                db.RecognizedSegments.RemoveRange(segments);
+                var hasSource = await db.YoutubeCaptionTexts.AnyAsync(t => t.Id == task.Id);
+                task.Status = hasSource ? RecognizeStatus.SegmentingCaptions : RecognizeStatus.Created;
+                task.Done = false;
+                task.Error = null;
+                task.SegmentsTotal = 0;
+                task.SegmentsProcessed = 0;
+                task.QuotaChargedAt = DateTime.UtcNow;
+                task.ModifiedAt = DateTime.UtcNow;
+                // Keep the previous result until a successful replacement is ready.
+                await db.SaveChangesAsync();
+                if (transaction != null)
+                    await transaction.CommitAsync();
+                result = await GetTaskStatusAsync(task.Id);
+            }
+            finally
+            {
+                if (reservedId != null)
+                    _inProgress.TryRemove(reservedId, out _);
+                _reprocessLock.Release();
+            }
+            _ = ProcessQueueAsync();
+            return result;
+        }
+
         public async Task<YoutubeCaptionTaskDto?> RestartCaptionTaskAsync(string taskId, string userId, bool isAdmin)
         {
-            await using var scope = _scopeFactory.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
-
-            YoutubeCaptionTask? task = await db.YoutubeCaptionTasks
-                .FirstOrDefaultAsync(t => t.Slug == taskId);
-
-            if (task is null)
+            await _reprocessLock.WaitAsync();
+            string? reservedId = null;
+            YoutubeCaptionTaskDto? result;
+            try
             {
-                task = await db.YoutubeCaptionTasks
-                    .FirstOrDefaultAsync(t => t.PreviousSlug == taskId);
-            }
+                await using var scope = _scopeFactory.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<MyDbContext>();
+                await using var transaction = db.Database.IsRelational()
+                    ? await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable)
+                    : null;
 
-            if (task is null)
+                YoutubeCaptionTask? task = await db.YoutubeCaptionTasks
+                    .FirstOrDefaultAsync(t => t.Slug == taskId);
+
+                if (task is null)
+                {
+                    task = await db.YoutubeCaptionTasks
+                        .FirstOrDefaultAsync(t => t.PreviousSlug == taskId);
+                }
+
+                if (task is null)
+                {
+                    task = await db.YoutubeCaptionTasks.FindAsync(taskId);
+                }
+
+                if (task is null)
+                    return null;
+
+                if (!isAdmin && !string.Equals(task.UserId, userId, StringComparison.Ordinal))
+                    throw new UnauthorizedAccessException("User is not allowed to restart this task.");
+
+                if (task.Visibility == YoutubeCaptionVisibility.Deleted)
+                    return null;
+                if (task.Status != RecognizeStatus.Error)
+                    return await GetTaskStatusAsync(task.Id);
+                if (!_inProgress.TryAdd(task.Id, true))
+                    throw new InvalidOperationException("Обработка ещё завершается. Повторите через несколько секунд.");
+                reservedId = task.Id;
+
+                // The owner identifies the document, not the payer for an explicit retry.
+                // Reserve unpaid quota from the caller before the worker can resume.
+                if (!task.QuotaChargedAt.HasValue)
+                {
+                    var subscription = scope.ServiceProvider.GetRequiredService<ISubscriptionService>();
+                    if (!await subscription.TryConsumeQuotaAsync(userId, 0, 1, $"caption-restart:{task.Id}:{Guid.NewGuid():N}"))
+                        throw new CaptionQuotaException("Недостаточно видео-кредитов на вашем счёте. Для запуска нужен 1 видео-кредит. Пополните пакет в биллинге.");
+                    task.QuotaChargedAt = DateTime.UtcNow;
+                }
+
+                var stuckSegments = await db.RecognizedSegments
+                    .Where(s => s.YoutubeCaptionTaskId == task.Id && s.IsProcessing)
+                    .ToListAsync();
+
+                foreach (var segment in stuckSegments)
+                {
+                    segment.IsProcessing = false;
+                }
+
+                var hasSegments = await db.RecognizedSegments
+                    .AnyAsync(s => s.YoutubeCaptionTaskId == task.Id);
+                var hasCaptionText = await db.YoutubeCaptionTexts
+                    .AnyAsync(t => t.Id == task.Id);
+
+                task.Status = hasSegments
+                    ? RecognizeStatus.ApplyingPunctuationSegment
+                    : hasCaptionText
+                        ? RecognizeStatus.SegmentingCaptions
+                        : !string.IsNullOrWhiteSpace(task.Title) || task.UploadDate.HasValue || !string.IsNullOrWhiteSpace(task.ChannelId)
+                            ? RecognizeStatus.DownloadingCaptions
+                            : RecognizeStatus.Created;
+
+                task.Done = false;
+                task.Error = null;
+                task.ModifiedAt = DateTime.UtcNow;
+
+                await db.SaveChangesAsync();
+                if (transaction != null)
+                    await transaction.CommitAsync();
+                result = await GetTaskStatusAsync(task.Id);
+            }
+            finally
             {
-                task = await db.YoutubeCaptionTasks.FindAsync(taskId);
+                if (reservedId != null)
+                    _inProgress.TryRemove(reservedId, out _);
+                _reprocessLock.Release();
             }
-
-            if (task is null)
-                return null;
-
-            if (!isAdmin && !string.Equals(task.UserId, userId, StringComparison.Ordinal))
-                throw new UnauthorizedAccessException("User is not allowed to restart this task.");
-
-            if (task.Status != RecognizeStatus.Error)
-                return await GetTaskStatusAsync(task.Id);
-
-            var stuckSegments = await db.RecognizedSegments
-                .Where(s => s.YoutubeCaptionTaskId == task.Id && s.IsProcessing)
-                .ToListAsync();
-
-            foreach (var segment in stuckSegments)
-            {
-                segment.IsProcessing = false;
-            }
-
-            var hasSegments = await db.RecognizedSegments
-                .AnyAsync(s => s.YoutubeCaptionTaskId == task.Id);
-            var hasCaptionText = await db.YoutubeCaptionTexts
-                .AnyAsync(t => t.Id == task.Id);
-
-            task.Status = hasSegments
-                ? RecognizeStatus.ApplyingPunctuationSegment
-                : hasCaptionText
-                    ? RecognizeStatus.SegmentingCaptions
-                    : !string.IsNullOrWhiteSpace(task.Title) || task.UploadDate.HasValue || !string.IsNullOrWhiteSpace(task.ChannelId)
-                        ? RecognizeStatus.DownloadingCaptions
-                        : RecognizeStatus.Created;
-
-            task.Done = false;
-            task.Error = null;
-            task.ModifiedAt = DateTime.UtcNow;
-
-            await db.SaveChangesAsync();
-
             _ = ProcessQueueAsync();
-            return await GetTaskStatusAsync(task.Id);
+            return result;
         }
 
 
@@ -467,6 +561,13 @@ namespace YandexSpeech.services
                     _logger.LogError(ex, "Error while scheduling caption task queue retry");
                 }
             });
+        }
+    }
+
+    public sealed class CaptionQuotaException : Exception
+    {
+        public CaptionQuotaException(string? message = null) : base(message ?? "Недостаточно видео-кредитов. Повторная обработка стоит 1 видео-кредит, как первое распознавание.")
+        {
         }
     }
 }

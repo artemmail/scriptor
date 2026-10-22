@@ -2,7 +2,7 @@
   <main class="ap-container rp-container">
     <nav class="rp-breadcrumb" aria-label="Навигация"><a routerLink="/Scriptorium"><mat-icon aria-hidden="true">arrow_back</mat-icon>Скрипторий</a><span aria-hidden="true">/</span><span>Расшифровка</span></nav>
     <ng-container *ngIf="taskDone && task; else pending">
-      <app-task-result [youtubeTask]="task"></app-task-result>
+      <app-task-result [youtubeTask]="task" [reprocessInProgress]="restartInProgress" [reprocessError]="restartErrorMessage" (reprocess)="onRestartTask(true)" (deleted)="onTaskDeleted()"></app-task-result>
     </ng-container>
     <ng-template #pending>
       <section *ngIf="taskErrorMessage; else progress" class="rp-error" aria-labelledby="rp-error-title">
@@ -13,9 +13,10 @@
         <p>Можно попробовать запустить задачу снова. Перезапуск доступен владельцу и администратору.</p>
         <details><summary>Подробности ошибки</summary><p>{{ taskErrorMessage }}</p></details>
         <div class="rp-error-actions">
-          <button *ngIf="isAuthenticated; else login" class="ap-button ap-button-dark" type="button" [disabled]="restartInProgress" (click)="onRestartTask()"><mat-icon aria-hidden="true">replay</mat-icon>{{ restartInProgress ? 'Перезапускаем…' : 'Попробовать снова' }}</button>
+          <button *ngIf="isAuthenticated; else login" class="ap-button ap-button-dark" type="button" [disabled]="restartInProgress || deleting" (click)="onRestartTask()"><mat-icon aria-hidden="true">replay</mat-icon>{{ restartInProgress ? 'Перезапускаем…' : 'Попробовать снова' }}</button>
           <ng-template #login><a class="ap-button ap-button-dark" routerLink="/login" [queryParams]="{returnUrl: '/recognized/' + taskId}">Войти для перезапуска ↗</a></ng-template>
           <a class="ap-button ap-button-outline" routerLink="/Scriptorium">В библиотеку</a>
+          <app-delete-caption-button *ngIf="task" [taskId]="task.id" [title]="task.title" [status]="task.status" [done]="task.done" [disabled]="restartInProgress" (busyChange)="deleting = $event" (deleted)="onTaskDeleted()"></app-delete-caption-button>
         </div>
         <p class="rp-restart-error" *ngIf="restartErrorMessage" role="alert">{{ restartErrorMessage }}</p>
       </section>

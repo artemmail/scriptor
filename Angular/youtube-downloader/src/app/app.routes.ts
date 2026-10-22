@@ -36,6 +36,7 @@ export const appRoutes: Routes = [
   { path: 'recognized/:id', component: TaskPageComponent },
   { path: 'markdown-converter/:id', component: MarkdownConverterComponent },
   { path: 'markdown-converter', component: MarkdownConverterComponent },
+  { path: 'fb2-reader', loadComponent: () => import('./fb2-reader/fb2-reader.component').then(m => m.Fb2ReaderComponent) },
   { path: 'png-to-webp/batch', component: PngToWebpBatchComponent },
   { path: 'png-to-webp', component: PngToWebpComponent },
   { path: 'edit/:id', component: EditorPageComponent },

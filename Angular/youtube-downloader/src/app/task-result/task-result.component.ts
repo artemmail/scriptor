@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, HostListener, Input, OnChanges, OnDestroy, ViewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, EventEmitter, HostListener, Input, OnChanges, OnDestroy, Output, SimpleChanges, ViewChild } from '@angular/core';
 import { A11yModule } from '@angular/cdk/a11y';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
@@ -17,6 +17,7 @@ import { RouterModule } from '@angular/router'; // ⬅️ Добавить
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../services/AuthService.service';
 import { ActionMenuPanelDirective } from '../shared/action-menu-panel.directive';
+import { DeleteCaptionButtonComponent } from '../shared/delete-caption-button.component';
 
 @Component({
   selector: 'app-task-result',
@@ -31,13 +32,19 @@ import { ActionMenuPanelDirective } from '../shared/action-menu-panel.directive'
     MatMenuModule,
     LocalTimePipe,
     YandexAdComponent,
-    ActionMenuPanelDirective
+    ActionMenuPanelDirective,
+    DeleteCaptionButtonComponent
   ],
   templateUrl: './task-result.component.html',
   styleUrls: ['../shared/account-page.css', './task-result.component.css']
 })
 export class TaskResultComponent implements OnDestroy, OnChanges {
   @Input() youtubeTask: YoutubeCaptionTaskDto | null = null;
+  @Input() reprocessInProgress = false;
+  @Input() reprocessError: string | null = null;
+  @Output() reprocess = new EventEmitter<void>();
+  @Output() deleted = new EventEmitter<void>();
+  deleting = false;
   @ViewChild('markdownContent') private markdownContentRef?: ElementRef<HTMLElement>;
   isDownloading = false;
   isCopying = false;
@@ -66,7 +73,8 @@ export class TaskResultComponent implements OnDestroy, OnChanges {
       });
   }
 
-  ngOnChanges(): void {
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!changes['youtubeTask']) return;
     const content = this.youtubeTask?.result || '';
     this.processedMarkdown = content ? this.sanitizer.bypassSecurityTrustHtml(this.renderMath(content)) : '';
     this.wordCount = this.stripMarkdown(content).trim().split(/\s+/).filter(Boolean).length;

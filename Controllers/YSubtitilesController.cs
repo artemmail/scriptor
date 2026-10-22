@@ -77,6 +77,8 @@ namespace YandexSpeech.Controllers
             if (task == null)
                 return NotFound("Task not found.");
 
+            task.CanReprocess = User.GetUserId() is string userId &&
+                (User.IsInRole("Admin") || string.Equals(entity.UserId, userId, StringComparison.Ordinal));
             return Ok(task);
         }
 
@@ -93,6 +95,35 @@ namespace YandexSpeech.Controllers
                 return NotFound("Task not found.");
 
             return NoContent();
+        }
+
+        [HttpPost("{taskId}/reprocess")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<ActionResult<YoutubeCaptionTaskDto>> ReprocessTask(string taskId)
+        {
+            var userId = User.GetUserId();
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized();
+            try
+            {
+                var task = await _taskManager.ReprocessCaptionTaskAsync(taskId, userId, User.IsInRole("Admin"));
+                if (task == null)
+                    return NotFound("Task not found.");
+                task.CanReprocess = true;
+                return Ok(task);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
+            }
+            catch (CaptionQuotaException ex)
+            {
+                return StatusCode(StatusCodes.Status402PaymentRequired, new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
+            }
         }
 
         [HttpPost("{taskId}/restart")]
@@ -118,6 +149,14 @@ namespace YandexSpeech.Controllers
             catch (UnauthorizedAccessException)
             {
                 return Forbid();
+            }
+            catch (CaptionQuotaException ex)
+            {
+                return StatusCode(StatusCodes.Status402PaymentRequired, new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { message = ex.Message });
             }
         }
 
