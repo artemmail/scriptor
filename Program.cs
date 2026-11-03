@@ -279,6 +279,8 @@ builder.Services.AddScoped<IYSpeechService, YSpeechService>();
 builder.Services.AddScoped<ISpeechWorkflowService, SpeechWorkflowService>();
 builder.Services.AddScoped<IPunctuationService, PunctuationService>();
 builder.Services.AddTransient<OpenAiBatchClient>();
+builder.Services.AddScoped<DjvuBookQueueService>();
+builder.Services.AddHostedService<DjvuBookBackgroundService>();
 
 builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddScoped<IWalletService, WalletService>();

@@ -121,6 +121,18 @@ export class OpenAiTranscriptionService {
     return this.http.post<OpenAiTranscriptionTaskDto>(this.apiUrl, formData);
   }
 
+  createFromYoutubeDownload(
+    youtubeTaskId: string,
+    recognitionProfileId: number,
+    clarification?: string | null
+  ): Observable<OpenAiTranscriptionTaskDto> {
+    const formData = new FormData();
+    formData.append('youtubeTaskId', youtubeTaskId);
+    formData.append('recognitionProfileId', recognitionProfileId.toString());
+    if (clarification?.trim()) formData.append('clarification', clarification.trim());
+    return this.http.post<OpenAiTranscriptionTaskDto>(this.apiUrl, formData);
+  }
+
   list(includeAll = false): Observable<OpenAiTranscriptionTaskDto[]> {
     const params = includeAll ? { includeAll: 'true' } : undefined;
     return this.http.get<OpenAiTranscriptionTaskDto[]>(this.apiUrl, { params });

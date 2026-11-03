@@ -19,11 +19,13 @@ export const UTILITY_LINKS: readonly SiteLink[] = [
   { label: 'PNG → WebP', path: '/png-to-webp', icon: 'image', description: 'Настройте качество, обрежьте изображение и сравните результат.' },
   { label: 'Пакетный PNG → WebP', path: '/png-to-webp/batch', icon: 'photo_library', description: 'Преобразуйте подборку изображений и скачайте всё одним ZIP.' },
   { label: 'FB2 Reader', path: '/fb2-reader', icon: 'menu_book', description: 'Читайте книги с оглавлением и сохраняйте в PDF, DOCX или Markdown.' },
+  { label: 'DjVu Reader', path: '/djvu-reader', icon: 'auto_stories', description: 'Читайте DjVu с оглавлением и преобразуйте текстовый слой в FB2.' },
 ];
 
 export const SITE_LINK_GROUPS: readonly SiteLinkGroup[] = [
   { id: 'work', label: 'Работа', title: 'От записи — к результату', links: [
     { label: 'Мои записи', path: '/transcriptions', icon: 'graphic_eq', description: 'Загрузка аудио и видео, расшифровка и анализ.' },
+    { label: 'Мои книги', path: '/djvu-conversions', icon: 'library_books', description: 'Очередь конвертации DjVu в FB2 и готовые книги.' },
     { label: 'Скрипторий', path: '/Scriptorium', icon: 'local_library', description: 'YouTube в текст и библиотека расшифровок.' },
     { label: 'Загрузчик YouTube', path: '/down', icon: 'download', description: 'Аудиодорожки и видео в подходящем качестве.' },
   ] },

@@ -56,10 +56,20 @@ namespace YandexSpeech
         public DbSet<WalletTransaction> WalletTransactions { get; set; }
         public DbSet<PaymentOperation> PaymentOperations { get; set; }
         public DbSet<RecognitionUsage> RecognitionUsage { get; set; }
+        public DbSet<DjvuBookJob> DjvuBookJobs { get; set; }
+        public DbSet<DjvuBookChapter> DjvuBookChapters { get; set; }
+        public DbSet<DjvuBookBlock> DjvuBookBlocks { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+
+            builder.Entity<DjvuBookJob>().HasIndex(j => new { j.UserId, j.CreatedAt });
+            builder.Entity<DjvuBookJob>().HasOne<ApplicationUser>().WithMany().HasForeignKey(j => j.UserId).OnDelete(DeleteBehavior.Cascade);
+            builder.Entity<DjvuBookChapter>().HasOne(c => c.Job).WithMany(j => j.Chapters).HasForeignKey(c => c.JobId).OnDelete(DeleteBehavior.Cascade);
+            builder.Entity<DjvuBookChapter>().HasIndex(c => new { c.JobId, c.Ordinal }).IsUnique();
+            builder.Entity<DjvuBookBlock>().HasOne(b => b.Job).WithMany(j => j.Blocks).HasForeignKey(b => b.JobId).OnDelete(DeleteBehavior.Cascade);
+            builder.Entity<DjvuBookBlock>().HasIndex(b => new { b.JobId, b.Ordinal }).IsUnique();
 
             builder.Entity<BlogTopic>()
                 .HasIndex(t => t.Slug)

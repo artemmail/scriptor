@@ -2,7 +2,7 @@ import { Component, DestroyRef, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -14,6 +14,7 @@ import { MergedVideoDto, YoutubeService } from '../services/youtube.service';
 import { AuthService } from '../services/AuthService.service';
 import { StreamDto } from '../models/stream-dto';
 import { BitratePipe, FileSizePipe, LocalTimePipe } from '../pipe/local-time.pipe';
+import { OpenAiRecognitionProfileOptionDto, OpenAiTranscriptionService } from '../services/openai-transcription.service';
 
 type DownloadMode = 'audio' | 'video' | 'silent';
 
@@ -73,6 +74,14 @@ export class YoutubeDownloaderComponent implements OnInit {
   historyLimit = 6;
   readonly downloading = new Set<string>();
   readonly downloadErrors = new Map<string, string>();
+  recognitionProfiles: OpenAiRecognitionProfileOptionDto[] = [];
+  profilesLoading = false;
+  profilesError = '';
+  selectedProfileId: number | null = null;
+  recognitionTaskId: string | null = null;
+  recognitionClarification = '';
+  recognitionBusy = false;
+  recognitionError = '';
   private streamsRequest?: Subscription;
   private historyRequest?: Subscription;
   private progressRequest?: Subscription;
@@ -84,6 +93,8 @@ export class YoutubeDownloaderComponent implements OnInit {
     private readonly youtubeService: YoutubeService,
     private readonly titleService: Title,
     private readonly auth: AuthService,
+    private readonly transcriptionService: OpenAiTranscriptionService,
+    private readonly router: Router,
     private readonly destroyRef: DestroyRef,
   ) {
     this.titleService.setTitle('Скачать аудио и видео с YouTube — YouScriptor');
@@ -123,7 +134,13 @@ export class YoutubeDownloaderComponent implements OnInit {
       this.mergeError = '';
       this.pollingWarning = '';
       this.downloadErrors.clear();
-      if (id) this.loadMergedVideos();
+      this.recognitionTaskId = null;
+      this.recognitionProfiles = [];
+      this.selectedProfileId = null;
+      if (id) {
+        this.loadMergedVideos();
+        this.loadRecognitionProfiles();
+      }
     });
     timer(10000, 10000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       if (this.isAuthenticated && this.mergedVideos.some(item => !this.isTerminal(item.status))) {
@@ -295,6 +312,39 @@ export class YoutubeDownloaderComponent implements OnInit {
   }
   canDownload(item: MergedVideoDto): boolean {
     return item.status === 'Done' && !!(item.downloadUrl || item.fileName || item.filePath);
+  }
+  loadRecognitionProfiles(): void {
+    this.profilesLoading = true;
+    this.profilesError = '';
+    this.transcriptionService.listRecognitionProfiles().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: profiles => {
+        this.profilesLoading = false;
+        this.recognitionProfiles = profiles;
+        this.selectedProfileId = profiles.find(profile => profile.name === 'punctuation-only')?.id ?? profiles[0]?.id ?? null;
+        if (!profiles.length) this.profilesError = 'Нет доступных профилей распознавания.';
+      },
+      error: error => {
+        this.profilesLoading = false;
+        this.profilesError = this.errorText(error, 'Не удалось загрузить профили.');
+      },
+    });
+  }
+  openRecognition(taskId: string): void {
+    if (this.recognitionBusy) return;
+    if (this.recognitionTaskId !== taskId) this.recognitionClarification = '';
+    this.recognitionTaskId = this.recognitionTaskId === taskId ? null : taskId;
+    this.recognitionError = '';
+  }
+  startRecognition(): void {
+    if (!this.recognitionTaskId || this.selectedProfileId == null || this.recognitionBusy) return;
+    this.recognitionBusy = true;
+    this.recognitionError = '';
+    this.transcriptionService.createFromYoutubeDownload(
+      this.recognitionTaskId, this.selectedProfileId, this.recognitionClarification,
+    ).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.recognitionBusy = false)).subscribe({
+      next: task => this.router.navigate(['/transcriptions'], { queryParams: { task: task.id } }),
+      error: error => this.recognitionError = this.errorText(error, 'Не удалось запустить распознавание.'),
+    });
   }
   downloadMergedFile(): void {
     if (this.activeTaskId && this.mergeStatus === 'Done') {

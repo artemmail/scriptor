@@ -151,55 +151,68 @@ namespace YandexSpeech.services.Telegram
             var httpClient = _httpClientFactory.CreateClient(nameof(TelegramTranscriptionBot));
             _botClient = new TelegramBotClient(botOptions, httpClient);
 
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                var me = await GetMeAsync(stoppingToken).ConfigureAwait(false);
-                _logger.LogInformation("Telegram bot connected as @{Username} (id {Id}).", me.Username, me.Id);
-
-                var webhookUrl = options.WebhookUrl;
-                var dropPendingUpdates = useLongPolling || string.IsNullOrWhiteSpace(webhookUrl);
-                await DeleteWebhookAsync(dropPendingUpdates, stoppingToken)
-                    .ConfigureAwait(false);
-
-                if (useLongPolling || string.IsNullOrWhiteSpace(webhookUrl))
-                {
-                    if (!useLongPolling)
-                    {
-                        _logger.LogWarning("Telegram webhook URL is not configured. Falling back to long polling mode.");
-                    }
-
-                    _logger.LogInformation("Telegram long polling mode enabled.");
-                    await RunLongPollingAsync(stoppingToken).ConfigureAwait(false);
-                    return;
-                }
-
                 try
                 {
-                    await SetWebhookAsync(
-                            webhookUrl!,
-                            new[] { UpdateType.Message },
-                            string.IsNullOrWhiteSpace(options.WebhookSecretToken) ? null : options.WebhookSecretToken,
-                            stoppingToken)
-                        .ConfigureAwait(false);
+                    var me = await GetMeAsync(stoppingToken).ConfigureAwait(false);
+                    _logger.LogInformation("Telegram bot connected as @{Username} (id {Id}).", me.Username, me.Id);
 
-                    _logger.LogInformation("Telegram webhook configured at {WebhookUrl}.", webhookUrl);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to configure Telegram webhook. Falling back to long polling mode.");
-                    _logger.LogInformation("Telegram long polling mode enabled.");
-                    await RunLongPollingAsync(stoppingToken).ConfigureAwait(false);
+                    var webhookUrl = options.WebhookUrl;
+                    // Keep updates that arrived while the application or Telegram was unavailable.
+                    await DeleteWebhookAsync(false, stoppingToken).ConfigureAwait(false);
+
+                    if (useLongPolling || string.IsNullOrWhiteSpace(webhookUrl))
+                    {
+                        if (!useLongPolling)
+                        {
+                            _logger.LogWarning("Telegram webhook URL is not configured. Falling back to long polling mode.");
+                        }
+
+                        _logger.LogInformation("Telegram long polling mode enabled.");
+                        await RunLongPollingAsync(stoppingToken).ConfigureAwait(false);
+                        return;
+                    }
+
+                    try
+                    {
+                        await SetWebhookAsync(
+                                webhookUrl!,
+                                new[] { UpdateType.Message },
+                                string.IsNullOrWhiteSpace(options.WebhookSecretToken) ? null : options.WebhookSecretToken,
+                                stoppingToken)
+                            .ConfigureAwait(false);
+
+                        _logger.LogInformation("Telegram webhook configured at {WebhookUrl}.", webhookUrl);
+                    }
+                    catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+                    {
+                        _logger.LogError(ex, "Failed to configure Telegram webhook. Falling back to long polling mode.");
+                        _logger.LogInformation("Telegram long polling mode enabled.");
+                        await RunLongPollingAsync(stoppingToken).ConfigureAwait(false);
+                        return;
+                    }
+
+                    await WaitForCancellationAsync(stoppingToken).ConfigureAwait(false);
                     return;
                 }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+                {
+                    _logger.LogError(ex, "Failed to initialize Telegram bot. Retrying in 15 seconds.");
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    {
+                        return;
+                    }
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to initialize Telegram bot.");
-                await WaitForCancellationAsync(stoppingToken);
-                return;
-            }
-
-            await WaitForCancellationAsync(stoppingToken);
         }
 
         public bool ValidateSecretToken(string? providedToken)

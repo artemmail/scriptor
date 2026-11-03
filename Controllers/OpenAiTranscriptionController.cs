@@ -16,6 +16,7 @@ using YandexSpeech.services.Interface;
 using YandexSpeech.services.Options;
 using YandexSpeech.services.Whisper;
 using Xabe.FFmpeg;
+using YoutubeDownload.Models;
 
 namespace YandexSpeech.Controllers
 {
@@ -71,6 +72,7 @@ namespace YandexSpeech.Controllers
         public async Task<ActionResult<OpenAiTranscriptionTaskDto>> Upload(
             [FromForm] IFormFile? file,
             [FromForm] string? fileUrl,
+            [FromForm] string? youtubeTaskId,
             [FromForm] string? clarification,
             [FromForm] int? recognitionProfileId,
             CancellationToken cancellationToken)
@@ -78,15 +80,16 @@ namespace YandexSpeech.Controllers
             var normalizedUrl = string.IsNullOrWhiteSpace(fileUrl) ? null : fileUrl.Trim();
             var hasFile = file != null && file.Length > 0;
             var hasUrl = !string.IsNullOrEmpty(normalizedUrl);
+            var hasYoutubeTask = !string.IsNullOrWhiteSpace(youtubeTaskId);
 
             if (file != null && file.Length == 0)
             {
                 return BadRequest(ErrorResponse.FromMessage("Uploaded file is empty."));
             }
 
-            if (!hasFile && !hasUrl)
+            if ((hasFile ? 1 : 0) + (hasUrl ? 1 : 0) + (hasYoutubeTask ? 1 : 0) != 1)
             {
-                return BadRequest(ErrorResponse.FromMessage("Either a file or a file URL must be provided."));
+                return BadRequest(ErrorResponse.FromMessage("Укажите один источник файла."));
             }
 
             if (hasFile)
@@ -108,6 +111,20 @@ namespace YandexSpeech.Controllers
 
             var userEmail = User.FindFirstValue(ClaimTypes.Email);
 
+            string? youtubeFilePath = null;
+            if (hasYoutubeTask)
+            {
+                var youtubeTask = await _dbContext.YoutubeDownloadTasks.AsNoTracking()
+                    .FirstOrDefaultAsync(t => t.Id == youtubeTaskId && t.UserId == userId, cancellationToken);
+                if (youtubeTask == null)
+                    return NotFound(ErrorResponse.FromMessage("Задача скачивания не найдена."));
+                if (youtubeTask.Status != YoutubeWorkflowStatus.Done || string.IsNullOrWhiteSpace(youtubeTask.MergedFilePath))
+                    return BadRequest(ErrorResponse.FromMessage("Файл ещё не подготовлен."));
+                youtubeFilePath = youtubeTask.MergedFilePath;
+                if (!System.IO.File.Exists(youtubeFilePath))
+                    return NotFound(ErrorResponse.FromMessage("Подготовленный файл не найден."));
+            }
+
             var uploadsDirectory = Path.Combine(_environment.ContentRootPath, "App_Data", "transcriptions");
             Directory.CreateDirectory(uploadsDirectory);
 
@@ -116,6 +133,11 @@ namespace YandexSpeech.Controllers
             if (hasFile)
             {
                 storedFilePath = await SaveUploadedFileAsync(file!, uploadsDirectory);
+            }
+            else if (hasYoutubeTask)
+            {
+                var sanitizedName = OpenAiTranscriptionFileHelper.SanitizeFileName(Path.GetFileName(youtubeFilePath));
+                storedFilePath = OpenAiTranscriptionFileHelper.GenerateStoredFilePath(uploadsDirectory, sanitizedName);
             }
             else
             {
@@ -132,9 +154,9 @@ namespace YandexSpeech.Controllers
             int? sourceDurationSeconds = null;
             var requestedTranscriptionMinutes = 1;
 
-            if (hasFile)
+            if (hasFile || hasYoutubeTask)
             {
-                sourceDurationSeconds = await TryResolveDurationSecondsAsync(storedFilePath, cancellationToken).ConfigureAwait(false);
+                sourceDurationSeconds = await TryResolveDurationSecondsAsync(hasYoutubeTask ? youtubeFilePath! : storedFilePath, cancellationToken).ConfigureAwait(false);
                 if (sourceDurationSeconds.HasValue && sourceDurationSeconds.Value > 0)
                 {
                     requestedTranscriptionMinutes = Math.Max(1, (int)Math.Ceiling(sourceDurationSeconds.Value / 60d));
@@ -182,6 +204,7 @@ namespace YandexSpeech.Controllers
 
                 if (profile == null)
                 {
+                    if (hasFile) TryDeleteFile(storedFilePath);
                     return BadRequest(ErrorResponse.FromMessage("Указанный профиль распознавания не найден."));
                 }
             }
@@ -192,7 +215,23 @@ namespace YandexSpeech.Controllers
 
                 if (profile == null)
                 {
+                    if (hasFile) TryDeleteFile(storedFilePath);
                     return BadRequest(ErrorResponse.FromMessage("Профиль распознавания по умолчанию не найден."));
+                }
+            }
+
+            if (hasYoutubeTask)
+            {
+                try
+                {
+                    await using var source = System.IO.File.OpenRead(youtubeFilePath!);
+                    await using var destination = System.IO.File.Create(storedFilePath);
+                    await source.CopyToAsync(destination, cancellationToken);
+                }
+                catch
+                {
+                    TryDeleteFile(storedFilePath);
+                    throw;
                 }
             }
 

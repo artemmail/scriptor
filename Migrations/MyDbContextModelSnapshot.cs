@@ -350,9 +350,6 @@ namespace YandexSpeech.Migrations
                     b.Property<string>("Preview")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("PreviousSlug")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("RecognizedText")
                         .HasColumnType("nvarchar(max)");
 
@@ -443,6 +440,128 @@ namespace YandexSpeech.Migrations
                         .IsUnique();
 
                     b.ToTable("BlogTopics");
+                });
+
+            modelBuilder.Entity("YandexSpeech.models.DB.DjvuBookBlock", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("ChapterIndex")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Fragment")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobId", "Ordinal")
+                        .IsUnique();
+
+                    b.ToTable("DjvuBookBlocks");
+                });
+
+            modelBuilder.Entity("YandexSpeech.models.DB.DjvuBookChapter", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Depth")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Page")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobId", "Ordinal")
+                        .IsUnique();
+
+                    b.ToTable("DjvuBookChapters");
+                });
+
+            modelBuilder.Entity("YandexSpeech.models.DB.DjvuBookJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CompletedBlocks")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CreditChargedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<string>("ResultXml")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("TotalBlocks")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("DjvuBookJobs");
                 });
 
             modelBuilder.Entity("YandexSpeech.models.DB.OpenAiRecognizedSegment", b =>
@@ -1222,6 +1341,9 @@ namespace YandexSpeech.Migrations
                     b.Property<string>("Preview")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PreviousSlug")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("QuotaChargedAt")
                         .HasColumnType("datetime2");
 
@@ -1552,6 +1674,37 @@ namespace YandexSpeech.Migrations
                     b.Navigation("CreatedBy");
                 });
 
+            modelBuilder.Entity("YandexSpeech.models.DB.DjvuBookBlock", b =>
+                {
+                    b.HasOne("YandexSpeech.models.DB.DjvuBookJob", "Job")
+                        .WithMany("Blocks")
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Job");
+                });
+
+            modelBuilder.Entity("YandexSpeech.models.DB.DjvuBookChapter", b =>
+                {
+                    b.HasOne("YandexSpeech.models.DB.DjvuBookJob", "Job")
+                        .WithMany("Chapters")
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Job");
+                });
+
+            modelBuilder.Entity("YandexSpeech.models.DB.DjvuBookJob", b =>
+                {
+                    b.HasOne("YandexSpeech.models.DB.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("YandexSpeech.models.DB.OpenAiRecognizedSegment", b =>
                 {
                     b.HasOne("YandexSpeech.models.DB.OpenAiTranscriptionTask", "Task")
@@ -1766,6 +1919,13 @@ namespace YandexSpeech.Migrations
             modelBuilder.Entity("YandexSpeech.models.DB.BlogTopic", b =>
                 {
                     b.Navigation("Comments");
+                });
+
+            modelBuilder.Entity("YandexSpeech.models.DB.DjvuBookJob", b =>
+                {
+                    b.Navigation("Blocks");
+
+                    b.Navigation("Chapters");
                 });
 
             modelBuilder.Entity("YandexSpeech.models.DB.OpenAiTranscriptionTask", b =>

@@ -19,6 +19,9 @@ public sealed class OpenAiBatchClient
 
     public async Task<string> CompleteAsync(object body, CancellationToken cancellationToken = default)
     {
+        if (!_configuration.GetValue("OpenAI:UseBatch", true))
+            return await CompleteDirectAsync(body, cancellationToken);
+
         var apiKey = _configuration["OpenAI:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new InvalidOperationException("OpenAI:ApiKey is not configured.");
@@ -26,14 +29,6 @@ public sealed class OpenAiBatchClient
         var client = _httpClientFactory.CreateClient(nameof(OpenAiBatchClient));
         client.BaseAddress = new Uri(BaseUrl);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-
-        if (!_configuration.GetValue("OpenAI:UseBatch", true))
-        {
-            using var requestContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
-            using var directResponse = await client.PostAsync("chat/completions", requestContent, cancellationToken);
-            using var directJson = await ReadSuccessJsonAsync(directResponse, cancellationToken);
-            return ReadCompletionText(directJson.RootElement);
-        }
 
         var customId = Guid.NewGuid().ToString("N");
         var line = JsonSerializer.Serialize(new
@@ -101,6 +96,21 @@ public sealed class OpenAiBatchClient
             if (status is "failed" or "expired" or "cancelled")
                 throw new InvalidOperationException($"Batch {batchId} ended with status {status}: {statusJson.RootElement}");
         }
+    }
+
+    public async Task<string> CompleteDirectAsync(object body, CancellationToken cancellationToken = default)
+    {
+        var apiKey = _configuration["OpenAI:ApiKey"];
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new InvalidOperationException("OpenAI:ApiKey is not configured.");
+
+        var client = _httpClientFactory.CreateClient(nameof(OpenAiBatchClient));
+        client.BaseAddress = new Uri(BaseUrl);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        using var requestContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync("chat/completions", requestContent, cancellationToken);
+        using var json = await ReadSuccessJsonAsync(response, cancellationToken);
+        return ReadCompletionText(json.RootElement);
     }
 
     private static async Task<JsonDocument> ReadSuccessJsonAsync(HttpResponseMessage response, CancellationToken cancellationToken)

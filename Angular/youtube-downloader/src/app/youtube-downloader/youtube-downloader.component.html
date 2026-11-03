@@ -89,7 +89,8 @@
       <mat-progress-bar *ngIf="isMerging" mode="indeterminate" aria-label="Файл готовится"></mat-progress-bar>
       <p *ngIf="pollingWarning" class="dl-alert" role="status">{{ pollingWarning }}</p>
       <p *ngIf="mergeError" class="dl-alert dl-error" role="alert">{{ mergeError }}</p>
-      <div class="dl-result" *ngIf="mergeStatus === 'Done'"><span>{{ mergeFileName || 'Файл готов. Можно скачивать.' }}</span><button class="ap-button ap-button-dark" type="button" (click)="downloadMergedFile()" [disabled]="!activeTaskId || downloading.has(activeTaskId)"><mat-icon aria-hidden="true">download</mat-icon>{{ activeTaskId && downloading.has(activeTaskId) ? 'Скачиваем…' : 'Скачать файл' }}</button></div>
+      <div class="dl-result" *ngIf="mergeStatus === 'Done'"><span>{{ mergeFileName || 'Файл готов. Можно скачивать.' }}</span><div class="dl-file-actions"><button class="ap-button ap-button-dark" type="button" (click)="downloadMergedFile()" [disabled]="!activeTaskId || downloading.has(activeTaskId)"><mat-icon aria-hidden="true">download</mat-icon>{{ activeTaskId && downloading.has(activeTaskId) ? 'Скачиваем…' : 'Скачать файл' }}</button><button class="ap-button ap-button-outline" type="button" [disabled]="!activeTaskId || recognitionBusy" (click)="openRecognition(activeTaskId!)"><mat-icon aria-hidden="true">graphic_eq</mat-icon>Распознать</button></div></div>
+      <ng-container *ngIf="activeTaskId && recognitionTaskId === activeTaskId"><ng-container *ngTemplateOutlet="recognitionForm"></ng-container></ng-container>
       <p class="dl-alert dl-error" *ngIf="activeTaskId && downloadErrors.get(activeTaskId)" role="alert">{{ downloadErrors.get(activeTaskId!) }}</p>
     </section>
 
@@ -104,13 +105,28 @@
           <article *ngFor="let item of visibleHistory" class="dl-history-item">
             <div class="dl-history-icon" [class.dl-history-icon-ready]="item.status === 'Done'"><mat-icon aria-hidden="true">{{ item.status === 'Done' ? 'download_done' : item.status === 'Error' ? 'error_outline' : 'schedule' }}</mat-icon></div>
             <div class="dl-history-info"><h3><a *ngIf="item.youtubeId; else plainTitle" [href]="'https://youtu.be/' + item.youtubeId" target="_blank" rel="noopener">{{ item.title || item.fileName || item.youtubeId }} <span aria-hidden="true">↗</span></a><ng-template #plainTitle>{{ item.title || item.fileName || 'Подготовка файла' }}</ng-template></h3><p><span>{{ item.createdAt | localTime:'dd.MM.yyyy HH:mm' }}</span><span [class.dl-error-text]="item.status === 'Error'">{{ statusLabel(item.status) }}</span></p><p class="dl-error-text" *ngIf="downloadErrors.get(item.taskId)" role="alert">{{ downloadErrors.get(item.taskId) }}</p></div>
-            <button class="ap-button ap-button-outline" type="button" *ngIf="item.status === 'Done'" [disabled]="!canDownload(item) || downloading.has(item.taskId)" (click)="downloadMergedVideo(item)"><mat-icon aria-hidden="true">download</mat-icon>{{ downloading.has(item.taskId) ? 'Скачиваем…' : 'Скачать' }}</button><span class="dl-history-wait" *ngIf="!isTerminal(item.status)">Обновляется автоматически</span>
+            <div class="dl-file-actions" *ngIf="item.status === 'Done'"><button class="ap-button ap-button-outline" type="button" [disabled]="!canDownload(item) || downloading.has(item.taskId)" (click)="downloadMergedVideo(item)"><mat-icon aria-hidden="true">download</mat-icon>{{ downloading.has(item.taskId) ? 'Скачиваем…' : 'Скачать' }}</button><button class="ap-button ap-button-outline" type="button" [disabled]="!canDownload(item) || recognitionBusy" (click)="openRecognition(item.taskId)"><mat-icon aria-hidden="true">graphic_eq</mat-icon>Распознать</button></div><span class="dl-history-wait" *ngIf="!isTerminal(item.status)">Обновляется автоматически</span>
+            <ng-container *ngIf="recognitionTaskId === item.taskId && activeTaskId !== item.taskId"><ng-container *ngTemplateOutlet="recognitionForm"></ng-container></ng-container>
           </article>
         </div>
         <div class="dl-empty" *ngIf="!historyLoading && !mergedErrorMessage && !filteredHistory.length"><mat-icon aria-hidden="true">inbox</mat-icon><h3>{{ mergedVideos.length ? 'В этой подборке пока пусто' : 'Здесь появятся ваши файлы' }}</h3><p>{{ mergedVideos.length ? 'Выберите другой фильтр, чтобы увидеть остальные задачи.' : 'Вставьте ссылку выше и запустите подготовку первого файла.' }}</p></div>
         <button class="ap-button ap-button-outline dl-more" type="button" *ngIf="filteredHistory.length > historyLimit" (click)="historyLimit = historyLimit + 6">Показать ещё ↓</button>
       </ng-container>
     </section>
+
+    <ng-template #recognitionForm>
+      <form class="dl-recognition-form" (ngSubmit)="startRecognition()">
+        <label>Профиль распознавания
+          <select name="recognitionProfile" [value]="selectedProfileId ?? ''" (change)="selectedProfileId = +$any($event.target).value" [disabled]="profilesLoading || recognitionBusy">
+            <option value="" disabled>Выберите профиль</option>
+            <option *ngFor="let profile of recognitionProfiles" [value]="profile.id">{{ profile.displayedName }}</option>
+          </select>
+        </label>
+        <label>Уточнение для обработки <span>(необязательно)</span><input name="clarification" type="text" [value]="recognitionClarification" (input)="recognitionClarification = $any($event.target).value" [disabled]="recognitionBusy" placeholder="Например, имена спикеров или термины"></label>
+        <button class="ap-button ap-button-lime" type="submit" [disabled]="profilesLoading || recognitionBusy || selectedProfileId == null">{{ recognitionBusy ? 'Запускаем…' : 'Начать распознавание' }} <mat-icon aria-hidden="true">arrow_forward</mat-icon></button>
+        <p class="dl-alert dl-error" *ngIf="profilesError || recognitionError" role="alert">{{ profilesError || recognitionError }} <button *ngIf="profilesError" type="button" (click)="loadRecognitionProfiles()">Повторить</button></p>
+      </form>
+    </ng-template>
 
     <section class="dl-next" aria-labelledby="dl-next-title"><div><p class="ap-eyebrow">ОТ ПРОСЛУШИВАНИЯ — К РАБОТЕ С ТЕКСТОМ</p><h2 id="dl-next-title">Нужен смысл <em>на бумаге?</em></h2><p>Откройте Скрипторий для расшифровок YouTube или загрузите свой файл для транскрибации с постобработкой.</p></div><div><a class="ap-button ap-button-dark" routerLink="/Scriptorium">Открыть Скрипторий ↗</a><a class="dl-secondary-link" routerLink="/transcriptions">Расшифровать свой файл →</a></div></section>
     <section class="dl-faq" aria-labelledby="dl-faq-title"><h2 id="dl-faq-title">Перед скачиванием</h2><div><details><summary>Какой файл я получу?</summary><p>В режиме аудио — MP3. Видео с выбранным звуком собирается в MP4. Видео без звука сохраняется в контейнере выбранной дорожки, например MP4 или WebM.</p></details><details><summary>Можно закрыть страницу во время подготовки?</summary><p>Да, после создания задачи обработка продолжается на сервере. Вернитесь в этот раздел под тем же аккаунтом: результат будет в истории скачиваний.</p></details><details><summary>Почему нет нужного качества?</summary><p>Список зависит от дорожек, доступных у конкретного ролика. Сервис показывает доступные варианты и не увеличивает исходное качество видео.</p></details></div></section>

@@ -6,7 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatButtonModule } from '@angular/material/button';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Subscription, timer } from 'rxjs';
 import { exhaustMap } from 'rxjs/operators';
 import { DomSanitizer, SafeHtml, Title } from '@angular/platform-browser';
@@ -73,6 +73,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   deleteConfirmation = false;
   resultView: 'formatted' | 'original' = 'formatted';
   private initialListLoaded = false;
+  private requestedTaskId: string | null = null;
   private listSubscription?: Subscription;
   private listPollSubscription?: Subscription;
   selectedTaskId: string | null = null;
@@ -229,6 +230,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
     private readonly markdownRenderer: MarkdownRendererService1,
     private readonly sanitizer: DomSanitizer,
     private readonly router: Router,
+    private readonly route: ActivatedRoute,
     private readonly dialog: MatDialog,
     private readonly snackBar: MatSnackBar,
     private readonly paymentsService: PaymentsService,
@@ -241,6 +243,7 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.requestedTaskId = this.route.snapshot.queryParamMap.get('task');
     this.userSubscription = this.authService.user$.subscribe((user) => {
       const wasAdmin = this.isAdmin;
       this.isAdmin = !!user?.roles?.some((role) => role.toLowerCase() === 'admin');
@@ -415,6 +418,17 @@ export class OpenAiTranscriptionComponent implements OnInit, OnDestroy {
         this.listLoading = false;
         this.listError = null;
         this.tasks = tasks;
+        const requestedTaskId = this.requestedTaskId;
+        if (requestedTaskId && tasks.some(task => task.id === requestedTaskId)) {
+          this.requestedTaskId = null;
+          this.router.navigate([], { relativeTo: this.route, queryParams: { task: null }, queryParamsHandling: 'merge', replaceUrl: true });
+          this.uploadExpanded = false;
+          this.mobileDetailsOpen = true;
+          this.initialListLoaded = true;
+          this.selectTaskById(requestedTaskId);
+          this.scheduleEnsureDetailsPanelVisible();
+          return;
+        }
         if (!this.initialListLoaded) {
           this.uploadExpanded = tasks.length === 0;
           this.initialListLoaded = true;
