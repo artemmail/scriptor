@@ -1,0 +1,42 @@
+<div class="ap-page fb-page dj-page">
+  <div class="fb-drop-overlay" *ngIf="dragging" role="status"><div><mat-icon aria-hidden="true">upload_file</mat-icon><strong>Отпустите книгу здесь</strong><span>Откроем FB2 или DjVu в нужном просмотрщике</span><small>Один файл · FB2 до 25 МБ, DjVu до 100 МБ</small></div></div>
+  <main class="ap-container fb-container">
+    <nav class="fb-topline" aria-label="Навигация"><a routerLink="/" fragment="utilities">← Все утилиты</a><span class="ap-eyebrow">YOUSCRIPTOR / DJVU READER</span></nav>
+    <header class="fb-heading">
+      <div><p class="ap-eyebrow">КНИГА ПО СТРАНИЦАМ</p><h1>DjVu Reader<span>.</span></h1><p>Читайте скан или оставьте только текстовый слой. Оглавление книги — слева.</p></div>
+      <div class="fb-actions"><input #fileInput type="file" accept=".fb2,.djvu,.djv,application/x-fictionbook+xml,image/vnd.djvu,image/x-djvu" hidden (change)="openFile($event)"><button class="ap-button ap-button-dark" type="button" [disabled]="loading || converting" (click)="fileInput.click()"><mat-icon aria-hidden="true">folder_open</mat-icon>{{ loading ? 'Открываем…' : 'Открыть' }}</button></div>
+    </header>
+    <p class="fb-feedback fb-error" *ngIf="error" role="alert">{{ error }}</p>
+    <p class="fb-feedback" *ngIf="notice" role="status">{{ notice }}</p>
+    <p class="fb-feedback" *ngIf="loading" role="status">Читаем файл и собираем оглавление…</p>
+    <div class="fb-workspace" [class.fb-has-book]="hasBook">
+      <aside class="fb-sidebar" aria-label="Оглавление книги">
+        <div class="fb-toc-heading"><h2><mat-icon aria-hidden="true">format_list_bulleted</mat-icon>Оглавление</h2><span *ngIf="hasBook">{{ chapters.length }}</span></div>
+        <button class="fb-toc-toggle" type="button" *ngIf="hasBook" (click)="contentsOpen = !contentsOpen" [attr.aria-expanded]="contentsOpen" aria-controls="dj-chapters">{{ contentsOpen ? 'Скрыть главы' : 'Показать главы' }}<mat-icon aria-hidden="true">{{ contentsOpen ? 'expand_less' : 'expand_more' }}</mat-icon></button>
+        <nav id="dj-chapters" class="fb-chapters" [class.fb-toc-open]="contentsOpen" *ngIf="hasBook; else emptyContents" aria-label="Главы">
+          <button class="dj-toc-start" type="button" (click)="showPage(1)">Начало книги</button>
+          <button *ngFor="let chapter of chapters" class="dj-chapter" type="button" [style.padding-left.px]="14 + (chapter.depth > 5 ? 5 : chapter.depth) * 12" [class.fb-active]="pageNumber === chapter.page" [attr.aria-current]="pageNumber === chapter.page ? 'location' : null" (click)="showPage(chapter.page)"><span>{{ chapter.title }}</span><small>{{ chapter.page }}</small></button>
+          <p class="fb-toc-note" *ngIf="!chapters.length">В этом файле нет оглавления. Страницы можно листать кнопками справа.</p>
+        </nav>
+        <ng-template #emptyContents><div class="fb-empty-toc"><span></span><span></span><span></span><p>Главы появятся здесь,<br>когда вы откроете книгу.</p></div></ng-template>
+        <div class="fb-file" *ngIf="filename"><mat-icon aria-hidden="true">description</mat-icon><span>{{ filename }}</span></div>
+      </aside>
+      <section class="fb-paper" aria-label="Чтение книги" [attr.aria-busy]="loading || pageLoading">
+        <div class="fb-toolbar"><span>{{ hasBook ? 'СТРАНИЦА КНИГИ' : 'МЕСТО ДЛЯ ВАШЕЙ КНИГИ' }}</span><span *ngIf="!hasBook">.djvu</span><span *ngIf="hasBook">{{ pageNumber }} / {{ pageCount }}</span></div>
+        <div class="dj-controls" *ngIf="hasBook"><div class="dj-page-controls"><button type="button" aria-label="Предыдущая страница" [disabled]="pageNumber <= 1" (click)="showPage(pageNumber - 1)"><mat-icon>chevron_left</mat-icon></button><label>Страница <input #pageField type="number" min="1" [max]="pageCount" [value]="pageNumber" (keydown.enter)="goToPageInput(pageField.value, pageField)" (change)="goToPageInput(pageField.value, pageField)"></label><span>из {{ pageCount }}</span><button type="button" aria-label="Следующая страница" [disabled]="pageNumber >= pageCount" (click)="showPage(pageNumber + 1)"><mat-icon>chevron_right</mat-icon></button></div><div class="dj-mode" role="group" aria-label="Слой книги"><button type="button" [class.active]="mode === 'page'" [attr.aria-pressed]="mode === 'page'" (click)="setMode('page')"><mat-icon>image</mat-icon>Страница</button><button type="button" [class.active]="mode === 'text'" [attr.aria-pressed]="mode === 'text'" (click)="setMode('text')"><mat-icon>article</mat-icon>Только текст</button></div></div>
+        <div class="dj-converter" *ngIf="hasBook">
+          <div class="dj-converter-copy"><strong>Собрать книгу FB2</strong><span>Нейросеть соединит текст страниц по оглавлению, уберёт мусор OCR и сохранит заголовки, жирный и курсив.</span></div>
+          <button type="button" class="ap-button ap-button-outline" (click)="queueConversion()"><mat-icon aria-hidden="true">auto_fix_high</mat-icon>В очередь конвертации</button>
+        </div>
+        <div class="dj-content" *ngIf="hasBook; else emptyBook">
+          <p class="dj-page-loading" *ngIf="pageLoading" role="status">Открываем страницу…</p>
+          <img class="dj-image" *ngIf="mode === 'page' && imageUrl" [src]="imageUrl" [width]="imageWidth" [height]="imageHeight" [alt]="'Страница ' + pageNumber + ' книги ' + filename">
+          <article class="dj-text" *ngIf="mode === 'text' && !pageLoading" [class.dj-no-text]="!pageText"><ng-container *ngIf="pageText; else noText"><p class="dj-text-eyebrow">ТЕКСТОВЫЙ СЛОЙ · СТРАНИЦА {{ pageNumber }}</p><div>{{ pageText }}</div></ng-container><ng-template #noText><mat-icon aria-hidden="true">image_not_supported</mat-icon><h2>На этой странице нет текстового слоя</h2><p>Можно читать изображение страницы. Распознавание текста в файле DjVu отсутствует.</p><button type="button" class="ap-button ap-button-outline" (click)="setMode('page')">Показать страницу</button></ng-template></article>
+        </div>
+        <ng-template #emptyBook><div class="fb-empty"><div class="fb-book-icon" aria-hidden="true"><mat-icon>auto_stories</mat-icon></div><p class="ap-eyebrow">ОТКРОЙТЕ КНИГУ</p><h2>Листайте.<br><em>Читайте.</em></h2><p>Перетащите FB2 или DjVu на страницу<br>или откройте книгу кнопкой ниже.</p><button class="ap-button ap-button-dark" type="button" [disabled]="loading || converting" (click)="fileInput.click()"><mat-icon aria-hidden="true">folder_open</mat-icon>Открыть книгу</button><span class="fb-limit">FB2 до 25 МБ · DjVu до 100 МБ</span></div></ng-template>
+      </section>
+    </div>
+    <p class="fb-privacy"><mat-icon aria-hidden="true">info_outline</mat-icon>Книга открывается в вашем браузере. Для конвертации откройте «Мои книги»: текстовый слой отправится в серверную очередь, изображения страниц не отправляются.</p>
+    <footer class="ap-bottom"><span>YouScriptor · Полезные инструменты для ваших файлов</span><nav aria-label="Другие инструменты"><a routerLink="/fb2-reader">FB2 Reader</a><a routerLink="/markdown-converter">Конвертер Markdown ↗</a></nav></footer>
+  </main>
+</div>

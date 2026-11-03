@@ -1,0 +1,44 @@
+<div class="ap-page fb-page">
+  <div class="fb-drop-overlay" *ngIf="dragging" role="status"><div><mat-icon aria-hidden="true">upload_file</mat-icon><strong>Отпустите книгу здесь</strong><span>Откроем FB2 или DjVu в нужном просмотрщике</span><small>Один файл · FB2 до 25 МБ, DjVu до 100 МБ</small></div></div>
+  <aside #noteHint id="fb-note-hint" class="fb-note-hint" *ngIf="noteText" role="tooltip" [style.left.px]="noteLeft" [style.top.px]="noteTop" (mouseenter)="keepNoteOpen()" (mouseleave)="scheduleNoteClose()"><span>СНОСКА</span><p>{{ noteText }}</p></aside>
+  <main class="ap-container fb-container">
+    <nav class="fb-topline" aria-label="Навигация"><a routerLink="/" fragment="utilities">← Все утилиты</a><span class="ap-eyebrow">YOUSCRIPTOR / FB2 READER</span></nav>
+    <header class="fb-heading">
+      <div><p class="ap-eyebrow">ВАША КНИГА, ВАШ ТЕМП</p><h1>FB2 Reader<span>.</span></h1><p>Откройте FB2 или DjVu. Найдите нужную главу. Сохраните FB2 в удобном формате.</p></div>
+      <div class="fb-actions">
+        <input #fileInput type="file" accept=".fb2,.djvu,.djv,application/x-fictionbook+xml,image/vnd.djvu,image/x-djvu" hidden (change)="openFile($event)">
+        <button class="ap-button ap-button-dark" type="button" [disabled]="busy" (click)="fileInput.click()"><mat-icon aria-hidden="true">folder_open</mat-icon>{{ loading ? 'Открываем…' : 'Открыть' }}</button>
+        <button class="ap-button ap-button-outline" type="button" [disabled]="!book || busy" [matMenuTriggerFor]="exportMenu"><mat-icon aria-hidden="true">file_download</mat-icon>{{ exporting ? 'Готовим ' + exporting.toUpperCase() + '…' : 'Экспорт' }}<mat-icon aria-hidden="true">expand_more</mat-icon></button>
+      </div>
+    </header>
+    <p class="fb-feedback fb-error" *ngIf="error" role="alert">{{ error }}</p>
+    <p class="fb-feedback" *ngIf="notice" role="status">{{ notice }}</p>
+    <p class="fb-feedback" *ngIf="loading || exporting" role="status">{{ loading ? 'Читаем файл и собираем оглавление…' : 'Подготавливаем книгу. Для больших книг это может занять несколько минут.' }}</p>
+    <div class="fb-workspace" [class.fb-has-book]="book">
+      <aside class="fb-sidebar" aria-label="Оглавление книги">
+        <div class="fb-toc-heading"><h2><mat-icon aria-hidden="true">format_list_bulleted</mat-icon>Оглавление</h2><span *ngIf="book">{{ book.toc.length }}</span></div>
+        <button class="fb-toc-toggle" type="button" *ngIf="book" (click)="contentsOpen = !contentsOpen" [attr.aria-expanded]="contentsOpen" aria-controls="fb-chapters">{{ contentsOpen ? 'Скрыть главы' : 'Показать главы' }}<mat-icon aria-hidden="true">{{ contentsOpen ? 'expand_less' : 'expand_more' }}</mat-icon></button>
+        <nav id="fb-chapters" class="fb-chapters" [class.fb-toc-open]="contentsOpen" *ngIf="book; else emptyContents" aria-label="Главы">
+          <a href="#" class="fb-book-start" (click)="goToStart($event)">Начало книги</a>
+          <a *ngFor="let chapter of book.toc" [href]="'#' + chapter.id" [style.padding-left.px]="14 + (chapter.depth > 5 ? 5 : chapter.depth) * 12" [class.fb-active]="activeChapter === chapter.id" [attr.aria-current]="activeChapter === chapter.id ? 'location' : null" (click)="navigate(chapter.id, $event)">{{ chapter.title }}</a>
+          <p class="fb-toc-note" *ngIf="!book.toc.length">В этой книге нет разделов с оглавлением.</p>
+        </nav>
+        <ng-template #emptyContents><div class="fb-empty-toc"><span></span><span></span><span></span><p>Главы появятся здесь,<br>когда вы откроете книгу.</p></div></ng-template>
+        <div class="fb-file" *ngIf="filename"><mat-icon aria-hidden="true">description</mat-icon><span>{{ filename }}</span></div>
+      </aside>
+      <section class="fb-paper" aria-label="Чтение книги" [attr.aria-busy]="loading">
+        <div class="fb-toolbar"><span>{{ book ? 'ТЕКСТ КНИГИ' : 'МЕСТО ДЛЯ ХОРОШЕЙ КНИГИ' }}</span><div class="fb-font" *ngIf="book"><button type="button" [disabled]="fontSize <= 16" (click)="changeFont(-1)" aria-label="Уменьшить шрифт">A−</button><span>{{ fontSize }}</span><button type="button" [disabled]="fontSize >= 26" (click)="changeFont(1)" aria-label="Увеличить шрифт">A+</button></div><span *ngIf="!book">.fb2</span></div>
+        <article #reader class="fb-prose" tabindex="-1" [style.font-size.px]="fontSize" [attr.lang]="book?.language || null" [innerHTML]="content" (click)="onBookClick($event)" (mouseover)="showNote($event)" (mouseout)="onNoteLeave($event)" (focusin)="showNote($event)" (focusout)="onNoteLeave($event)" [hidden]="!book"></article>
+        <div class="fb-empty" *ngIf="!book">
+          <div class="fb-book-icon" aria-hidden="true"><mat-icon>auto_stories</mat-icon></div>
+          <p class="ap-eyebrow">С ПЕРВОЙ СТРАНИЦЫ</p><h2>Продолжим<br><em>читать?</em></h2><p>Перетащите книгу FB2 или DjVu на страницу<br>или откройте её кнопкой ниже.</p>
+          <button class="ap-button ap-button-dark" type="button" [disabled]="busy" (click)="fileInput.click()"><mat-icon aria-hidden="true">folder_open</mat-icon>Открыть книгу</button>
+          <span class="fb-limit">FB2 до 25 МБ · DjVu до 100 МБ</span>
+        </div>
+      </section>
+    </div>
+    <p class="fb-privacy"><mat-icon aria-hidden="true">info_outline</mat-icon>Чтение и Markdown — в вашем браузере. Для экспорта PDF и DOCX содержимое книги отправляется на сервер.</p>
+    <footer class="ap-bottom"><span>YouScriptor · Полезные инструменты для ваших файлов</span><nav aria-label="Другие инструменты"><a routerLink="/djvu-reader">DjVu Reader</a><a routerLink="/markdown-converter">Конвертер Markdown ↗</a><a routerLink="/png-to-webp">PNG → WebP</a></nav></footer>
+  </main>
+  <mat-menu #exportMenu="matMenu"><button mat-menu-item (click)="export('pdf')"><mat-icon>picture_as_pdf</mat-icon><span>PDF — для чтения и печати</span></button><button mat-menu-item (click)="export('docx')"><mat-icon>description</mat-icon><span>DOCX — для редактирования</span></button><button mat-menu-item (click)="export('md')"><mat-icon>notes</mat-icon><span>Markdown — текст с разметкой</span></button></mat-menu>
+</div>

@@ -1,0 +1,40 @@
+:host { display: block; }
+.dj-page .fb-workspace { align-items: stretch; }
+.dj-page .fb-paper { min-height: 520px; }
+.dj-page .fb-chapters button { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; width: 100%; border: 0; border-radius: 7px; background: transparent; color: #62754b; text-align: left; font-size: 12px; line-height: 1.5; cursor: pointer; }
+.dj-page .fb-chapters button:hover { background: #e4ecd7; }
+.dj-page .fb-chapters button.fb-active { background: #dce8c9; color: #3e5627; font-weight: 600; }
+.dj-page .fb-chapters .dj-toc-start { padding: 9px 14px; margin-bottom: 7px; color: #8b987c; font-size: 11px; }
+.dj-page .fb-chapters .dj-chapter { padding: 9px 12px; }
+.dj-chapter span { overflow-wrap: anywhere; }
+.dj-chapter small { color: #91a17d; flex: none; }
+.dj-controls { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 24px; border-bottom: 1px solid #e4e8dc; color: #617250; font-size: 12px; }
+.dj-page-controls, .dj-mode { display: flex; align-items: center; gap: 5px; }
+.dj-page-controls label { display: flex; align-items: center; gap: 8px; margin: 0 5px; }
+.dj-page-controls input { width: 60px; padding: 5px 6px; border: 1px solid #d8e2c9; border-radius: 6px; background: #fff; color: #3c4f2c; font: inherit; text-align: center; }
+.dj-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 32px; padding: 5px 8px; border: 0; border-radius: 7px; background: transparent; color: #648044; cursor: pointer; font: inherit; }
+.dj-controls button:hover:not(:disabled) { background: #edf3e6; }
+.dj-controls button:disabled { opacity: .4; cursor: default; }
+.dj-controls mat-icon { width: 18px; height: 18px; font-size: 18px; }
+.dj-mode { padding: 3px; border: 1px solid #dfe7d3; border-radius: 9px; background: #f3f7ed; }
+.dj-mode button.active { background: #fff; color: #334d27; box-shadow: 0 1px 4px #2842211c; font-weight: 600; }
+.dj-content { min-height: 500px; padding: 26px clamp(16px, 3vw, 38px) 50px; text-align: center; }
+.dj-page-loading { margin: 20px 0; color: #819375; font-size: 12px; }
+.dj-image { display: block; max-width: 100%; height: auto; margin: 0 auto; box-shadow: 0 4px 22px #2737191b; }
+.dj-text { max-width: 760px; margin: 5px auto; color: #394131; text-align: left; font: 18px/1.8 Georgia, 'Times New Roman', serif; overflow-wrap: anywhere; }
+.dj-text > div { white-space: pre-wrap; }
+.dj-text-eyebrow { margin-bottom: 20px; color: #91a184; font: 10px/1.5 Arial, sans-serif; letter-spacing: 1.2px; }
+.dj-text.dj-no-text { padding: 70px 20px; text-align: center; font: 14px/1.7 Arial, sans-serif; color: #748368; }
+.dj-no-text mat-icon { width: 40px; height: 40px; font-size: 40px; color: #9cad8d; }
+.dj-no-text h2 { margin: 17px 0 9px; color: #34432c; font: 500 24px/1.3 Georgia, serif; }
+.dj-no-text p { margin-bottom: 20px; }
+.dj-converter { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 15px 24px; border-bottom: 1px solid #e4e8dc; background: #f6f8f1; }
+.dj-converter-copy { display: flex; flex: 1 1 290px; flex-direction: column; gap: 4px; min-width: 0; color: #66775a; font-size: 11px; line-height: 1.5; }
+.dj-converter-copy strong { color: #3f562e; font-size: 13px; font-weight: 600; }
+.dj-converter > .ap-button, .dj-converter-actions .ap-button { min-height: 37px; padding: 8px 12px; font-size: 11px; white-space: nowrap; }
+.dj-converter .ap-button mat-icon { width: 17px; height: 17px; font-size: 17px; }
+.dj-converter-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.dj-converter-status { width: 100%; margin: 0; color: #71845f; font-size: 11px; }
+.dj-converter-error { color: #9d4e42; }
+.dj-page .fb-privacy { display: flex; align-items: flex-start; gap: 8px; margin-top: 22px; color: #89957b; font-size: 11px; }
+@media(max-width:700px) { .dj-controls { padding: 10px 14px; } .dj-mode { width: 100%; } .dj-mode button { flex: 1; } .dj-converter { padding: 13px 14px; } .dj-converter > .ap-button { width: 100%; justify-content: center; } .dj-converter-actions { width: 100%; } .dj-converter-actions .ap-button { flex: 1; justify-content: center; } .dj-content { min-height: 320px; padding: 16px 12px 32px; } .dj-text { font-size: 17px; } }

@@ -1,0 +1,75 @@
+:host { display: block; min-width: 0; }
+[hidden] { display: none !important; }
+button:disabled { opacity: .48; cursor: not-allowed; }
+button:focus-visible { outline: 2px solid #5e8a5c; outline-offset: 3px; }
+
+.mc-pane-title button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #d9e4d2; border-radius: 8px; padding: 8px 11px; background: #f8faf5; color: #476a47; cursor: pointer; font-size: 11px; }
+.mc-pane-title button:hover:not(:disabled) { background: #edf4e7; }
+.mc-pane-title mat-icon { width: 16px; height: 16px; font-size: 16px; }
+.mc-modebar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 22px; border-top: 1px solid #e7ece2; border-bottom: 1px solid #dce5d5; background: #f7faf4; }
+.mc-mode-group { display: flex; gap: 4px; padding: 3px; border: 1px solid #dce6d7; border-radius: 9px; background: #eef3ea; }
+.mc-mode-group button { display: inline-flex; justify-content: center; align-items: center; gap: 6px; padding: 8px 12px; border: 0; border-radius: 6px; background: transparent; color: #788978; cursor: pointer; font-size: 11px; }
+.mc-mode-group button.active { background: #fff; color: #31553a; box-shadow: 0 1px 4px #203b1c20; font-weight: 600; }
+.mc-mode-group mat-icon { width: 16px; height: 16px; font-size: 16px; }
+.mc-view-group button { padding: 8px 10px; }
+.mc-editor-alert { margin: 0; padding: 10px 22px; background: #fff4e9; color: #925d35; font-size: 11px; }
+.mc-canvas { display: grid; grid-template-columns: minmax(0, 1fr); }
+.mc-canvas-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.mc-writing-pane, .mc-preview-pane { min-width: 0; overflow: hidden; }
+.mc-canvas-split .mc-preview-pane { border-left: 1px solid #e0e7dc; }
+.mc-pane-title { height: 42px; display: flex; justify-content: space-between; align-items: center; padding: 0 18px; border-bottom: 1px solid #e7ede2; color: #899b84; font-size: 9px; font-weight: 700; letter-spacing: .13em; }
+.mc-pane-title button { padding: 5px 8px; letter-spacing: 0; font-weight: 500; }
+.mc-live { display: inline-flex; align-items: center; gap: 6px; font-size: 8px; color: #8da184; }
+.mc-live i { width: 6px; height: 6px; border-radius: 50%; background: #8dbd6a; }
+.mc-toast-host { min-height: 600px; }
+:host ::ng-deep .mc-toast-host .toastui-editor-defaultUI { border: 0; border-radius: 0; }
+:host ::ng-deep .mc-toast-host .toastui-editor-toolbar { background: #f9fbf7; border-bottom-color: #e6ebe2; }
+:host ::ng-deep .mc-toast-host .toastui-editor-toolbar button { border-radius: 5px; }
+:host ::ng-deep .mc-toast-host .toastui-editor-main { background: #fff; }
+:host ::ng-deep .mc-toast-host .toastui-editor-contents { font: 14px/1.75 'Segoe UI', sans-serif; color: #334237; }
+:host ::ng-deep .mc-toast-host .toastui-editor-contents h1, :host ::ng-deep .mc-toast-host .toastui-editor-contents h2 { color: #284338; letter-spacing: -.03em; }
+:host ::ng-deep .mc-toast-host .toastui-editor-ww-container .toastui-editor-contents { padding: 24px 27px; }
+:host ::ng-deep .mc-toast-host .toastui-editor-md-container .CodeMirror { font: 13px/1.8 Consolas, monospace; }
+:host ::ng-deep .mc-toast-host .toastui-editor-tabs,
+:host ::ng-deep .mc-toast-host .toastui-editor-md-container .toastui-editor-md-preview { display: none !important; }
+:host ::ng-deep .mc-toast-host .toastui-editor-md-container .toastui-editor { display: block !important; width: 100% !important; }
+.mc-preview-scroll { height: 600px; overflow: auto; padding: 26px 27px; scrollbar-width: thin; }
+.mc-prose { display: block; color: #334237; font: 14px/1.8 'Segoe UI', sans-serif; overflow-wrap: anywhere; }
+:host ::ng-deep .mc-prose :is(h1,h2,h3,h4,h5,h6) { color: #294238; line-height: 1.28; margin: 1.35em 0 .55em; font-weight: 600; letter-spacing: -.035em; }
+:host ::ng-deep .mc-prose h1 { font-size: 29px; }
+:host ::ng-deep .mc-prose h2 { font-size: 23px; }
+:host ::ng-deep .mc-prose h3 { font-size: 19px; }
+:host ::ng-deep .mc-prose h4 { font-size: 17px; }
+:host ::ng-deep .mc-prose h5 { font-size: 15px; }
+:host ::ng-deep .mc-prose h6 { font-size: 14px; }
+:host ::ng-deep .mc-prose > :first-child { margin-top: 0; }
+:host ::ng-deep .mc-prose p { margin: 0 0 1em; }
+:host ::ng-deep .mc-prose a { color: #527748; text-decoration: underline; }
+:host ::ng-deep .mc-prose :is(ul,ol) { padding-left: 22px; margin-bottom: 1em; }
+:host ::ng-deep .mc-prose li::marker { color: #8aaa75; }
+:host ::ng-deep .mc-prose blockquote { margin: 20px 0; padding: 14px 19px; border-left: 3px solid #a8c892; background: #f2f7ed; color: #466245; font: 18px/1.55 Georgia, serif; }
+:host ::ng-deep .mc-prose img { max-width: 100%; height: auto; border-radius: 7px; }
+:host ::ng-deep .mc-prose pre { max-width: 100%; overflow-x: auto; padding: 15px; background: #eef4eb; border-radius: 8px; font-size: 12px; }
+:host ::ng-deep .mc-prose code { color: #436745; }
+:host ::ng-deep .mc-prose table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin-bottom: 18px; font-size: 12px; }
+:host ::ng-deep .mc-prose :is(td,th) { padding: 8px 11px; border: 1px solid #d8e5d2; }
+:host ::ng-deep .mc-prose th { background: #edf4e9; }
+:host ::ng-deep .mc-prose :is(.katex-display,.katex-block) { max-width: 100%; overflow-x: auto; overflow-y: hidden; padding-bottom: 5px; }
+.mc-empty-preview { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 450px; text-align: center; }
+.mc-empty-preview > span { color: #bad0ad; font: 58px Georgia, serif; }
+.mc-empty-preview h3 { margin: 12px 0 7px; font-size: 21px; font-weight: 500; }
+.mc-empty-preview p { margin: 0 0 14px; color: #8c9b88; font-size: 11px; }
+@media (max-width: 1200px) {
+.mc-canvas-split { grid-template-columns: minmax(0, 1fr); }
+.mc-canvas-split .mc-preview-pane { border-left: 0; border-top: 1px solid #e0e7dc; }
+.mc-canvas-split .mc-preview-scroll { height: 390px; }
+}
+
+@media (max-width: 600px) {
+.mc-modebar { padding: 9px 11px; flex-wrap: wrap; }
+.mc-mode-group button { padding: 7px 8px; font-size: 10px; }
+.mc-view-group { margin-left: auto; }
+.mc-view-group button { padding: 7px 8px; }
+.mc-pane-title { padding-inline: 12px; }
+.mc-preview-scroll { height: 470px; padding: 20px; }
+}

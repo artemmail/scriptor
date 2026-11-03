@@ -1,0 +1,34 @@
+<div class="ap-page books-page">
+  <div class="books-drop" *ngIf="dragging">Отпустите книгу DjVu, чтобы добавить её в очередь</div>
+  <main class="ap-container">
+    <nav class="books-breadcrumb"><a routerLink="/transcriptions">Работа</a><span>/</span><span>Мои книги</span></nav>
+    <header class="books-heading">
+      <div><p class="ap-eyebrow">РАБОТА / МОИ КНИГИ</p><h1 class="ap-title">DjVu → <em>FB2</em></h1>
+        <p class="ap-lead">Загрузите книгу с текстовым слоем. Оглавление и текст подготовятся в браузере, затем книга попадёт в серверную очередь. После добавления можно закрыть вкладку и вернуться за FB2 позже.</p></div>
+      <div class="books-credit"><span>ВАШ БАЛАНС</span><strong>{{ balance === undefined ? '—' : balance }}</strong><small>видео-кредитов · 10 за готовую книгу</small><a routerLink="/billing">Пополнить баланс ↗</a></div>
+    </header>
+    <section class="ap-panel books-upload" aria-label="Загрузить DjVu">
+      <div class="books-upload-icon"><mat-icon>auto_stories</mat-icon></div>
+      <div><h2>Новая книга</h2><p>Выберите DjVu или перетащите файл сюда. После подготовки и появления задачи в списке браузер можно закрыть.</p><small>.djvu / .djv · до 100 МБ · до 1200 страниц · требуется текстовый слой</small></div>
+      <input #fileInput type="file" accept=".djvu,.djv,image/vnd.djvu,image/x-djvu" hidden (change)="openFile($event)">
+      <button type="button" class="ap-button" [disabled]="busy" (click)="fileInput.click()"><mat-icon>upload_file</mat-icon>{{ busy ? 'Подготовка…' : 'Загрузить DjVu' }}</button>
+    </section>
+    <div class="books-progress" *ngIf="busy" role="status"><span>{{ stage }}</span><strong *ngIf="total">{{ progress }} / {{ total }}</strong><div *ngIf="total"><span [style.width.%]="progress / total * 100"></span></div></div>
+    <p class="ap-notice ap-error books-feedback" role="alert" *ngIf="error">{{ error }}</p>
+    <p class="ap-notice books-feedback" role="status" *ngIf="notice">{{ notice }}</p>
+    <section class="books-queue" aria-label="Очередь книг">
+      <div class="books-queue-heading"><div><p class="ap-eyebrow">ВАШИ ЗАДАЧИ</p><h2>Очередь и результаты</h2></div><button type="button" (click)="refresh()" [disabled]="refreshing"><mat-icon>refresh</mat-icon>Обновить</button></div>
+      <div class="ap-panel books-empty" *ngIf="!jobs.length"><mat-icon>library_books</mat-icon><h3>Пока нет книг</h3><p>Добавьте DjVu, и задача появится здесь. Готовый FB2 останется доступным при следующем входе.</p></div>
+      <article class="ap-panel books-job" *ngFor="let job of jobs">
+        <div class="books-job-icon"><mat-icon>{{ job.status === 'completed' ? 'menu_book' : 'auto_stories' }}</mat-icon></div>
+        <div class="books-job-main"><div class="books-job-title"><h3>{{ job.title }}</h3><span class="books-status" [class.done]="job.status === 'completed'" [class.error]="job.status === 'failed' || job.status === 'awaiting_credits'">{{ label(job.status) }}</span></div>
+          <p>{{ job.fileName }} · {{ job.createdAt | date:'dd.MM.yyyy, HH:mm' }}</p>
+          <div class="books-job-progress" *ngIf="job.status === 'processing' || job.status === 'queued'"><div><span [style.width.%]="job.totalBlocks ? job.completedBlocks / job.totalBlocks * 100 : 0"></span></div><small>{{ job.completedBlocks }} / {{ job.totalBlocks }} блоков</small></div>
+          <p class="books-job-error" *ngIf="job.error">{{ job.error }}</p>
+        </div>
+        <div class="books-job-actions"><ng-container *ngIf="job.status === 'completed'"><button type="button" class="ap-button" [disabled]="!!openingId" (click)="open(job)"><mat-icon>menu_book</mat-icon>{{ openingId === job.id ? 'Открываем…' : 'Открыть' }}</button><button type="button" class="ap-button ap-button-outline" (click)="download(job)"><mat-icon>download</mat-icon>Скачать FB2</button></ng-container><button *ngIf="job.status === 'failed' || job.status === 'awaiting_credits'" type="button" class="ap-button ap-button-outline" (click)="retry(job)">Продолжить</button></div>
+      </article>
+    </section>
+    <footer class="ap-bottom"><span>YouScriptor · Конвертация книг</span><nav><a routerLink="/djvu-reader">DjVu Reader</a><a routerLink="/fb2-reader">FB2 Reader</a></nav></footer>
+  </main>
+</div>
