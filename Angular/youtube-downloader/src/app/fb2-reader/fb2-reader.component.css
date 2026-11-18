@@ -25,10 +25,17 @@
 .fb-toc-heading h2 { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; }
 .fb-toc-heading mat-icon { color: #799452; width: 19px; height: 19px; font-size: 19px; }
 .fb-toc-heading > span { color: #82916f; font-size: 11px; }
+.fb-reading-progress { padding: 17px 7px 4px; color: #657a4c; }
+.fb-progress-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 10px; }
+.fb-progress-label strong { color: #486532; font-size: 13px; }
+.fb-progress-track { height: 5px; margin-top: 9px; border-radius: 5px; background: #dce6ce; overflow: hidden; }
+.fb-progress-track span { display: block; height: 100%; border-radius: inherit; background: #86a958; transition: width .15s ease-out; }
+.fb-reading-progress p { margin: 8px 0 0; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
 .fb-chapters { max-height: calc(100dvh - 260px); overflow-y: auto; margin-top: 14px; scrollbar-width: thin; scrollbar-color: #c4d0b1 transparent; }
 .fb-chapters a { display: block; padding: 9px 14px; border-radius: 7px; color: #62754b; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .fb-chapters a:hover { background: #e4ecd7; }
 .fb-chapters a.fb-active { background: #dce8c9; color: #3e5627; font-weight: 600; }
+.fb-chapters .fb-book-start.fb-active { background: #dce8c9; color: #3e5627; font-weight: 600; }
 .fb-chapters .fb-book-start { color: #8b987c; margin-bottom: 7px; font-size: 11px; }
 .fb-toc-note { padding: 12px; color: #7b896d; font-size: 12px; }
 .fb-empty-toc { padding: 25px 7px 12px; }

@@ -17,9 +17,14 @@
     <div class="fb-workspace" [class.fb-has-book]="book">
       <aside class="fb-sidebar" aria-label="Оглавление книги">
         <div class="fb-toc-heading"><h2><mat-icon aria-hidden="true">format_list_bulleted</mat-icon>Оглавление</h2><span *ngIf="book">{{ book.toc.length }}</span></div>
+        <div class="fb-reading-progress" *ngIf="book" role="group" [attr.aria-label]="'Прочитано ' + readingPercent + '%; ' + (activeChapter ? 'текущая глава ' + currentChapterTitle : 'начало книги')">
+          <div class="fb-progress-label"><span>Вы сейчас здесь</span><strong>{{ readingPercent }}%</strong></div>
+          <div class="fb-progress-track" aria-hidden="true"><span [style.width.%]="readingPercent"></span></div>
+          <p>{{ currentChapterTitle }}</p>
+        </div>
         <button class="fb-toc-toggle" type="button" *ngIf="book" (click)="contentsOpen = !contentsOpen" [attr.aria-expanded]="contentsOpen" aria-controls="fb-chapters">{{ contentsOpen ? 'Скрыть главы' : 'Показать главы' }}<mat-icon aria-hidden="true">{{ contentsOpen ? 'expand_less' : 'expand_more' }}</mat-icon></button>
         <nav id="fb-chapters" class="fb-chapters" [class.fb-toc-open]="contentsOpen" *ngIf="book; else emptyContents" aria-label="Главы">
-          <a href="#" class="fb-book-start" (click)="goToStart($event)">Начало книги</a>
+          <a href="#" class="fb-book-start" [class.fb-active]="!activeChapter" [attr.aria-current]="!activeChapter ? 'location' : null" (click)="goToStart($event)">Начало книги</a>
           <a *ngFor="let chapter of book.toc" [href]="'#' + chapter.id" [style.padding-left.px]="14 + (chapter.depth > 5 ? 5 : chapter.depth) * 12" [class.fb-active]="activeChapter === chapter.id" [attr.aria-current]="activeChapter === chapter.id ? 'location' : null" (click)="navigate(chapter.id, $event)">{{ chapter.title }}</a>
           <p class="fb-toc-note" *ngIf="!book.toc.length">В этой книге нет разделов с оглавлением.</p>
         </nav>

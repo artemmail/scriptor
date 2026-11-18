@@ -115,7 +115,7 @@ export function parseFb2(xml: string, filename: string): Fb2Book {
     if (name === 'section' || name === 'body') {
       const titleElement = child(el, 'title');
       const titleLabel = headingText(titleElement);
-      const label = titleLabel || (name === 'body' ? (el.getAttribute('name') === 'notes' || el.getAttribute('name') === 'footnotes' ? 'Примечания' : el.getAttribute('name') || '') : 'Раздел без названия');
+      const label = titleLabel || (name === 'body' ? (el.getAttribute('name') === 'notes' || el.getAttribute('name') === 'footnotes' ? 'Примечания' : el.getAttribute('name') || '') : '');
       const hasHeading = !!(titleLabel || (name === 'body' && label));
       if (label && id) toc.push({ id, title: label, depth: headingDepth });
       // Only visible headings add a level; anonymous XML wrappers are not chapters.

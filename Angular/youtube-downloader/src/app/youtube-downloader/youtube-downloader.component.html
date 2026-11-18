@@ -89,8 +89,8 @@
       <mat-progress-bar *ngIf="isMerging" mode="indeterminate" aria-label="Файл готовится"></mat-progress-bar>
       <p *ngIf="pollingWarning" class="dl-alert" role="status">{{ pollingWarning }}</p>
       <p *ngIf="mergeError" class="dl-alert dl-error" role="alert">{{ mergeError }}</p>
-      <div class="dl-result" *ngIf="mergeStatus === 'Done'"><span>{{ mergeFileName || 'Файл готов. Можно скачивать.' }}</span><div class="dl-file-actions"><button class="ap-button ap-button-dark" type="button" (click)="downloadMergedFile()" [disabled]="!activeTaskId || downloading.has(activeTaskId)"><mat-icon aria-hidden="true">download</mat-icon>{{ activeTaskId && downloading.has(activeTaskId) ? 'Скачиваем…' : 'Скачать файл' }}</button><button class="ap-button ap-button-outline" type="button" [disabled]="!activeTaskId || recognitionBusy" (click)="openRecognition(activeTaskId!)"><mat-icon aria-hidden="true">graphic_eq</mat-icon>Распознать</button></div></div>
-      <ng-container *ngIf="activeTaskId && recognitionTaskId === activeTaskId"><ng-container *ngTemplateOutlet="recognitionForm"></ng-container></ng-container>
+      <div class="dl-result" *ngIf="mergeStatus === 'Done'"><span>{{ mergeFileName || 'Файл готов. Можно скачивать.' }}</span><div class="dl-file-actions"><button class="ap-button ap-button-dark" type="button" (click)="downloadMergedFile()" [disabled]="!activeTaskId || downloading.has(activeTaskId)"><mat-icon aria-hidden="true">download</mat-icon>{{ activeTaskId && downloading.has(activeTaskId) ? 'Скачиваем…' : 'Скачать файл' }}</button><button class="ap-button ap-button-outline" type="button" [disabled]="!activeTaskId || recognitionBusy" (click)="openRecognition(activeTaskId!, 'current')"><mat-icon aria-hidden="true">graphic_eq</mat-icon>Распознать</button></div></div>
+      <ng-container *ngIf="activeTaskId && recognitionTaskId === activeTaskId && recognitionPlacement === 'current'"><ng-container *ngTemplateOutlet="recognitionForm"></ng-container></ng-container>
       <p class="dl-alert dl-error" *ngIf="activeTaskId && downloadErrors.get(activeTaskId)" role="alert">{{ downloadErrors.get(activeTaskId!) }}</p>
     </section>
 
@@ -105,8 +105,8 @@
           <article *ngFor="let item of visibleHistory" class="dl-history-item">
             <div class="dl-history-icon" [class.dl-history-icon-ready]="item.status === 'Done'"><mat-icon aria-hidden="true">{{ item.status === 'Done' ? 'download_done' : item.status === 'Error' ? 'error_outline' : 'schedule' }}</mat-icon></div>
             <div class="dl-history-info"><h3><a *ngIf="item.youtubeId; else plainTitle" [href]="'https://youtu.be/' + item.youtubeId" target="_blank" rel="noopener">{{ item.title || item.fileName || item.youtubeId }} <span aria-hidden="true">↗</span></a><ng-template #plainTitle>{{ item.title || item.fileName || 'Подготовка файла' }}</ng-template></h3><p><span>{{ item.createdAt | localTime:'dd.MM.yyyy HH:mm' }}</span><span [class.dl-error-text]="item.status === 'Error'">{{ statusLabel(item.status) }}</span></p><p class="dl-error-text" *ngIf="downloadErrors.get(item.taskId)" role="alert">{{ downloadErrors.get(item.taskId) }}</p></div>
-            <div class="dl-file-actions" *ngIf="item.status === 'Done'"><button class="ap-button ap-button-outline" type="button" [disabled]="!canDownload(item) || downloading.has(item.taskId)" (click)="downloadMergedVideo(item)"><mat-icon aria-hidden="true">download</mat-icon>{{ downloading.has(item.taskId) ? 'Скачиваем…' : 'Скачать' }}</button><button class="ap-button ap-button-outline" type="button" [disabled]="!canDownload(item) || recognitionBusy" (click)="openRecognition(item.taskId)"><mat-icon aria-hidden="true">graphic_eq</mat-icon>Распознать</button></div><span class="dl-history-wait" *ngIf="!isTerminal(item.status)">Обновляется автоматически</span>
-            <ng-container *ngIf="recognitionTaskId === item.taskId && activeTaskId !== item.taskId"><ng-container *ngTemplateOutlet="recognitionForm"></ng-container></ng-container>
+            <div class="dl-file-actions" *ngIf="item.status === 'Done'"><button class="ap-button ap-button-outline" type="button" [disabled]="!canDownload(item) || downloading.has(item.taskId)" (click)="downloadMergedVideo(item)"><mat-icon aria-hidden="true">download</mat-icon>{{ downloading.has(item.taskId) ? 'Скачиваем…' : 'Скачать' }}</button><button class="ap-button ap-button-outline" type="button" [disabled]="!canDownload(item) || recognitionBusy" (click)="openRecognition(item.taskId, 'history')"><mat-icon aria-hidden="true">graphic_eq</mat-icon>Распознать</button></div><span class="dl-history-wait" *ngIf="!isTerminal(item.status)">Обновляется автоматически</span>
+            <ng-container *ngIf="recognitionTaskId === item.taskId && recognitionPlacement === 'history'"><ng-container *ngTemplateOutlet="recognitionForm"></ng-container></ng-container>
           </article>
         </div>
         <div class="dl-empty" *ngIf="!historyLoading && !mergedErrorMessage && !filteredHistory.length"><mat-icon aria-hidden="true">inbox</mat-icon><h3>{{ mergedVideos.length ? 'В этой подборке пока пусто' : 'Здесь появятся ваши файлы' }}</h3><p>{{ mergedVideos.length ? 'Выберите другой фильтр, чтобы увидеть остальные задачи.' : 'Вставьте ссылку выше и запустите подготовку первого файла.' }}</p></div>
@@ -115,7 +115,7 @@
     </section>
 
     <ng-template #recognitionForm>
-      <form class="dl-recognition-form" (ngSubmit)="startRecognition()">
+      <form class="dl-recognition-form" (submit)="$event.preventDefault(); startRecognition()">
         <label>Профиль распознавания
           <select name="recognitionProfile" [value]="selectedProfileId ?? ''" (change)="selectedProfileId = +$any($event.target).value" [disabled]="profilesLoading || recognitionBusy">
             <option value="" disabled>Выберите профиль</option>

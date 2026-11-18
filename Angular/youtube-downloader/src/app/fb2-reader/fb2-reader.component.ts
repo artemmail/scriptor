@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
+import { afterNextRender, Component, DestroyRef, ElementRef, HostListener, Injector, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { DomSanitizer, SafeHtml, Title } from '@angular/platform-browser';
@@ -9,6 +9,11 @@ import { finalize } from 'rxjs';
 import { SubtitleService } from '../services/subtitle.service';
 import { decodeFb2, Fb2Book, parseFb2 } from './fb2-parser';
 import { ReaderFileTransferService } from '../shared/reader-file-transfer.service';
+
+interface ReadingPosition { index: number; offset: number; }
+const POSITION_PREFIX = 'fb2-reader:position:';
+const READING_LINE = 120;
+const CHAPTER_POSITION_TOLERANCE = 4;
 
 @Component({
   selector: 'app-fb2-reader', standalone: true,
@@ -27,6 +32,8 @@ export class Fb2ReaderComponent implements OnInit {
   error = '';
   notice = '';
   activeChapter = '';
+  currentChapterTitle = 'Начало книги';
+  readingPercent = 0;
   contentsOpen = false;
   fontSize = 19;
   dragging = false;
@@ -36,12 +43,25 @@ export class Fb2ReaderComponent implements OnInit {
   private dragDepth = 0;
   private noteLink: HTMLElement | null = null;
   private noteTimer?: ReturnType<typeof setTimeout>;
+  private saveTimer?: ReturnType<typeof setTimeout>;
+  private scrollFrame = 0;
+  private renderVersion = 0;
+  private restoringPosition = false;
+  private readingBlocks: HTMLElement[] = [];
+  private chapterElements: HTMLElement[] = [];
+  private currentPosition: ReadingPosition | null = null;
   private destroyed = false;
 
   constructor(private sanitizer: DomSanitizer, private subtitles: SubtitleService,
-    private destroyRef: DestroyRef, private title: Title, private readerFiles: ReaderFileTransferService) {
+    private destroyRef: DestroyRef, private title: Title, private readerFiles: ReaderFileTransferService,
+    private injector: Injector) {
     title.setTitle('FB2 Reader — читать и конвертировать книги | YouScriptor');
-    destroyRef.onDestroy(() => { this.destroyed = true; this.hideNote(); });
+    destroyRef.onDestroy(() => {
+      this.flushPosition();
+      this.destroyed = true;
+      cancelAnimationFrame(this.scrollFrame);
+      this.hideNote();
+    });
   }
 
   get busy(): boolean { return this.loading || !!this.exporting; }
@@ -70,14 +90,25 @@ export class Fb2ReaderComponent implements OnInit {
       const bytes = await file.arrayBuffer();
       if (this.destroyed) return;
       const book = parseFb2(decodeFb2(bytes), file.name);
+      this.flushPosition();
+      clearTimeout(this.saveTimer);
+      cancelAnimationFrame(this.scrollFrame);
+      this.scrollFrame = 0;
+      this.currentPosition = null;
+      this.restoringPosition = true;
+      this.readingBlocks = [];
+      this.chapterElements = [];
       // Parser builds HTML from an explicit element/attribute allowlist, never from source markup.
       this.content = this.sanitizer.bypassSecurityTrustHtml(book.html);
       this.book = book;
       this.filename = file.name;
       this.activeChapter = '';
+      this.currentChapterTitle = 'Начало книги';
+      this.readingPercent = 0;
       this.contentsOpen = false;
       this.title.setTitle(`${book.title} — FB2 Reader | YouScriptor`);
-      window.scrollTo({ top: 0, behavior: 'instant' });
+      const version = ++this.renderVersion;
+      afterNextRender(() => this.restorePosition(version), { injector: this.injector });
     } catch (error) {
       this.error = error instanceof Error ? error.message : 'Не удалось прочитать книгу. Попробуйте другой файл FB2.';
     } finally { this.loading = false; }
@@ -128,6 +159,88 @@ export class Fb2ReaderComponent implements OnInit {
   @HostListener('window:blur')
   onWindowBlur(): void { this.resetDrag(); this.hideNote(); }
 
+  @HostListener('window:scroll')
+  @HostListener('window:resize')
+  onReaderScroll(): void {
+    this.hideNote();
+    if (!this.book || this.restoringPosition || this.scrollFrame) return;
+    this.scrollFrame = requestAnimationFrame(() => {
+      this.scrollFrame = 0;
+      this.updateReadingPosition();
+    });
+  }
+
+  @HostListener('window:pagehide')
+  onPageHide(): void { this.flushPosition(); }
+
+  private restorePosition(version: number): void {
+    if (this.destroyed || version !== this.renderVersion || !this.reader || !this.book) return;
+    const article = this.reader.nativeElement;
+    this.readingBlocks = Array.from(article.querySelectorAll<HTMLElement>('p,h1,h2,h3,h4,h5,h6,img,table'));
+    this.chapterElements = this.book.toc.map(chapter => article.querySelector<HTMLElement>(`#${chapter.id}`))
+      .filter((element): element is HTMLElement => !!element);
+    const position = this.readStoredPosition();
+    const block = position && this.readingBlocks[position.index];
+    if (block) {
+      const top = window.scrollY + block.getBoundingClientRect().top + position.offset - this.readingLine;
+      window.scrollTo({ top, behavior: 'instant' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+    this.restoringPosition = false;
+    this.updateReadingPosition();
+  }
+
+  private get readingLine(): number { return READING_LINE; }
+
+  private updateReadingPosition(): void {
+    if (!this.book || !this.reader || this.restoringPosition) return;
+    const article = this.reader.nativeElement;
+    const rect = article.getBoundingClientRect();
+    const line = this.readingLine;
+    const total = Math.max(1, rect.height - window.innerHeight + line);
+    this.readingPercent = rect.height <= window.innerHeight ? 100
+      : Math.round(Math.max(0, Math.min(1, (line - rect.top) / total)) * 100);
+    // On the final screen the viewport cannot scroll far enough to place the last chapter at the top.
+    // Section links use a 120px scroll margin; allow for fractional pixel rounding.
+    const chapterLine = (this.readingPercent === 100 ? Math.max(line, window.innerHeight * 0.4) : line)
+      + CHAPTER_POSITION_TOLERANCE;
+    const chapterIndex = this.lastElementBefore(this.chapterElements, chapterLine);
+    this.activeChapter = rect.top > line || chapterIndex < 0 ? '' : this.book.toc[chapterIndex]?.id || '';
+    this.currentChapterTitle = this.activeChapter ? this.book.toc[chapterIndex].title : 'Начало книги';
+    const blockIndex = this.lastElementBefore(this.readingBlocks, line);
+    if (blockIndex >= 0 && rect.top <= line) {
+      this.currentPosition = { index: blockIndex, offset: Math.max(0, Math.round(line - this.readingBlocks[blockIndex].getBoundingClientRect().top)) };
+    } else this.currentPosition = { index: -1, offset: 0 };
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => this.flushPosition(), 300);
+  }
+
+  private lastElementBefore(elements: HTMLElement[], line: number): number {
+    let low = 0, high = elements.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (elements[middle].getBoundingClientRect().top <= line) low = middle + 1;
+      else high = middle;
+    }
+    return low - 1;
+  }
+
+  private readStoredPosition(): ReadingPosition | null {
+    try {
+      const value = JSON.parse(window.localStorage.getItem(POSITION_PREFIX + this.filename) || 'null');
+      return value && Number.isInteger(value.index) && value.index >= -1 && Number.isFinite(value.offset) && value.offset >= 0
+        ? value as ReadingPosition : null;
+    } catch { return null; }
+  }
+
+  private flushPosition(): void {
+    clearTimeout(this.saveTimer);
+    if (!this.filename || !this.currentPosition) return;
+    try { window.localStorage.setItem(POSITION_PREFIX + this.filename, JSON.stringify(this.currentPosition)); }
+    catch { /* Storage may be unavailable or full; reading still works. */ }
+  }
+
   showNote(event: MouseEvent | FocusEvent): void {
     const link = (event.target as Element).closest<HTMLElement>('a[data-fb2-note]');
     const id = link?.getAttribute('href')?.slice(1);
@@ -174,8 +287,6 @@ export class Fb2ReaderComponent implements OnInit {
   }
 
   @HostListener('document:keydown.escape')
-  @HostListener('window:scroll')
-  @HostListener('window:resize')
   hideNote(): void {
     this.keepNoteOpen();
     this.noteLink?.removeAttribute('aria-describedby');
@@ -188,14 +299,12 @@ export class Fb2ReaderComponent implements OnInit {
     this.hideNote();
     const target = this.reader?.nativeElement.querySelector<HTMLElement>(`#${id}`);
     if (!target) return;
-    this.activeChapter = id;
     this.contentsOpen = false;
     this.scrollTo(target);
   }
 
   goToStart(event: Event): void {
     event.preventDefault();
-    this.activeChapter = '';
     this.contentsOpen = false;
     if (this.reader) this.scrollTo(this.reader.nativeElement);
   }
@@ -206,6 +315,7 @@ export class Fb2ReaderComponent implements OnInit {
       if (this.destroyed || !target.isConnected) return;
       target.focus({ preventScroll: true });
       target.scrollIntoView({ behavior: 'instant', block: 'start' });
+      this.updateReadingPosition();
     });
   }
 
@@ -215,7 +325,10 @@ export class Fb2ReaderComponent implements OnInit {
     if (href && /^#fb2-part-\d+$/.test(href)) this.navigate(href.slice(1), event);
   }
 
-  changeFont(delta: number): void { this.fontSize = Math.max(16, Math.min(26, this.fontSize + delta)); }
+  changeFont(delta: number): void {
+    this.fontSize = Math.max(16, Math.min(26, this.fontSize + delta));
+    requestAnimationFrame(() => this.updateReadingPosition());
+  }
 
   export(format: 'md' | 'pdf' | 'docx'): void {
     if (!this.book || this.busy) return;

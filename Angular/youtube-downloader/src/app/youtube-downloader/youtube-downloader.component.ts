@@ -79,6 +79,7 @@ export class YoutubeDownloaderComponent implements OnInit {
   profilesError = '';
   selectedProfileId: number | null = null;
   recognitionTaskId: string | null = null;
+  recognitionPlacement: 'current' | 'history' | null = null;
   recognitionClarification = '';
   recognitionBusy = false;
   recognitionError = '';
@@ -135,6 +136,7 @@ export class YoutubeDownloaderComponent implements OnInit {
       this.pollingWarning = '';
       this.downloadErrors.clear();
       this.recognitionTaskId = null;
+      this.recognitionPlacement = null;
       this.recognitionProfiles = [];
       this.selectedProfileId = null;
       if (id) {
@@ -329,11 +331,20 @@ export class YoutubeDownloaderComponent implements OnInit {
       },
     });
   }
-  openRecognition(taskId: string): void {
+  openRecognition(taskId: string, placement: 'current' | 'history'): void {
     if (this.recognitionBusy) return;
     if (this.recognitionTaskId !== taskId) this.recognitionClarification = '';
-    this.recognitionTaskId = this.recognitionTaskId === taskId ? null : taskId;
+    const isSameForm = this.recognitionTaskId === taskId && this.recognitionPlacement === placement;
+    this.recognitionTaskId = isSameForm ? null : taskId;
+    this.recognitionPlacement = isSameForm ? null : placement;
     this.recognitionError = '';
+    if (!isSameForm && typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        const select = document.querySelector<HTMLElement>('.dl-recognition-form select');
+        select?.scrollIntoView({ block: 'nearest' });
+        select?.focus({ preventScroll: true });
+      });
+    }
   }
   startRecognition(): void {
     if (!this.recognitionTaskId || this.selectedProfileId == null || this.recognitionBusy) return;
